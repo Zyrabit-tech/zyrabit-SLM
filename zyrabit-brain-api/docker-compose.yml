@@ -1,0 +1,77 @@
+services:
+  # 1. EL CEREBRO: Tu API de RAG con FastAPI
+  api-rag:
+    build:
+      context: ./api-rag # Apunta a la carpeta con tu Dockerfile de FastAPI
+    ports:
+      - "8080:8080" # El único puerto expuesto a tu máquina (host)
+    environment:
+      - LLM_URL=http://llm-server:11434 # URL interna para hablar con Ollama
+      - DB_URL=http://vector-db:8005 # URL interna para hablar con Chroma
+    depends_on:
+      - llm-server
+      - vector-db
+    networks:
+      - rag-net
+
+  # 2. EL MÚSCULO: El servidor de LLMs (Ollama)
+  llm-server:
+    image: ollama/ollama
+    ports:
+      - "11434:11434" # Expose to host for local scripts
+    volumes:
+      - ./ollama-models:/root/.ollama # Volumen persistente para los modelos (pesados)
+    networks:
+      - rag-net
+    # --- ¡CRÍTICO PARA GPU! ---
+    # Descomenta esto en tu servidor de nube (ej. DigitalOcean con GPU)
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: 1
+    #           capabilities: [gpu]
+
+    # 3. LA MEMORIA: La Base de Datos Vectorial (ChromaDB)
+  vector-db:
+    image: chromadb/chroma
+    ports:
+      - "8001:8005" # Exponemos al host en 8001 SOLO para el script de ingesta (ingest.py)
+    volumes:
+      - ./chroma-data:/chroma/chroma # Volumen persistente para los vectores
+    networks:
+      - rag-net
+
+  # 4. EL MONITOR (Scraper): Prometheus
+  prometheus:
+    image: prom/prometheus
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus-data:/prometheus
+    ports:
+      - "9091:9090" # Accede a Prometheus en http://localhost:9091
+    networks:
+      - rag-net
+
+  # 5. EL MONITOR (Dashboard): Grafana
+  grafana:
+    image: grafana/grafana
+    volumes:
+      - grafana-data:/var/lib/grafana
+    ports:
+      - "3000:3000" # Accede a Grafana en http://localhost:3000
+    depends_on:
+      - prometheus
+    networks:
+      - rag-net
+
+# Red interna para que los contenedores se hablen por nombre de servicio
+networks:
+  rag-net:
+    driver: bridge
+
+# Volúmenes para persistir datos aunque destruyas los contenedores
+volumes:
+  prometheus-data:
+  grafana-data:

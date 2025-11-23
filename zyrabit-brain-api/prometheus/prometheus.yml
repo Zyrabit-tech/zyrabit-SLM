@@ -1,0 +1,7 @@
+global:
+  scrape_interval: 15s # Rasca métricas cada 15 segundos
+
+scrape_configs:
+  - job_name: 'api-rag'
+    static_configs:
+      - targets: ['api-rag:8080'] # Apunta al servicio 'api-rag' por su nombre de red

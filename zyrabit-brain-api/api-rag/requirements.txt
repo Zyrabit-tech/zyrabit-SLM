@@ -1,0 +1,11 @@
+fastapi
+uvicorn[standard]
+langchain
+langchain-community
+langchain-ollama    
+chromadb-client     
+prometheus-fastapi-instrumentator 
+python-dotenv      
+pytest
+pytest-mock
+httpx

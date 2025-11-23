@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+.env
+.pytest_cache
+venv/
+
+ollama-models/models/
+
+# Datos de Ingesta
+document_source/
+zyrabit-brain-api/.DS_Store
+
+# macOS metadata
+.DS_Store
+# Model files (pesados, no deben ir al repo)
+ollama-models/
+zyrabit-brain-api/ollama-models/
+# Volúmenes de Docker que guardan datos temporales
+grafana-data/
+prometheus-data/
+zyrabit-brain-api/grafana-data/
+zyrabit-brain-api/prometheus-data/
+chroma-data/
+zyrabit-brain-api/chroma-data/
+zyrabit-brain-api/.ai/
