@@ -1,38 +1,32 @@
 #!/bin/bash
 
-# Colores para output
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-RED='\033[0;31m'
-NC='\033[0m' # No Color
+# setup_ollama.sh
+# Script para configurar Ollama y descargar el modelo Phi-3
 
-echo -e "${YELLOW}🚀 Iniciando Setup de Ollama para Zyrabit...${NC}"
+echo "--- Zyrabit LLM Setup ---"
 
-# 1. Navegar al directorio correcto
-cd zyrabit-brain-api || { echo -e "${RED}❌ Error: No encuentro el directorio zyrabit-brain-api${NC}"; exit 1; }
-
-# 2. Levantar el contenedor de Ollama
-echo -e "${YELLOW}📦 Levantando contenedor llm-server...${NC}"
-docker-compose up -d llm-server
-
-# 3. Esperar a que Ollama esté listo
-echo -e "${YELLOW}⏳ Esperando a que Ollama inicie (10s)...${NC}"
-sleep 10
-
-# 4. Verificar si el modelo ya existe
-echo -e "${YELLOW}🔍 Verificando modelos instalados...${NC}"
-if docker-compose exec llm-server ollama list | grep -q "phi3"; then
-    echo -e "${GREEN}✅ El modelo 'phi3' ya está instalado.${NC}"
+# 1. Verificar si Ollama está instalado
+if ! command -v ollama &> /dev/null; then
+    echo "[INFO] Ollama no encontrado. Instalando..."
+    curl -fsSL https://ollama.com/install.sh | sh
 else
-    echo -e "${YELLOW}⬇️  Modelo 'phi3' no encontrado. Descargando (esto puede tardar unos minutos)...${NC}"
-    docker-compose exec llm-server ollama pull phi3
-    
-    if [ $? -eq 0 ]; then
-        echo -e "${GREEN}✅ Modelo 'phi3' descargado correctamente.${NC}"
-    else
-        echo -e "${RED}❌ Error al descargar el modelo.${NC}"
-        exit 1
-    fi
+    echo "[INFO] Ollama ya está instalado."
 fi
 
-echo -e "${GREEN}🎉 Setup Completado. Ollama está listo para recibir peticiones.${NC}"
+# 2. Iniciar el servidor Ollama (en segundo plano si es necesario)
+# Nota: En macOS/Linux, 'ollama serve' inicia el backend.
+# Si ya está corriendo como servicio, este paso podría no ser necesario o fallar.
+if ! pgrep -x "ollama" > /dev/null; then
+    echo "[INFO] Iniciando servidor Ollama..."
+    ollama serve &
+    sleep 5 # Esperar a que inicie
+else
+    echo "[INFO] Servidor Ollama ya está corriendo."
+fi
+
+# 3. Descargar el modelo Phi-3
+echo "[INFO] Descargando modelo 'phi3'..."
+ollama pull phi3
+
+echo "--- Setup Completado ---"
+echo "Ejecuta 'python3 secure_agent.py' para probar el agente."
