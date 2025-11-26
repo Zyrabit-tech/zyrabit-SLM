@@ -129,3 +129,63 @@ def call_direct_llm(query: str) -> str:
     except (httpx.RequestError, httpx.HTTPStatusError) as e:
         print(f"Error al contactar al LLM para respuesta directa: {e}")
         return "Lo siento, no pude contactar al LLM para responder a tu pregunta."
+
+def process_and_ingest_file(file_path: str) -> dict:
+    """
+    Procesa un archivo (PDF) e ingesta sus embeddings en ChromaDB.
+    """
+    from langchain_community.document_loaders import PyPDFLoader
+    from langchain.text_splitter import RecursiveCharacterTextSplitter
+    from langchain_ollama import OllamaEmbeddings
+    
+    db_url = os.environ.get("DB_URL", "http://localhost:8000")
+    
+    try:
+        # 1. Cargar el documento
+        loader = PyPDFLoader(file_path)
+        documents = loader.load()
+        
+        # 2. Dividir en chunks
+        text_splitter = RecursiveCharacterTextSplitter(
+            chunk_size=1000,
+            chunk_overlap=200
+        )
+        chunks = text_splitter.split_documents(documents)
+        
+        # 3. Generar Embeddings y guardar en ChromaDB
+        # Usamos langchain-ollama para generar embeddings con mxbai-embed-large
+        embeddings = OllamaEmbeddings(model="mxbai-embed-large")
+        
+        parsed_url = urlparse(db_url)
+        chroma_client = chromadb.HttpClient(host=parsed_url.hostname, port=parsed_url.port)
+        collection = chroma_client.get_or_create_collection("libros_tecnicos")
+        
+        # Preparamos los datos para ChromaDB
+        ids = [f"doc_{i}" for i in range(len(chunks))]
+        texts = [chunk.page_content for chunk in chunks]
+        metadatas = [chunk.metadata for chunk in chunks]
+        
+        # Generamos embeddings manualmente si no usamos la integración directa de Langchain con Chroma
+        # Pero para simplicidad y control, podemos usar la colección directamente si tenemos los embeddings
+        # O dejar que Chroma calcule si tiene la función de embedding configurada.
+        # Aquí asumiremos que Chroma NO tiene el embedding function configurado en el servidor,
+        # así que los calculamos nosotros.
+        
+        embedded_texts = embeddings.embed_documents(texts)
+        
+        collection.add(
+            ids=ids,
+            documents=texts,
+            embeddings=embedded_texts,
+            metadatas=metadatas
+        )
+        
+        return {
+            "status": "success",
+            "chunks_processed": len(chunks),
+            "message": "Documento ingestada correctamente en la base de conocimiento."
+        }
+
+    except Exception as e:
+        print(f"Error en la ingesta: {e}")
+        raise e

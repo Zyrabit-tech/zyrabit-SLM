@@ -1,4 +1,5 @@
 # Zyrabit LLM Secure Suite
+[![Spanish](https://img.shields.io/badge/lang-Español-red.svg)](README.md)
 ![Python](https://img.shields.io/badge/python-v3.10+-blue.svg)
 ![Docker](https://img.shields.io/badge/docker--compose-ready-green.svg)
 ![License](https://img.shields.io/badge/license-MIT-yellow.svg)
@@ -54,7 +55,7 @@ graph TD
 
 1.  **Clone the repository**:
     ```bash
-    git clone https://github.com/your-org/zyrabit-llm.git
+    git clone https://github.com/Zyrabit-tech/zyrabit-llm.git
     cd zyrabit-llm
     ```
 
@@ -63,12 +64,21 @@ graph TD
     # Install Python dependencies
     pip install -r requirements.txt
     
-    # Setup Ollama and download model
+    # Setup Ollama and download models (phi3 + mxbai-embed-large)
     chmod +x setup_ollama.sh
     ./setup_ollama.sh
     ```
 
-3.  **Run Secure Agent**:
+3.  **Document Ingestion (RAG)**:
+    To feed the vector memory with your own documents:
+    1.  Place your PDF files in the `document_source` folder.
+    2.  Run the advanced ingestion script:
+        ```bash
+        python3 ingest/ingest.py
+        ```
+    This script uses `PyPDFLoader` to process documents and `mxbai-embed-large` to automatically generate high-quality embeddings.
+
+4.  **Run Secure Agent**:
     ```bash
     python3 secure_agent.py
     ```
@@ -76,5 +86,12 @@ graph TD
 ## Troubleshooting
 
 *   **Ollama Connection Error**: Ensure Ollama is running (`ollama serve`) and listening on port 11434.
-*   **Model Not Found**: Run `./setup_ollama.sh` to ensure `phi3` is downloaded.
+*   **Model Not Found**: Run `./setup_ollama.sh` to ensure `phi3` and `mxbai-embed-large` are downloaded.
 *   **Execution Permissions**: If `setup_ollama.sh` fails, make sure you ran `chmod +x setup_ollama.sh`.
+
+## Contributing
+
+We want your help to make Zyrabit LLM better!
+Please read our [Contribution Guidelines](CONTRIBUTING_EN.md) to learn about our workflow, commit convention, and how to get started.
+
+**Remember**: Pull Requests must target the `beta` branch.

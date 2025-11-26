@@ -1,4 +1,5 @@
 # Zyrabit LLM Secure Suite
+[![English](https://img.shields.io/badge/lang-English-blue.svg)](README_EN.md)
 ![Python](https://img.shields.io/badge/python-v3.10+-blue.svg)
 ![Docker](https://img.shields.io/badge/docker--compose-ready-green.svg)
 ![License](https://img.shields.io/badge/license-MIT-yellow.svg)
@@ -8,32 +9,36 @@
 
 ## Arquitectura
 
+El proyecto se divide en dos componentes principales:
+
+1.  **Frontend (Raíz)**:
+    *   `app.py`: Dashboard de Streamlit para interacción con el usuario.
+    *   `secure_agent.py`: Agente CLI para pruebas rápidas y seguras.
+2.  **Backend (`zyrabit-brain-api`)**:
+    *   `api-rag/`: API FastAPI que orquesta la lógica de RAG, conecta con ChromaDB y Ollama.
+
 ```mermaid
 graph TD
-    subgraph "Cliente Seguro (Python Local)"
+    subgraph "Frontend"
         User((👤 Usuario))
-        Agent["🕵️ secure_agent.py<br/>(Sanitizer Regex/NER)"]
-        UI["🖥️ app.py<br/>(Streamlit Dashboard)"]
+        UI["�️ Streamlit (app.py)"]
+        CLI["� CLI (secure_agent.py)"]
     end
 
-    subgraph "Zyrabit Core (Docker Network)"
-        API["⚡ api-rag<br/>(FastAPI Gateway)"]
-        LLM["🧠 llm-server<br/>(Ollama - Phi3)"]
-        VectorDB[("🗄️ ChromaDB<br/>Memoria Vectorial")]
-        Monitor["📊 Grafana + Prometheus<br/>Observabilidad"]
+    subgraph "Backend (Docker Network)"
+        API["⚡ FastAPI (api-rag)"]
+        LLM["🧠 Ollama (Phi-3)"]
+        Embed["🧩 Ollama (mxbai-embed-large)"]
+        VectorDB[("�️ ChromaDB")]
     end
 
     User --> UI
-    UI -->|1. Prompt Crudo| Agent
-    Agent -->|2. Datos Redacted| API
-    API -->|3. Query Vectorial| VectorDB
-    VectorDB -->|4. Contexto| API
-    API -->|5. Prompt Final| LLM
-    LLM -->|6. Respuesta| API
-    API -->|7. Display Seguro| UI
-
-    style Agent fill:#ff9900,stroke:#333,stroke-width:2px
-    style LLM fill:#99ff99,stroke:#333,stroke-width:2px
+    User --> CLI
+    UI -->|HTTP POST /v1/chat| API
+    CLI -->|HTTP POST /v1/chat| API
+    API -->|Generar Embeddings| Embed
+    API -->|Buscar Contexto| VectorDB
+    API -->|Generar Respuesta| LLM
 ```
 
 ## Propuesta de Valor
@@ -54,7 +59,7 @@ graph TD
 
 1.  **Clonar el repositorio**:
     ```bash
-    git clone https://github.com/tu-org/zyrabit-llm.git
+    git clone https://github.com/Zyrabit-tech/zyrabit-llm.git
     cd zyrabit-llm
     ```
 
@@ -63,18 +68,43 @@ graph TD
     # Instalar dependencias de Python
     pip install -r requirements.txt
     
-    # Configurar Ollama y descargar modelo
+    # Configurar Ollama y descargar modelos (phi3 + mxbai-embed-large)
     chmod +x setup_ollama.sh
     ./setup_ollama.sh
     ```
 
-3.  **Ejecutar Agente Seguro**:
+3.  **Ingesta de Documentos (RAG)**:
+    Para alimentar la memoria vectorial con tus propios documentos, utiliza el endpoint de la API:
+
+    **Opción A: Vía cURL**
+    ```bash
+    curl -X POST "http://localhost:8080/v1/ingest" \
+         -H "accept: application/json" \
+         -H "Content-Type: multipart/form-data" \
+         -F "file=@/ruta/a/tu/documento.pdf"
+    ```
+
+    **Opción B: Vía Interfaz Swagger**
+    1.  Abre `http://localhost:8080/docs` en tu navegador.
+    2.  Busca el endpoint `POST /v1/ingest`.
+    3.  Sube tu archivo PDF (Máx 800MB).
+
+    El sistema procesará el PDF, generará embeddings con `mxbai-embed-large` y los guardará en ChromaDB automáticamente.
+
+4.  **Ejecutar Agente Seguro**:
     ```bash
     python3 secure_agent.py
     ```
 
+## Contribución
+
+¡Queremos tu ayuda para hacer Zyrabit LLM mejor!
+Por favor lee nuestras [Guías de Contribución](CONTRIBUTING.md) para conocer nuestro flujo de trabajo, convención de commits y cómo empezar.
+
+**Recuerda**: Los Pull Requests deben apuntar a la rama `beta`.
+
 ## Troubleshooting
 
 *   **Error de conexión con Ollama**: Asegúrate de que Ollama esté corriendo (`ollama serve`) y escuchando en el puerto 11434.
-*   **Modelo no encontrado**: Ejecuta `./setup_ollama.sh` para asegurar que `phi3` esté descargado.
+*   **Modelo no encontrado**: Ejecuta `./setup_ollama.sh` para asegurar que `phi3` y `mxbai-embed-large` estén descargados.
 *   **Permisos de ejecución**: Si `setup_ollama.sh` falla, asegúrate de haber ejecutado `chmod +x setup_ollama.sh`.

@@ -1,6 +1,6 @@
 import os
 from . import services
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, UploadFile, File
 from pydantic import BaseModel
 
 # --- Configuración ---
@@ -65,6 +65,43 @@ def chat_router(query: ChatQuery):
             status_code=500,
             detail=f"Error interno: Decisión del router desconocida ('{decision}')."
         )
+
+@app.post("/v1/ingest", tags=["Ingestion"])
+async def ingest_document(file: UploadFile = File(...)):
+    """
+    Endpoint para ingestar documentos PDF a la base de conocimiento.
+    
+    - **Validación**: Solo archivos .pdf y .docx (por ahora solo PDF implementado).
+    - **Tamaño**: Máximo 800MB (validado por configuración del servidor, aquí lógica básica).
+    """
+    ALLOWED_EXTENSIONS = {".pdf"}
+    MAX_SIZE_MB = 800
+    
+    # 1. Validar extensión
+    file_ext = os.path.splitext(file.filename)[1].lower()
+    if file_ext not in ALLOWED_EXTENSIONS:
+        raise HTTPException(status_code=400, detail=f"Tipo de archivo no permitido. Solo se aceptan: {ALLOWED_EXTENSIONS}")
+    
+    # 2. Guardar temporalmente para procesar
+    temp_file_path = f"/tmp/{file.filename}"
+    try:
+        with open(temp_file_path, "wb") as buffer:
+            # Podríamos leer en chunks para validar tamaño, pero por simplicidad:
+            content = await file.read()
+            if len(content) > MAX_SIZE_MB * 1024 * 1024:
+                 raise HTTPException(status_code=400, detail=f"El archivo excede el tamaño máximo de {MAX_SIZE_MB}MB.")
+            buffer.write(content)
+            
+        # 3. Procesar ingesta
+        result = services.process_and_ingest_file(temp_file_path)
+        return result
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error procesando el archivo: {str(e)}")
+    finally:
+        # Limpieza
+        if os.path.exists(temp_file_path):
+            os.remove(temp_file_path)
 
 # Para ejecutar localmente con `uvicorn main:app --reload`
 if __name__ == "__main__":

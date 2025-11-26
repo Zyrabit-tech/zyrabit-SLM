@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # setup_ollama.sh
-# Script para configurar Ollama y descargar el modelo Phi-3
+# Script para configurar Ollama y descargar los modelos necesarios
 
 echo "--- Zyrabit LLM Setup ---"
 
@@ -14,8 +14,6 @@ else
 fi
 
 # 2. Iniciar el servidor Ollama (en segundo plano si es necesario)
-# Nota: En macOS/Linux, 'ollama serve' inicia el backend.
-# Si ya está corriendo como servicio, este paso podría no ser necesario o fallar.
 if ! pgrep -x "ollama" > /dev/null; then
     echo "[INFO] Iniciando servidor Ollama..."
     ollama serve &
@@ -24,9 +22,12 @@ else
     echo "[INFO] Servidor Ollama ya está corriendo."
 fi
 
-# 3. Descargar el modelo Phi-3
-echo "[INFO] Descargando modelo 'phi3'..."
+# 3. Descargar modelos
+echo "[INFO] Descargando modelo LLM 'phi3'..."
 ollama pull phi3
+
+echo "[INFO] Descargando modelo de Embeddings 'mxbai-embed-large'..."
+ollama pull mxbai-embed-large
 
 echo "--- Setup Completado ---"
 echo "Ejecuta 'python3 secure_agent.py' para probar el agente."

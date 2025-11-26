@@ -100,7 +100,6 @@ with st.sidebar:
     st.info(f"🧠 Modelo: {MODEL}")
     st.warning("🛡️ DLP Sidecar: ACTIVO")
     st.markdown("---")
-    st.metric(label="Costo por Token", value="$0.00", delta="-100% vs OpenAI")
 
 # Área de Chat
 st.subheader("💬 Interfaz de Prueba Segura")
