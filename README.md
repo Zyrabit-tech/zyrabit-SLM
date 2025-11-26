@@ -8,12 +8,23 @@
 ## 📖 Descripción del proyecto
 
 **Zyrabit** es una solución completa de IA **Zero‑Trust** que combina:
-- Un **servidor Ollama** local (modelo `phi3` – sustituto de `mistral`).
+- Un **servidor Ollama** local.
 - Un **cliente Python** (`secure_agent.py`) que **sanitiza** cualquier prompt antes de enviarlo al modelo, evitando fugas de datos sensibles (PII, tarjetas, montos).
 - Un **dashboard interactivo** construido con **Streamlit** (`app.py`) que muestra el prompt original y el prompt sanitizado, y visualiza la respuesta del modelo.
 - Un **entorno Docker‑Compose** que orquesta el API RAG, Ollama, ChromaDB, Prometheus y Grafana.
 
 El objetivo es demostrar cómo integrar **ciberseguridad ofensiva** en flujos de IA generativa sin sacrificar la usabilidad.
+
+---
+
+## 💰 Por qué Zyrabit (Value Proposition)
+
+| Característica | 🚫 IA Pública (ChatGPT/Claude) | ✅ Zyrabit (Local & Secure) |
+| :--- | :--- | :--- |
+| **Fuga de Datos** | Alto Riesgo (Tus datos entrenan sus modelos) | **Cero Riesgo** (Sanitización local + Air-Gapped) |
+| **Costos Nube** | Recurrentes ($20/mes por usuario) | **$0 / mes** (Corre en tu propio hardware) |
+| **Hardware** | Depende de servidores externos | **Optimizado** (Corre en CPU/GPU de consumo) |
+| **Privacidad** | Caja Negra | **Auditable** (Código Abierto 100%) |
 
 ---
 
@@ -30,17 +41,32 @@ El objetivo es demostrar cómo integrar **ciberseguridad ofensiva** en flujos de
 
 ## 🏗️ Arquitectura
 
-```
-┌─────────────────────┐   ┌─────────────────────┐
-│  api-rag (FastAPI) │←─▶│   llm-server (Ollama)│
-│  (RAG endpoint)    │   │   model: phi3       │
-└─────────────────────┘   └─────────────────────┘
-          │                         │
-          ▼                         ▼
-   ┌───────────────┐        ┌───────────────┐
-   │ vector-db     │        │ prometheus    │
-   │ (ChromaDB)   │        │ & grafana     │
-   └───────────────┘        └───────────────┘
+```mermaid
+graph TD
+    subgraph "Cliente Seguro (Python Local)"
+        User((👤 Usuario))
+        Agent[🕵️ secure_agent.py<br/>(Sanitizer Regex/NER)]
+        UI[🖥️ app.py<br/>(Streamlit Dashboard)]
+    end
+
+    subgraph "Zyrabit Core (Docker Network)"
+        API[⚡ api-rag<br/>(FastAPI Gateway)]
+        LLM[🧠 llm-server<br/>(Ollama - Phi3)]
+        VectorDB[(🗄️ ChromaDB<br/>Memoria Vectorial)]
+        Monitor[📊 Grafana + Prometheus<br/>Observabilidad]
+    end
+
+    User --> UI
+    UI -->|1. Prompt Crudo| Agent
+    Agent -->|2. Datos Redacted| API
+    API -->|3. Query Vectorial| VectorDB
+    VectorDB -->|4. Contexto| API
+    API -->|5. Prompt Final| LLM
+    LLM -->|6. Respuesta| API
+    API -->|7. Display Seguro| UI
+
+    style Agent fill:#ff9900,stroke:#333,stroke-width:2px
+    style LLM fill:#99ff99,stroke:#333,stroke-width:2px
 ```
 
 ---
@@ -103,14 +129,14 @@ Abre `http://localhost:8501` en tu navegador. La barra lateral muestra la config
 
 ---
 
-## 📋 Tareas pendientes
+## 🚑 Troubleshooting
 
-- [ ] **Mejorar la DLP**: sustituir expresiones regulares por un modelo NER local para detección más robusta.
-- [ ] **Integrar autenticación** en la UI (OAuth / API key).
-- [ ] **Añadir pruebas unitarias** para `sanitize_input` y la capa de red.
-- [ ] **Documentar la API RAG** (`api-rag` endpoints) en Swagger.
-- [ ] **Configurar CI/CD** para despliegues automáticos en Vercel/Firebase.
-- [ ] **Actualizar README** con screenshots de la UI y diagramas de arquitectura.
+| Problema | Solución Posible |
+| :--- | :--- |
+| **Error: Connection refused** | Asegúrate de que Docker esté corriendo (`docker ps`) y que el puerto 11434 esté libre. |
+| **Modelo no responde** | Ejecuta `./setup_ollama.sh` nuevamente para verificar que `phi3` se descargó correctamente. |
+| **Streamlit no encontrado** | Revisa tu PATH o ejecuta `python3 -m streamlit run app.py`. |
+| **Permisos denegados** | Ejecuta `chmod +x setup_ollama.sh` antes de correr el script. |
 
 ---
 
@@ -130,8 +156,5 @@ Las contribuciones son bienvenidas. Por favor, abre un *pull request* describien
 
 **Zyrabit Systems** – https://zyrabit.com
 
----
 
-*Este README fue generado automáticamente y actualizado con los últimos cambios del proyecto.*
-
-https://github.com/mlco2/codecarbon/blob/master/CONTRIBUTING.md
+🚧 PUBLIC BETA / EARLY ACCESS Este proyecto está en desarrollo activo. La arquitectura Core es estable, pero las interfaces pueden cambiar. Buscamos contribuidores valientes que quieran probar la "Seguridad Ofensiva" en sus propios entornos. Si rompes algo, abre un Issue. Si te gusta, danos una

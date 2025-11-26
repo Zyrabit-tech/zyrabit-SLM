@@ -5,7 +5,7 @@ import time
 
 # --- CONFIGURACIÓN ---
 OLLAMA_URL = "http://localhost:11434/api/generate"
-MODEL = "mistral"
+MODEL = "phi3"
 
 def print_header(title):
     print(f"\n{'='*60}")
