@@ -1,6 +1,6 @@
 RAG-Stack-Local 🚀
 
-Tu propio "cerebro" de IA, 100% open-source, 0% bullshit.
+Tu propio "cerebro" de IA, 100% open-sources
 
 Este proyecto te da el stack completo para correr un sistema de Retrieval-Augmented Generation (RAG) en tu propia máquina o servidor. Olvídate de APIs de terceros, facturas impredecibles y de mandar tus datos sensibles a la nube de alguien más.
 
@@ -197,9 +197,6 @@ Por qué RAG es una genialidad: No intentamos re-entrenar al doctor (modificar l
 
 📜 Filosofía de Código y Pruebas
 
-Este proyecto valora el código sostenible. (Ver "Clean Architecture" y "Código Sostenible").
-
-Buenas Prácticas
 
 Stateless API: El api-rag NO debe guardar estado. Todo estado persistente vive en vector-db o ollama-models.
 

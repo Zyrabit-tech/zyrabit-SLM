@@ -10,3 +10,4 @@ pytest
 pytest-mock
 httpx
 pypdf
+python-multipart

@@ -141,3 +141,168 @@ def test_execute_rag_pipeline_retrieves_augments_and_generates(mock_httpx_post, 
 
     # -- Verificamos la RESPUESTA FINAL --
     assert final_answer == "Robert C. Martin opina que el framework es un detalle."
+
+# --- PRUEBAS DE MANEJO DE ERRORES ---
+
+@patch.dict('os.environ', {'LLM_URL': MOCK_LLM_URL})
+@patch('httpx.post')
+def test_get_llm_router_decision_network_error(mock_httpx_post):
+    """
+    Prueba que get_llm_router_decision retorne un fallback seguro cuando hay error de red.
+    """
+    # GIVEN
+    mock_httpx_post.side_effect = httpx.RequestError("Connection refused")
+    query = "¿Qué es Python?"
+    
+    # WHEN
+    decision = services.get_llm_router_decision(query)
+    
+    # THEN
+    # Debe retornar el fallback seguro
+    assert decision == "direct_llm_answer"
+
+@patch.dict('os.environ', {'LLM_URL': MOCK_LLM_URL})
+@patch('httpx.post')
+def test_get_llm_router_decision_invalid_response(mock_httpx_post):
+    """
+    Prueba que maneje respuestas inválidas del LLM (decisión no reconocida).
+    """
+    # GIVEN
+    mock_api_response = MagicMock()
+    mock_api_response.status_code = 200
+    mock_api_response.json.return_value = {
+        "response": "invalid_tool_name",  # Decisión no válida
+        "done": True
+    }
+    mock_httpx_post.return_value = mock_api_response
+    
+    query = "¿Qué es Python?"
+    
+    # WHEN
+    decision = services.get_llm_router_decision(query)
+    
+    # THEN
+    # Debe retornar el fallback seguro
+    assert decision == "direct_llm_answer"
+
+@patch.dict('os.environ', {'LLM_URL': MOCK_LLM_URL})
+@patch('httpx.post')
+def test_call_direct_llm_timeout(mock_httpx_post):
+    """
+    Prueba que call_direct_llm maneje timeouts correctamente.
+    """
+    # GIVEN
+    mock_httpx_post.side_effect = httpx.TimeoutException("Request timed out")
+    query = "¿Qué es Python?"
+    
+    # WHEN
+    response_text = services.call_direct_llm(query)
+    
+    # THEN
+    # Debe retornar un mensaje de error amigable
+    assert "no pude contactar" in response_text.lower()
+
+@patch.dict('os.environ', {'LLM_URL': MOCK_LLM_URL, 'DB_URL': MOCK_DB_URL})
+@patch('chromadb.HttpClient')
+def test_execute_rag_pipeline_chroma_connection_error(mock_chroma_client):
+    """
+    Prueba que execute_rag_pipeline maneje errores de conexión a ChromaDB.
+    """
+    # GIVEN
+    mock_chroma_client.side_effect = Exception("Connection to ChromaDB failed")
+    query = "¿Qué opina Robert C. Martin sobre los frameworks?"
+    
+    # WHEN
+    final_answer = services.execute_rag_pipeline(query)
+    
+    # THEN
+    # Debe retornar un mensaje de error amigable
+    assert "error" in final_answer.lower()
+    assert "base de datos" in final_answer.lower()
+
+@patch.dict('os.environ', {'LLM_URL': MOCK_LLM_URL, 'DB_URL': MOCK_DB_URL})
+@patch('chromadb.HttpClient')
+@patch('httpx.post')
+def test_execute_rag_pipeline_empty_results(mock_httpx_post, mock_chroma_client):
+    """
+    Prueba que execute_rag_pipeline maneje el caso cuando ChromaDB no retorna documentos.
+    """
+    # GIVEN
+    query = "¿Qué es clean code?"
+    
+    # Mock de Chroma que retorna resultados vacíos
+    mock_collection = MagicMock()
+    mock_collection.query.return_value = {
+        'documents': [[]]  # Sin documentos
+    }
+    mock_chroma_instance = mock_chroma_client.return_value
+    mock_chroma_instance.get_or_create_collection.return_value = mock_collection
+    
+    # Mock de Ollama
+    mock_llm_response = MagicMock()
+    mock_llm_response.status_code = 200
+    mock_llm_response.json.return_value = {
+        "response": "No encontré información sobre eso en la base de conocimiento.",
+        "done": True
+    }
+    mock_httpx_post.return_value = mock_llm_response
+    
+    # WHEN
+    final_answer = services.execute_rag_pipeline(query)
+    
+    # THEN
+    # Debe seguir funcionando, pero con contexto vacío
+    assert isinstance(final_answer, str)
+    mock_collection.query.assert_called_once()
+
+@patch.dict('os.environ', {'DB_URL': MOCK_DB_URL})
+@patch('chromadb.HttpClient')
+@patch('langchain_ollama.OllamaEmbeddings')
+@patch('langchain_community.document_loaders.PyPDFLoader')
+def test_process_and_ingest_file_success(mock_pdf_loader, mock_embeddings, mock_chroma_client):
+    """
+    Prueba que process_and_ingest_file procese e ingeste un PDF correctamente.
+    """
+    # GIVEN
+    file_path = "/tmp/test.pdf"
+    
+    # Mock del loader de PDF
+    mock_doc = MagicMock()
+    mock_doc.page_content = "Este es el contenido de la página 1"
+    mock_doc.metadata = {"page": 1, "source": file_path}
+    
+    mock_loader_instance = mock_pdf_loader.return_value
+    mock_loader_instance.load.return_value = [mock_doc]
+    
+    # Mock de embeddings
+    mock_embeddings_instance = mock_embeddings.return_value
+    mock_embeddings_instance.embed_documents.return_value = [[0.1, 0.2, 0.3]]
+    
+    # Mock de ChromaDB
+    mock_collection = MagicMock()
+    mock_chroma_instance = mock_chroma_client.return_value
+    mock_chroma_instance.get_or_create_collection.return_value = mock_collection
+    
+    # WHEN
+    result = services.process_and_ingest_file(file_path)
+    
+    # THEN
+    assert result["status"] == "success"
+    assert result["chunks_processed"] > 0
+    mock_pdf_loader.assert_called_once_with(file_path)
+    mock_collection.add.assert_called()
+
+@patch('langchain_community.document_loaders.PyPDFLoader')
+def test_process_and_ingest_file_invalid_pdf(mock_pdf_loader):
+    """
+    Prueba que process_and_ingest_file maneje PDFs corruptos o inválidos.
+    """
+    # GIVEN
+    file_path = "/tmp/corrupted.pdf"
+    mock_pdf_loader.side_effect = Exception("Invalid PDF format")
+    
+    # WHEN/THEN
+    with pytest.raises(Exception) as exc_info:
+        services.process_and_ingest_file(file_path)
+    
+    assert "Invalid PDF" in str(exc_info.value)
