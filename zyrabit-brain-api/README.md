@@ -132,10 +132,10 @@ Prueba el API
 
 Una vez que tus documentos estén cargados, puedes hacer una consulta:
 
-curl -X POST http://localhost:8080/query \
+curl -X POST http://localhost:8080/v1/chat \
      -H "Content-Type: application/json" \
      -d '{
-           "question": "¿Cuál es la filosofía de Clean Architecture?"
+           "text": "¿Cuál es la filosofía de Clean Architecture?"
          }'
 
 

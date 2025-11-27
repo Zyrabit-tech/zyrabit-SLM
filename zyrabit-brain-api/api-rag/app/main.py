@@ -1,5 +1,6 @@
 import os
 from . import services
+from fastapi.responses import RedirectResponse
 from fastapi import FastAPI, HTTPException, UploadFile, File
 from pydantic import BaseModel
 
@@ -23,6 +24,13 @@ class ChatResponse(BaseModel):
     response: str
 
 # --- Endpoints de la API ---
+
+@app.get("/", include_in_schema=False)
+async def root():
+    """
+    Redirige la raíz a la documentación interactiva.
+    """
+    return RedirectResponse(url="/docs")
 
 @app.get("/health", tags=["Monitoring"])
 def health_check():
@@ -65,6 +73,13 @@ def chat_router(query: ChatQuery):
             status_code=500,
             detail=f"Error interno: Decisión del router desconocida ('{decision}')."
         )
+@app.get("/metrics", tags=["Monitoring"])
+def get_metrics():
+    """
+    Endpoint para Prometheus.
+    """
+    return {"status": "ok", "message": "Metrics endpoint (implementar métricas reales aquí)"}
+
 
 @app.post("/v1/ingest", tags=["Ingestion"])
 async def ingest_document(file: UploadFile = File(...)):

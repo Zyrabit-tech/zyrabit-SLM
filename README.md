@@ -108,3 +108,11 @@ Por favor lee nuestras [Guías de Contribución](CONTRIBUTING.md) para conocer n
 *   **Error de conexión con Ollama**: Asegúrate de que Ollama esté corriendo (`ollama serve`) y escuchando en el puerto 11434.
 *   **Modelo no encontrado**: Ejecuta `./setup_ollama.sh` para asegurar que `phi3` y `mxbai-embed-large` estén descargados.
 *   **Permisos de ejecución**: Si `setup_ollama.sh` falla, asegúrate de haber ejecutado `chmod +x setup_ollama.sh`.
+
+______________________
+
+# Run The App chat
+
+```bash 
+streamlit run app.py
+```
