@@ -27,37 +27,45 @@ Pregunta del usuario:
 ---
 """
 
+
 def get_llm_router_decision(query: str) -> str:
     """
     Calls an LLM to classify the user query and decide which tool to use.
     """
     llm_url = os.environ.get("LLM_URL", "http://localhost:11434")
-    
+
     prompt = ROUTER_META_PROMPT.format(query=query)
-    
+
     payload = {
         "model": "mistral",
         "prompt": prompt,
         "stream": False
     }
-    
+
     try:
-        response = httpx.post(f"{llm_url}/api/generate", json=payload, timeout=20)
+        response = httpx.post(
+            f"{llm_url}/api/generate",
+            json=payload,
+            timeout=20)
         response.raise_for_status()  # Raises an exception for HTTP 4xx/5xx errors
-        
+
         api_response = response.json()
-        
+
         # Extracts and cleans the LLM decision
         decision = api_response.get("response", "").strip()
-        
+
         # A small guardrail in case the LLM responds with something unexpected
-        allowed_decisions = ["search_rag_database", "direct_llm_answer", "reject_query"]
+        allowed_decisions = [
+            "search_rag_database",
+            "direct_llm_answer",
+            "reject_query"]
         if decision in allowed_decisions:
             return decision
         else:
-            # If the LLM does not give a valid response, we use a safe fallback.
+            # If the LLM does not give a valid response, we use a safe
+            # fallback.
             return "direct_llm_answer"
-            
+
     except (httpx.RequestError, httpx.HTTPStatusError) as e:
         # In case of network or HTTP error, we use a safe fallback.
         print(f"Error al contactar al LLM: {e}")
@@ -77,9 +85,10 @@ def execute_rag_pipeline(query: str) -> str:
     try:
         # 1. Connect and search in ChromaDB
         parsed_url = urlparse(db_url)
-        chroma_client = chromadb.HttpClient(host=parsed_url.hostname, port=parsed_url.port)
+        chroma_client = chromadb.HttpClient(
+            host=parsed_url.hostname, port=parsed_url.port)
         collection = chroma_client.get_or_create_collection("libros_tecnicos")
-        
+
         results = collection.query(query_texts=[query], n_results=5)
         context_documents = results.get('documents', [[]])[0]
         context = "\n".join(context_documents)
@@ -93,10 +102,13 @@ def execute_rag_pipeline(query: str) -> str:
             "prompt": augmented_prompt,
             "stream": False
         }
-        
-        response = httpx.post(f"{llm_url}/api/generate", json=payload, timeout=30)
+
+        response = httpx.post(
+            f"{llm_url}/api/generate",
+            json=payload,
+            timeout=30)
         response.raise_for_status()
-        
+
         api_response = response.json()
         return api_response.get("response", "").strip()
 
@@ -110,25 +122,29 @@ def call_direct_llm(query: str) -> str:
     Calls an LLM (Ollama) directly with the user query.
     """
     llm_url = os.environ.get("LLM_URL", "http://localhost:11434")
-    
+
     payload = {
-        "model": "mistral", # We use the same model as for the router
+        "model": "mistral",  # We use the same model as for the router
         "prompt": query,    # The prompt is directly the user query
         "stream": False
     }
-    
+
     try:
-        response = httpx.post(f"{llm_url}/api/generate", json=payload, timeout=20)
+        response = httpx.post(
+            f"{llm_url}/api/generate",
+            json=payload,
+            timeout=20)
         response.raise_for_status()
-        
+
         api_response = response.json()
-        
+
         # Extracts and cleans the LLM response
         return api_response.get("response", "").strip()
-            
+
     except (httpx.RequestError, httpx.HTTPStatusError) as e:
         print(f"Error al contactar al LLM para respuesta directa: {e}")
         return "Lo siento, no pude contactar al LLM para responder a tu pregunta."
+
 
 def process_and_ingest_file(file_path: str) -> dict:
     """
@@ -137,54 +153,54 @@ def process_and_ingest_file(file_path: str) -> dict:
     from langchain_community.document_loaders import PyPDFLoader
     from langchain.text_splitter import RecursiveCharacterTextSplitter
     from langchain_ollama import OllamaEmbeddings
-    
+
     db_url = os.environ.get("DB_URL", "http://localhost:8000")
-    
+
     try:
         # 1. Load the document
         loader = PyPDFLoader(file_path)
         documents = loader.load()
-        
+
         # 2. Split into chunks
         text_splitter = RecursiveCharacterTextSplitter(
             chunk_size=1000,
             chunk_overlap=200
         )
         chunks = text_splitter.split_documents(documents)
-        
+
         # 3. Generate Embeddings and save to ChromaDB
         # We use langchain-ollama to generate embeddings with mxbai-embed-large
         embeddings = OllamaEmbeddings(model="mxbai-embed-large")
-        
+
         parsed_url = urlparse(db_url)
-        chroma_client = chromadb.HttpClient(host=parsed_url.hostname, port=parsed_url.port)
+        chroma_client = chromadb.HttpClient(
+            host=parsed_url.hostname, port=parsed_url.port)
         collection = chroma_client.get_or_create_collection("libros_tecnicos")
-        
+
         # Prepare data for ChromaDB
         ids = [f"doc_{i}" for i in range(len(chunks))]
         texts = [chunk.page_content for chunk in chunks]
         metadatas = [chunk.metadata for chunk in chunks]
-        
+
         # Generate embeddings manually if we don't use Langchain's direct integration with Chroma
         # But for simplicity and control, we can use the collection directly if we have the embeddings
         # Or let Chroma calculate if it has the embedding function configured.
         # Here we assume Chroma does NOT have the embedding function configured on the server,
         # so we calculate them ourselves.
-        
+
         embedded_texts = embeddings.embed_documents(texts)
-        
+
         collection.add(
             ids=ids,
             documents=texts,
             embeddings=embedded_texts,
             metadatas=metadatas
         )
-        
+
         return {
             "status": "success",
             "chunks_processed": len(chunks),
-            "message": "Documento ingestada correctamente en la base de conocimiento."
-        }
+            "message": "Documento ingestada correctamente en la base de conocimiento."}
 
     except Exception as e:
         print(f"Error en la ingesta: {e}")

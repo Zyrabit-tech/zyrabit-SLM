@@ -3,13 +3,20 @@ import requests
 import re
 import time
 import json
+import os
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
 
 # --- CONFIGURATION ---
-OLLAMA_URL = "http://localhost:11434/api/generate"
+OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434/api/generate")
 # MODEL = "mistral"
-MODEL = "phi3"
+MODEL = os.getenv("MODEL", "phi3")
 
 # --- ZYRABIT STYLES ---
+
+
 def load_css():
     st.markdown("""
         <style>
@@ -19,7 +26,7 @@ def load_css():
             font-family: 'Funnel Display', sans-serif;
             color: #323439;
         }
-        
+
         /* Primary Color Elements */
         .stButton>button {
             background-color: #3f5a6d !important;
@@ -28,24 +35,24 @@ def load_css():
             border: none;
             font-weight: 600;
         }
-        
+
         /* Secondary Accents */
         .stStatus {
             background-color: #e2ecf4;
             border: 1px solid #a9c4d9;
         }
-        
+
         /* Headers */
         h1, h2, h3 {
             color: #3f5a6d !important;
         }
-        
+
         /* Sidebar */
         [data-testid="stSidebar"] {
             background-color: #fdfdfd;
             border-right: 1px solid #a9c4d9;
         }
-        
+
         /* Metrics */
         [data-testid="stMetricValue"] {
             color: #6090b4;
@@ -54,12 +61,15 @@ def load_css():
     """, unsafe_allow_html=True)
 
 # --- BUSINESS LOGIC (Same as secure agent) ---
+
+
 def sanitize_input(text):
     # DLP (Data Loss Prevention) Rules
-    text = re.sub(r'[\w\.-]+@[\w\.-]+', '████████', text) # Visual redaction
+    text = re.sub(r'[\w\.-]+@[\w\.-]+', '████████', text)  # Visual redaction
     text = re.sub(r'\b(?:\d[ -]*?){13,16}\b', '[CREDIT_CARD]', text)
     text = re.sub(r'\$\d+(?:,\d{3})*(?:\.\d{2})?', '[AMOUNT]', text)
     return text
+
 
 def query_ollama(prompt):
     payload = {
@@ -75,11 +85,15 @@ def query_ollama(prompt):
             return response.json()['response'], end - start
         else:
             return "Error del servidor", 0
-    except:
+    except BaseException:
         return "Error de conexión", 0
 
+
 # --- GUI (THE FACE OF THE PRODUCT) ---
-st.set_page_config(page_title="Zyrabit Secure AI", layout="wide", page_icon="🛡️")
+st.set_page_config(
+    page_title="Zyrabit Secure AI",
+    layout="wide",
+    page_icon="🛡️")
 load_css()
 
 # Header
@@ -104,26 +118,32 @@ with st.sidebar:
 # Chat Area
 st.subheader("💬 Interfaz de Prueba Segura")
 
-user_input = st.text_area("Escribe tu consulta (Intenta incluir datos sensibles como emails o montos):", height=100)
+user_input = st.text_area(
+    "Escribe tu consulta (Intenta incluir datos sensibles como emails o montos):",
+    height=100)
 
 if st.button("🚀 Ejecutar Inferencia Segura"):
     if user_input:
         # 1. Sanitization Process
         with st.status("🔒 Procesando Protocolo de Seguridad...", expanded=True) as status:
             st.write("1. Interceptando payload...")
-            time.sleep(0.5) # Dramatic effect
+            time.sleep(0.5)  # Dramatic effect
             clean_prompt = sanitize_input(user_input)
             st.write("2. Ejecutando PII Scrubbing (Borrado de Datos Personales)...")
             st.write("3. Enviando a Motor Local (Air-Gapped)...")
-            status.update(label="✅ Inferencia Completada", state="complete", expanded=False)
+            status.update(
+                label="✅ Inferencia Completada",
+                state="complete",
+                expanded=False)
 
         # 2. Visual Results
         col_input, col_output = st.columns(2)
-        
+
         with col_input:
             st.markdown("### 👁️ Lo que ve Zyrabit (Seguro)")
             st.code(clean_prompt, language="text")
-            st.caption("Nota: Los datos sensibles nunca tocaron la RAM del modelo.")
+            st.caption(
+                "Nota: Los datos sensibles nunca tocaron la RAM del modelo.")
 
         # 3. Model Call
         response_text, latency = query_ollama(clean_prompt)
@@ -131,11 +151,13 @@ if st.button("🚀 Ejecutar Inferencia Segura"):
         with col_output:
             st.markdown("### 🤖 Respuesta del Modelo")
             st.success(response_text)
-            st.caption(f"⏱️ Latencia: {latency:.2f}s | 🔋 Hardware: CPU Standard")
+            st.caption(
+                f"⏱️ Latencia: {latency:.2f}s | 🔋 Hardware: CPU Standard")
 
     else:
         st.error("Por favor ingresa un texto para procesar.")
 
 # Credibility Footer
 st.markdown("---")
-st.markdown("*Zyrabit Systems - Powered by Clean Architecture & Memory-First RAG Protocol*")
+st.markdown(
+    "*Zyrabit Systems - Powered by Clean Architecture & Memory-First RAG Protocol*")

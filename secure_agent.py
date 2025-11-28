@@ -2,10 +2,16 @@ import re
 import requests
 import json
 import sys
+import os
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
 
 # Configuration
-MODEL = "phi3"
-OLLAMA_URL = "http://localhost:11434/api/generate"
+MODEL = os.getenv("MODEL", "phi3")
+OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434/api/generate")
+
 
 class SecureAgent:
     def __init__(self):
@@ -21,7 +27,8 @@ class SecureAgent:
         """Redacts sensitive information from the text."""
         redacted_text = text
         for label, pattern in self.patterns.items():
-            redacted_text = re.sub(pattern, f"[{label}_REDACTED]", redacted_text)
+            redacted_text = re.sub(
+                pattern, f"[{label}_REDACTED]", redacted_text)
         return redacted_text
 
     def query_ollama(self, prompt):
@@ -41,7 +48,7 @@ class SecureAgent:
     def run(self):
         print(f"--- Zyrabit Secure Agent (Model: {MODEL}) ---")
         print("Escribe tu prompt (o 'exit' para salir):")
-        
+
         while True:
             user_input = input("\n> ")
             if user_input.lower() in ['exit', 'quit']:
@@ -49,18 +56,20 @@ class SecureAgent:
 
             # 1. Sanitization
             safe_prompt = self.sanitize_input(user_input)
-            
+
             if safe_prompt != user_input:
-                print(f"\n[SEGURIDAD] PII Detectado. Prompt Sanitizado:\n{safe_prompt}")
+                print(
+                    f"\n[SEGURIDAD] PII Detectado. Prompt Sanitizado:\n{safe_prompt}")
             else:
                 print("\n[SEGURIDAD] No se detectó PII. Enviando prompt limpio...")
 
             # 2. LLM Query
             print(f"\n[AGENT] Consultando a {MODEL}...")
             response = self.query_ollama(safe_prompt)
-            
+
             # 3. Response
             print(f"\n[RESPUESTA]:\n{response}")
+
 
 if __name__ == "__main__":
     agent = SecureAgent()
