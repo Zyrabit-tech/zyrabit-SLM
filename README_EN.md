@@ -8,65 +8,129 @@
 
 **Zyrabit LLM Secure Suite** is a reference architecture for deploying secure and private Generative AI agents in enterprise environments. It combines the power of **Ollama (Phi-3)** with an intermediate security layer that sanitizes sensitive data before it touches the LLM.
 
-## Architecture
-
-
-
-## Value Proposition
+## 🎯 Value Proposition
 
 1.  **Privacy by Design**: No PII data (Emails, Phones, Credit Cards) reaches the language model. The secure agent acts as a data firewall.
 2.  **Data Sovereignty**: 100% local or on-premise execution using efficient models like Phi-3.
 3.  **Full Observability**: Integrated monitoring stack to trace latency, token usage, and errors in real-time.
 4.  **Modular Architecture**: Decoupled components (Client, API, LLM, VectorDB) allowing independent scaling.
 
-## Installation
+## 🏗️ Architecture
+
+The project is divided into two main components:
+
+1.  **Frontend (Root)**:
+    *   `app.py`: Streamlit dashboard for user interaction.
+    *   `secure_agent.py`: CLI agent for quick and secure testing.
+2.  **Backend (`zyrabit-brain-api`)**:
+    *   `api-rag/`: FastAPI API that orchestrates RAG logic, connects with ChromaDB and Ollama.
+
+## 🐍 Quick Setup (Local)
 
 ### Prerequisites
-*   Docker & Docker Compose
-*   Python 3.10+
-*   Ollama (for local execution without Docker)
+*   **Python 3.10+**
+*   **Docker** (for the full stack with ChromaDB and Prometheus)
 
-### Quick Start
+### ✅ Validated Specifications
 
-1.  **Clone the repository**:
+This project has been tested and validated on the following configuration:
+
+| Component | Validation Specification |
+|-----------|--------------------------|
+| Base Hardware | MacBook Pro (Apple Silicon M1 Pro) |
+| RAM | 16 GB (Unified Memory) |
+| Operating System | macOS Sequoia 15.1 (Build 25B78) |
+| Python | Version 3.9+ / 3.10+ |
+
+
+### ⚠️ Compatibility Notes
+
+**Windows Users:** We strongly recommend using **WSL2** (Windows Subsystem for Linux). Bash scripts (`.sh`) and Docker network management work natively in WSL2. Running this directly in PowerShell may require manual adjustments.
+
+**Linux Users:** Natively compatible with Ubuntu 22.04+ and Debian 11+.
+
+**Architecture:** Docker images are built for `linux/amd64` and `linux/arm64`, ensuring compatibility on both Intel/AMD servers and ARM architectures (Apple Silicon, AWS Graviton).
+
+### Installation Steps
+
+1.  **Configure Python Environment**:
     ```bash
-    git clone https://github.com/Zyrabit-tech/zyrabit-llm.git
-    cd zyrabit-llm
+    # Create virtual environment
+    python3 -m venv .venv
+
+    # Activate environment (Mac/Linux)
+    source .venv/bin/activate
+    # Windows (WSL2 recommended or PowerShell):
+    # .\.venv\Scripts\activate
+
+    # Install dependencies
+    pip3 install -r requirements.txt
     ```
 
-2.  **Setup Environment**:
+2.  **Spin up Infrastructure (Docker)**:
+    This step starts the brain (API), memory (Chroma), and engine (Ollama).
     ```bash
-    # Install Python dependencies
-    pip install -r requirements.txt
-    
-    # Setup Ollama and download models (phi3 + mxbai-embed-large)
+    cd zyrabit-brain-api
+    docker compose up -d
+    cd ..
+    ```
+
+3.  **Initialize AI Models**:
+    Once Docker is running, download the necessary models (`phi3` and `mxbai-embed-large`).
+    ```bash
     chmod +x setup_ollama.sh
     ./setup_ollama.sh
     ```
 
-3.  **Document Ingestion (RAG)**:
-    To feed the vector memory with your own documents:
-    1.  Place your PDF files in the `document_source` folder.
-    2.  Run the advanced ingestion script:
-        ```bash
-        python3 ingest/ingest.py
-        ```
-    This script uses `PyPDFLoader` to process documents and `mxbai-embed-large` to automatically generate high-quality embeddings.
-
-4.  **Run Secure Agent**:
+4.  **Launch! 🚀**:
     ```bash
-    python3 secure_agent.py
+    streamlit run app.py
     ```
 
-## Troubleshooting
+## 📚 Document Ingestion (RAG)
+
+To feed the vector memory with your own documents, use the API endpoint:
+
+**Option A: Via cURL**
+```bash
+curl -X POST "http://localhost:8080/v1/ingest" \
+     -H "accept: application/json" \
+     -H "Content-Type: multipart/form-data" \
+     -F "file=@/path/to/your/document.pdf"
+```
+
+**Option B: Via Swagger Interface**
+1.  Open `http://localhost:8080/docs` in your browser.
+2.  Find the `POST /v1/ingest` endpoint.
+3.  Upload your PDF file (Max 800MB).
+
+The system will process the PDF, generate embeddings with `mxbai-embed-large`, and save them to ChromaDB automatically.
+
+## 🐳 Docker Deployment (Optional)
+
+To run the full stack with ChromaDB, Prometheus, and Grafana:
+
+```bash
+cd zyrabit-brain-api
+docker compose up -d
+```
+
+See [zyrabit-brain-api/README.md](zyrabit-brain-api/README.md) for more details about the Docker architecture.
+
+## 🛠️ Troubleshooting
 
 *   **Ollama Connection Error**: Ensure Ollama is running (`ollama serve`) and listening on port 11434.
 *   **Model Not Found**: Run `./setup_ollama.sh` to ensure `phi3` and `mxbai-embed-large` are downloaded.
 *   **Execution Permissions**: If `setup_ollama.sh` fails, make sure you ran `chmod +x setup_ollama.sh`.
+*   **Virtual environment not active**: Verify that your terminal prompt shows `(.venv)` at the beginning.
 
-## Contributing
+## 🤝 Contributing
 
 We want your help to make Zyrabit LLM better!
 Please read our [Contribution Guidelines](CONTRIBUTING_EN.md) to learn about our workflow, commit convention, and how to get started.
 
 **Remember**: Pull Requests must target the `beta` branch.
+
+## 📄 License
+
+This project is licensed under the [MIT License](LICENSE).
