@@ -29,7 +29,7 @@ Pregunta del usuario:
 
 def get_llm_router_decision(query: str) -> str:
     """
-    Llama a un LLM para clasificar la consulta del usuario y decidir qué herramienta usar.
+    Calls an LLM to classify the user query and decide which tool to use.
     """
     llm_url = os.environ.get("LLM_URL", "http://localhost:11434")
     
@@ -43,39 +43,39 @@ def get_llm_router_decision(query: str) -> str:
     
     try:
         response = httpx.post(f"{llm_url}/api/generate", json=payload, timeout=20)
-        response.raise_for_status()  # Lanza una excepción para errores HTTP 4xx/5xx
+        response.raise_for_status()  # Raises an exception for HTTP 4xx/5xx errors
         
         api_response = response.json()
         
-        # Extrae y limpia la decisión del LLM
+        # Extracts and cleans the LLM decision
         decision = api_response.get("response", "").strip()
         
-        # Un pequeño guardrail por si el LLM responde algo inesperado
+        # A small guardrail in case the LLM responds with something unexpected
         allowed_decisions = ["search_rag_database", "direct_llm_answer", "reject_query"]
         if decision in allowed_decisions:
             return decision
         else:
-            # Si el LLM no da una respuesta válida, usamos un fallback seguro.
+            # If the LLM does not give a valid response, we use a safe fallback.
             return "direct_llm_answer"
             
     except (httpx.RequestError, httpx.HTTPStatusError) as e:
-        # En caso de error de red o HTTP, usamos un fallback seguro.
+        # In case of network or HTTP error, we use a safe fallback.
         print(f"Error al contactar al LLM: {e}")
         return "direct_llm_answer"
 
 
 def execute_rag_pipeline(query: str) -> str:
     """
-    Ejecuta el pipeline de Retrieval-Augmented Generation (RAG).
-    1. Recupera contexto de ChromaDB.
-    2. Aumenta un prompt con ese contexto.
-    3. Genera una respuesta con un LLM.
+    Executes the Retrieval-Augmented Generation (RAG) pipeline.
+    1. Retrieves context from ChromaDB.
+    2. Augments a prompt with that context.
+    3. Generates a response with an LLM.
     """
     db_url = os.environ.get("DB_URL", "http://localhost:8000")
     llm_url = os.environ.get("LLM_URL", "http://localhost:11434")
 
     try:
-        # 1. Conectar y buscar en ChromaDB
+        # 1. Connect and search in ChromaDB
         parsed_url = urlparse(db_url)
         chroma_client = chromadb.HttpClient(host=parsed_url.hostname, port=parsed_url.port)
         collection = chroma_client.get_or_create_collection("libros_tecnicos")
@@ -84,10 +84,10 @@ def execute_rag_pipeline(query: str) -> str:
         context_documents = results.get('documents', [[]])[0]
         context = "\n".join(context_documents)
 
-        # 2. Construir el megaprompt
+        # 2. Build the megaprompt
         augmented_prompt = RAG_MEGA_PROMPT.format(context=context, query=query)
 
-        # 3. Llamar al LLM con el prompt aumentado
+        # 3. Call the LLM with the augmented prompt
         payload = {
             "model": "mistral",
             "prompt": augmented_prompt,
@@ -107,13 +107,13 @@ def execute_rag_pipeline(query: str) -> str:
 
 def call_direct_llm(query: str) -> str:
     """
-    Llama directamente a un LLM (Ollama) con la consulta del usuario.
+    Calls an LLM (Ollama) directly with the user query.
     """
     llm_url = os.environ.get("LLM_URL", "http://localhost:11434")
     
     payload = {
-        "model": "mistral", # Usamos el mismo modelo que para el router
-        "prompt": query,    # El prompt es directamente la consulta del usuario
+        "model": "mistral", # We use the same model as for the router
+        "prompt": query,    # The prompt is directly the user query
         "stream": False
     }
     
@@ -123,7 +123,7 @@ def call_direct_llm(query: str) -> str:
         
         api_response = response.json()
         
-        # Extrae y limpia la respuesta del LLM
+        # Extracts and cleans the LLM response
         return api_response.get("response", "").strip()
             
     except (httpx.RequestError, httpx.HTTPStatusError) as e:
@@ -132,7 +132,7 @@ def call_direct_llm(query: str) -> str:
 
 def process_and_ingest_file(file_path: str) -> dict:
     """
-    Procesa un archivo (PDF) e ingesta sus embeddings en ChromaDB.
+    Processes a file (PDF) and ingests its embeddings into ChromaDB.
     """
     from langchain_community.document_loaders import PyPDFLoader
     from langchain.text_splitter import RecursiveCharacterTextSplitter
@@ -141,35 +141,35 @@ def process_and_ingest_file(file_path: str) -> dict:
     db_url = os.environ.get("DB_URL", "http://localhost:8000")
     
     try:
-        # 1. Cargar el documento
+        # 1. Load the document
         loader = PyPDFLoader(file_path)
         documents = loader.load()
         
-        # 2. Dividir en chunks
+        # 2. Split into chunks
         text_splitter = RecursiveCharacterTextSplitter(
             chunk_size=1000,
             chunk_overlap=200
         )
         chunks = text_splitter.split_documents(documents)
         
-        # 3. Generar Embeddings y guardar en ChromaDB
-        # Usamos langchain-ollama para generar embeddings con mxbai-embed-large
+        # 3. Generate Embeddings and save to ChromaDB
+        # We use langchain-ollama to generate embeddings with mxbai-embed-large
         embeddings = OllamaEmbeddings(model="mxbai-embed-large")
         
         parsed_url = urlparse(db_url)
         chroma_client = chromadb.HttpClient(host=parsed_url.hostname, port=parsed_url.port)
         collection = chroma_client.get_or_create_collection("libros_tecnicos")
         
-        # Preparamos los datos para ChromaDB
+        # Prepare data for ChromaDB
         ids = [f"doc_{i}" for i in range(len(chunks))]
         texts = [chunk.page_content for chunk in chunks]
         metadatas = [chunk.metadata for chunk in chunks]
         
-        # Generamos embeddings manualmente si no usamos la integración directa de Langchain con Chroma
-        # Pero para simplicidad y control, podemos usar la colección directamente si tenemos los embeddings
-        # O dejar que Chroma calcule si tiene la función de embedding configurada.
-        # Aquí asumiremos que Chroma NO tiene el embedding function configurado en el servidor,
-        # así que los calculamos nosotros.
+        # Generate embeddings manually if we don't use Langchain's direct integration with Chroma
+        # But for simplicity and control, we can use the collection directly if we have the embeddings
+        # Or let Chroma calculate if it has the embedding function configured.
+        # Here we assume Chroma does NOT have the embedding function configured on the server,
+        # so we calculate them ourselves.
         
         embedded_texts = embeddings.embed_documents(texts)
         

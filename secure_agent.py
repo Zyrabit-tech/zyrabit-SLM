@@ -3,13 +3,13 @@ import requests
 import json
 import sys
 
-# Configuración
+# Configuration
 MODEL = "phi3"
 OLLAMA_URL = "http://localhost:11434/api/generate"
 
 class SecureAgent:
     def __init__(self):
-        # Patrones de regex para PII (Información de Identificación Personal)
+        # Regex patterns for PII (Personally Identifiable Information)
         self.patterns = {
             'EMAIL': r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b',
             'PHONE': r'\b\d{3}[-.]?\d{3}[-.]?\d{4}\b',
@@ -18,14 +18,14 @@ class SecureAgent:
         }
 
     def sanitize_input(self, text):
-        """Redacta información sensible del texto."""
+        """Redacts sensitive information from the text."""
         redacted_text = text
         for label, pattern in self.patterns.items():
             redacted_text = re.sub(pattern, f"[{label}_REDACTED]", redacted_text)
         return redacted_text
 
     def query_ollama(self, prompt):
-        """Envía el prompt sanitizado a Ollama."""
+        """Sends the sanitized prompt to Ollama."""
         payload = {
             "model": MODEL,
             "prompt": prompt,
@@ -47,7 +47,7 @@ class SecureAgent:
             if user_input.lower() in ['exit', 'quit']:
                 break
 
-            # 1. Sanitización
+            # 1. Sanitization
             safe_prompt = self.sanitize_input(user_input)
             
             if safe_prompt != user_input:
@@ -55,11 +55,11 @@ class SecureAgent:
             else:
                 print("\n[SEGURIDAD] No se detectó PII. Enviando prompt limpio...")
 
-            # 2. Consulta al LLM
+            # 2. LLM Query
             print(f"\n[AGENT] Consultando a {MODEL}...")
             response = self.query_ollama(safe_prompt)
             
-            # 3. Respuesta
+            # 3. Response
             print(f"\n[RESPUESTA]:\n{response}")
 
 if __name__ == "__main__":

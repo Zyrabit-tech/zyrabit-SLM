@@ -4,15 +4,15 @@ from fastapi.responses import RedirectResponse
 from fastapi import FastAPI, HTTPException, UploadFile, File
 from pydantic import BaseModel
 
-# --- Configuración ---
-# Lee las variables de entorno. Asegúrate de tener un .env o de exportarlas.
-LLM_URL = os.getenv("LLM_URL", "http://localhost:11434") # Default para desarrollo local
-DB_URL = os.getenv("DB_URL", "http://localhost:8000") # Default para ChromaDB local
+# --- CONFIGURATION ---
+# Reads environment variables. Ensure you have a .env file or export them.
+LLM_URL = os.getenv("LLM_URL", "http://localhost:11434") # Default for local development
+DB_URL = os.getenv("DB_URL", "http://localhost:8000") # Default for local ChromaDB
 
-# --- Inicialización de FastAPI ---
+# --- FastAPI Initialization ---
 app = FastAPI(
     title="RAG-Ops Framework API",
-    description="Una API para orquestar decisiones entre RAG y llamadas directas a LLM.",
+    description="An API to orchestrate decisions between RAG and direct LLM calls.",
     version="0.1.0",
 )
 
@@ -23,36 +23,36 @@ class ChatQuery(BaseModel):
 class ChatResponse(BaseModel):
     response: str
 
-# --- Endpoints de la API ---
+# --- API Endpoints ---
 
 @app.get("/", include_in_schema=False)
 async def root():
     """
-    Redirige la raíz a la documentación interactiva.
+    Redirects root to interactive documentation.
     """
     return RedirectResponse(url="/docs")
 
 @app.get("/health", tags=["Monitoring"])
 def health_check():
     """
-    Endpoint de salud para verificar que el servicio está activo.
+    Health check endpoint to verify the service is active.
     """
     return {"status": "ok", "llm_url": LLM_URL, "db_url": DB_URL}
 
 @app.post("/v1/chat", response_model=ChatResponse, tags=["Agentic Router"])
 def chat_router(query: ChatQuery):
     """
-    Router Agéntico Principal.
+    Main Agentic Router.
 
-    Este endpoint recibe una consulta y decide la mejor manera de responderla:
-    1.  **search_rag_database**: Usa el pipeline RAG para conocimiento específico.
-    2.  **direct_llm_answer**: Pregunta directamente al LLM para conocimiento general.
-    3.  **reject_query**: Rechaza la consulta si está fuera de alcance.
+    This endpoint receives a query and decides the best way to answer it:
+    1.  **search_rag_database**: Uses the RAG pipeline for specific knowledge.
+    2.  **direct_llm_answer**: Asks the LLM directly for general knowledge.
+    3.  **reject_query**: Rejects the query if it is out of scope.
     """
-    # 1. El router decide qué hacer
+    # 1. The router decides what to do
     decision = services.get_llm_router_decision(query.text)
 
-    # 2. El `if/elif/else` "chingón" ejecuta la decisión
+    # 2. The "badass" if/elif/else executes the decision
     if decision == "search_rag_database":
         response_text = services.execute_rag_pipeline(query.text)
         return ChatResponse(response=response_text)
@@ -67,7 +67,7 @@ def chat_router(query: ChatQuery):
             detail="Consulta fuera de alcance. Por favor, haz preguntas relacionadas con los temas permitidos."
         )
     
-    # Fallback por si la decisión no es ninguna de las esperadas
+    # Fallback in case the decision is none of the expected ones
     else:
         raise HTTPException(
             status_code=500,
@@ -76,7 +76,7 @@ def chat_router(query: ChatQuery):
 @app.get("/metrics", tags=["Monitoring"])
 def get_metrics():
     """
-    Endpoint para Prometheus.
+    Prometheus endpoint.
     """
     return {"status": "ok", "message": "Metrics endpoint (implementar métricas reales aquí)"}
 
@@ -84,41 +84,41 @@ def get_metrics():
 @app.post("/v1/ingest", tags=["Ingestion"])
 async def ingest_document(file: UploadFile = File(...)):
     """
-    Endpoint para ingestar documentos PDF a la base de conocimiento.
+    Endpoint to ingest PDF documents into the knowledge base.
     
-    - **Validación**: Solo archivos .pdf y .docx (por ahora solo PDF implementado).
-    - **Tamaño**: Máximo 800MB (validado por configuración del servidor, aquí lógica básica).
+    - **Validation**: Only .pdf and .docx files (only PDF implemented for now).
+    - **Size**: Max 800MB (validated by server config, basic logic here).
     """
     ALLOWED_EXTENSIONS = {".pdf"}
     MAX_SIZE_MB = 800
     
-    # 1. Validar extensión
+    # 1. Validate extension
     file_ext = os.path.splitext(file.filename)[1].lower()
     if file_ext not in ALLOWED_EXTENSIONS:
         raise HTTPException(status_code=400, detail=f"Tipo de archivo no permitido. Solo se aceptan: {ALLOWED_EXTENSIONS}")
     
-    # 2. Guardar temporalmente para procesar
+    # 2. Save temporarily for processing
     temp_file_path = f"/tmp/{file.filename}"
     try:
         with open(temp_file_path, "wb") as buffer:
-            # Podríamos leer en chunks para validar tamaño, pero por simplicidad:
+            # We could read in chunks to validate size, but for simplicity:
             content = await file.read()
             if len(content) > MAX_SIZE_MB * 1024 * 1024:
                  raise HTTPException(status_code=400, detail=f"El archivo excede el tamaño máximo de {MAX_SIZE_MB}MB.")
             buffer.write(content)
             
-        # 3. Procesar ingesta
+        # 3. Process ingestion
         result = services.process_and_ingest_file(temp_file_path)
         return result
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error procesando el archivo: {str(e)}")
     finally:
-        # Limpieza
+        # Cleanup
         if os.path.exists(temp_file_path):
             os.remove(temp_file_path)
 
-# Para ejecutar localmente con `uvicorn main:app --reload`
+# To run locally with `uvicorn main:app --reload`
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8080)

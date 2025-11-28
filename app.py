@@ -4,12 +4,12 @@ import re
 import time
 import json
 
-# --- CONFIGURACIÓN ---
+# --- CONFIGURATION ---
 OLLAMA_URL = "http://localhost:11434/api/generate"
 # MODEL = "mistral"
 MODEL = "phi3"
 
-# --- ESTILOS ZYRABIT ---
+# --- ZYRABIT STYLES ---
 def load_css():
     st.markdown("""
         <style>
@@ -53,10 +53,10 @@ def load_css():
         </style>
     """, unsafe_allow_html=True)
 
-# --- LÓGICA DE NEGOCIO (Igual que tu agente seguro) ---
+# --- BUSINESS LOGIC (Same as secure agent) ---
 def sanitize_input(text):
-    # Reglas de DLP (Data Loss Prevention)
-    text = re.sub(r'[\w\.-]+@[\w\.-]+', '████████', text) # Redacción visual
+    # DLP (Data Loss Prevention) Rules
+    text = re.sub(r'[\w\.-]+@[\w\.-]+', '████████', text) # Visual redaction
     text = re.sub(r'\b(?:\d[ -]*?){13,16}\b', '[CREDIT_CARD]', text)
     text = re.sub(r'\$\d+(?:,\d{3})*(?:\.\d{2})?', '[AMOUNT]', text)
     return text
@@ -78,7 +78,7 @@ def query_ollama(prompt):
     except:
         return "Error de conexión", 0
 
-# --- INTERFAZ GRÁFICA (LA CARA DEL PRODUCTO) ---
+# --- GUI (THE FACE OF THE PRODUCT) ---
 st.set_page_config(page_title="Zyrabit Secure AI", layout="wide", page_icon="🛡️")
 load_css()
 
@@ -93,7 +93,7 @@ with col2:
 
 st.divider()
 
-# Panel de Control
+# Control Panel
 with st.sidebar:
     st.header("⚙️ Configuración del Nodo")
     st.success("● Motor Neural: ONLINE (CPU Mode)")
@@ -101,23 +101,23 @@ with st.sidebar:
     st.warning("🛡️ DLP Sidecar: ACTIVO")
     st.markdown("---")
 
-# Área de Chat
+# Chat Area
 st.subheader("💬 Interfaz de Prueba Segura")
 
 user_input = st.text_area("Escribe tu consulta (Intenta incluir datos sensibles como emails o montos):", height=100)
 
 if st.button("🚀 Ejecutar Inferencia Segura"):
     if user_input:
-        # 1. Proceso de Sanitización
+        # 1. Sanitization Process
         with st.status("🔒 Procesando Protocolo de Seguridad...", expanded=True) as status:
             st.write("1. Interceptando payload...")
-            time.sleep(0.5) # Efecto dramático
+            time.sleep(0.5) # Dramatic effect
             clean_prompt = sanitize_input(user_input)
             st.write("2. Ejecutando PII Scrubbing (Borrado de Datos Personales)...")
             st.write("3. Enviando a Motor Local (Air-Gapped)...")
             status.update(label="✅ Inferencia Completada", state="complete", expanded=False)
 
-        # 2. Resultados Visuales
+        # 2. Visual Results
         col_input, col_output = st.columns(2)
         
         with col_input:
@@ -125,7 +125,7 @@ if st.button("🚀 Ejecutar Inferencia Segura"):
             st.code(clean_prompt, language="text")
             st.caption("Nota: Los datos sensibles nunca tocaron la RAM del modelo.")
 
-        # 3. Llamada al Modelo
+        # 3. Model Call
         response_text, latency = query_ollama(clean_prompt)
 
         with col_output:
@@ -136,6 +136,6 @@ if st.button("🚀 Ejecutar Inferencia Segura"):
     else:
         st.error("Por favor ingresa un texto para procesar.")
 
-# Footer de Credibilidad
+# Credibility Footer
 st.markdown("---")
 st.markdown("*Zyrabit Systems - Powered by Clean Architecture & Memory-First RAG Protocol*")
