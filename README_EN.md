@@ -1,6 +1,7 @@
 # Zyrabit LLM Secure Suite
 [![Spanish](https://img.shields.io/badge/lang-Español-red.svg)](README.md)
 ![Python](https://img.shields.io/badge/python-v3.10+-blue.svg)
+![Tests](https://img.shields.io/badge/tests-passing-brightgreen.svg)
 ![Docker](https://img.shields.io/badge/docker--compose-ready-green.svg)
 ![License](https://img.shields.io/badge/license-MIT-yellow.svg)
 ![Architecture](https://img.shields.io/badge/architecture-clean-orange.svg)
@@ -9,33 +10,7 @@
 
 ## Architecture
 
-```mermaid
-graph TD
-    subgraph "Secure Client (Local Python)"
-        User((👤 User))
-        Agent["🕵️ secure_agent.py<br/>(Sanitizer Regex/NER)"]
-        UI["🖥️ app.py<br/>(Streamlit Dashboard)"]
-    end
 
-    subgraph "Zyrabit Core (Docker Network)"
-        API["⚡ api-rag<br/>(FastAPI Gateway)"]
-        LLM["🧠 llm-server<br/>(Ollama - Phi3)"]
-        VectorDB[("🗄️ ChromaDB<br/>Vector Memory")]
-        Monitor["📊 Grafana + Prometheus<br/>Observability"]
-    end
-
-    User --> UI
-    UI -->|1. Raw Prompt| Agent
-    Agent -->|2. Redacted Data| API
-    API -->|3. Vector Query| VectorDB
-    VectorDB -->|4. Context| API
-    API -->|5. Final Prompt| LLM
-    LLM -->|6. Response| API
-    API -->|7. Secure Display| UI
-
-    style Agent fill:#ff9900,stroke:#333,stroke-width:2px
-    style LLM fill:#99ff99,stroke:#333,stroke-width:2px
-```
 
 ## Value Proposition
 

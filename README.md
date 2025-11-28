@@ -1,6 +1,7 @@
 # Zyrabit LLM Secure Suite
 [![English](https://img.shields.io/badge/lang-English-blue.svg)](README_EN.md)
 ![Python](https://img.shields.io/badge/python-v3.10+-blue.svg)
+![Tests](https://img.shields.io/badge/tests-passing-brightgreen.svg)
 ![Docker](https://img.shields.io/badge/docker--compose-ready-green.svg)
 ![License](https://img.shields.io/badge/license-MIT-yellow.svg)
 ![Architecture](https://img.shields.io/badge/architecture-clean-orange.svg)
@@ -17,29 +18,6 @@ El proyecto se divide en dos componentes principales:
 2.  **Backend (`zyrabit-brain-api`)**:
     *   `api-rag/`: API FastAPI que orquesta la lógica de RAG, conecta con ChromaDB y Ollama.
 
-```mermaid
-graph TD
-    subgraph "Frontend"
-        User((👤 Usuario))
-        UI["�️ Streamlit (app.py)"]
-        CLI["� CLI (secure_agent.py)"]
-    end
-
-    subgraph "Backend (Docker Network)"
-        API["⚡ FastAPI (api-rag)"]
-        LLM["🧠 Ollama (Phi-3)"]
-        Embed["🧩 Ollama (mxbai-embed-large)"]
-        VectorDB[("�️ ChromaDB")]
-    end
-
-    User --> UI
-    User --> CLI
-    UI -->|HTTP POST /v1/chat| API
-    CLI -->|HTTP POST /v1/chat| API
-    API -->|Generar Embeddings| Embed
-    API -->|Buscar Contexto| VectorDB
-    API -->|Generar Respuesta| LLM
-```
 
 ## Propuesta de Valor
 

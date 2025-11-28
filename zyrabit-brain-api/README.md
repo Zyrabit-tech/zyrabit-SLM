@@ -22,45 +22,7 @@ Observabilidad Primero: No volamos a ciegas. El stack incluye Prometheus y Grafa
 
 Este es el plan. Usamos docker-compose para orquestar 5 servicios que se hablan entre sí en una red interna.
 
-graph TD
-    subgraph "Tu Máquina (Host/Server)"
-        User[Dev/Usuario]
-        IngestScript[ingest.py (Script de Carga)]
-        SourceDocs[PDFs/Libros/Docs]
-        Gpu[Host GPU]
-        VolModelos[Volumen: ./ollama-models]
-        VolVectores[Volumen: ./chroma-data]
-    end
 
-    subgraph "Stack Docker (docker-compose)"
-        ApiRag(api-rag: FastAPI<br/>El Cerebro<br/>Port: 8080)
-        LLM(llm-server: Ollama<br/>El Músculo)
-        DB(vector-db: Chroma<br/>La Memoria)
-        Prom(prometheus: Monitor<br/>Port: 9090)
-        Graf(grafana: Dashboard<br/>Port: 3000)
-    end
-
-    %% --- Flujos de Interacción ---
-    User -- HTTP Request --> ApiRag
-    ApiRag -- 1. Busca contexto --> DB
-    DB -- 2. Devuelve chunks --> ApiRag
-    ApiRag -- 3. Prompt aumentado --> LLM
-    LLM -- 4. Genera respuesta --> ApiRag
-    ApiRag -- 5. Respuesta final --> User
-
-    %% --- Flujo de Ingesta (Data Ingestion)
-    SourceDocs -- 1. Lee --> IngestScript
-    IngestScript -- 2. Vectoriza y Escribe --> DB
-
-    %% --- Dependencias de Hardware y Datos
-    Gpu -- Acelera --> LLM
-    VolModelos -- Monta modelos --> LLM
-    VolVectores -- Persiste vectores --> DB
-
-    %% --- Flujo de Monitoreo
-    Prom -- Scrape metrics (scrapea) --> ApiRag
-    Graf -- Visualiza datos de --> Prom
-    User -- Revisa dashboards --> Graf(http://localhost:3000)
 
 
 🛠️ Tech Stack
