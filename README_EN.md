@@ -6,7 +6,7 @@
 ![License](https://img.shields.io/badge/license-MIT-yellow.svg)
 ![Architecture](https://img.shields.io/badge/architecture-clean-orange.svg)
 
-**Zyrabit LLM Secure Suite** is a reference architecture for deploying secure and private Generative AI agents in enterprise environments. It combines the power of **Ollama (Phi-3)** with an intermediate security layer that sanitizes sensitive data before it touches the LLM.
+**Zyrabit LLM Secure Suite** is a reference architecture for deploying secure and private Generative AI agents in any environment. It combines the power of **Ollama (Phi-3)** with an intermediate security layer that sanitizes sensitive data before it touches the LLM.
 
 ## 🎯 Value Proposition
 
@@ -74,6 +74,19 @@ This project has been tested and validated on the following configuration:
     docker compose up -d
     cd ..
     ```
+
+    **Optional Configuration**: If you need to customize environment variables (URLs, model names, etc.):
+    ```bash
+    cd zyrabit-brain-api
+    cp .env.example .env
+    # Edit .env with your custom values
+    ```
+    
+    Key variables available:
+    - `OLLAMA_BASE_URL`: Ollama server URL (default: `http://llm-server:11434`)
+    - `MODEL_NAME`: LLM model to use (default: `phi3`)
+    - `VECTOR_DB_HOST`: ChromaDB host (default: `vector-db`)
+    - `ENABLE_PII_SANITIZATION`: Enable sensitive data sanitization (default: `True`)
 
 3.  **Initialize AI Models**:
     Once Docker is running, download the necessary models (`phi3` and `mxbai-embed-large`).

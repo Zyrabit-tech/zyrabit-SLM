@@ -88,8 +88,8 @@ with col1:
     # Placeholder for logo if available, otherwise shield icon
     st.image("https://img.icons8.com/color/96/000000/shield.png", width=80)
 with col2:
-    st.title("Zyrabit Enterprise Core")
-    st.markdown("**Infraestructura de IA Soberana & Zero-Trust**")
+    st.title("Zyrabit Core")
+    st.markdown("**Infraestructura de IA & Zero-Trust**")
 
 st.divider()
 

@@ -68,6 +68,65 @@ Your commit MUST follow this format:
 *   `feat(api): add /v1/ingest endpoint`
 *   `fix(ingest): fix PDF validation`
 *   `docs(contributing): update project name`
+*   `test(security): add PII sanitization tests`
+
+## 📝 Coding Standards
+
+### Naming Conventions
+
+> [!IMPORTANT]
+> **All code must be in English**: variables, functions, classes, documentation comments.
+
+**Variables and Functions**: Use `snake_case` in English
+*   ✅ `user_input`, `sanitize_data()`, `process_pdf_file()`
+*   ❌ `entrada_usuario`, `sanitizarDatos()`, `procesarArchivoPDF()`
+
+**Classes**: Use `PascalCase` in English
+*   ✅ `VectorDatabase`, `SecureAgent`, `OllamaClient`
+*   ❌ `BaseDeDatosVectorial`, `AgenteSeguro`
+
+**Dictionaries and Configuration**: Use `snake_case` for keys
+```python
+# ✅ Correct
+config = {
+    "model_name": "phi3",
+    "max_tokens": 1000,
+    "enable_sanitization": True
+}
+
+# ❌ Incorrect
+config = {
+    "nombreModelo": "phi3",
+    "maxTokens": 1000
+}
+```
+
+**Comments**:
+*   Docstrings (function/class documentation): **Required in English**
+*   Inline comments: Preferably in English, but Spanish allowed for internal clarity
+
+### Dependency Security
+
+Before adding a new dependency to `requirements.txt`, **you must verify its security**:
+
+```bash
+# Install security tools
+pip install pip-audit safety
+
+# Scan current dependencies
+pip-audit
+safety check
+
+# Verify a specific dependency before adding it
+pip install <new-dependency>
+pip-audit
+```
+
+**Requirements for PRs adding dependencies:**
+- [ ] Run `pip-audit` and `safety check`
+- [ ] Include scan results in PR description
+- [ ] Justify why the dependency is necessary
+- [ ] Verify there are no known vulnerabilities
 
 ## 📋 Pull Request Template
 

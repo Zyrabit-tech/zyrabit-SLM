@@ -75,6 +75,19 @@ Este proyecto ha sido probado y validado en la siguiente configuración:
     cd ..
     ```
 
+    **Configuración Opcional**: Si necesitas personalizar variables de entorno (URLs, nombres de modelos, etc.):
+    ```bash
+    cd zyrabit-brain-api
+    cp .env.example .env
+    # Edita .env con tus valores personalizados
+    ```
+    
+    Variables clave disponibles:
+    - `OLLAMA_BASE_URL`: URL del servidor Ollama (default: `http://llm-server:11434`)
+    - `MODEL_NAME`: Modelo LLM a usar (default: `phi3`)
+    - `VECTOR_DB_HOST`: Host de ChromaDB (default: `vector-db`)
+    - `ENABLE_PII_SANITIZATION`: Activar sanitización de datos sensibles (default: `True`)
+
 3.  **Inicializar Modelos de IA**:
     Una vez que Docker esté corriendo, descarga los modelos necesarios (`phi3` y `mxbai-embed-large`).
     ```bash
