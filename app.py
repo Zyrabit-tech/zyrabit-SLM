@@ -10,7 +10,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # --- CONFIGURATION ---
-OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434/api/generate")
+API_URL = os.getenv("API_URL", "http://localhost:8080/v1/chat")
 # MODEL = "mistral"
 MODEL = os.getenv("MODEL", "phi3")
 
@@ -63,30 +63,24 @@ def load_css():
 # --- BUSINESS LOGIC (Same as secure agent) ---
 
 
-def sanitize_input(text):
-    # DLP (Data Loss Prevention) Rules
-    text = re.sub(r'[\w\.-]+@[\w\.-]+', '████████', text)  # Visual redaction
-    text = re.sub(r'\b(?:\d[ -]*?){13,16}\b', '[CREDIT_CARD]', text)
-    text = re.sub(r'\$\d+(?:,\d{3})*(?:\.\d{2})?', '[AMOUNT]', text)
-    return text
+from security import sanitize_pii as sanitize_input
 
 
-def query_ollama(prompt):
-    payload = {
-        "model": MODEL,
-        "prompt": prompt + " (Responde en español, sé conciso)",
-        "stream": False
-    }
+def query_backend(prompt):
+    payload = {"text": prompt}
     try:
         start = time.time()
-        response = requests.post(OLLAMA_URL, json=payload)
+        with st.spinner('Pensando...'):
+            response = requests.post(API_URL, json=payload)
         end = time.time()
         if response.status_code == 200:
-            return response.json()['response'], end - start
+            # Expect response format {'response': '...'}
+            data = response.json()
+            return data.get('response', ''), end - start
         else:
-            return "Error del servidor", 0
-    except BaseException:
-        return "Error de conexión", 0
+            return f"Error del servidor: {response.status_code}", 0
+    except BaseException as e:
+        return f"Error de conexión: {str(e)}", 0
 
 
 # --- GUI (THE FACE OF THE PRODUCT) ---
@@ -140,20 +134,17 @@ if st.button("🚀 Ejecutar Inferencia Segura"):
         col_input, col_output = st.columns(2)
 
         with col_input:
-            st.markdown("### 👁️ Lo que ve Zyrabit (Seguro)")
+            st.markdown("### 👁️ Entrada Original (Sanitizada)")
             st.code(clean_prompt, language="text")
-            st.caption(
-                "Nota: Los datos sensibles nunca tocaron la RAM del modelo.")
+            st.caption("Nota: Los datos sensibles nunca tocaron la RAM del modelo.")
 
         # 3. Model Call
-        response_text, latency = query_ollama(clean_prompt)
+        response_text, latency = query_backend(clean_prompt)
 
         with col_output:
             st.markdown("### 🤖 Respuesta del Modelo")
             st.success(response_text)
-            st.caption(
-                f"⏱️ Latencia: {latency:.2f}s | 🔋 Hardware: CPU Standard")
-
+            st.caption(f"⏱️ Latencia: {latency:.2f}s | 🔋 Hardware: CPU Standard")
     else:
         st.error("Por favor ingresa un texto para procesar.")
 

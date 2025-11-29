@@ -51,3 +51,4 @@ zyrabit-brain-api/chroma-data/
 zyrabit-brain-api/.ai/
 zyrabit-brain-api/ollama-models/
 zyrabit-brain-api/.DS_Store
+.continue/prompts/new-prompt.md

@@ -1,38 +1,40 @@
+# security.py - Centralized PII sanitization for Zyrabit API
+
+"""Provides a single function `sanitize_pii` that redacts sensitive information.
+
+Supported patterns:
+- Email addresses (replaced with "████████")
+- Credit‑card numbers (13‑16 digits, allowing spaces or dashes) replaced with "[CREDIT_CARD]"
+- Monetary amounts prefixed with $ (e.g., $1,234.56) replaced with "[AMOUNT]"
+
+The function returns a tuple `(clean_text, redacted)` where `redacted` is a boolean indicating
+whether any replacement occurred.
+"""
+
 import re
 from typing import Tuple
 
-# Patrones de Regex Compilados (Mejor rendimiento)
-EMAIL_REGEX = re.compile(r'[\w\.-]+@[\w\.-]+')
-CREDIT_CARD_REGEX = re.compile(r'\b(?:\d[ -]*?){13,16}\b')
-# Detecta formatos como $50,000.00, 500 USD, $50k
-AMOUNT_REGEX = re.compile(r'\$?\d+(?:,\d{3})*(?:\.\d{2})? ?(?:USD|MXN|EUR|k)?')
+# Pre‑compiled regex patterns for performance
+_EMAIL_REGEX = re.compile(r"[\w\.-]+@[\w\.-]+")
+_CREDIT_CARD_REGEX = re.compile(r"\b(?:\d[ -]*?){13,16}\b")
+_AMOUNT_REGEX = re.compile(r"\$\d+(?:,\d{3})*(?:\.\d{2})?")
 
 
 def sanitize_pii(text: str) -> Tuple[str, bool]:
-    """
-    Sanitiza información personal identificable (PII) del texto.
-
-    Args:
-        text (str): El texto de entrada (prompt).
+    """Redact PII in *text*.
 
     Returns:
-        Tuple[str, bool]: (Texto sanitizado, Bool indicando si hubo cambios)
+        (clean_text, redacted)
+        - *clean_text*: the sanitized string.
+        - *redacted*: ``True`` if any substitution was performed.
     """
-    if not text:
-        return "", False
+    original = text
+    # Apply replacements
+    text = _EMAIL_REGEX.sub("████████", text)
+    text = _CREDIT_CARD_REGEX.sub("[CREDIT_CARD]", text)
+    text = _AMOUNT_REGEX.sub("[AMOUNT]", text)
+    redacted = text != original
+    return text, redacted
 
-    original_text = text
-
-    # 1. Sanitizar Emails
-    text = EMAIL_REGEX.sub('[EMAIL_REDACTED]', text)
-
-    # 2. Sanitizar Tarjetas de Crédito
-    text = CREDIT_CARD_REGEX.sub('[CREDIT_CARD_REDACTED]', text)
-
-    # 3. Sanitizar Montos (Opcional: a veces el monto es contexto útil, pero para demos financieras lo quitamos)
-    # Nota: Ajustamos para no borrar números simples, solo los que parecen
-    # dinero
-    text = AMOUNT_REGEX.sub('[AMOUNT_REDACTED]', text)
-
-    is_sanitized = text != original_text
-    return text, is_sanitized
+# Export name for convenient import
+__all__ = ["sanitize_pii"]

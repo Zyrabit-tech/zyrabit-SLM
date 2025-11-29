@@ -1,76 +1,83 @@
-import re
-import requests
-import json
-import sys
-import os
-from dotenv import load_dotenv
+#!/usr/bin/env python3
 
-# Load environment variables
-load_dotenv()
+"""secure_agent.py - CLI client for Zyrabit LLM Secure Suite
+
+Reads a prompt from the command line (or stdin), sanitizes any PII using the same
+logic as the central security module, sends the sanitized prompt to the backend
+API (`http://localhost:8080/v1/chat`) and prints the original prompt, the sanitized
+prompt and the model response.
+"""
+
+import os
+import sys
+import re
+import json
+import time
+import argparse
+import requests
 
 # Configuration
-MODEL = os.getenv("MODEL", "phi3")
-OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434/api/generate")
+API_URL = os.getenv("API_URL", "http://localhost:8080/v1/chat")
+MODEL_NAME = os.getenv("MODEL_NAME", "phi3")
+
+# Simple PII sanitization (stand‑alone version)
+EMAIL_REGEX = re.compile(r"[\w\.-]+@[\w\.-]+")
+CREDIT_CARD_REGEX = re.compile(r"\b(?:\d[ -]*?){13,16}\b")
+AMOUNT_REGEX = re.compile(r"\$\d+(?:,\d{3})*(?:\.\d{2})?")
 
 
-class SecureAgent:
-    def __init__(self):
-        # Regex patterns for PII (Personally Identifiable Information)
-        self.patterns = {
-            'EMAIL': r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b',
-            'PHONE': r'\b\d{3}[-.]?\d{3}[-.]?\d{4}\b',
-            'CREDIT_CARD': r'\b(?:\d{4}[-\s]?){3}\d{4}\b',
-            'SSN': r'\b\d{3}-\d{2}-\d{4}\b'
-        }
+def sanitize_pii(text: str) -> (str, bool):
+    """Redact email, credit‑card numbers and monetary amounts.
+    Returns the cleaned text and a flag indicating whether any redaction occurred.
+    """
+    original = text
+    text = EMAIL_REGEX.sub("████████", text)
+    text = CREDIT_CARD_REGEX.sub("[CREDIT_CARD]", text)
+    text = AMOUNT_REGEX.sub("[AMOUNT]", text)
+    changed = text != original
+    return text, changed
 
-    def sanitize_input(self, text):
-        """Redacts sensitive information from the text."""
-        redacted_text = text
-        for label, pattern in self.patterns.items():
-            redacted_text = re.sub(
-                pattern, f"[{label}_REDACTED]", redacted_text)
-        return redacted_text
 
-    def query_ollama(self, prompt):
-        """Sends the sanitized prompt to Ollama."""
-        payload = {
-            "model": MODEL,
-            "prompt": prompt,
-            "stream": False
-        }
-        try:
-            response = requests.post(OLLAMA_URL, json=payload)
-            response.raise_for_status()
-            return response.json().get('response', '')
-        except requests.exceptions.RequestException as e:
-            return f"Error conectando con Ollama: {e}"
+def query_backend(prompt: str) -> (str, float):
+    payload = {"text": prompt}
+    start = time.time()
+    try:
+        response = requests.post(API_URL, json=payload)
+        elapsed = time.time() - start
+        if response.status_code == 200:
+            data = response.json()
+            return data.get("response", ""), elapsed
+        else:
+            return f"Error del servidor: {response.status_code}", elapsed
+    except Exception as e:
+        return f"Error de conexión: {str(e)}", 0.0
 
-    def run(self):
-        print(f"--- Zyrabit Secure Agent (Model: {MODEL}) ---")
-        print("Escribe tu prompt (o 'exit' para salir):")
 
-        while True:
-            user_input = input("\n> ")
-            if user_input.lower() in ['exit', 'quit']:
-                break
+def main():
+    parser = argparse.ArgumentParser(description="Secure agent for Zyrabit LLM")
+    parser.add_argument("prompt", nargs="?", help="Prompt to send to the model")
+    args = parser.parse_args()
 
-            # 1. Sanitization
-            safe_prompt = self.sanitize_input(user_input)
+    if args.prompt:
+        user_input = args.prompt
+    else:
+        print("Introduce tu consulta (Ctrl‑D para terminar):")        
+        user_input = sys.stdin.read().strip()
 
-            if safe_prompt != user_input:
-                print(
-                    f"\n[SEGURIDAD] PII Detectado. Prompt Sanitizado:\n{safe_prompt}")
-            else:
-                print("\n[SEGURIDAD] No se detectó PII. Enviando prompt limpio...")
+    if not user_input:
+        print("No se recibió ninguna entrada.")
+        sys.exit(1)
 
-            # 2. LLM Query
-            print(f"\n[AGENT] Consultando a {MODEL}...")
-            response = self.query_ollama(safe_prompt)
+    print(f"\n🧩 Prompt original: {user_input}\n")
+    clean_prompt, redacted = sanitize_pii(user_input)
+    if redacted:
+        print(f"🔐 Prompt sanitizado: {clean_prompt}\n")
+    else:
+        print("🔐 No se detectó PII para sanitizar.\n")
 
-            # 3. Response
-            print(f"\n[RESPUESTA]:\n{response}")
+    response, latency = query_backend(clean_prompt)
+    print(f"🤖 Respuesta del modelo (latencia {latency:.2f}s):\n{response}\n")
 
 
 if __name__ == "__main__":
-    agent = SecureAgent()
-    agent.run()
+    main()
