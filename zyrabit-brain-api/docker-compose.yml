@@ -1,30 +1,32 @@
 services:
-  # 1. EL CEREBRO: Tu API de RAG con FastAPI
+  # 1. THE BRAIN: Your RAG API with FastAPI
   api-rag:
     build:
-      context: ./api-rag # Apunta a la carpeta con tu Dockerfile de FastAPI
+      context: ./api-rag # Points to the folder with your FastAPI Dockerfile
     ports:
-      - "8080:8080" # El único puerto expuesto a tu máquina (host)
+      - "8080:8080" # The only port exposed to your host machine
     environment:
-      - LLM_URL=http://llm-server:11434 # URL interna para hablar con Ollama
-      - DB_URL=http://vector-db:8005 # URL interna para hablar con Chroma
+      - LLM_URL=http://llm-server:11434 # Internal URL to talk to Ollama
+      - DB_URL=http://vector-db:8005 # Internal URL to talk to Chroma
     depends_on:
-      - llm-server
-      - vector-db
+      vector-db:
+        condition: service_healthy # <--- Wait for DB to respond
+      llm-server:
+        condition: service_started
     networks:
       - rag-net
 
-  # 2. EL MÚSCULO: El servidor de LLMs (Ollama)
+  # 2. THE MUSCLE: The LLM Server (Ollama)
   llm-server:
     image: ollama/ollama
     ports:
       - "11434:11434" # Expose to host for local scripts
     volumes:
-      - ./ollama-models:/root/.ollama # Volumen persistente para los modelos (pesados)
+      - ./ollama-models:/root/.ollama # Persistent volume for models (heavy)
     networks:
       - rag-net
-    # --- ¡CRÍTICO PARA GPU! ---
-    # Descomenta esto en tu servidor de nube (ej. DigitalOcean con GPU)
+    # --- CRITICAL FOR GPU! ---
+    # Uncomment this on your cloud server (e.g. DigitalOcean with GPU)
     # deploy:
     #   resources:
     #     reservations:
@@ -33,45 +35,50 @@ services:
     #           count: 1
     #           capabilities: [gpu]
 
-    # 3. LA MEMORIA: La Base de Datos Vectorial (ChromaDB)
+    # 3. THE MEMORY: Vector Database (ChromaDB)
   vector-db:
     image: chromadb/chroma
     ports:
-      - "8001:8005" # Exponemos al host en 8001 SOLO para el script de ingesta (ingest.py)
+      - "8001:8005" # Expose to host on 8001 ONLY for ingestion script (ingest.py)
     volumes:
-      - ./chroma-data:/chroma/chroma # Volumen persistente para los vectores
+      - ./chroma-data:/chroma/chroma # Persistent volume for vectors
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:8000/api/v1/heartbeat" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
     networks:
       - rag-net
 
-  # 4. EL MONITOR (Scraper): Prometheus
+  # 4. THE MONITOR (Scraper): Prometheus
   prometheus:
     image: prom/prometheus
     volumes:
       - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
       - prometheus-data:/prometheus
     ports:
-      - "9091:9090" # Accede a Prometheus en http://localhost:9091
+      - "9091:9090" # Access Prometheus at http://localhost:9091
     networks:
       - rag-net
 
-  # 5. EL MONITOR (Dashboard): Grafana
+  # 5. THE MONITOR (Dashboard): Grafana
   grafana:
     image: grafana/grafana
     volumes:
       - grafana-data:/var/lib/grafana
     ports:
-      - "3000:3000" # Accede a Grafana en http://localhost:3000
+      - "3000:3000" # Access Grafana at http://localhost:3000
     depends_on:
       - prometheus
     networks:
       - rag-net
 
-# Red interna para que los contenedores se hablen por nombre de servicio
+# Internal network for containers to talk by service name
 networks:
   rag-net:
     driver: bridge
 
-# Volúmenes para persistir datos aunque destruyas los contenedores
+# Volumes to persist data even if containers are destroyed
 volumes:
   prometheus-data:
   grafana-data:
