@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-"""secure_agent.py - CLI client for Zyrabit LLM Secure Suite
+"""secure_agent.py - CLI client for Zyrabit SLM Secure Suite
 
 Reads a prompt from the command line (or stdin), sanitizes any PII using the same
 logic as the central security module, sends the sanitized prompt to the backend
@@ -54,7 +54,7 @@ def query_backend(prompt: str) -> (str, float):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Secure agent for Zyrabit LLM")
+    parser = argparse.ArgumentParser(description="Secure agent for Zyrabit SLM")
     parser.add_argument("prompt", nargs="?", help="Prompt to send to the model")
     args = parser.parse_args()
 

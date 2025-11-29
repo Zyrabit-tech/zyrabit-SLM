@@ -1,4 +1,4 @@
-# Zyrabit LLM Secure Suite
+# Zyrabit SLM Secure Suite
 [![Spanish](https://img.shields.io/badge/lang-Español-red.svg)](README.md)
 ![Python](https://img.shields.io/badge/python-v3.10+-blue.svg)
 ![Tests](https://img.shields.io/badge/tests-passing-brightgreen.svg)
@@ -6,14 +6,14 @@
 ![License](https://img.shields.io/badge/license-MIT-yellow.svg)
 ![Architecture](https://img.shields.io/badge/architecture-clean-orange.svg)
 
-**Zyrabit LLM Secure Suite** is a reference architecture for deploying secure and private Generative AI agents in any environment. It combines the power of **Ollama (Phi-3)** with an intermediate security layer that sanitizes sensitive data before it touches the LLM.
+**Zyrabit SLM Secure Suite** is a reference architecture for deploying secure and private Generative AI agents in any environment. It combines the power of **Ollama (Phi-3)** with an intermediate security layer that sanitizes sensitive data before it touches the SLM.
 
 ## 🎯 Value Proposition
 
 1.  **Privacy by Design**: No PII data (Emails, Phones, Credit Cards) reaches the language model. The secure agent acts as a data firewall.
 2.  **Data Sovereignty**: 100% local or on-premise execution using efficient models like Phi-3.
 3.  **Full Observability**: Integrated monitoring stack to trace latency, token usage, and errors in real-time.
-4.  **Modular Architecture**: Decoupled components (Client, API, LLM, VectorDB) allowing independent scaling.
+4.  **Modular Architecture**: Decoupled components (Client, API, SLM, VectorDB) allowing independent scaling.
 
 ## 🏗️ Architecture
 
@@ -83,8 +83,8 @@ This project has been tested and validated on the following configuration:
     ```
     
     Key variables available:
-    - `OLLAMA_BASE_URL`: Ollama server URL (default: `http://llm-server:11434`)
-    - `MODEL_NAME`: LLM model to use (default: `phi3`)
+    - `OLLAMA_BASE_URL`: Ollama server URL (default: `http://SLM-server:11434`)
+    - `MODEL_NAME`: SLM model to use (default: `phi3`)
     - `VECTOR_DB_HOST`: ChromaDB host (default: `vector-db`)
     - `ENABLE_PII_SANITIZATION`: Enable sensitive data sanitization (default: `True`)
 
@@ -139,7 +139,7 @@ See [zyrabit-brain-api/README.md](zyrabit-brain-api/README.md) for more details 
 
 ## 🤝 Contributing
 
-We want your help to make Zyrabit LLM better!
+We want your help to make Zyrabit SLM better!
 Please read our [Contribution Guidelines](CONTRIBUTING_EN.md) to learn about our workflow, commit convention, and how to get started.
 
 **Remember**: Pull Requests must target the `beta` branch.

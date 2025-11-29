@@ -2,7 +2,7 @@
 
 # setup_ollama.sh - Robust installer for required Ollama models
 # ------------------------------------------------------------
-# Checks Docker daemon, ensures llm-server container is running,
+# Checks Docker daemon, ensures SLM-server container is running,
 # waits for Ollama port 11434, then pulls required models.
 # Uses ANSI colors for feedback.
 
@@ -24,8 +24,8 @@ if ! docker info > /dev/null 2>&1; then
 fi
 log_success "Docker daemon is active."
 
-# 2. Ensure llm-server container exists
-CONTAINER_NAME="llm-server"
+# 2. Ensure SLM-server container exists
+CONTAINER_NAME="SLM-server"
 if ! docker ps -a --format '{{.Names}}' | grep -q "^${CONTAINER_NAME}$"; then
   log_error "Container '${CONTAINER_NAME}' not found. Ensure it is defined in docker-compose.yml and run 'docker compose up -d'."
   exit 1

@@ -21,7 +21,7 @@ def test_health_check_returns_ok_status():
     assert response.status_code == 200
     data = response.json()
     assert data["status"] == "ok"
-    assert "llm_url" in data
+    assert "SLM_url" in data
     assert "db_url" in data
 
 
@@ -83,7 +83,7 @@ def test_ingest_document_invalid_file_type():
 
 # --- PRUEBA 5: Chat Router - Error Handling ---
 
-@patch('app.services.get_llm_router_decision')
+@patch('app.services.get_SLM_router_decision')
 @patch('app.services.execute_rag_pipeline')
 def test_chat_router_handles_service_exceptions(
         mock_rag_pipeline, mock_router_decision):
@@ -109,13 +109,13 @@ def test_chat_router_handles_service_exceptions(
 
 # --- PRUEBA 6: Chat Router - Decision Fallback ---
 
-@patch('app.services.get_llm_router_decision')
-@patch('app.services.call_direct_llm')
+@patch('app.services.get_SLM_router_decision')
+@patch('app.services.call_direct_SLM')
 def test_chat_router_handles_unknown_decision(
-        mock_direct_llm, mock_router_decision):
+        mock_direct_SLM, mock_router_decision):
     """
-    Prueba que el router maneje una decisión desconocida del LLM.
-    Si get_llm_router_decision retorna algo inesperado, debería manejarlo.
+    Prueba que el router maneje una decisión desconocida del SLM.
+    Si get_SLM_router_decision retorna algo inesperado, debería manejarlo.
     """
     # GIVEN
     # Simulamos una decisión que no es ninguna de las esperadas

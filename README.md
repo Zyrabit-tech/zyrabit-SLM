@@ -1,4 +1,4 @@
-# Zyrabit LLM Secure Suite (v1.0‑beta)
+# Zyrabit SLM Secure Suite (v1.0‑beta)
 
 [![English](https://img.shields.io/badge/lang-English-blue.svg)](README_EN.md)
 ![Python](https://img.shields.io/badge/python-v3.10%2B-blue.svg)
@@ -11,7 +11,7 @@
 
 ## 📖 Descripción
 
-**Zyrabit LLM Secure Suite** es una solución de IA local que combina un modelo de lenguaje grande (Ollama) con un motor de recuperación‑aumentada (RAG) y una capa de **Zero‑Trust** que sanitiza cualquier dato sensible antes de enviarlo al modelo. El proyecto está pensado para ejecutarse en entornos locales (Mac M1 Pro, Linux, Windows WSL2) sin depender de la nube, garantizando privacidad y cumplimiento de normativas.
+**Zyrabit SLM Secure Suite** es una solución de IA local que combina un modelo de lenguaje grande (Ollama) con un motor de recuperación‑aumentada (RAG) y una capa de **Zero‑Trust** que sanitiza cualquier dato sensible antes de enviarlo al modelo. El proyecto está pensado para ejecutarse en entornos locales (Mac M1 Pro, Linux, Windows WSL2) sin depender de la nube, garantizando privacidad y cumplimiento de normativas.
 
 ---
 
@@ -26,14 +26,14 @@ graph TD
     end
     subgraph "Zyrabit Core"
         API["⚡ api‑rag"]
-        LLM["🧠 Ollama (Phi3 / Kimi)"]
+        SLM["🧠 Ollama (Phi3 / Kimi)"]
         VectorDB[("🗄️ ChromaDB")]
     end
     User --> UI
     UI -->|1. Prompt| Agent
     Agent -->|2. Sanitized| API
-    API -->|3. RAG/Direct| LLM
-    LLM --> VectorDB
+    API -->|3. RAG/Direct| SLM
+    SLM --> VectorDB
 ```
 
 ---
@@ -58,8 +58,8 @@ graph TD
    - `git` (opcional)
 2. **Clonar el repositorio**
    ```bash
-   git clone https://github.com/zyrabit/zyrabit-llm.git
-   cd zyrabit-llm
+   git clone https://github.com/zyrabit/zyrabit-SLM.git
+   cd zyrabit-SLM
    ```
 3. **Entorno virtual**
    ```bash
@@ -70,11 +70,11 @@ graph TD
    ```
 4. **Infraestructura**
    ```bash
-   docker compose up -d   # levanta llm‑server, vector‑db y api‑rag
+   docker compose up -d   # levanta SLM‑server, vector‑db y api‑rag
    ```
 5. **Descargar modelos obligatorios**
    ```bash
-   ./setup_ollama.sh   # verifica Docker, arranca llm‑server y descarga phi3, kimi‑k2‑thinking:cloud y mxbai‑embed‑large
+   ./setup_ollama.sh   # verifica Docker, arranca SLM‑server y descarga phi3, kimi‑k2‑thinking:cloud y mxbai‑embed‑large
    ```
 6. **Ejecutar la UI**
    ```bash

@@ -11,7 +11,7 @@ client = TestClient(app)
 
 
 @patch('app.services.execute_rag_pipeline')
-@patch('app.services.get_llm_router_decision')
+@patch('app.services.get_SLM_router_decision')
 def test_end_to_end_rag_flow(mock_router_decision, mock_rag_pipeline):
     """
     Prueba el flujo completo: Usuario pregunta → Router → RAG → Respuesta.
@@ -36,18 +36,18 @@ def test_end_to_end_rag_flow(mock_router_decision, mock_rag_pipeline):
     mock_router_decision.assert_called_once_with(query["text"])
     mock_rag_pipeline.assert_called_once_with(query["text"])
 
-# --- PRUEBA 2: End-to-End Direct LLM Flow ---
+# --- PRUEBA 2: End-to-End Direct SLM Flow ---
 
 
-@patch('app.services.call_direct_llm')
-@patch('app.services.get_llm_router_decision')
-def test_end_to_end_direct_llm_flow(mock_router_decision, mock_direct_llm):
+@patch('app.services.call_direct_SLM')
+@patch('app.services.get_SLM_router_decision')
+def test_end_to_end_direct_SLM_flow(mock_router_decision, mock_direct_SLM):
     """
-    Prueba el flujo completo: Usuario pregunta → Router → LLM Directo → Respuesta.
+    Prueba el flujo completo: Usuario pregunta → Router → SLM Directo → Respuesta.
     """
     # GIVEN
-    mock_router_decision.return_value = "direct_llm_answer"
-    mock_direct_llm.return_value = "Python es un lenguaje de programación interpretado, de alto nivel y de propósito general."
+    mock_router_decision.return_value = "direct_SLM_answer"
+    mock_direct_SLM.return_value = "Python es un lenguaje de programación interpretado, de alto nivel y de propósito general."
 
     query = {"text": "¿Qué es Python?"}
 
@@ -63,12 +63,12 @@ def test_end_to_end_direct_llm_flow(mock_router_decision, mock_direct_llm):
 
     # Verificar que se llamó a los servicios correctos
     mock_router_decision.assert_called_once_with(query["text"])
-    mock_direct_llm.assert_called_once_with(query["text"])
+    mock_direct_SLM.assert_called_once_with(query["text"])
 
 # --- PRUEBA 3: End-to-End Reject Query Flow ---
 
 
-@patch('app.services.get_llm_router_decision')
+@patch('app.services.get_SLM_router_decision')
 def test_end_to_end_reject_query_flow(mock_router_decision):
     """
     Prueba el flujo completo: Usuario pregunta spam → Router → Rechazo.
@@ -94,7 +94,7 @@ def test_end_to_end_reject_query_flow(mock_router_decision):
 
 
 @patch('app.services.execute_rag_pipeline')
-@patch('app.services.get_llm_router_decision')
+@patch('app.services.get_SLM_router_decision')
 @patch('app.services.process_and_ingest_file')
 def test_ingest_then_query_flow(
         mock_process_file,
@@ -143,13 +143,13 @@ def test_ingest_then_query_flow(
 # --- PRUEBA 5: Multiple Queries Flow ---
 
 
-@patch('app.services.call_direct_llm')
+@patch('app.services.call_direct_SLM')
 @patch('app.services.execute_rag_pipeline')
-@patch('app.services.get_llm_router_decision')
+@patch('app.services.get_SLM_router_decision')
 def test_multiple_queries_flow(
         mock_router_decision,
         mock_rag_pipeline,
-        mock_direct_llm):
+        mock_direct_SLM):
     """
     Prueba múltiples consultas en secuencia con diferentes rutas.
     """
@@ -160,9 +160,9 @@ def test_multiple_queries_flow(
     response1 = client.post("/v1/chat", json={"text": "Pregunta técnica 1"})
     assert response1.status_code == 200
 
-    # Query 2: Direct LLM
-    mock_router_decision.return_value = "direct_llm_answer"
-    mock_direct_llm.return_value = "Respuesta LLM 2"
+    # Query 2: Direct SLM
+    mock_router_decision.return_value = "direct_SLM_answer"
+    mock_direct_SLM.return_value = "Respuesta SLM 2"
 
     response2 = client.post("/v1/chat", json={"text": "Pregunta general 2"})
     assert response2.status_code == 200
@@ -176,7 +176,7 @@ def test_multiple_queries_flow(
     # Verificar que todas las consultas funcionaron independientemente
     assert mock_router_decision.call_count == 3
     mock_rag_pipeline.assert_called_once()
-    mock_direct_llm.assert_called_once()
+    mock_direct_SLM.assert_called_once()
 
 # --- PRUEBA 6: Health Check Before Operations ---
 
@@ -202,11 +202,11 @@ def test_health_check_before_operations():
 
 
 @patch('app.services.execute_rag_pipeline')
-@patch('app.services.call_direct_llm')
-@patch('app.services.get_llm_router_decision')
+@patch('app.services.call_direct_SLM')
+@patch('app.services.get_SLM_router_decision')
 def test_error_recovery_flow(
         mock_router_decision,
-        mock_direct_llm,
+        mock_direct_SLM,
         mock_rag_pipeline):
     """
     Prueba que el sistema se recupere de errores y siga funcionando.
@@ -219,9 +219,9 @@ def test_error_recovery_flow(
     assert response1.status_code == 200
     assert "error" in response1.json()["response"].lower()
 
-    # Query 2: Direct LLM funciona bien
-    mock_router_decision.return_value = "direct_llm_answer"
-    mock_direct_llm.return_value = "Respuesta correcta"
+    # Query 2: Direct SLM funciona bien
+    mock_router_decision.return_value = "direct_SLM_answer"
+    mock_direct_SLM.return_value = "Respuesta correcta"
 
     response2 = client.post("/v1/chat", json={"text": "Pregunta 2"})
     assert response2.status_code == 200
