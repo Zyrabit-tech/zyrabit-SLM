@@ -10,6 +10,24 @@ SLM_URL = os.getenv("SLM_URL", "http://slm-engine:11434/api/generate")
 # Defaulting to phi3 as per setup script, but overridable
 MODEL_NAME = os.getenv("MODEL_NAME", "phi3")
 
+# --- SYSTEM PROMPT LOADING ---
+def load_system_prompt() -> str:
+    """Loads the system prompt from the txt file.
+    
+    Returns:
+        str: The system prompt content, or empty string if file not found.
+    """
+    prompt_path = os.path.join(os.path.dirname(__file__), "system_prompt.txt")
+    try:
+        with open(prompt_path, "r", encoding="utf-8") as f:
+            return f.read().strip()
+    except FileNotFoundError:
+        print(f"⚠️  WARNING: system_prompt.txt not found at {prompt_path}")
+        return ""
+
+# Load system prompt once at module initialization
+SYSTEM_PROMPT = load_system_prompt()
+
 def print_header(title: str):
     """Prints a styled header to the console."""
     print(f"\n{'='*60}")
@@ -67,9 +85,12 @@ def query_secure_slm(prompt: str) -> tuple[str, float]:
         print("   ✅ Input clean. Forwarding to core.")
 
     # PHASE B: LOCAL INFERENCE (Air-Gapped)
+    # Construct prompt with system context
+    full_prompt = f"{SYSTEM_PROMPT}\n\nUser: {sanitized_prompt}\nAssistant:" if SYSTEM_PROMPT else sanitized_prompt
+    
     payload = {
         "model": MODEL_NAME,
-        "prompt": sanitized_prompt + " (Answer concisely in English)",
+        "prompt": full_prompt,
         "stream": False
     }
     
@@ -91,9 +112,12 @@ def call_direct_slm(prompt: str) -> str:
     """
     Direct call to SLM without sanitization (for general knowledge).
     """
+    # Construct prompt with system context
+    full_prompt = f"{SYSTEM_PROMPT}\n\nUser: {prompt}\nAssistant:" if SYSTEM_PROMPT else prompt
+    
     payload = {
         "model": MODEL_NAME,
-        "prompt": prompt,
+        "prompt": full_prompt,
         "stream": False
     }
     try:
