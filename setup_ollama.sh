@@ -34,6 +34,7 @@ fi
 # 3. Start container if it is stopped/exited
 STATUS=$(docker inspect -f '{{.State.Status}}' ${CONTAINER_NAME})
 if [ "$STATUS" != "running" ]; then
+  log_warning "Starting SLM Engine..."
   log_warning "Container '${CONTAINER_NAME}' is $STATUS. Attempting to start..."
   docker compose start ${CONTAINER_NAME}
   if [ $? -ne 0 ]; then

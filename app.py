@@ -85,7 +85,7 @@ def query_backend(prompt):
 
 # --- GUI (THE FACE OF THE PRODUCT) ---
 st.set_page_config(
-    page_title="Zyrabit Secure AI",
+    page_title="Zyrabit SLM Secure Suite",
     layout="wide",
     page_icon="🛡️")
 load_css()
@@ -97,26 +97,26 @@ with col1:
     st.image("https://img.icons8.com/color/96/000000/shield.png", width=80)
 with col2:
     st.title("Zyrabit Core")
-    st.markdown("**Infraestructura de IA & Zero-Trust**")
+    st.markdown("**Infraestructura SLM & Zero-Trust**")
 
 st.divider()
 
 # Control Panel
 with st.sidebar:
     st.header("⚙️ Configuración del Nodo")
-    st.success("● Motor Neural: ONLINE (CPU Mode)")
+    st.success("● Motor SLM: ONLINE (CPU Mode)")
     st.info(f"🧠 Modelo: {MODEL}")
     st.warning("🛡️ DLP Sidecar: ACTIVO")
     st.markdown("---")
 
 # Chat Area
-st.subheader("💬 Interfaz de Prueba Segura")
+st.subheader("💬 Interfaz de Prueba Segura (SLM)")
 
 user_input = st.text_area(
     "Escribe tu consulta (Intenta incluir datos sensibles como emails o montos):",
     height=100)
 
-if st.button("🚀 Ejecutar Inferencia Segura"):
+if st.button("🚀 Ejecutar Inferencia SLM Segura"):
     if user_input:
         # 1. Sanitization Process
         with st.status("🔒 Procesando Protocolo de Seguridad...", expanded=True) as status:
@@ -124,7 +124,7 @@ if st.button("🚀 Ejecutar Inferencia Segura"):
             time.sleep(0.5)  # Dramatic effect
             clean_prompt = sanitize_input(user_input)
             st.write("2. Ejecutando PII Scrubbing (Borrado de Datos Personales)...")
-            st.write("3. Enviando a Motor Local (Air-Gapped)...")
+            st.write("3. Enviando a Motor SLM Local (Air-Gapped)...")
             status.update(
                 label="✅ Inferencia Completada",
                 state="complete",
@@ -142,7 +142,7 @@ if st.button("🚀 Ejecutar Inferencia Segura"):
         response_text, latency = query_backend(clean_prompt)
 
         with col_output:
-            st.markdown("### 🤖 Respuesta del Modelo")
+            st.markdown("### 🤖 Respuesta del SLM")
             st.success(response_text)
             st.caption(f"⏱️ Latencia: {latency:.2f}s | 🔋 Hardware: CPU Standard")
     else:

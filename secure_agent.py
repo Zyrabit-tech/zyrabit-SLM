@@ -38,7 +38,7 @@ def sanitize_pii(text: str) -> (str, bool):
     return text, changed
 
 
-def query_backend(prompt: str) -> (str, float):
+def query_secure_slm(prompt: str) -> (str, float):
     payload = {"text": prompt}
     start = time.time()
     try:
@@ -55,7 +55,7 @@ def query_backend(prompt: str) -> (str, float):
 
 def main():
     parser = argparse.ArgumentParser(description="Secure agent for Zyrabit SLM")
-    parser.add_argument("prompt", nargs="?", help="Prompt to send to the model")
+    parser.add_argument("prompt", nargs="?", help="Prompt to send to the SLM")
     args = parser.parse_args()
 
     if args.prompt:
@@ -75,8 +75,8 @@ def main():
     else:
         print("🔐 No se detectó PII para sanitizar.\n")
 
-    response, latency = query_backend(clean_prompt)
-    print(f"🤖 Respuesta del modelo (latencia {latency:.2f}s):\n{response}\n")
+    response, latency = query_secure_slm(clean_prompt)
+    print(f"🤖 Respuesta del SLM (latencia {latency:.2f}s):\n{response}\n")
 
 
 if __name__ == "__main__":
