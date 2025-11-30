@@ -1,0 +1,37 @@
+{
+  "annotations": { "list": [] },
+  "editable": true,
+  "gnetId": null,
+  "graphTooltip": 0,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "title": "Total Requests (Traffic)",
+      "type": "stat",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "targets": [
+        { "expr": "sum(rate(slm_requests_total[1m]))", "legendFormat": "Requests/sec" }
+      ]
+    },
+    {
+      "title": "slm Latency (Seconds)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "targets": [
+        { "expr": "rate(slm_request_duration_seconds_sum[1m]) / rate(slm_request_duration_seconds_count[1m])", "legendFormat": "Avg Latency" }
+      ]
+    }
+  ],
+  "schemaVersion": 36,
+  "style": "dark",
+  "tags": ["zyrabit", "slm"],
+  "templating": { "list": [] },
+  "time": { "from": "now-15m", "to": "now" },
+  "timepicker": {},
+  "timezone": "",
+  "title": "Zyrabit SLM Command Center",
+  "uid": "zyrabit-main",
+  "version": 1,
+  "weekStart": ""
+}

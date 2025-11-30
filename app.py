@@ -11,7 +11,6 @@ load_dotenv()
 
 # --- CONFIGURATION ---
 API_URL = os.getenv("API_URL", "http://localhost:8080/v1/chat")
-# MODEL = "mistral"
 MODEL = os.getenv("MODEL", "phi3")
 
 # --- ZYRABIT STYLES ---

@@ -1,5 +1,5 @@
 services:
-  # 1. THE BRAIN: Your RAG API with FastAPI
+  # 1. THE BRAIN: API RAG
   api-rag:
     build:
       context: ./api-rag
@@ -7,9 +7,6 @@ services:
       - "8080:8080"
     env_file:
       - .env
-    environment:
-      - SLM_URL=http://slm-engine:11434
-      - DB_URL=http://vector-db:8000
     depends_on:
       vector-db:
         condition: service_healthy
@@ -18,7 +15,7 @@ services:
     networks:
       - rag-net
 
-  # 2. THE MUSCLE: The SLM Server (Ollama)
+  # 2. THE MUSCLE: SLM Server
   slm-engine:
     image: ollama/ollama:latest
     container_name: slm-engine
@@ -28,16 +25,8 @@ services:
       - ./ollama-models:/root/.ollama
     networks:
       - rag-net
-    # GPU Support (Commented out for CPU/Mac compatibility)
-    # deploy:
-    #   resources:
-    #     reservations:
-    #       devices:
-    #         - driver: nvidia
-    #           count: 1
-    #           capabilities: [gpu]
 
-  # 3. THE MEMORY: Vector Database (ChromaDB)
+  # 3. THE MEMORY: Vector DB
   vector-db:
     image: chromadb/chroma:latest
     container_name: vector-db
@@ -58,7 +47,7 @@ services:
     image: prom/prometheus:latest
     container_name: prometheus
     volumes:
-      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./config/prometheus.yml:/etc/prometheus/prometheus.yml
       - prometheus-data:/prometheus
     ports:
       - "9091:9090"
@@ -69,10 +58,13 @@ services:
   grafana:
     image: grafana/grafana:latest
     container_name: grafana
-    volumes:
-      - grafana-data:/var/lib/grafana
     ports:
       - "3000:3000"
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./config/grafana/datasources:/etc/grafana/provisioning/datasources
+      - ./config/grafana/dashboards:/etc/grafana/provisioning/dashboards
+      - ./config/grafana/dashboards:/var/lib/grafana/dashboards
     depends_on:
       - prometheus
     networks:
