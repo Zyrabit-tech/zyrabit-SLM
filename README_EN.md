@@ -1,149 +1,97 @@
-# Zyrabit SLM Secure Suite
-[![Spanish](https://img.shields.io/badge/lang-Español-red.svg)](README.md)
-![Python](https://img.shields.io/badge/python-v3.10+-blue.svg)
-![Tests](https://img.shields.io/badge/tests-passing-brightgreen.svg)
+# Zyrabit SLM Secure Suite (v1.0‑beta)
+
+[![Spanish](https://img.shields.io/badge/lang-Spanish-blue.svg)](README.md)
+![Python](https://img.shields.io/badge/python-v3.10%2B-blue.svg)
 ![Docker](https://img.shields.io/badge/docker--compose-ready-green.svg)
 ![License](https://img.shields.io/badge/license-MIT-yellow.svg)
 ![Architecture](https://img.shields.io/badge/architecture-clean-orange.svg)
+![Tests](https://img.shields.io/badge/tests-passing-brightgreen.svg)
+-----
 
-**Zyrabit SLM Secure Suite** is a reference architecture for deploying secure and private Generative AI agents in any environment. It combines the power of **Ollama (Phi-3)** with an intermediate security layer that sanitizes sensitive data before it touches the SLM.
+## 📖 Description
 
-## 🎯 Value Proposition
+**Zyrabit SLM Secure Suite** is a local AI solution that combines **Small Language Models (SLMs)** with a Retrieval-Augmented Generation (RAG) engine and a **Zero-Trust** security layer.
 
-1.  **Privacy by Design**: No PII data (Emails, Phones, Credit Cards) reaches the language model. The secure agent acts as a data firewall.
-2.  **Data Sovereignty**: 100% local or on-premise execution using efficient models like Phi-3.
-3.  **Full Observability**: Integrated monitoring stack to trace latency, token usage, and errors in real-time.
-4.  **Modular Architecture**: Decoupled components (Client, API, SLM, VectorDB) allowing independent scaling.
+### 🧬 Our Philosophy
 
-## 🏗️ Architecture
+  * **Efficiency**: Optimized execution for consumer hardware (Mac M1/M2, Consumer GPUs).
+  * **Speed**: Lower latency thanks to compact models (Phi-3, Mistral).
+  * **Sovereignty**: Your data never leaves your infrastructure. Everything runs locally.
 
-The project is divided into two main components:
+-----
 
-1.  **Frontend (Root)**:
-    *   `app.py`: Streamlit dashboard for user interaction.
-    *   `secure_agent.py`: CLI agent for quick and secure testing.
-2.  **Backend (`zyrabit-brain-api`)**:
-    *   `api-rag/`: FastAPI API that orchestrates RAG logic, connects with ChromaDB and Ollama.
+## 🛠️ Validated Environment
 
-## 🐍 Quick Setup (Local)
+| Platform | CPU | RAM | OS |
+|------------|-----|-----|----|
+| MacBook Pro (M1 Pro) | 8‑core | 16 GB | macOS Sequoia 15.1 |
+| Linux (Ubuntu 22.04) | 4‑core | 8 GB | - |
+| Windows (WSL2) | 4‑core | 8 GB | - |
 
-### Prerequisites
-*   **Python 3.10+**
-*   **Docker** (for the full stack with ChromaDB and Prometheus)
+> **Windows Note:** Use WSL2 to run Docker and scripts.
 
-### ✅ Validated Specifications
+-----
 
-This project has been tested and validated on the following configuration:
+## 📦 Installation
 
-| Component | Validation Specification |
-|-----------|--------------------------|
-| Base Hardware | MacBook Pro (Apple Silicon M1 Pro) |
-| RAM | 16 GB (Unified Memory) |
-| Operating System | macOS Sequoia 15.1 (Build 25B78) |
-| Python | Version 3.9+ / 3.10+ |
-
-
-### ⚠️ Compatibility Notes
-
-**Windows Users:** We strongly recommend using **WSL2** (Windows Subsystem for Linux). Bash scripts (`.sh`) and Docker network management work natively in WSL2. Running this directly in PowerShell may require manual adjustments.
-
-**Linux Users:** Natively compatible with Ubuntu 22.04+ and Debian 11+.
-
-**Architecture:** Docker images are built for `linux/amd64` and `linux/arm64`, ensuring compatibility on both Intel/AMD servers and ARM architectures (Apple Silicon, AWS Graviton).
-
-### Installation Steps
-
-1.  **Configure Python Environment**:
+1.  **Prerequisites**
+      - Docker & Docker‑Compose
+      - Python 3.10 +
+      - `git` (optional)
+2.  **Clone the repository**
     ```bash
-    # Create virtual environment
-    python3 -m venv .venv
-
-    # Activate environment (Mac/Linux)
-    source .venv/bin/activate
-    # Windows (WSL2 recommended or PowerShell):
-    # .\.venv\Scripts\activate
-
-    # Install dependencies
-    pip3 install -r requirements.txt
+    git clone https://github.com/Zyrabit-tech/zyrabit-llm.git
+    cd zyrabit-SLM
     ```
-
-2.  **Spin up Infrastructure (Docker)**:
-    This step starts the brain (API), memory (Chroma), and engine (Ollama).
+3.  **Virtual Environment**
+    ```bash
+    python -m venv .venv
+    source .venv/bin/activate   # macOS / Linux
+    # .venv\Scripts\activate   # Windows
+    pip install -r requirements.txt
+    ```
+4.  **Infrastructure**
     ```bash
     cd zyrabit-brain-api
-    docker compose up -d
+    docker compose up -d   # spins up slm-engine, vector‑db and api‑rag
     cd ..
     ```
-
-    **Optional Configuration**: If you need to customize environment variables (URLs, model names, etc.):
+5.  **Download Required Models**
     ```bash
-    cd zyrabit-brain-api
-    cp .env.example .env
-    # Edit .env with your custom values
+    chmod +x setup_slm.sh
+    ./setup_slm.sh   # verifies Docker, starts slm-engine and downloads phi3, kimi‑k2‑thinking:cloud and mxbai‑embed‑large
     ```
-    
-    Key variables available:
-    - `OLLAMA_BASE_URL`: Ollama server URL (default: `http://SLM-server:11434`)
-    - `MODEL_NAME`: SLM model to use (default: `phi3`)
-    - `VECTOR_DB_HOST`: ChromaDB host (default: `vector-db`)
-    - `ENABLE_PII_SANITIZATION`: Enable sensitive data sanitization (default: `True`)
-
-3.  **Initialize AI Models**:
-    Once Docker is running, download the necessary models (`phi3` and `mxbai-embed-large`).
-    ```bash
-    chmod +x setup_ollama.sh
-    ./setup_ollama.sh
-    ```
-
-4.  **Launch! 🚀**:
+6.  **Run the UI**
     ```bash
     streamlit run app.py
     ```
+    Access at `http://localhost:8501`.
 
-## 📚 Document Ingestion (RAG)
+-----
 
-To feed the vector memory with your own documents, use the API endpoint:
-
-**Option A: Via cURL**
-```bash
-curl -X POST "http://localhost:8080/v1/ingest" \
-     -H "accept: application/json" \
-     -H "Content-Type: multipart/form-data" \
-     -F "file=@/path/to/your/document.pdf"
-```
-
-**Option B: Via Swagger Interface**
-1.  Open `http://localhost:8080/docs` in your browser.
-2.  Find the `POST /v1/ingest` endpoint.
-3.  Upload your PDF file (Max 800MB).
-
-The system will process the PDF, generate embeddings with `mxbai-embed-large`, and save them to ChromaDB automatically.
-
-## 🐳 Docker Deployment (Optional)
-
-To run the full stack with ChromaDB, Prometheus, and Grafana:
+## 🚀 Quick Usage
 
 ```bash
-cd zyrabit-brain-api
-docker compose up -d
+# Secure CLI
+python secure_agent.py "My email is john@example.com and my balance is $1,200.00"
 ```
 
-See [zyrabit-brain-api/README.md](zyrabit-brain-api/README.md) for more details about the Docker architecture.
+The agent will display the original prompt, the sanitized prompt, and the model's response.
 
-## 🛠️ Troubleshooting
+-----
 
-*   **Ollama Connection Error**: Ensure Ollama is running (`ollama serve`) and listening on port 11434.
-*   **Model Not Found**: Run `./setup_ollama.sh` to ensure `phi3` and `mxbai-embed-large` are downloaded.
-*   **Execution Permissions**: If `setup_ollama.sh` fails, make sure you ran `chmod +x setup_ollama.sh`.
-*   **Virtual environment not active**: Verify that your terminal prompt shows `(.venv)` at the beginning.
+## 🧪 Tests
 
-## 🤝 Contributing
+Run the test suite with:
 
-We want your help to make Zyrabit SLM better!
-Please read our [Contribution Guidelines](CONTRIBUTING_EN.md) to learn about our workflow, commit convention, and how to get started.
+```bash
+pytest -q
+```
 
-**Remember**: Pull Requests must target the `beta` branch.
+Tests cover PII sanitization and backend response validation.
 
-## 📄 License
+-----
 
-This project is licensed under the [MIT License](LICENSE).
+## 📜 License
+
+MIT © Zyrabit 2025

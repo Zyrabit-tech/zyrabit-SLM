@@ -2,15 +2,17 @@ services:
   # 1. THE BRAIN: Your RAG API with FastAPI
   api-rag:
     build:
-      context: ./api-rag # Points to the folder with your FastAPI Dockerfile
+      context: ./api-rag
     ports:
-      - "8080:8080" # The only port exposed to your host machine
+      - "8080:8080"
+    env_file:
+      - .env
     environment:
-      - SLM_URL=http://slm-engine:11434 # Internal URL to talk to Ollama
-      - DB_URL=http://vector-db:8005 # Internal URL to talk to Chroma
+      - SLM_URL=http://slm-engine:11434
+      - DB_URL=http://vector-db:8000
     depends_on:
       vector-db:
-        condition: service_healthy # <--- Wait for DB to respond
+        condition: service_healthy
       slm-engine:
         condition: service_started
     networks:
@@ -18,15 +20,15 @@ services:
 
   # 2. THE MUSCLE: The SLM Server (Ollama)
   slm-engine:
-    image: ollama/ollama
+    image: ollama/ollama:latest
+    container_name: slm-engine
     ports:
-      - "11434:11434" # Expose to host for local scripts
+      - "11434:11434"
     volumes:
-      - ./ollama-models:/root/.ollama # Persistent volume for models (heavy)
+      - ./ollama-models:/root/.ollama
     networks:
       - rag-net
-    # --- CRITICAL FOR GPU! ---
-    # Uncomment this on your cloud server (e.g. DigitalOcean with GPU)
+    # GPU Support (Commented out for CPU/Mac compatibility)
     # deploy:
     #   resources:
     #     reservations:
@@ -35,13 +37,14 @@ services:
     #           count: 1
     #           capabilities: [gpu]
 
-    # 3. THE MEMORY: Vector Database (ChromaDB)
+  # 3. THE MEMORY: Vector Database (ChromaDB)
   vector-db:
-    image: chromadb/chroma
+    image: chromadb/chroma:latest
+    container_name: vector-db
     ports:
-      - "8001:8005" # Expose to host on 8001 ONLY for ingestion script (ingest.py)
+      - "8001:8000"
     volumes:
-      - ./chroma-data:/chroma/chroma # Persistent volume for vectors
+      - ./chroma-data:/chroma/chroma
     healthcheck:
       test: [ "CMD", "curl", "-f", "http://localhost:8000/api/v1/heartbeat" ]
       interval: 30s
@@ -52,33 +55,33 @@ services:
 
   # 4. THE MONITOR (Scraper): Prometheus
   prometheus:
-    image: prom/prometheus
+    image: prom/prometheus:latest
+    container_name: prometheus
     volumes:
       - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
       - prometheus-data:/prometheus
     ports:
-      - "9091:9090" # Access Prometheus at http://localhost:9091
+      - "9091:9090"
     networks:
       - rag-net
 
   # 5. THE MONITOR (Dashboard): Grafana
   grafana:
-    image: grafana/grafana
+    image: grafana/grafana:latest
+    container_name: grafana
     volumes:
       - grafana-data:/var/lib/grafana
     ports:
-      - "3000:3000" # Access Grafana at http://localhost:3000
+      - "3000:3000"
     depends_on:
       - prometheus
     networks:
       - rag-net
 
-# Internal network for containers to talk by service name
 networks:
   rag-net:
     driver: bridge
 
-# Volumes to persist data even if containers are destroyed
 volumes:
   prometheus-data:
   grafana-data:

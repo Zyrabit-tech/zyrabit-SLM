@@ -20,29 +20,6 @@
 
 ---
 
-## 🏗️ Arquitectura
-
-```mermaid
-graph TD
-    subgraph "Cliente Seguro"
-        User((👤 Usuario))
-        Agent["🕵️ secure_agent.py"]
-        UI["🖥️ app.py (Streamlit)"]
-    end
-    subgraph "Zyrabit Core"
-        API["⚡ api‑rag"]
-        SLM["🧠 slm-engine (Ollama)"]
-        VectorDB[("🗄️ ChromaDB")]
-    end
-    User --> UI
-    UI -->|1. Prompt| Agent
-    Agent -->|2. Sanitized| API
-    API -->|3. RAG/Direct| SLM
-    SLM --> VectorDB
-```
-
----
-
 ## 🛠️ Entorno Validado
 
 | Plataforma | CPU | RAM | OS |
@@ -63,15 +40,15 @@ graph TD
    - `git` (opcional)
 2. **Clonar el repositorio**
    ```bash
-   git clone https://github.com/zyrabit/zyrabit-SLM.git
+   git clone https://github.com/Zyrabit-tech/zyrabit-llm.git
    cd zyrabit-SLM
    ```
 3. **Entorno virtual**
    ```bash
-   python -m venv .venv
+   python3 -m venv .venv
    source .venv/bin/activate   # macOS / Linux
    # .venv\Scripts\activate   # Windows
-   pip install -r requirements.txt
+   pip3 install -r requirements.txt
    ```
 4. **Infraestructura**
    ```bash
