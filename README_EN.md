@@ -63,7 +63,7 @@
     ```
 6.  **Run the UI**
     ```bash
-    streamlit run app.py
+    streamlit run slm_console.py
     ```
     Access at `http://localhost:8501`.
 

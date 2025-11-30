@@ -9,7 +9,7 @@ services:
       - .env
     depends_on:
       vector-db:
-        condition: service_healthy
+        condition: service_started
       slm-engine:
         condition: service_started
     networks:
@@ -34,11 +34,6 @@ services:
       - "8001:8000"
     volumes:
       - ./chroma-data:/chroma/chroma
-    healthcheck:
-      test: [ "CMD", "curl", "-f", "http://localhost:8000/api/v1/heartbeat" ]
-      interval: 30s
-      timeout: 10s
-      retries: 3
     networks:
       - rag-net
 

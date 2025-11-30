@@ -6,7 +6,7 @@ import os
 
 # --- CONFIGURATION ---
 # Use environment variables or default to local settings
-SLM_URL = os.getenv("SLM_URL", "http://localhost:11434/api/generate")
+SLM_URL = os.getenv("SLM_URL", "http://slm-engine:11434/api/generate")
 # Defaulting to phi3 as per setup script, but overridable
 MODEL_NAME = os.getenv("MODEL_NAME", "phi3")
 
