@@ -11,7 +11,12 @@
 
 ## 📖 Descripción
 
-**Zyrabit SLM Secure Suite** es una solución de IA local que combina un modelo de lenguaje grande (Ollama) con un motor de recuperación‑aumentada (RAG) y una capa de **Zero‑Trust** que sanitiza cualquier dato sensible antes de enviarlo al modelo. El proyecto está pensado para ejecutarse en entornos locales (Mac M1 Pro, Linux, Windows WSL2) sin depender de la nube, garantizando privacidad y cumplimiento de normativas.
+**Zyrabit SLM Secure Suite** es una solución de IA local que combina un modelo de lenguaje pequeño (**Small Language Models - SLMs**) con un motor de recuperación‑aumentada (RAG) y una capa de **Zero‑Trust**.
+
+### 🧬 Nuestra Filosofía
+*   **Eficiencia**: Ejecución optimizada para hardware de consumo (Mac M1/M2, Consumer GPUs).
+*   **Velocidad**: Menor latencia gracias a modelos compactos (Phi-3, Mistral).
+*   **Soberanía**: Tus datos nunca salen de tu infraestructura. Todo corre localmente.
 
 ---
 
@@ -26,7 +31,7 @@ graph TD
     end
     subgraph "Zyrabit Core"
         API["⚡ api‑rag"]
-        SLM["🧠 Ollama (Phi3 / Kimi)"]
+        SLM["🧠 slm-engine (Ollama)"]
         VectorDB[("🗄️ ChromaDB")]
     end
     User --> UI
@@ -70,11 +75,14 @@ graph TD
    ```
 4. **Infraestructura**
    ```bash
-   docker compose up -d   # levanta SLM‑server, vector‑db y api‑rag
+   cd zyrabit-brain-api
+   docker compose up -d   # levanta slm-engine, vector‑db y api‑rag
+   cd ..
    ```
 5. **Descargar modelos obligatorios**
    ```bash
-   ./setup_ollama.sh   # verifica Docker, arranca SLM‑server y descarga phi3, kimi‑k2‑thinking:cloud y mxbai‑embed‑large
+   chmod +x setup_slm.sh
+   ./setup_slm.sh   # verifica Docker, arranca slm-engine y descarga phi3, kimi‑k2‑thinking:cloud y mxbai‑embed‑large
    ```
 6. **Ejecutar la UI**
    ```bash

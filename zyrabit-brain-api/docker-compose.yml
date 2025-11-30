@@ -6,18 +6,18 @@ services:
     ports:
       - "8080:8080" # The only port exposed to your host machine
     environment:
-      - SLM_URL=http://SLM-server:11434 # Internal URL to talk to Ollama
+      - SLM_URL=http://slm-engine:11434 # Internal URL to talk to Ollama
       - DB_URL=http://vector-db:8005 # Internal URL to talk to Chroma
     depends_on:
       vector-db:
         condition: service_healthy # <--- Wait for DB to respond
-      SLM-server:
+      slm-engine:
         condition: service_started
     networks:
       - rag-net
 
   # 2. THE MUSCLE: The SLM Server (Ollama)
-  SLM-server:
+  slm-engine:
     image: ollama/ollama
     ports:
       - "11434:11434" # Expose to host for local scripts

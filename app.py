@@ -45,6 +45,7 @@ def load_css():
         /* Headers */
         h1, h2, h3 {
             color: #3f5a6d !important;
+            font-weight: 700;
         }
 
         /* Sidebar */
@@ -70,7 +71,7 @@ def query_backend(prompt):
     payload = {"text": prompt}
     try:
         start = time.time()
-        with st.spinner('Pensando...'):
+        with st.spinner('Procesando en SLM Engine...'):
             response = requests.post(API_URL, json=payload)
         end = time.time()
         if response.status_code == 200:
@@ -85,7 +86,7 @@ def query_backend(prompt):
 
 # --- GUI (THE FACE OF THE PRODUCT) ---
 st.set_page_config(
-    page_title="Zyrabit SLM Secure Suite",
+    page_title="Zyrabit SLM Enterprise Console",
     layout="wide",
     page_icon="🛡️")
 load_css()
@@ -96,7 +97,7 @@ with col1:
     # Placeholder for logo if available, otherwise shield icon
     st.image("https://img.icons8.com/color/96/000000/shield.png", width=80)
 with col2:
-    st.title("Zyrabit Core")
+    st.title("Zyrabit SLM Enterprise")
     st.markdown("**Infraestructura SLM & Zero-Trust**")
 
 st.divider()
@@ -104,13 +105,13 @@ st.divider()
 # Control Panel
 with st.sidebar:
     st.header("⚙️ Configuración del Nodo")
-    st.success("● Motor SLM: ONLINE (CPU Mode)")
+    st.success("● SLM Engine: ONLINE (slm-engine)")
     st.info(f"🧠 Modelo: {MODEL}")
     st.warning("🛡️ DLP Sidecar: ACTIVO")
     st.markdown("---")
 
 # Chat Area
-st.subheader("💬 Interfaz de Prueba Segura (SLM)")
+st.subheader("💬 Consola de Operaciones SLM")
 
 user_input = st.text_area(
     "Escribe tu consulta (Intenta incluir datos sensibles como emails o montos):",
@@ -124,7 +125,7 @@ if st.button("🚀 Ejecutar Inferencia SLM Segura"):
             time.sleep(0.5)  # Dramatic effect
             clean_prompt = sanitize_input(user_input)
             st.write("2. Ejecutando PII Scrubbing (Borrado de Datos Personales)...")
-            st.write("3. Enviando a Motor SLM Local (Air-Gapped)...")
+            st.write("3. Enviando a SLM Engine (Air-Gapped)...")
             status.update(
                 label="✅ Inferencia Completada",
                 state="complete",

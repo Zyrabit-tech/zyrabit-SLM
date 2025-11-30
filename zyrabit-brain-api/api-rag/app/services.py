@@ -6,7 +6,7 @@ import os
 
 # --- CONFIGURATION ---
 # Use environment variables or default to local settings
-OLLAMA_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434/api/generate")
+SLM_URL = os.getenv("SLM_URL", "http://localhost:11434/api/generate")
 # Defaulting to phi3 as per setup script, but overridable
 MODEL_NAME = os.getenv("MODEL_NAME", "phi3")
 
@@ -46,7 +46,7 @@ def sanitize_pii(text: str) -> str:
     
     return text
 
-def query_secure_SLM(prompt: str) -> tuple[str, float]:
+def query_secure_slm(prompt: str) -> tuple[str, float]:
     """
     Sends a sanitized prompt to the local SLM and returns the response and latency.
     
@@ -75,7 +75,7 @@ def query_secure_SLM(prompt: str) -> tuple[str, float]:
     
     try:
         start_time = time.time()
-        response = requests.post(OLLAMA_URL, json=payload)
+        response = requests.post(SLM_URL, json=payload)
         end_time = time.time()
         
         if response.status_code == 200:
@@ -85,7 +85,56 @@ def query_secure_SLM(prompt: str) -> tuple[str, float]:
             return f"Server Error: {response.text}", 0.0
             
     except requests.exceptions.ConnectionError:
-        return "❌ ERROR: Cannot connect to Ollama. Is the Docker container running?", 0.0
+        return "❌ ERROR: Cannot connect to Ollama (slm-engine). Is the Docker container running?", 0.0
+
+def call_direct_slm(prompt: str) -> str:
+    """
+    Direct call to SLM without sanitization (for general knowledge).
+    """
+    payload = {
+        "model": MODEL_NAME,
+        "prompt": prompt,
+        "stream": False
+    }
+    try:
+        response = requests.post(SLM_URL, json=payload)
+        if response.status_code == 200:
+            return response.json().get('response', '')
+        return f"Error: {response.status_code}"
+    except Exception as e:
+        return f"Connection Error: {str(e)}"
+
+def get_slm_router_decision(text: str) -> str:
+    """
+    Decides whether to use RAG or Direct SLM.
+    Simple keyword-based router for now.
+    """
+    # In a real system, this would be another SLM call or a classifier.
+    # For now, if it asks about "Zyrabit" or specific docs, use RAG.
+    keywords = ["zyrabit", "architecture", "security", "slm", "rag"]
+    if any(k in text.lower() for k in keywords):
+        return "search_rag_database"
+    return "direct_SLM_answer"
+
+def execute_rag_pipeline(text: str) -> str:
+    """
+    Executes the RAG pipeline: Retrieve -> Augment -> Generate.
+    Placeholder implementation.
+    """
+    # 1. Retrieve (Mock)
+    context = "Zyrabit SLM is a secure, local AI architecture."
+    
+    # 2. Augment
+    augmented_prompt = f"Context: {context}\n\nQuestion: {text}\n\nAnswer:"
+    
+    # 3. Generate
+    return call_direct_slm(augmented_prompt)
+
+def process_and_ingest_file(file_path: str):
+    """
+    Mock ingestion function.
+    """
+    return {"status": "success", "filename": os.path.basename(file_path), "chunks": 10}
 
 # --- EXECUTION ---
 if __name__ == "__main__":
@@ -94,13 +143,13 @@ if __name__ == "__main__":
     # CASE 1: HARMLESS QUERY
     query_1 = "What is the capital of France?"
     print(f"\n🗣️  User: {query_1}")
-    response, latency = query_secure_SLM(query_1)
+    response, latency = query_secure_slm(query_1)
     print(f"🤖 Zyrabit ({latency:.2f}s): {response.strip()}")
 
     # CASE 2: DATA LEAK ATTEMPT (Whisper Leak Scenario)
     query_2 = "Draft an email confirming I transferred $50,000.00 USD to account 4532-1234-5678-9012 using my credentials."
     print(f"\n🗣️  User (Risky): {query_2}")
-    response, latency = query_secure_SLM(query_2)
+    response, latency = query_secure_slm(query_2)
     
     print_header("SECURE MODEL RESPONSE")
     print(f"🤖 Zyrabit ({latency:.2f}s): {response.strip()}")

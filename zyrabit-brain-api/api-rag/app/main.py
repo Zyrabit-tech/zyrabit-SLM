@@ -58,7 +58,7 @@ def chat_router(query: ChatQuery):
     3.  **reject_query**: Rejects the query if it is out of scope.
     """
     # 1. The router decides what to do
-    decision = services.get_SLM_router_decision(query.text)
+    decision = services.get_slm_router_decision(query.text)
 
     # 2. The "badass" if/elif/else executes the decision
     if decision == "search_rag_database":
@@ -66,7 +66,7 @@ def chat_router(query: ChatQuery):
         return ChatResponse(response=response_text)
 
     elif decision == "direct_SLM_answer":
-        response_text = services.call_direct_SLM(query.text)
+        response_text = services.call_direct_slm(query.text)
         return ChatResponse(response=response_text)
 
     elif decision == "reject_query":
