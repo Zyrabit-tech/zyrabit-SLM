@@ -2,7 +2,7 @@
 
 ## 🔒 Reporting Security Vulnerabilities
 
-If you discover a security vulnerability in Zyrabit LLM, please **do not** open a public issue. Instead:
+If you discover a security vulnerability in Zyrabit SLM, please **do not** open a public issue. Instead:
 
 1. **Email**: Send details to `security@zyrabit.com` (or create a private security advisory on GitHub)
 2. **Include**: 
@@ -52,7 +52,7 @@ pip-audit
 This project implements Privacy by Design. When handling user data:
 
 1. **Never Log PII**: Emails, phone numbers, credit cards, SSNs must never appear in logs
-2. **Sanitize Before LLM**: Use the `SecureAgent` class to redact PII before sending to the model
+2. **Sanitize Before SLM**: Use the `SecureAgent` class to redact PII before sending to the model
 3. **Test Sanitization**: Add tests for new PII patterns in `tests/test_security.py`
 
 ### Supported PII Patterns
@@ -71,7 +71,7 @@ To add new patterns, update `SecureAgent.patterns` in `secure_agent.py`.
 
 This project is designed for **local or on-premise deployment**. Key security features:
 
-- **No External APIs**: All LLM inference happens locally via Ollama
+- **No External APIs**: All SLM inference happens locally via Ollama
 - **Air-Gapped Mode**: Can run completely offline after initial model download
 - **Data Sovereignty**: Your data never leaves your infrastructure
 

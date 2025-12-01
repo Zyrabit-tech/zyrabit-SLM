@@ -12,7 +12,7 @@ Vivimos una revolución de IA, pero la mayoría de las soluciones nos piden sacr
 
 Control Total (Self-Hosted): Tus modelos, tus datos, tus reglas. Todo corre en tu hardware (local o en la nube que tú elijas). No más dependencia de APIs externas.
 
-Arquitectura Desacoplada: Inspirado en microservicios. El "Cerebro" (API), el "Músculo" (LLM) y la "Memoria" (VectorDB) son contenedores separados. ¿Necesitas escalar la GPU? Escala solo el "Músculo". ¿Quieres cambiar de Chroma a Qdrant? Cambia solo la "Memoria".
+Arquitectura Desacoplada: Inspirado en microservicios. El "Cerebro" (API), el "Músculo" (SLM) y la "Memoria" (VectorDB) son contenedores separados. ¿Necesitas escalar la GPU? Escala solo el "Músculo". ¿Quieres cambiar de Chroma a Qdrant? Cambia solo la "Memoria".
 
 Portabilidad (Docker): docker compose up. Funciona en el Mac M2 de tu dev, funciona en un Droplet de DigitalOcean con GPU, y funciona en tu server bare-metal. Sin drama.
 
@@ -29,7 +29,7 @@ Este es el plan. Usamos docker-compose para orquestar 5 servicios que se hablan 
 
 API (Cerebro): FastAPI (Python)
 
-Servidor LLM (Músculo): Ollama
+Servidor SLM (Músculo): Ollama
 
 VectorDB (Memoria): ChromaDB
 
@@ -71,7 +71,7 @@ docker compose up -d
 
 Baja tu primer modelo (ej: Phi-3):
 
-docker compose exec llm-server ollama pull phi3
+docker compose exec SLM-server ollama pull phi3
 
 
 (Revisa la sección de "Elegir tu Modelo" para más opciones)
@@ -147,11 +147,11 @@ codestral:latest, qwen:72b-chat-q4_K_M
 
 Para entender RAG, debes entender esta diferencia:
 
-Pesos (Parámetros): Es el Cerebro del LLM. Es el conocimiento permanente que el modelo "aprendió" durante su entrenamiento (meses de cómputo en supercomputadoras). Es estático y pesado (gigas).
+Pesos (Parámetros): Es el Cerebro del SLM. Es el conocimiento permanente que el modelo "aprendió" durante su entrenamiento (meses de cómputo en supercomputadoras). Es estático y pesado (gigas).
 
 Analogía: La educación de un doctor en la facultad de medicina. Sabe qué es la diabetes, el cáncer y cómo funciona el cuerpo humano.
 
-Contexto (Ventana de Contexto): Es la Memoria RAM del LLM. Es la información temporal que le das en este instante. Es volátil y se limpia con cada nueva petición.
+Contexto (Ventana de Contexto): Es la Memoria RAM del SLM. Es la información temporal que le das en este instante. Es volátil y se limpia con cada nueva petición.
 
 Analogía: El expediente del paciente que le das al doctor.
 
@@ -170,7 +170,7 @@ Pruebas
 
 Un PR sin pruebas es un PR roto. Exigimos:
 
-Unit Tests (Pytest): Prueba funciones puras (ej. chunkers, prompt_formatters). Mockea (simula) las llamadas a los servicios llm-server y vector-db.
+Unit Tests (Pytest): Prueba funciones puras (ej. chunkers, prompt_formatters). Mockea (simula) las llamadas a los servicios SLM-server y vector-db.
 
 Integration Tests: Prueba el flujo completo. Usa un docker-compose.override.yml para levantar una base de datos de prueba y un modelo ligero, y confirma que el endpoint /query devuelve una respuesta.
 

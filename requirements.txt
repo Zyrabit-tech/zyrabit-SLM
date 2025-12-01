@@ -2,3 +2,4 @@ streamlit
 requests
 python-dotenv
 autopep8
+pytest

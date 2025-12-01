@@ -1,4 +1,4 @@
-# 🤝 Cómo Contribuir a Zyrabit LLM
+# 🤝 Cómo Contribuir a Zyrabit SLM
 
 ¡Gracias por tu interés en contribuir! Este proyecto es open-source porque creemos en el poder de la comunidad.
 
@@ -25,12 +25,12 @@ Tu flujo de trabajo debe ser:
 1.  **Haz Fork**: Crea un fork del repositorio a tu propia cuenta de GitHub.
 2.  **Clona tu Fork**:
     ```bash
-    git clone https://github.com/TU_USUARIO/zyrabit-llm.git
+    git clone https://github.com/TU_USUARIO/zyrabit-SLM.git
     ```
 3.  **Configura el Upstream** (Solo lo haces una vez):
     ```bash
-    cd zyrabit-llm
-    git remote add upstream https://github.com/Zyrabit-tech/zyrabit-llm.git
+    cd zyrabit-SLM
+    git remote add upstream https://github.com/Zyrabit-tech/zyrabit-SLM.git
     ```
 4.  **Sincroniza tu Fork**: Antes de empezar a programar, asegúrate de tener lo último de `beta`.
     ```bash

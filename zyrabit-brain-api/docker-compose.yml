@@ -1,77 +1,74 @@
 services:
-  # 1. EL CEREBRO: Tu API de RAG con FastAPI
+  # 1. THE BRAIN: API RAG
   api-rag:
     build:
-      context: ./api-rag # Apunta a la carpeta con tu Dockerfile de FastAPI
+      context: ./api-rag
     ports:
-      - "8080:8080" # El único puerto expuesto a tu máquina (host)
-    environment:
-      - LLM_URL=http://llm-server:11434 # URL interna para hablar con Ollama
-      - DB_URL=http://vector-db:8005 # URL interna para hablar con Chroma
+      - "8080:8080"
+    env_file:
+      - .env
     depends_on:
-      - llm-server
-      - vector-db
+      vector-db:
+        condition: service_started
+      slm-engine:
+        condition: service_started
     networks:
       - rag-net
 
-  # 2. EL MÚSCULO: El servidor de LLMs (Ollama)
-  llm-server:
-    image: ollama/ollama
+  # 2. THE MUSCLE: SLM Server
+  slm-engine:
+    image: ollama/ollama:latest
+    container_name: slm-engine
     ports:
-      - "11434:11434" # Expose to host for local scripts
+      - "11434:11434"
     volumes:
-      - ./ollama-models:/root/.ollama # Volumen persistente para los modelos (pesados)
+      - ./ollama-models:/root/.ollama
     networks:
       - rag-net
-    # --- ¡CRÍTICO PARA GPU! ---
-    # Descomenta esto en tu servidor de nube (ej. DigitalOcean con GPU)
-    # deploy:
-    #   resources:
-    #     reservations:
-    #       devices:
-    #         - driver: nvidia
-    #           count: 1
-    #           capabilities: [gpu]
 
-    # 3. LA MEMORIA: La Base de Datos Vectorial (ChromaDB)
+  # 3. THE MEMORY: Vector DB
   vector-db:
-    image: chromadb/chroma
+    image: chromadb/chroma:latest
+    container_name: vector-db
     ports:
-      - "8001:8005" # Exponemos al host en 8001 SOLO para el script de ingesta (ingest.py)
+      - "8001:8000"
     volumes:
-      - ./chroma-data:/chroma/chroma # Volumen persistente para los vectores
+      - ./chroma-data:/chroma/chroma
     networks:
       - rag-net
 
-  # 4. EL MONITOR (Scraper): Prometheus
+  # 4. THE MONITOR (Scraper): Prometheus
   prometheus:
-    image: prom/prometheus
+    image: prom/prometheus:latest
+    container_name: prometheus
     volumes:
-      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./config/prometheus.yml:/etc/prometheus/prometheus.yml
       - prometheus-data:/prometheus
     ports:
-      - "9091:9090" # Accede a Prometheus en http://localhost:9091
+      - "9091:9090"
     networks:
       - rag-net
 
-  # 5. EL MONITOR (Dashboard): Grafana
+  # 5. THE MONITOR (Dashboard): Grafana
   grafana:
-    image: grafana/grafana
+    image: grafana/grafana:latest
+    container_name: grafana
+    ports:
+      - "3000:3000"
     volumes:
       - grafana-data:/var/lib/grafana
-    ports:
-      - "3000:3000" # Accede a Grafana en http://localhost:3000
+      - ./config/grafana/datasources:/etc/grafana/provisioning/datasources
+      - ./config/grafana/dashboards:/etc/grafana/provisioning/dashboards
+      - ./config/grafana/dashboards:/var/lib/grafana/dashboards
     depends_on:
       - prometheus
     networks:
       - rag-net
 
-# Red interna para que los contenedores se hablen por nombre de servicio
 networks:
   rag-net:
     driver: bridge
 
-# Volúmenes para persistir datos aunque destruyas los contenedores
 volumes:
   prometheus-data:
   grafana-data:

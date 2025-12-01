@@ -1,207 +1,179 @@
+import requests
+import json
+import re
+import time
 import os
-import httpx
-import chromadb
-from urllib.parse import urlparse
 
-ROUTER_META_PROMPT = """Tus herramientas son: [search_rag_database, direct_llm_answer, reject_query].
-Debes clasificar la siguiente consulta del usuario en una de esas herramientas.
-Responde SÓLO con el nombre de la herramienta.
+# --- CONFIGURATION ---
+# Use environment variables or default to local settings
+SLM_URL = os.getenv("SLM_URL", "http://slm-engine:11434/api/generate")
+# Defaulting to phi3 as per setup script, but overridable
+MODEL_NAME = os.getenv("MODEL_NAME", "phi3")
 
-Consulta del usuario:
----
-{query}
----
-"""
-
-RAG_MEGA_PROMPT = """Basado en el siguiente contexto de una base de datos de conocimiento, responde a la pregunta del usuario.
-Sé conciso y directo, basándote únicamente en el contexto proporcionado.
-
-Contexto:
----
-{context}
----
-
-Pregunta del usuario:
----
-{query}
----
-"""
-
-
-def get_llm_router_decision(query: str) -> str:
+# --- SYSTEM PROMPT LOADING ---
+def load_system_prompt() -> str:
+    """Loads the system prompt from the txt file.
+    
+    Returns:
+        str: The system prompt content, or empty string if file not found.
     """
-    Calls an LLM to classify the user query and decide which tool to use.
+    prompt_path = os.path.join(os.path.dirname(__file__), "system_prompt.txt")
+    try:
+        with open(prompt_path, "r", encoding="utf-8") as f:
+            return f.read().strip()
+    except FileNotFoundError:
+        print(f"⚠️  WARNING: system_prompt.txt not found at {prompt_path}")
+        return ""
+
+# Load system prompt once at module initialization
+SYSTEM_PROMPT = load_system_prompt()
+
+def print_header(title: str):
+    """Prints a styled header to the console."""
+    print(f"\n{'='*60}")
+    print(f"🛡️ ZYRABIT SECURITY LAYER: {title}")
+    print(f"{'='*60}")
+
+def sanitize_pii(text: str) -> str:
     """
-    llm_url = os.environ.get("LLM_URL", "http://localhost:11434")
+    Scans and redacts Personally Identifiable Information (PII) from the input text.
+    
+    Current patterns handled:
+    - Email addresses
+    - Credit Card numbers (simple digit matching)
+    - High monetary amounts
+    
+    Args:
+        text (str): The raw input text.
+        
+    Returns:
+        str: The sanitized text with PII replaced by tokens.
+    """
+    print("   [🔍 Scanning for PII...]")
+    
+    # Regex rules (In production, this should use a sophisticated NER model)
+    
+    # Detect Emails
+    text = re.sub(r'[\w\.-]+@[\w\.-]+', '[EMAIL_REDACTED]', text)
+    
+    # Detect Credit Cards (Simulated logic for 13-16 digits)
+    text = re.sub(r'\b(?:\d[ -]*?){13,16}\b', '[CREDIT_CARD_REDACTED]', text)
+    
+    # Detect High Monetary Amounts
+    text = re.sub(r'\$\d+(?:,\d{3})*(?:\.\d{2})?', '[AMOUNT_REDACTED]', text)
+    
+    return text
 
-    prompt = ROUTER_META_PROMPT.format(query=query)
+def query_secure_slm(prompt: str) -> tuple[str, float]:
+    """
+    Sends a sanitized prompt to the local SLM and returns the response and latency.
+    
+    Args:
+        prompt (str): The user's input prompt.
+        
+    Returns:
+        tuple[str, float]: A tuple containing the (response_text, latency_in_seconds).
+    """
+    # PHASE A: SANITIZATION (Sidecar Pattern)
+    sanitized_prompt = sanitize_pii(prompt)
+    
+    if sanitized_prompt != prompt:
+        print(f"   ⚠️  THREAT DETECTED. DATA REDACTED.")
+        print(f"   ORIGINAL: {prompt}")
+        print(f"   SENT:     {sanitized_prompt}")
+    else:
+        print("   ✅ Input clean. Forwarding to core.")
 
+    # PHASE B: LOCAL INFERENCE (Air-Gapped)
+    # Construct prompt with system context
+    full_prompt = f"{SYSTEM_PROMPT}\n\nUser: {sanitized_prompt}\nAssistant:" if SYSTEM_PROMPT else sanitized_prompt
+    
     payload = {
-        "model": "mistral",
-        "prompt": prompt,
+        "model": MODEL_NAME,
+        "prompt": full_prompt,
         "stream": False
     }
-
+    
     try:
-        response = httpx.post(
-            f"{llm_url}/api/generate",
-            json=payload,
-            timeout=20)
-        response.raise_for_status()  # Raises an exception for HTTP 4xx/5xx errors
-
-        api_response = response.json()
-
-        # Extracts and cleans the LLM decision
-        decision = api_response.get("response", "").strip()
-
-        # A small guardrail in case the LLM responds with something unexpected
-        allowed_decisions = [
-            "search_rag_database",
-            "direct_llm_answer",
-            "reject_query"]
-        if decision in allowed_decisions:
-            return decision
+        start_time = time.time()
+        response = requests.post(SLM_URL, json=payload)
+        end_time = time.time()
+        
+        if response.status_code == 200:
+            res_json = response.json()
+            return res_json.get('response', ''), end_time - start_time
         else:
-            # If the LLM does not give a valid response, we use a safe
-            # fallback.
-            return "direct_llm_answer"
+            return f"Server Error: {response.text}", 0.0
+            
+    except requests.exceptions.ConnectionError:
+        return "❌ ERROR: Cannot connect to Ollama (slm-engine). Is the Docker container running?", 0.0
 
-    except (httpx.RequestError, httpx.HTTPStatusError) as e:
-        # In case of network or HTTP error, we use a safe fallback.
-        print(f"Error al contactar al LLM: {e}")
-        return "direct_llm_answer"
-
-
-def execute_rag_pipeline(query: str) -> str:
+def call_direct_slm(prompt: str) -> str:
     """
-    Executes the Retrieval-Augmented Generation (RAG) pipeline.
-    1. Retrieves context from ChromaDB.
-    2. Augments a prompt with that context.
-    3. Generates a response with an LLM.
+    Direct call to SLM without sanitization (for general knowledge).
     """
-    db_url = os.environ.get("DB_URL", "http://localhost:8000")
-    llm_url = os.environ.get("LLM_URL", "http://localhost:11434")
-
-    try:
-        # 1. Connect and search in ChromaDB
-        parsed_url = urlparse(db_url)
-        chroma_client = chromadb.HttpClient(
-            host=parsed_url.hostname, port=parsed_url.port)
-        collection = chroma_client.get_or_create_collection("libros_tecnicos")
-
-        results = collection.query(query_texts=[query], n_results=5)
-        context_documents = results.get('documents', [[]])[0]
-        context = "\n".join(context_documents)
-
-        # 2. Build the megaprompt
-        augmented_prompt = RAG_MEGA_PROMPT.format(context=context, query=query)
-
-        # 3. Call the LLM with the augmented prompt
-        payload = {
-            "model": "mistral",
-            "prompt": augmented_prompt,
-            "stream": False
-        }
-
-        response = httpx.post(
-            f"{llm_url}/api/generate",
-            json=payload,
-            timeout=30)
-        response.raise_for_status()
-
-        api_response = response.json()
-        return api_response.get("response", "").strip()
-
-    except Exception as e:
-        print(f"Error en el pipeline RAG: {e}")
-        return "Lo siento, ocurrió un error al procesar tu consulta con la base de datos de conocimiento."
-
-
-def call_direct_llm(query: str) -> str:
-    """
-    Calls an LLM (Ollama) directly with the user query.
-    """
-    llm_url = os.environ.get("LLM_URL", "http://localhost:11434")
-
+    # Construct prompt with system context
+    full_prompt = f"{SYSTEM_PROMPT}\n\nUser: {prompt}\nAssistant:" if SYSTEM_PROMPT else prompt
+    
     payload = {
-        "model": "mistral",  # We use the same model as for the router
-        "prompt": query,    # The prompt is directly the user query
+        "model": MODEL_NAME,
+        "prompt": full_prompt,
         "stream": False
     }
-
     try:
-        response = httpx.post(
-            f"{llm_url}/api/generate",
-            json=payload,
-            timeout=20)
-        response.raise_for_status()
-
-        api_response = response.json()
-
-        # Extracts and cleans the LLM response
-        return api_response.get("response", "").strip()
-
-    except (httpx.RequestError, httpx.HTTPStatusError) as e:
-        print(f"Error al contactar al LLM para respuesta directa: {e}")
-        return "Lo siento, no pude contactar al LLM para responder a tu pregunta."
-
-
-def process_and_ingest_file(file_path: str) -> dict:
-    """
-    Processes a file (PDF) and ingests its embeddings into ChromaDB.
-    """
-    from langchain_community.document_loaders import PyPDFLoader
-    from langchain.text_splitter import RecursiveCharacterTextSplitter
-    from langchain_ollama import OllamaEmbeddings
-
-    db_url = os.environ.get("DB_URL", "http://localhost:8000")
-
-    try:
-        # 1. Load the document
-        loader = PyPDFLoader(file_path)
-        documents = loader.load()
-
-        # 2. Split into chunks
-        text_splitter = RecursiveCharacterTextSplitter(
-            chunk_size=1000,
-            chunk_overlap=200
-        )
-        chunks = text_splitter.split_documents(documents)
-
-        # 3. Generate Embeddings and save to ChromaDB
-        # We use langchain-ollama to generate embeddings with mxbai-embed-large
-        embeddings = OllamaEmbeddings(model="mxbai-embed-large")
-
-        parsed_url = urlparse(db_url)
-        chroma_client = chromadb.HttpClient(
-            host=parsed_url.hostname, port=parsed_url.port)
-        collection = chroma_client.get_or_create_collection("libros_tecnicos")
-
-        # Prepare data for ChromaDB
-        ids = [f"doc_{i}" for i in range(len(chunks))]
-        texts = [chunk.page_content for chunk in chunks]
-        metadatas = [chunk.metadata for chunk in chunks]
-
-        # Generate embeddings manually if we don't use Langchain's direct integration with Chroma
-        # But for simplicity and control, we can use the collection directly if we have the embeddings
-        # Or let Chroma calculate if it has the embedding function configured.
-        # Here we assume Chroma does NOT have the embedding function configured on the server,
-        # so we calculate them ourselves.
-
-        embedded_texts = embeddings.embed_documents(texts)
-
-        collection.add(
-            ids=ids,
-            documents=texts,
-            embeddings=embedded_texts,
-            metadatas=metadatas
-        )
-
-        return {
-            "status": "success",
-            "chunks_processed": len(chunks),
-            "message": "Documento ingestada correctamente en la base de conocimiento."}
-
+        response = requests.post(SLM_URL, json=payload)
+        if response.status_code == 200:
+            return response.json().get('response', '')
+        return f"Error: {response.status_code}"
     except Exception as e:
-        print(f"Error en la ingesta: {e}")
-        raise e
+        return f"Connection Error: {str(e)}"
+
+def get_slm_router_decision(text: str) -> str:
+    """
+    Decides whether to use RAG or Direct SLM.
+    Simple keyword-based router for now.
+    """
+    # In a real system, this would be another SLM call or a classifier.
+    # For now, if it asks about "Zyrabit" or specific docs, use RAG.
+    keywords = ["zyrabit", "architecture", "security", "slm", "rag"]
+    if any(k in text.lower() for k in keywords):
+        return "search_rag_database"
+    return "direct_SLM_answer"
+
+def execute_rag_pipeline(text: str) -> str:
+    """
+    Executes the RAG pipeline: Retrieve -> Augment -> Generate.
+    Placeholder implementation.
+    """
+    # 1. Retrieve (Mock)
+    context = "Zyrabit SLM is a secure, local AI architecture."
+    
+    # 2. Augment
+    augmented_prompt = f"Context: {context}\n\nQuestion: {text}\n\nAnswer:"
+    
+    # 3. Generate
+    return call_direct_slm(augmented_prompt)
+
+def process_and_ingest_file(file_path: str):
+    """
+    Mock ingestion function.
+    """
+    return {"status": "success", "filename": os.path.basename(file_path), "chunks": 10}
+
+# --- EXECUTION ---
+if __name__ == "__main__":
+    print_header("INITIATING ZERO-TRUST PROTOCOL")
+
+    # CASE 1: HARMLESS QUERY
+    query_1 = "What is the capital of France?"
+    print(f"\n🗣️  User: {query_1}")
+    response, latency = query_secure_slm(query_1)
+    print(f"🤖 Zyrabit ({latency:.2f}s): {response.strip()}")
+
+    # CASE 2: DATA LEAK ATTEMPT (Whisper Leak Scenario)
+    query_2 = "Draft an email confirming I transferred $50,000.00 USD to account 4532-1234-5678-9012 using my credentials."
+    print(f"\n🗣️  User (Risky): {query_2}")
+    response, latency = query_secure_slm(query_2)
+    
+    print_header("SECURE MODEL RESPONSE")
+    print(f"🤖 Zyrabit ({latency:.2f}s): {response.strip()}")
