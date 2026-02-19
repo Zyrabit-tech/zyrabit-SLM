@@ -1,10 +1,31 @@
 services:
+  traefik:
+    image: traefik:v3.1
+    container_name: zyrabit-traefik
+    command:
+      - --api.dashboard=true
+      - --providers.docker=true
+      - --providers.docker.exposedbydefault=false
+      - --providers.file.filename=/etc/traefik/dynamic.yml
+      - --entryPoints.web.address=:80
+      - --entryPoints.web.http.redirections.entryPoint.to=websecure
+      - --entryPoints.web.http.redirections.entryPoint.scheme=https
+      - --entryPoints.websecure.address=:443
+      - --entryPoints.websecure.http.tls=true
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./traefik/dynamic.yml:/etc/traefik/dynamic.yml:ro
+    networks:
+      - frontend-network
+      - backend-network
+
   # 1. THE BRAIN: API RAG
   api-rag:
     build:
       context: ./api-rag
-    ports:
-      - "8080:8080"
     env_file:
       - .env
     depends_on:
@@ -12,30 +33,36 @@ services:
         condition: service_started
       slm-engine:
         condition: service_started
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.api-rag.rule=PathPrefix(`/`)
+      - traefik.http.routers.api-rag.entrypoints=websecure
+      - traefik.http.routers.api-rag.tls=true
+      - traefik.http.routers.api-rag.middlewares=api-ratelimit@docker,secureHeaders@file
+      - traefik.http.services.api-rag.loadbalancer.server.port=8080
+      - traefik.http.middlewares.api-ratelimit.ratelimit.average=25
+      - traefik.http.middlewares.api-ratelimit.ratelimit.burst=50
     networks:
-      - rag-net
+      - backend-network
+      - model-network
 
   # 2. THE MUSCLE: SLM Server
   slm-engine:
     image: ollama/ollama:latest
     container_name: slm-engine
-    ports:
-      - "11434:11434"
     volumes:
       - ./ollama-models:/root/.ollama
     networks:
-      - rag-net
+      - model-network
 
   # 3. THE MEMORY: Vector DB
   vector-db:
     image: chromadb/chroma:latest
     container_name: vector-db
-    ports:
-      - "8001:8000"
     volumes:
       - ./chroma-data:/chroma/chroma
     networks:
-      - rag-net
+      - backend-network
 
   # 4. THE MONITOR (Scraper): Prometheus
   prometheus:
@@ -47,7 +74,7 @@ services:
     ports:
       - "9091:9090"
     networks:
-      - rag-net
+      - backend-network
 
   # 5. THE MONITOR (Dashboard): Grafana
   grafana:
@@ -63,11 +90,42 @@ services:
     depends_on:
       - prometheus
     networks:
-      - rag-net
+      - backend-network
+
+  loki:
+    image: grafana/loki:3.1.1
+    container_name: loki
+    command: -config.file=/etc/loki/local-config.yaml
+    profiles: ["observability-extra"]
+    ports:
+      - "3100:3100"
+    networks:
+      - backend-network
+
+  docs-portal:
+    build:
+      context: ../docs-portal
+    container_name: docs-portal
+    profiles: ["docs"]
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.docs.rule=PathPrefix(`/docs-portal`)
+      - traefik.http.routers.docs.entrypoints=websecure
+      - traefik.http.routers.docs.tls=true
+      - traefik.http.services.docs.loadbalancer.server.port=3001
+      - traefik.http.middlewares.docs-stripprefix.stripprefix.prefixes=/docs-portal
+      - traefik.http.routers.docs.middlewares=docs-stripprefix@docker,secureHeaders@file
+    networks:
+      - frontend-network
 
 networks:
-  rag-net:
+  frontend-network:
     driver: bridge
+  backend-network:
+    driver: bridge
+  model-network:
+    driver: bridge
+    internal: true
 
 volumes:
   prometheus-data:

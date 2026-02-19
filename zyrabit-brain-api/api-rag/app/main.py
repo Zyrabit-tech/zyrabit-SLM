@@ -1,8 +1,10 @@
 import os
 from . import services
-from fastapi.responses import RedirectResponse
-from fastapi import FastAPI, HTTPException, UploadFile, File
+from fastapi.responses import JSONResponse, RedirectResponse
+from fastapi import FastAPI, HTTPException, UploadFile, File, Request
 from pydantic import BaseModel
+from prometheus_fastapi_instrumentator import Instrumentator
+from . import mcp_bridge
 
 # --- CONFIGURATION ---
 # Reads environment variables. Ensure you have a .env file or export them.
@@ -18,6 +20,13 @@ app = FastAPI(
     version="0.1.0",
 )
 
+_instrumentator = Instrumentator(
+    should_group_status_codes=True,
+    should_ignore_untemplated=False,
+    should_instrument_requests_inprogress=True,
+    excluded_handlers=["/docs", "/openapi.json"],
+)
+
 # --- DTOs (Data Transfer Objects) con Pydantic ---
 
 
@@ -27,6 +36,11 @@ class ChatQuery(BaseModel):
 
 class ChatResponse(BaseModel):
     response: str
+
+
+@app.on_event("startup")
+async def startup_event():
+    _instrumentator.instrument(app).expose(app, include_in_schema=False)
 
 # --- API Endpoints ---
 
@@ -45,6 +59,18 @@ def health_check():
     Health check endpoint to verify the service is active.
     """
     return {"status": "ok", "SLM_url": SLM_URL, "db_url": DB_URL}
+
+
+@app.get("/mcp/config.json", tags=["MCP"])
+def mcp_config():
+    return mcp_bridge.get_config()
+
+
+@app.post("/mcp", tags=["MCP"])
+async def mcp_jsonrpc(request: Request):
+    payload = await request.json()
+    response, status_code = mcp_bridge.handle_jsonrpc(payload)
+    return JSONResponse(content=response, status_code=status_code)
 
 
 @app.post("/v1/chat", response_model=ChatResponse, tags=["Agentic Router"])
@@ -80,16 +106,6 @@ def chat_router(query: ChatQuery):
         raise HTTPException(
             status_code=500,
             detail=f"Error interno: Decisión del router desconocida ('{decision}').")
-
-
-@app.get("/metrics", tags=["Monitoring"])
-def get_metrics():
-    """
-    Prometheus endpoint.
-    """
-    return {
-        "status": "ok",
-        "message": "Metrics endpoint (implementar métricas reales aquí)"}
 
 
 @app.post("/v1/ingest", tags=["Ingestion"])

@@ -21,7 +21,9 @@ except ImportError as e:
 
 # --- APP CONFIGURATION ---
 # Smart Default: Allows overriding via environment variable for Cloud/Docker deployments
-API_URL = os.getenv("API_URL", "http://localhost:8080/v1/chat")
+API_URL = os.getenv("API_URL", "https://localhost/v1/chat")
+HEALTH_URL = os.getenv("HEALTH_URL", "https://localhost/health")
+VERIFY_TLS = os.getenv("VERIFY_TLS", "false").lower() == "true"
 
 # Page Config
 st.set_page_config(
@@ -71,7 +73,7 @@ with st.sidebar:
     
     # API Health Check
     try:
-        health_response = requests.get("http://localhost:8080/health", timeout=2)
+        health_response = requests.get(HEALTH_URL, timeout=2, verify=VERIFY_TLS)
         if health_response.status_code == 200:
             api_status = "🟢 ONLINE"
             st.success(f"Core API: {api_status}")
@@ -147,7 +149,7 @@ if col_action.button("🚀 Run Inference", type="primary"):
             
             # UX Improvement: Spinner while waiting for response
             with st.spinner("🧠 SLM is reasoning..."):
-                response = requests.post(API_URL, json=payload)
+                response = requests.post(API_URL, json=payload, verify=VERIFY_TLS)
             
             end_time = time.time()
             

@@ -1,8 +1,15 @@
-import requests
-import json
-import re
-import time
 import os
+import time
+
+import requests
+
+from .metrics import (
+    approximate_token_count,
+    observe_latency_per_token,
+    observe_security_hits,
+    observe_token_usage,
+)
+from .security import anonymize_text, deanonymize_text
 
 # --- CONFIGURATION ---
 # Use environment variables or default to local settings
@@ -34,36 +41,6 @@ def print_header(title: str):
     print(f"🛡️ ZYRABIT SECURITY LAYER: {title}")
     print(f"{'='*60}")
 
-def sanitize_pii(text: str) -> str:
-    """
-    Scans and redacts Personally Identifiable Information (PII) from the input text.
-    
-    Current patterns handled:
-    - Email addresses
-    - Credit Card numbers (simple digit matching)
-    - High monetary amounts
-    
-    Args:
-        text (str): The raw input text.
-        
-    Returns:
-        str: The sanitized text with PII replaced by tokens.
-    """
-    print("   [🔍 Scanning for PII...]")
-    
-    # Regex rules (In production, this should use a sophisticated NER model)
-    
-    # Detect Emails
-    text = re.sub(r'[\w\.-]+@[\w\.-]+', '[EMAIL_REDACTED]', text)
-    
-    # Detect Credit Cards (Simulated logic for 13-16 digits)
-    text = re.sub(r'\b(?:\d[ -]*?){13,16}\b', '[CREDIT_CARD_REDACTED]', text)
-    
-    # Detect High Monetary Amounts
-    text = re.sub(r'\$\d+(?:,\d{3})*(?:\.\d{2})?', '[AMOUNT_REDACTED]', text)
-    
-    return text
-
 def query_secure_slm(prompt: str) -> tuple[str, float]:
     """
     Sends a sanitized prompt to the local SLM and returns the response and latency.
@@ -75,9 +52,11 @@ def query_secure_slm(prompt: str) -> tuple[str, float]:
         tuple[str, float]: A tuple containing the (response_text, latency_in_seconds).
     """
     # PHASE A: SANITIZATION (Sidecar Pattern)
-    sanitized_prompt = sanitize_pii(prompt)
-    
-    if sanitized_prompt != prompt:
+    anonymized = anonymize_text(prompt)
+    sanitized_prompt = anonymized.sanitized_text
+    observe_security_hits(anonymized.detected_entities)
+
+    if anonymized.token_map:
         print(f"   ⚠️  THREAT DETECTED. DATA REDACTED.")
         print(f"   ORIGINAL: {prompt}")
         print(f"   SENT:     {sanitized_prompt}")
@@ -101,7 +80,16 @@ def query_secure_slm(prompt: str) -> tuple[str, float]:
         
         if response.status_code == 200:
             res_json = response.json()
-            return res_json.get('response', ''), end_time - start_time
+            masked_response = res_json.get("response", "")
+            restored_response = deanonymize_text(masked_response, anonymized.token_map)
+            latency = end_time - start_time
+
+            input_tokens = approximate_token_count(prompt)
+            output_tokens = approximate_token_count(restored_response)
+            observe_token_usage(input_tokens=input_tokens, output_tokens=output_tokens)
+            observe_latency_per_token(latency_seconds=latency, output_tokens=output_tokens)
+
+            return restored_response, latency
         else:
             return f"Server Error: {response.text}", 0.0
             
@@ -112,21 +100,8 @@ def call_direct_slm(prompt: str) -> str:
     """
     Direct call to SLM without sanitization (for general knowledge).
     """
-    # Construct prompt with system context
-    full_prompt = f"{SYSTEM_PROMPT}\n\nUser: {prompt}\nAssistant:" if SYSTEM_PROMPT else prompt
-    
-    payload = {
-        "model": MODEL_NAME,
-        "prompt": full_prompt,
-        "stream": False
-    }
-    try:
-        response = requests.post(SLM_URL, json=payload)
-        if response.status_code == 200:
-            return response.json().get('response', '')
-        return f"Error: {response.status_code}"
-    except Exception as e:
-        return f"Connection Error: {str(e)}"
+    response, _ = query_secure_slm(prompt)
+    return response
 
 def get_slm_router_decision(text: str) -> str:
     """
@@ -151,8 +126,9 @@ def execute_rag_pipeline(text: str) -> str:
     # 2. Augment
     augmented_prompt = f"Context: {context}\n\nQuestion: {text}\n\nAnswer:"
     
-    # 3. Generate
-    return call_direct_slm(augmented_prompt)
+    # 3. Generate with security layer enabled
+    response, _ = query_secure_slm(augmented_prompt)
+    return response
 
 def process_and_ingest_file(file_path: str):
     """

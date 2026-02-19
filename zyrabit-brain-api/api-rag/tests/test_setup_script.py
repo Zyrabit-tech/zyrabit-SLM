@@ -1,37 +1,21 @@
 import os
 
 
-def test_setup_ollama_script_contains_models():
-    """
-    Verifica que el script setup_ollama.sh esté configurado para descargar
-    los modelos requeridos: phi3 y mxbai-embed-large.
-    """
-    # Ruta al script setup_ollama.sh (asumiendo que se ejecuta desde la raíz del proyecto o ajustando la ruta)
-    # Desde zyrabit-brain-api/api-rag/tests/../../../../setup_ollama.sh
-
-    # Ajustar la ruta base dependiendo de dónde se ejecute pytest
-    # Si se ejecuta desde zyrabit-brain-api/api-rag/
+def test_zyra_up_defaults_to_qwen_family():
     script_path = os.path.abspath(
         os.path.join(
             os.path.dirname(__file__),
-            "../../../setup_ollama.sh"))
+            "../../../zyra-up.sh"))
 
     if not os.path.exists(script_path):
-        # Intentar ruta alternativa si estamos en la raíz del repo
-        script_path = os.path.abspath("setup_ollama.sh")
+        script_path = os.path.abspath("zyra-up.sh")
 
-    assert os.path.exists(
-        script_path), f"No se encontró setup_ollama.sh en {script_path}"
+    assert os.path.exists(script_path), f"zyra-up.sh not found in {script_path}"
 
-    with open(script_path, "r") as f:
-        content = f.read()
+    with open(script_path, "r", encoding="utf-8") as file:
+        content = file.read()
 
-    # Verificar que los modelos estén en la lista de descarga
-    assert "phi3" in content, "El modelo 'phi3' no está en setup_ollama.sh"
-    assert "mxbai-embed-large" in content, "El modelo 'mxbai-embed-large' no está en setup_ollama.sh"
-
-    # Verificar que estén definidos en la variable MODELS_TO_PULL
-    # Esto es una verificación más estricta
-    assert 'MODELS_TO_PULL=("phi3" "mxbai-embed-large")' in content or \
-           'MODELS_TO_PULL=("mxbai-embed-large" "phi3")' in content, \
-           "La definición de MODELS_TO_PULL no coincide con lo esperado"
+    assert "qwen2.5:7b" in content
+    assert "qwen2.5:1.5b" in content
+    assert "nvidia-smi" in content
+    assert "Darwin" in content

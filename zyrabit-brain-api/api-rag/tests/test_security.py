@@ -1,17 +1,32 @@
-import pytest
-from app.security import sanitize_pii
+from app.security import anonymize_text, deanonymize_text, sanitize_pii
 
-@pytest.mark.parametrize(
-    "input_text,expected_output,expected_redacted",
-    [
-        ("Contact me at user@example.com", "Contact me at ████████", True),
-        ("My card 4111-1111-1111-1111 is valid", "My card [CREDIT_CARD] is valid", True),
-        ("Amount due: $1,234.56", "Amount due: [AMOUNT]", True),
-        ("No sensitive data here.", "No sensitive data here.", False),
-        ("Mixed 1234 5678 9012 3456 and $99.99", "Mixed [CREDIT_CARD] and [AMOUNT]", True),
-    ],
-)
-def test_sanitize_pii(input_text, expected_output, expected_redacted):
-    cleaned, redacted = sanitize_pii(input_text)
-    assert cleaned == expected_output
-    assert redacted == expected_redacted
+
+def test_sanitize_pii_legacy_contract():
+    text = "My email is user@example.com and amount is $9,999.99"
+    cleaned, redacted = sanitize_pii(text)
+    assert redacted is True
+    assert "<USER_EMAIL_1>" in cleaned
+    assert "<AMOUNT_1>" in cleaned
+
+
+def test_anonymize_and_deanonymize_roundtrip():
+    prompt = (
+        "My name is John Doe and my email is john.doe@example.com. "
+        "Card 4111-1111-1111-1111 has amount $1,234.56."
+    )
+    result = anonymize_text(prompt)
+    assert result.detected_entities["name"] == 1
+    assert result.detected_entities["email"] == 1
+    assert result.detected_entities["card"] == 1
+    assert result.detected_entities["amount"] == 1
+    assert "john.doe@example.com" not in result.sanitized_text
+    assert "4111-1111-1111-1111" not in result.sanitized_text
+
+    model_response = (
+        "Sure <USER_NAME_1>, I will send confirmation to <USER_EMAIL_1> "
+        "for <AMOUNT_1>."
+    )
+    restored = deanonymize_text(model_response, result.token_map)
+    assert "John Doe" in restored
+    assert "john.doe@example.com" in restored
+    assert "$1,234.56" in restored

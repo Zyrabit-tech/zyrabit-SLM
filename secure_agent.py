@@ -10,39 +10,27 @@ prompt and the model response.
 
 import os
 import sys
-import re
-import json
 import time
 import argparse
 import requests
 
 # Configuration
-API_URL = os.getenv("API_URL", "http://localhost:8080/v1/chat")
+API_URL = os.getenv("API_URL", "https://localhost/v1/chat")
 MODEL_NAME = os.getenv("MODEL_NAME", "phi3")
+VERIFY_TLS = os.getenv("VERIFY_TLS", "false").lower() == "true"
 
-# Simple PII sanitization (stand‑alone version)
-EMAIL_REGEX = re.compile(r"[\w\.-]+@[\w\.-]+")
-CREDIT_CARD_REGEX = re.compile(r"\b(?:\d[ -]*?){13,16}\b")
-AMOUNT_REGEX = re.compile(r"\$\d+(?:,\d{3})*(?:\.\d{2})?")
-
-
-def sanitize_pii(text: str) -> (str, bool):
-    """Redact email, credit‑card numbers and monetary amounts.
-    Returns the cleaned text and a flag indicating whether any redaction occurred.
-    """
-    original = text
-    text = EMAIL_REGEX.sub("████████", text)
-    text = CREDIT_CARD_REGEX.sub("[CREDIT_CARD]", text)
-    text = AMOUNT_REGEX.sub("[AMOUNT]", text)
-    changed = text != original
-    return text, changed
+# Shared security pipeline from backend package.
+CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
+BACKEND_PATH = os.path.join(CURRENT_DIR, "zyrabit-brain-api", "api-rag")
+sys.path.append(BACKEND_PATH)
+from app.security import anonymize_text, deanonymize_text  # noqa: E402
 
 
 def query_secure_slm(prompt: str) -> (str, float):
     payload = {"text": prompt}
     start = time.time()
     try:
-        response = requests.post(API_URL, json=payload)
+        response = requests.post(API_URL, json=payload, verify=VERIFY_TLS)
         elapsed = time.time() - start
         if response.status_code == 200:
             data = response.json()
@@ -69,14 +57,16 @@ def main():
         sys.exit(1)
 
     print(f"\n🧩 Prompt original: {user_input}\n")
-    clean_prompt, redacted = sanitize_pii(user_input)
-    if redacted:
+    anonymized = anonymize_text(user_input)
+    clean_prompt = anonymized.sanitized_text
+    if anonymized.token_map:
         print(f"🔐 Prompt sanitizado: {clean_prompt}\n")
     else:
         print("🔐 No se detectó PII para sanitizar.\n")
 
     response, latency = query_secure_slm(clean_prompt)
-    print(f"🤖 Respuesta del SLM (latencia {latency:.2f}s):\n{response}\n")
+    restored_response = deanonymize_text(response, anonymized.token_map)
+    print(f"🤖 Respuesta del SLM (latencia {latency:.2f}s):\n{restored_response}\n")
 
 
 if __name__ == "__main__":

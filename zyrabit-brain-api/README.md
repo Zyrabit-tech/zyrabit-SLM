@@ -2,6 +2,23 @@ RAG-Stack-Local 🚀
 
 Tu propio "cerebro" de IA, 100% open-sources
 
+## Actualizaciones de endurecimiento (MVP)
+
+- **PII Pipeline con sharding**: anonimización reversible por tokens antes de tocar el SLM.
+- **Observabilidad real**: `/metrics` ahora exporta métricas Prometheus útiles de seguridad y eficiencia.
+- **Aislamiento de red**: separación `frontend-network`, `backend-network`, `model-network` (`internal: true`).
+- **Guardían de entrada**: Traefik como único ingreso con HTTPS local y rate limiting.
+- **MCP bridge**: endpoints `/mcp/config.json` y `/mcp` para integración compatible JSON-RPC.
+
+## Endpoints clave
+
+- `GET /health`
+- `POST /v1/chat`
+- `POST /v1/ingest`
+- `GET /metrics`
+- `GET /mcp/config.json`
+- `POST /mcp`
+
 Este proyecto te da el stack completo para correr un sistema de Retrieval-Augmented Generation (RAG) en tu propia máquina o servidor. Olvídate de APIs de terceros, facturas impredecibles y de mandar tus datos sensibles a la nube de alguien más.
 
 Aquí, tú tienes el control.

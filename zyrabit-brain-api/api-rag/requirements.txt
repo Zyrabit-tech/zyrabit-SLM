@@ -5,6 +5,7 @@ langchain-community
 langchain-ollama    
 chromadb-client     
 prometheus-fastapi-instrumentator 
+prometheus-client
 python-dotenv      
 pytest
 pytest-mock

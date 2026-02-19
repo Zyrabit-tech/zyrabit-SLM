@@ -34,6 +34,14 @@
 
 ## 📦 Installation
 
+Ultra-fast bootstrap installer:
+
+```bash
+curl -sSL https://zyrabit.com/install.sh | bash
+```
+
+Or local setup:
+
 1.  **Prerequisites**
       - Docker & Docker‑Compose
       - Python 3.10 +
@@ -58,9 +66,10 @@
     ```
 5.  **Download Required Models**
     ```bash
-    chmod +x setup_slm.sh
-    ./setup_slm.sh   # verifies Docker, starts slm-engine and downloads phi3, kimi‑k2‑thinking:cloud and mxbai‑embed‑large
+    chmod +x zyra-up.sh
+    ./zyra-up.sh
     ```
+    The script auto-detects NVIDIA/Metal/CPU and defaults to `qwen2.5:7b` (`qwen2.5:1.5b` on low-RAM machines).
 6.  **Run the UI**
     ```bash
     streamlit run slm_console.py
@@ -76,7 +85,42 @@
 python secure_agent.py "My email is john@example.com and my balance is $1,200.00"
 ```
 
-The agent will display the original prompt, the sanitized prompt, and the model's response.
+The agent applies reversible token anonymization (`<USER_EMAIL_1>`, etc.) before inference and restores values for the final user response.
+
+## 🔐 Network and ingress hardening
+
+- Traefik reverse proxy as single public entrypoint (`https://localhost`).
+- HTTP→HTTPS redirection plus request rate limiting.
+- Segmented Docker networks:
+  - `frontend-network`
+  - `backend-network`
+  - `model-network` with `internal: true`
+
+## 📈 Observability
+
+Prometheus metrics on `/metrics`, including:
+
+- `zyrabit_token_latency_ms_per_token`
+- `zyrabit_token_usage_total`
+- `zyrabit_security_hits_total`
+
+## 🔌 MCP Bridge
+
+- Standard config file: `mcp/config.json`
+- API config endpoint: `GET /mcp/config.json`
+- MCP JSON-RPC endpoint: `POST /mcp`
+- Bridge operations are sanitization-first by design.
+
+## 📚 Docs portal
+
+An optional Docusaurus docs container is included:
+
+```bash
+cd zyrabit-brain-api
+docker compose --profile docs up -d docs-portal
+```
+
+A machine-friendly technical digest is available in `llms-full.md`.
 
 -----
 
