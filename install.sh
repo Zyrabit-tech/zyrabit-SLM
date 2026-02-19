@@ -11,4 +11,4 @@ echo "Installing Zyrabit..."
 git clone --depth 1 "${REPO_URL}" "${TMP_DIR}/zyrabit-SLM"
 cd "${TMP_DIR}/zyrabit-SLM"
 chmod +x "./zyra-up.sh"
-./zyra-up.sh
+./zyra-up.sh install

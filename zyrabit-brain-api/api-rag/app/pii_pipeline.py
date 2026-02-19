@@ -1,8 +1,9 @@
-"""PII anonymization pipeline with context sharding and reversible tokens."""
+"""PII anonymization with interceptor-based security pipeline."""
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from abc import ABC, abstractmethod
+from dataclasses import dataclass, field
 from typing import Dict, List, Tuple
 import re
 
@@ -35,6 +36,73 @@ class AnonymizationResult:
     sanitized_text: str
     token_map: Dict[str, str]
     detected_entities: Dict[str, int]
+
+
+@dataclass
+class PipelineContext:
+    """Shared mutable context through interceptor stages."""
+
+    token_map: Dict[str, str] = field(default_factory=dict)
+    detected_entities: Dict[str, int] = field(
+        default_factory=lambda: {"email": 0, "card": 0, "amount": 0, "name": 0}
+    )
+
+
+class TextInterceptor(ABC):
+    """Request/response interceptor contract."""
+
+    @abstractmethod
+    def process_request(self, text: str, context: PipelineContext) -> str:
+        raise NotImplementedError
+
+    def process_response(self, text: str, context: PipelineContext) -> str:
+        return text
+
+
+class ShardAnonymizationInterceptor(TextInterceptor):
+    """Apply sharded anonymization before model call and restore after."""
+
+    def __init__(self, shard_size: int = 160, overlap: int = 40):
+        self.shard_size = shard_size
+        self.overlap = overlap
+
+    def process_request(self, text: str, context: PipelineContext) -> str:
+        result = _anonymize_with_shards(
+            text=text,
+            shard_size=self.shard_size,
+            overlap=self.overlap,
+        )
+        context.token_map = result.token_map
+        context.detected_entities = result.detected_entities
+        return result.sanitized_text
+
+    def process_response(self, text: str, context: PipelineContext) -> str:
+        return deanonymize_text(text, context.token_map)
+
+
+class InterceptorPipeline:
+    """Composable interceptor pipeline for secure prompt processing."""
+
+    def __init__(self, interceptors: List[TextInterceptor]):
+        self.interceptors = interceptors
+
+    def process_request(self, text: str, context: PipelineContext) -> str:
+        output = text
+        for interceptor in self.interceptors:
+            output = interceptor.process_request(output, context)
+        return output
+
+    def process_response(self, text: str, context: PipelineContext) -> str:
+        output = text
+        for interceptor in reversed(self.interceptors):
+            output = interceptor.process_response(output, context)
+        return output
+
+
+def build_default_pipeline(shard_size: int = 160, overlap: int = 40) -> InterceptorPipeline:
+    return InterceptorPipeline(
+        interceptors=[ShardAnonymizationInterceptor(shard_size=shard_size, overlap=overlap)]
+    )
 
 
 def _is_luhn_valid(number_text: str) -> bool:
@@ -147,7 +215,11 @@ def _dedupe_entities(entities: List[EntitySpan]) -> List[EntitySpan]:
     return sorted(selected, key=lambda item: item.start)
 
 
-def anonymize_text(text: str, shard_size: int = 160, overlap: int = 40) -> AnonymizationResult:
+def _anonymize_with_shards(
+    text: str,
+    shard_size: int = 160,
+    overlap: int = 40,
+) -> AnonymizationResult:
     shards = _build_shards(text, shard_size=shard_size, overlap=overlap)
 
     detected: List[EntitySpan] = []
@@ -188,6 +260,11 @@ def anonymize_text(text: str, shard_size: int = 160, overlap: int = 40) -> Anony
         token_map=token_map,
         detected_entities=entity_counts,
     )
+
+
+def anonymize_text(text: str, shard_size: int = 160, overlap: int = 40) -> AnonymizationResult:
+    """Backward-compatible helper for direct anonymization usage."""
+    return _anonymize_with_shards(text=text, shard_size=shard_size, overlap=overlap)
 
 
 def deanonymize_text(text: str, token_map: Dict[str, str]) -> str:

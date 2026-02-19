@@ -9,7 +9,7 @@ from .metrics import (
     observe_security_hits,
     observe_token_usage,
 )
-from .security import anonymize_text, deanonymize_text
+from .security import PipelineContext, build_security_pipeline
 
 # --- CONFIGURATION ---
 # Use environment variables or default to local settings
@@ -51,12 +51,13 @@ def query_secure_slm(prompt: str) -> tuple[str, float]:
     Returns:
         tuple[str, float]: A tuple containing the (response_text, latency_in_seconds).
     """
-    # PHASE A: SANITIZATION (Sidecar Pattern)
-    anonymized = anonymize_text(prompt)
-    sanitized_prompt = anonymized.sanitized_text
-    observe_security_hits(anonymized.detected_entities)
+    # PHASE A: SANITIZATION (Interceptor pipeline)
+    pipeline = build_security_pipeline()
+    pipeline_context = PipelineContext()
+    sanitized_prompt = pipeline.process_request(prompt, pipeline_context)
+    observe_security_hits(pipeline_context.detected_entities)
 
-    if anonymized.token_map:
+    if pipeline_context.token_map:
         print(f"   ⚠️  THREAT DETECTED. DATA REDACTED.")
         print(f"   ORIGINAL: {prompt}")
         print(f"   SENT:     {sanitized_prompt}")
@@ -81,7 +82,7 @@ def query_secure_slm(prompt: str) -> tuple[str, float]:
         if response.status_code == 200:
             res_json = response.json()
             masked_response = res_json.get("response", "")
-            restored_response = deanonymize_text(masked_response, anonymized.token_map)
+            restored_response = pipeline.process_response(masked_response, pipeline_context)
             latency = end_time - start_time
 
             input_tokens = approximate_token_count(prompt)

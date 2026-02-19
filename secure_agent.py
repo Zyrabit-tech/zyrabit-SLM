@@ -23,7 +23,7 @@ VERIFY_TLS = os.getenv("VERIFY_TLS", "false").lower() == "true"
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
 BACKEND_PATH = os.path.join(CURRENT_DIR, "zyrabit-brain-api", "api-rag")
 sys.path.append(BACKEND_PATH)
-from app.security import anonymize_text, deanonymize_text  # noqa: E402
+from app.security import PipelineContext, build_security_pipeline  # noqa: E402
 
 
 def query_secure_slm(prompt: str) -> (str, float):
@@ -57,15 +57,16 @@ def main():
         sys.exit(1)
 
     print(f"\n🧩 Prompt original: {user_input}\n")
-    anonymized = anonymize_text(user_input)
-    clean_prompt = anonymized.sanitized_text
-    if anonymized.token_map:
+    pipeline = build_security_pipeline()
+    pipeline_context = PipelineContext()
+    clean_prompt = pipeline.process_request(user_input, pipeline_context)
+    if pipeline_context.token_map:
         print(f"🔐 Prompt sanitizado: {clean_prompt}\n")
     else:
         print("🔐 No se detectó PII para sanitizar.\n")
 
     response, latency = query_secure_slm(clean_prompt)
-    restored_response = deanonymize_text(response, anonymized.token_map)
+    restored_response = pipeline.process_response(response, pipeline_context)
     print(f"🤖 Respuesta del SLM (latencia {latency:.2f}s):\n{restored_response}\n")
 
 
