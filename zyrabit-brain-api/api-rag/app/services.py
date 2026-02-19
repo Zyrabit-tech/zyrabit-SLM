@@ -59,7 +59,6 @@ def query_secure_slm(prompt: str) -> tuple[str, float]:
 
     if pipeline_context.token_map:
         print(f"   ⚠️  THREAT DETECTED. DATA REDACTED.")
-        print(f"   ORIGINAL: {prompt}")
         print(f"   SENT:     {sanitized_prompt}")
     else:
         print("   ✅ Input clean. Forwarding to core.")

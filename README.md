@@ -48,7 +48,7 @@ O instalación local:
    - `git` (opcional)
 2. **Clonar el repositorio**
    ```bash
-   git clone https://github.com/Zyrabit-tech/zyrabit-llm.git
+   git clone https://github.com/Zyrabit-tech/zyrabit-SLM.git
    cd zyrabit-SLM
    ```
 3. **Entorno virtual**
@@ -60,14 +60,14 @@ O instalación local:
    ```
 4. **Infraestructura**
    ```bash
-   cd zyrabit-brain-api
-   docker compose up -d   # levanta slm-engine, vector‑db y api‑rag
-   cd ..
-   ```
-5. **Descargar modelos obligatorios**
-   ```bash
    chmod +x zyra-up.sh
-   ./zyra-up.sh
+   ./zyra-up.sh install
+   ```
+5. **Opciones del instalador**
+   ```bash
+   ./zyra-up.sh doctor   # valida entorno y perfil hardware
+   ./zyra-up.sh start    # solo arranca infraestructura
+   ./zyra-up.sh install  # arranca + descarga modelos base
    ```
    El script detecta NVIDIA/Metal/CPU y usa `qwen2.5:7b` por defecto (`qwen2.5:1.5b` en equipos con menos RAM).
 6. **Ejecutar la UI**
@@ -128,9 +128,10 @@ Además, se incluye `llms-full.md` como referencia técnica optimizada para agen
 
 Ejecuta la suite de pruebas con:
 ```bash
-pytest -q
+cd zyrabit-brain-api/api-rag
+python3 -m pytest -q
 ```
-Los tests cubren la sanitización de PII y la correcta respuesta del backend.
+Los tests cubren sanitización PII, integración de endpoints, seguridad del payload al SLM y contrato MCP.
 
 ---
 

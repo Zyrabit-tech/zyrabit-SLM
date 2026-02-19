@@ -1,4 +1,5 @@
 from fastapi.testclient import TestClient
+import tempfile
 
 from app.main import app
 
@@ -27,3 +28,23 @@ def test_mcp_tools_list():
     names = {tool["name"] for tool in tools}
     assert "secure_chat" in names
     assert "sanitize_text" in names
+
+
+def test_mcp_read_resource_sanitizes_by_default():
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as tmp:
+        tmp.write("email alice@example.com and ssn 123-45-6789")
+        uri = f"file://{tmp.name}"
+
+    payload = {
+        "jsonrpc": "2.0",
+        "id": "2",
+        "method": "resources/read",
+        "params": {"uri": uri},
+    }
+    response = client.post("/mcp", json=payload)
+    assert response.status_code == 200
+    text = response.json()["result"]["contents"][0]["text"]
+    assert "alice@example.com" not in text
+    assert "123-45-6789" not in text
+    assert "<USER_EMAIL_1>" in text
+    assert "<SSN_1>" in text

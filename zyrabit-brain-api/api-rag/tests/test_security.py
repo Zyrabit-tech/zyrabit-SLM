@@ -53,3 +53,12 @@ def test_interceptor_pipeline_request_and_response():
     restored = pipeline.process_response(masked_response, context)
     assert "Alice Doe" in restored
     assert "alice@example.com" in restored
+
+
+def test_phone_and_ssn_are_anonymized():
+    text = "Contact +1 (415) 555-1234, SSN 123-45-6789"
+    result = anonymize_text(text)
+    assert "<PHONE_1>" in result.sanitized_text
+    assert "<SSN_1>" in result.sanitized_text
+    assert result.detected_entities["phone"] == 1
+    assert result.detected_entities["ssn"] == 1

@@ -48,7 +48,7 @@ Or local setup:
       - `git` (optional)
 2.  **Clone the repository**
     ```bash
-    git clone https://github.com/Zyrabit-tech/zyrabit-llm.git
+    git clone https://github.com/Zyrabit-tech/zyrabit-SLM.git
     cd zyrabit-SLM
     ```
 3.  **Virtual Environment**
@@ -60,14 +60,14 @@ Or local setup:
     ```
 4.  **Infrastructure**
     ```bash
-    cd zyrabit-brain-api
-    docker compose up -d   # spins up slm-engine, vector‑db and api‑rag
-    cd ..
-    ```
-5.  **Download Required Models**
-    ```bash
     chmod +x zyra-up.sh
-    ./zyra-up.sh
+    ./zyra-up.sh install
+    ```
+5.  **Installer command modes**
+    ```bash
+    ./zyra-up.sh doctor   # validate environment profile
+    ./zyra-up.sh start    # start infrastructure only
+    ./zyra-up.sh install  # start stack + pull base models
     ```
     The script auto-detects NVIDIA/Metal/CPU and defaults to `qwen2.5:7b` (`qwen2.5:1.5b` on low-RAM machines).
 6.  **Run the UI**
@@ -129,10 +129,11 @@ A machine-friendly technical digest is available in `llms-full.md`.
 Run the test suite with:
 
 ```bash
-pytest -q
+cd zyrabit-brain-api/api-rag
+python3 -m pytest -q
 ```
 
-Tests cover PII sanitization and backend response validation.
+Tests cover PII sanitization, endpoint integration, secure model payload flow, and MCP contract checks.
 
 -----
 

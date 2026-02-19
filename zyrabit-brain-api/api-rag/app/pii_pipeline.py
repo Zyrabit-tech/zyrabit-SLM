@@ -11,6 +11,8 @@ import re
 EMAIL_REGEX = re.compile(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b")
 CARD_REGEX = re.compile(r"\b(?:\d[ -]*?){13,19}\b")
 AMOUNT_REGEX = re.compile(r"(?:USD|EUR|MXN|\$)\s?\d+(?:,\d{3})*(?:\.\d{2})?")
+PHONE_REGEX = re.compile(r"\b(?:\+?1[\s.-]?)?(?:\(?\d{3}\)?[\s.-]?){2}\d{4}\b")
+SSN_REGEX = re.compile(r"\b\d{3}-\d{2}-\d{4}\b")
 NAME_CONTEXT_REGEX = re.compile(
     r"\b(?:my name is|i am|i'm|me llamo|mi nombre es)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+){0,2})\b"
 )
@@ -19,6 +21,8 @@ TOKEN_PREFIX = {
     "email": "USER_EMAIL",
     "card": "CARD",
     "amount": "AMOUNT",
+    "phone": "PHONE",
+    "ssn": "SSN",
     "name": "USER_NAME",
 }
 
@@ -44,7 +48,14 @@ class PipelineContext:
 
     token_map: Dict[str, str] = field(default_factory=dict)
     detected_entities: Dict[str, int] = field(
-        default_factory=lambda: {"email": 0, "card": 0, "amount": 0, "name": 0}
+        default_factory=lambda: {
+            "email": 0,
+            "card": 0,
+            "amount": 0,
+            "phone": 0,
+            "ssn": 0,
+            "name": 0,
+        }
     )
 
 
@@ -173,6 +184,26 @@ def _detect_entities_in_shard(shard_text: str, offset: int) -> List[EntitySpan]:
             )
         )
 
+    for match in PHONE_REGEX.finditer(shard_text):
+        entities.append(
+            EntitySpan(
+                start=offset + match.start(),
+                end=offset + match.end(),
+                label="phone",
+                value=match.group(0),
+            )
+        )
+
+    for match in SSN_REGEX.finditer(shard_text):
+        entities.append(
+            EntitySpan(
+                start=offset + match.start(),
+                end=offset + match.end(),
+                label="ssn",
+                value=match.group(0),
+            )
+        )
+
     for match in NAME_CONTEXT_REGEX.finditer(shard_text):
         captured_name = match.group(1)
         start = offset + match.start(1)
@@ -231,11 +262,18 @@ def _anonymize_with_shards(
         return AnonymizationResult(
             sanitized_text=text,
             token_map={},
-            detected_entities={"email": 0, "card": 0, "amount": 0, "name": 0},
+            detected_entities={
+                "email": 0,
+                "card": 0,
+                "amount": 0,
+                "phone": 0,
+                "ssn": 0,
+                "name": 0,
+            },
         )
 
     token_map: Dict[str, str] = {}
-    entity_counts = {"email": 0, "card": 0, "amount": 0, "name": 0}
+    entity_counts = {"email": 0, "card": 0, "amount": 0, "phone": 0, "ssn": 0, "name": 0}
     value_to_token: Dict[Tuple[str, str], str] = {}
 
     output_parts: List[str] = []
