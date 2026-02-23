@@ -39,17 +39,17 @@ Scripts principales de instalacion:
 
 ## Validacion de variables de entorno
 
-El script `zyra-up.sh` ahora valida `zyrabit-brain-api/.env` antes de arrancar:
+El script `zyra-up.sh` valida el valor efectivo de variables requeridas antes de arrancar:
 
-- El archivo debe existir.
-- No puede estar vacio.
+- Prioriza variables del entorno del servidor (por ejemplo CI/CD o systemd).
+- Si no existen en runtime, usa `zyrabit-brain-api/.env` como fallback.
 - Deben existir y tener valor valido:
   - `SLM_URL`
   - `DB_URL`
   - `MODEL_NAME`
 - Se rechazan valores vacios o invalidos como `undefined`, `null`, `none`.
 
-Ejemplo minimo recomendado para `.env`:
+Ejemplo minimo para `.env` (opcional si ya exportas variables en servidor):
 
 ```bash
 SLM_URL=http://slm-engine:11434/api/generate
