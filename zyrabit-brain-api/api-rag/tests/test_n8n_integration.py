@@ -1,5 +1,6 @@
 import hashlib
 import hmac
+import pathlib
 
 from fastapi.testclient import TestClient
 
@@ -80,3 +81,23 @@ def test_n8n_webhook_requires_text_field(monkeypatch):
     )
     assert response.status_code == 400
     assert "text" in response.json()["detail"].lower()
+
+
+def test_n8n_policy_reads_secrets_from_file(monkeypatch, tmp_path):
+    token_path = tmp_path / "n8n_service_token"
+    signing_path = tmp_path / "n8n_webhook_signing_secret"
+    token_path.write_text("file-token", encoding="utf-8")
+    signing_path.write_text("file-secret", encoding="utf-8")
+
+    monkeypatch.delenv("N8N_SERVICE_TOKEN", raising=False)
+    monkeypatch.delenv("N8N_WEBHOOK_SIGNING_SECRET", raising=False)
+    monkeypatch.setenv("N8N_SERVICE_TOKEN_FILE", str(pathlib.Path(token_path)))
+    monkeypatch.setenv(
+        "N8N_WEBHOOK_SIGNING_SECRET_FILE",
+        str(pathlib.Path(signing_path)),
+    )
+    monkeypatch.setenv("N8N_REQUIRE_SIGNATURE", "true")
+
+    policy = N8nIntegrationPolicy.from_env()
+    assert policy.service_token == "file-token"
+    assert policy.signing_secret == "file-secret"

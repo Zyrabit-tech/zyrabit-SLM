@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - n8n integration adapter and automation port in `api-rag` (`app/adapters/n8n_adapter.py`, `app/ports/automation_port.py`).
 - Secure n8n webhook endpoint `POST /v1/integrations/n8n/webhook` and integration tests.
 - New docs-portal pages: `integration-playbook.md`, `architecture-mermaid.md`, and reusable Mermaid source `zyrabit-architecture.mmd`.
+- `api-rag/app/adapters/make_adapter_blueprint.py` as a reusable blueprint for Make.com integration.
 
 ### Changed
 - Updated `README.md` and `README_EN.md` to document the official setup flow.
@@ -21,6 +22,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Updated all 4 README files to clarify responsibilities, manual Docker flows, and manual model pull commands.
 - Added optional `automation` profile with `n8n` routed via Traefik in `zyrabit-brain-api/docker-compose.yml`.
 - Updated docs-portal navigation and enabled Mermaid rendering in Docusaurus config.
+- Restored root `README.md` as Spanish documentation mirror with explicit Air-Gapped installation guidance.
+- Routed `grafana` and `prometheus` through Traefik (`/grafana`, `/prometheus`) removing direct public port exposure.
+- Added file-based secret support in n8n adapter (`N8N_SERVICE_TOKEN_FILE`, `N8N_WEBHOOK_SIGNING_SECRET_FILE`) for Docker Secrets/Vault workflows.
+- Updated installer output (`zyra-up.sh`) to reflect Traefik observability routes.
+- Expanded docs (root/backend/docs-portal) with Air-Gapped deployment, observability auth routes, Make adapter bootstrap, and local super-fine-tuning next steps.
 
 ### Fixed
 - Removed fixed `DOCKER_API_VERSION=1.41` from `traefik` in `zyrabit-brain-api/docker-compose.yml` to avoid Docker API compatibility errors with newer Docker engines.

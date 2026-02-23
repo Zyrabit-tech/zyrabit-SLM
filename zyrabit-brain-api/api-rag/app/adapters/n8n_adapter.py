@@ -15,6 +15,23 @@ def _parse_bool(value: str, default: bool) -> bool:
     return value.strip().lower() in {"1", "true", "yes", "on"}
 
 
+def _read_secret_from_file(file_path: str) -> str:
+    if not file_path:
+        return ""
+    try:
+        with open(file_path, "r", encoding="utf-8") as secret_file:
+            return secret_file.read().strip()
+    except OSError:
+        return ""
+
+
+def _resolve_secret(env_var: str, file_env_var: str) -> str:
+    direct_value = os.getenv(env_var, "").strip()
+    if direct_value:
+        return direct_value
+    return _read_secret_from_file(os.getenv(file_env_var, "").strip())
+
+
 @dataclass(frozen=True)
 class N8nIntegrationPolicy:
     """High-level policies for n8n integration security."""
@@ -26,8 +43,11 @@ class N8nIntegrationPolicy:
     @classmethod
     def from_env(cls) -> "N8nIntegrationPolicy":
         return cls(
-            service_token=os.getenv("N8N_SERVICE_TOKEN", ""),
-            signing_secret=os.getenv("N8N_WEBHOOK_SIGNING_SECRET", ""),
+            service_token=_resolve_secret("N8N_SERVICE_TOKEN", "N8N_SERVICE_TOKEN_FILE"),
+            signing_secret=_resolve_secret(
+                "N8N_WEBHOOK_SIGNING_SECRET",
+                "N8N_WEBHOOK_SIGNING_SECRET_FILE",
+            ),
             require_signature=_parse_bool(os.getenv("N8N_REQUIRE_SIGNATURE"), True),
         )
 

@@ -206,8 +206,8 @@ run_install() {
   log_ok "Zyrabit is ready."
   echo
   echo "API (Traefik HTTPS): https://localhost/health"
-  echo "Prometheus: http://localhost:9091"
-  echo "Grafana: http://localhost:3000"
+  echo "Prometheus (Traefik): https://localhost/prometheus"
+  echo "Grafana (Traefik): https://localhost/grafana"
 }
 
 run_doctor() {

@@ -53,6 +53,26 @@ N8N_WEBHOOK_SIGNING_SECRET=replace-with-hmac-secret
 N8N_REQUIRE_SIGNATURE=true
 ```
 
+In production, use file-based secrets or Vault (never hardcoded values):
+
+```bash
+N8N_SERVICE_TOKEN_FILE=/run/secrets/n8n_service_token
+N8N_WEBHOOK_SIGNING_SECRET_FILE=/run/secrets/n8n_webhook_signing_secret
+```
+
+Basic-auth credentials for observability routes in Traefik:
+
+```bash
+PROMETHEUS_BASIC_AUTH=<user:htpasswd_hash>
+GRAFANA_BASIC_AUTH=<user:htpasswd_hash>
+```
+
+Hash generation example:
+
+```bash
+htpasswd -nbB admin 'change-this'
+```
+
 Manual model pull (without automatic installer flow):
 
 ```bash
@@ -84,6 +104,34 @@ Networks:
 - **Webhook integrity**: HMAC SHA-256 signature in `X-Zyrabit-Signature` when `N8N_REQUIRE_SIGNATURE=true`.
 - **Stable contract**: minimum payload `{ "text": "..." }`; optional metadata `workflow_id`, `execution_id`.
 - **Hexagonal boundary**: every new external tool (Make, Strapi, DB connectors) should add a dedicated adapter over a port, without coupling core domain logic to provider APIs.
+- **Production secrets**: use `_FILE` variables with Docker Secrets or on-prem Vault, never plain secrets in `docker-compose.yml`.
+
+## Observability without public ports
+
+- `grafana` is published at `https://localhost/grafana`.
+- `prometheus` is published at `https://localhost/prometheus`.
+- Both are behind Traefik and protected with `basicauth` middleware.
+
+## Template for new adapters (Make)
+
+A reusable template is included at:
+
+- `api-rag/app/adapters/make_adapter_blueprint.py`
+
+It demonstrates:
+
+- bearer-token validation
+- HMAC signature validation
+- external payload normalization into a stable internal contract
+
+## Next step: feedback-driven local re-training
+
+Recommended evolution path for a local super-fine-tuning pipeline:
+
+1. Emit a `model_miss_detected` event from `automation_port`.
+2. Persist curated examples in a local feedback dataset.
+3. Trigger controlled offline fine-tuning jobs (LoRA/PEFT).
+4. Version and promote tuned models through automated evaluation gates.
 
 ## Testing
 

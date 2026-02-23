@@ -87,6 +87,37 @@ Or local setup:
     ```
     Access at `http://localhost:8501`.
 
+## Air-Gapped Installation (high priority)
+
+For isolated US/EU environments:
+
+1. On an internet-connected workstation, pull required images:
+   ```bash
+   docker pull traefik:latest
+   docker pull ollama/ollama:latest
+   docker pull chromadb/chroma:latest
+   docker pull prom/prometheus:latest
+   docker pull grafana/grafana:latest
+   docker pull n8nio/n8n:latest
+   ```
+2. Export them as a transport bundle:
+   ```bash
+   docker save -o zyrabit-images.tar \
+     traefik:latest ollama/ollama:latest chromadb/chroma:latest \
+     prom/prometheus:latest grafana/grafana:latest n8nio/n8n:latest
+   ```
+3. Move `zyrabit-images.tar` via controlled USB media.
+4. Load images on the offline server:
+   ```bash
+   docker load -i zyrabit-images.tar
+   ```
+5. Start the stack without internet egress:
+   ```bash
+   ./zyra-up.sh start
+   ```
+
+Enterprise alternative: mirror signed images into an on-prem local registry (Harbor/Nexus/Artifactory) and pull from that registry only.
+
 -----
 
 ## 🚀 Quick Usage
@@ -102,6 +133,7 @@ The agent applies reversible token anonymization (`<USER_EMAIL_1>`, etc.) before
 
 - Traefik reverse proxy as single public entrypoint (`https://localhost`).
 - HTTP→HTTPS redirection plus request rate limiting.
+- Observability is exposed via Traefik routes (`/grafana`, `/prometheus`) with required basic auth variables.
 - Segmented Docker networks:
   - `frontend-network`
   - `backend-network`

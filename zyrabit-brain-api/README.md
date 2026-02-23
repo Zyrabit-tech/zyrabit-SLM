@@ -67,6 +67,26 @@ N8N_WEBHOOK_SIGNING_SECRET=replace-with-hmac-secret
 N8N_REQUIRE_SIGNATURE=true
 ```
 
+En produccion, usa secretos por archivo o Vault (no hardcode):
+
+```bash
+N8N_SERVICE_TOKEN_FILE=/run/secrets/n8n_service_token
+N8N_WEBHOOK_SIGNING_SECRET_FILE=/run/secrets/n8n_webhook_signing_secret
+```
+
+Credenciales de autenticacion basica para observabilidad en Traefik:
+
+```bash
+PROMETHEUS_BASIC_AUTH=<usuario:hash_htpasswd>
+GRAFANA_BASIC_AUTH=<usuario:hash_htpasswd>
+```
+
+Ejemplo para generar hash:
+
+```bash
+htpasswd -nbB admin 'cambia-esto'
+```
+
 ## Ejemplos de uso
 
 Verificar entorno y configuracion:
@@ -198,3 +218,31 @@ Suites clave:
 - **Integridad de webhook**: firma HMAC SHA-256 en `X-Zyrabit-Signature` cuando `N8N_REQUIRE_SIGNATURE=true`.
 - **Contrato estable**: payload minimo `{ "text": "..." }`; metadatos opcionales `workflow_id`, `execution_id`.
 - **Arquitectura hexagonal**: nuevas integraciones (Make, Strapi, DB connectors) deben implementar su propio adapter sobre un port, sin acoplar el dominio a proveedores externos.
+- **Secrets en produccion**: usar `_FILE` con Docker Secrets o un Vault on-prem, nunca secretos en claro en `docker-compose.yml`.
+
+## Observabilidad sin puertos publicos
+
+- `grafana` se publica por `https://localhost/grafana`.
+- `prometheus` se publica por `https://localhost/prometheus`.
+- Ambos quedan detras de Traefik con middleware `basicauth` configurable por variables de entorno.
+
+## Plantilla para nuevos adapters (Make)
+
+Se incluye plantilla base en:
+
+- `api-rag/app/adapters/make_adapter_blueprint.py`
+
+La plantilla implementa el mismo contrato del `AutomationPort` y sirve como referencia para:
+
+- validacion de token
+- validacion de firma HMAC
+- normalizacion de payload externo a contrato interno estable
+
+## Siguiente paso: feedback y re-entrenamiento local
+
+Para el pipeline de super-fine-tuning local, el siguiente paso recomendado es:
+
+1. Definir un evento de feedback (`model_miss_detected`) desde `automation_port`.
+2. Persistir ejemplos en un dataset curado local.
+3. Disparar un job offline de ajuste (LoRA/PEFT) en ventana controlada.
+4. Versionar modelo ajustado y promoverlo mediante validacion automatica.
