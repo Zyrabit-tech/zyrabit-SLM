@@ -70,6 +70,10 @@ Or local setup:
     ./zyra-up.sh install  # start stack + pull base models
     ```
     The script auto-detects NVIDIA/Metal/CPU and defaults to `qwen2.5:7b` (`qwen2.5:1.5b` on low-RAM machines).
+    
+    Official setup scripts:
+    - `install.sh`: remote/local bootstrap (clones repo and runs `zyra-up.sh install`)
+    - `zyra-up.sh`: main installer and stack orchestrator
 6.  **Run the UI**
     ```bash
     streamlit run slm_console.py

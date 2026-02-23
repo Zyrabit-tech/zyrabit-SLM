@@ -15,6 +15,7 @@ log_err() { echo -e "${RED}✖${NC} $1"; }
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 COMPOSE_FILE="${SCRIPT_DIR}/zyrabit-brain-api/docker-compose.yml"
+ENV_FILE="${SCRIPT_DIR}/zyrabit-brain-api/.env"
 
 usage() {
   cat <<'EOF'
@@ -33,6 +34,59 @@ require_compose_file() {
     log_err "docker-compose file not found at ${COMPOSE_FILE}"
     exit 1
   fi
+}
+
+read_env_value() {
+  local key="$1"
+  awk -F= -v key="${key}" '
+    /^[[:space:]]*#/ {next}
+    $1 ~ "^[[:space:]]*" key "[[:space:]]*$" {
+      sub(/^[^=]*=/, "", $0)
+      gsub(/^[[:space:]]+|[[:space:]]+$/, "", $0)
+      print $0
+      exit
+    }
+  ' "${ENV_FILE}"
+}
+
+validate_env_file() {
+  local required_vars=(
+    "SLM_URL"
+    "DB_URL"
+    "MODEL_NAME"
+  )
+
+  if [[ ! -f "${ENV_FILE}" ]]; then
+    log_err "Missing env file: ${ENV_FILE}"
+    exit 1
+  fi
+
+  if [[ ! -s "${ENV_FILE}" ]]; then
+    log_err "The env file is empty: ${ENV_FILE}"
+    exit 1
+  fi
+
+  for var_name in "${required_vars[@]}"; do
+    local value value_lower
+    value="$(read_env_value "${var_name}")"
+    value="${value%\"}"
+    value="${value#\"}"
+    value="${value%\'}"
+    value="${value#\'}"
+
+    if [[ -z "${value}" ]]; then
+      log_err "Required variable '${var_name}' is missing or empty in ${ENV_FILE}"
+      exit 1
+    fi
+
+    value_lower="$(printf '%s' "${value}" | tr '[:upper:]' '[:lower:]')"
+    case "${value_lower}" in
+      undefined|null|none)
+        log_err "Variable '${var_name}' has invalid value '${value}' in ${ENV_FILE}"
+        exit 1
+        ;;
+    esac
+  done
 }
 
 require_docker() {
@@ -111,6 +165,7 @@ apply_accelerator_profile() {
 
 run_start() {
   require_compose_file
+  validate_env_file
   require_docker
   log_info "Starting secure stack via Docker Compose..."
   docker compose -f "${COMPOSE_FILE}" up -d
@@ -136,8 +191,10 @@ run_install() {
   done
 
   log_info "Ensuring base models are present..."
+  docker network connect zyrabit-brain-api_backend-network slm-engine || true
   docker compose -f "${COMPOSE_FILE}" exec -T slm-engine ollama pull "${model_name}"
   docker compose -f "${COMPOSE_FILE}" exec -T slm-engine ollama pull "mxbai-embed-large"
+  docker network disconnect zyrabit-brain-api_backend-network slm-engine || true
 
   log_ok "Zyrabit is ready."
   echo
@@ -149,6 +206,7 @@ run_install() {
 run_doctor() {
   local accelerator model_name ram_gb
   require_compose_file
+  validate_env_file
   ram_gb="$(detect_ram_gb)"
   accelerator="$(detect_accelerator)"
   model_name="$(resolve_model_name)"

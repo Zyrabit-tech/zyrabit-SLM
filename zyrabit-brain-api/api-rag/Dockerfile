@@ -1,5 +1,5 @@
 # 1. Base Image: Use Slim for smaller attack surface
-FROM python:3.10-slim
+FROM python:latest-slim
 
 # 2. Environment Config (Avoid .pyc files and buffers)
 ENV PYTHONDONTWRITEBYTECODE=1 \

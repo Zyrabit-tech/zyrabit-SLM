@@ -61,6 +61,7 @@ zyrabit-brain-api/.DS_Store
 TEMP_QA_E2E_CHECKLIST.md
 TEMP_TASK_TRACKING.md
 TEMP_*.md
+AGENT.md
 
 # Internal / Weirdly-named tests and drafts
 TEMP_*test*.py

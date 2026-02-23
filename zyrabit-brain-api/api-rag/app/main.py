@@ -26,6 +26,7 @@ _instrumentator = Instrumentator(
     should_instrument_requests_inprogress=True,
     excluded_handlers=["/docs", "/openapi.json"],
 )
+_instrumentator.instrument(app)
 
 # --- DTOs (Data Transfer Objects) con Pydantic ---
 
@@ -40,7 +41,7 @@ class ChatResponse(BaseModel):
 
 @app.on_event("startup")
 async def startup_event():
-    _instrumentator.instrument(app).expose(app, include_in_schema=False)
+    _instrumentator.expose(app, include_in_schema=False)
 
 # --- API Endpoints ---
 

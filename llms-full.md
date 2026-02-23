@@ -71,6 +71,8 @@ Built-in tools:
 
 ## Installer flow
 
+`install.sh` is a bootstrap wrapper that clones the repository and delegates to `zyra-up.sh install`.
+
 `zyra-up.sh` detects hardware profile:
 
 - NVIDIA -> CUDA-capable runtime path

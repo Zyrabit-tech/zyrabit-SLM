@@ -1,6 +1,6 @@
 services:
   traefik:
-    image: traefik:v3.1
+    image: traefik:latest
     container_name: zyrabit-traefik
     command:
       - --api.dashboard=true
@@ -16,7 +16,7 @@ services:
       - "80:80"
       - "443:443"
     volumes:
-      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /var/run/docker.sock:/var/run/docker.sock
       - ./traefik/dynamic.yml:/etc/traefik/dynamic.yml:ro
     networks:
       - frontend-network
@@ -42,6 +42,7 @@ services:
       - traefik.http.services.api-rag.loadbalancer.server.port=8080
       - traefik.http.middlewares.api-ratelimit.ratelimit.average=25
       - traefik.http.middlewares.api-ratelimit.ratelimit.burst=50
+      - traefik.docker.network=zyrabit-brain-api_backend-network
     networks:
       - backend-network
       - model-network
@@ -93,10 +94,10 @@ services:
       - backend-network
 
   loki:
-    image: grafana/loki:3.1.1
+    image: grafana/loki:latest
     container_name: loki
     command: -config.file=/etc/loki/local-config.yaml
-    profiles: ["observability-extra"]
+    profiles: [ "observability-extra" ]
     ports:
       - "3100:3100"
     networks:
@@ -106,7 +107,7 @@ services:
     build:
       context: ../docs-portal
     container_name: docs-portal
-    profiles: ["docs"]
+    profiles: [ "docs" ]
     labels:
       - traefik.enable=true
       - traefik.http.routers.docs.rule=PathPrefix(`/docs-portal`)

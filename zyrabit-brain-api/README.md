@@ -1,52 +1,137 @@
 # Zyrabit Brain API
 
-Backend stack for secure local RAG, MCP bridge, and observability.
+[English version](README_EN.md)
 
-## What this folder contains
+Stack backend para RAG local seguro, puente MCP y observabilidad.
 
-- `api-rag/`: FastAPI service and security pipeline.
-- `docker-compose.yml`: local orchestration with segmented networks.
-- `config/`: Prometheus/Grafana provisioning.
-- `traefik/`: reverse-proxy dynamic security config.
+## Contenido de esta carpeta
 
-## Core capabilities
+- `api-rag/`: API en FastAPI y flujo de seguridad.
+- `docker-compose.yml`: orquestacion local del stack.
+- `config/`: provisionamiento de Prometheus y Grafana.
+- `traefik/`: configuracion de reverse proxy y reglas de seguridad.
 
-- Interceptor-based PII anonymization before SLM inference.
-- Reversible token de-anonymization after response generation.
-- Prometheus metrics at `/metrics`:
+## Capacidades principales
+
+- Anonimizacion de PII basada en interceptores antes de inferencia.
+- Desanonimizacion reversible de tokens al responder al usuario.
+- Metricas Prometheus en `/metrics`:
   - `zyrabit_token_latency_ms_per_token`
   - `zyrabit_token_usage_total`
   - `zyrabit_security_hits_total`
-- MCP endpoints:
+- Endpoints MCP:
   - `GET /mcp/config.json`
   - `POST /mcp`
 
-## Quick start
+## Inicio rapido
 
-From repository root:
+Desde la raiz del repositorio:
 
 ```bash
 chmod +x zyra-up.sh
 ./zyra-up.sh install
 ```
 
-Or from this folder:
+Scripts principales de instalacion:
+
+- `install.sh`: bootstrap remoto/local para primera ejecucion.
+- `zyra-up.sh`: entrada principal para validar entorno y levantar stack.
+
+## Validacion de variables de entorno
+
+El script `zyra-up.sh` ahora valida `zyrabit-brain-api/.env` antes de arrancar:
+
+- El archivo debe existir.
+- No puede estar vacio.
+- Deben existir y tener valor valido:
+  - `SLM_URL`
+  - `DB_URL`
+  - `MODEL_NAME`
+- Se rechazan valores vacios o invalidos como `undefined`, `null`, `none`.
+
+Ejemplo minimo recomendado para `.env`:
 
 ```bash
-docker compose up -d
+SLM_URL=http://slm-engine:11434/api/generate
+DB_URL=http://vector-db:8000
+MODEL_NAME=qwen2.5:7b
 ```
 
-## Service topology
+## Ejemplos de uso
 
-- `traefik`: ingress, TLS redirect, rate-limiting.
-- `api-rag`: FastAPI core.
-- `slm-engine`: Ollama inference engine.
-- `vector-db`: ChromaDB persistence layer.
-- `prometheus` + `grafana`: local monitoring.
-- `loki` (optional profile): extended logs.
-- `docs-portal` (optional profile): local docs container.
+Verificar entorno y configuracion:
 
-Networks:
+```bash
+./zyra-up.sh doctor
+```
+
+Levantar infraestructura:
+
+```bash
+./zyra-up.sh start
+```
+
+Levantar e instalar modelos base:
+
+```bash
+./zyra-up.sh install
+```
+
+Consultar salud de la API:
+
+```bash
+curl -k https://localhost/health
+```
+
+Enviar una consulta al router:
+
+```bash
+curl -k https://localhost/v1/chat \
+  -H "Content-Type: application/json" \
+  -d '{"text":"Explica la arquitectura de Zyrabit"}'
+```
+
+## Capas de abstraccion
+
+La solucion esta organizada por capas para separar responsabilidades:
+
+1. **Capa de entrada (Edge/Ingress)**
+   - `traefik` recibe trafico y aplica TLS, redirecciones y rate limiting.
+2. **Capa de aplicacion**
+   - `api-rag` expone endpoints HTTP y coordina la logica.
+3. **Capa de seguridad**
+   - Pipeline de anonymizacion/desanonimizacion de datos sensibles.
+4. **Capa de inferencia**
+   - `slm-engine` (Ollama) ejecuta el modelo local.
+5. **Capa de conocimiento**
+   - `vector-db` almacena y recupera embeddings/contexto.
+6. **Capa de observabilidad**
+   - `prometheus`, `grafana` y opcionalmente `loki`.
+
+## Patrones aplicados
+
+- **Interceptor Pipeline**: cadena de transformaciones para sanitizar input/output.
+- **Router Pattern**: el endpoint `/v1/chat` decide entre flujo RAG o respuesta directa.
+- **Facade/API Gateway**: FastAPI y Traefik simplifican acceso al sistema distribuido.
+- **Defense in Depth**: redes segmentadas + sanitizacion + reverse proxy.
+
+## Arquitectura utilizada
+
+- **Arquitectura por servicios (micro-servicios locales)** orquestada con Docker Compose.
+- **Estilo Clean / Layered** dentro de `api-rag` para aislar transporte, servicios y seguridad.
+- **Topologia Zero-Trust local**: nada de datos sensibles sale fuera de la infraestructura.
+
+## Topologia de servicios
+
+- `traefik`: ingress, HTTPS y politicas de entrada.
+- `api-rag`: nucleo FastAPI.
+- `slm-engine`: motor de inferencia local.
+- `vector-db`: capa de persistencia semantica.
+- `prometheus` + `grafana`: monitoreo.
+- `loki` (perfil opcional): logs centralizados.
+- `docs-portal` (perfil opcional): portal de documentacion.
+
+Redes:
 
 - `frontend-network`
 - `backend-network`
@@ -59,14 +144,14 @@ cd api-rag
 python3 -m pytest -q
 ```
 
-Focus suites:
+Suites clave:
 
-- `tests/test_security.py`: critical PII and pipeline behavior.
-- `tests/test_services_security.py`: no raw PII reaches model payload.
-- `tests/test_integration.py`: API integration.
-- `tests/test_mcp.py`: MCP interface and sanitization behavior.
+- `tests/test_security.py`: comportamiento de sanitizacion PII.
+- `tests/test_services_security.py`: evita fuga de PII al payload del modelo.
+- `tests/test_integration.py`: integracion API.
+- `tests/test_mcp.py`: contrato MCP y sanitizacion.
 
-## Security references
+## Referencias de seguridad
 
-- Repository-wide security policy: `../SECURITY.md`
-- MCP static config: `../mcp/config.json`
+- Politica global: `../SECURITY.md`
+- Config MCP estatico: `../mcp/config.json`
