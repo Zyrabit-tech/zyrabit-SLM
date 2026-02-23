@@ -1,0 +1,33 @@
+.git
+.gitignore
+.dockerignore
+.venv/
+venv/
+env/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Temporary internal docs and test files
+TEMP_*.md
+TEMP_*.py
+*test_interno*.py
+*draft*.py
+
+# Credentials
+*.env*
+*.key
+*.pem
+
+# Data directories explicitly ignored to prevent large context uploads
+chroma-data/
+grafana-data/
+prometheus-data/
+zyrabit-brain-api/chroma-data/
+zyrabit-brain-api/grafana-data/
+zyrabit-brain-api/prometheus-data/
+zyrabit-brain-api/.ai/
+zyrabit-brain-api/ollama-models/
+ollama-models/
+document_source/

@@ -31,7 +31,7 @@ log_error()   { echo -e "${RED}✖ $1${NC}"; }
 # --- Configuration ---
 REQUIRED_MODELS=(
   "phi3"
-  "kimi-k2-thinking:cloud"
+  "kimi-k2-thinking"
   "mxbai-embed-large"
 )
 
