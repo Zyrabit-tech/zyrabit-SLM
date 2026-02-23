@@ -136,6 +136,18 @@ def process_and_ingest_file(file_path: str):
     """
     return {"status": "success", "filename": os.path.basename(file_path), "chunks": 10}
 
+
+def execute_automation_request(text: str) -> str:
+    """
+    Executes automation-originated requests using the same routing rules as chat.
+    """
+    decision = get_slm_router_decision(text)
+    if decision == "search_rag_database":
+        return execute_rag_pipeline(text)
+    if decision == "direct_SLM_answer":
+        return call_direct_slm(text)
+    return "Automation request rejected by router policy."
+
 # --- EXECUTION ---
 if __name__ == "__main__":
     print_header("INITIATING ZERO-TRUST PROTOCOL")

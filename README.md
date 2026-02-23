@@ -1,144 +1,157 @@
-# Zyrabit SLM Secure Suite (v1.0‑beta)
+services:
+  traefik:
+    image: traefik:latest
+    container_name: zyrabit-traefik
+    command:
+      - --api.dashboard=true
+      - --providers.docker=true
+      - --providers.docker.exposedbydefault=false
+      - --providers.file.filename=/etc/traefik/dynamic.yml
+      - --entryPoints.web.address=:80
+      - --entryPoints.web.http.redirections.entryPoint.to=websecure
+      - --entryPoints.web.http.redirections.entryPoint.scheme=https
+      - --entryPoints.websecure.address=:443
+      - --entryPoints.websecure.http.tls=true
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./traefik/dynamic.yml:/etc/traefik/dynamic.yml:ro
+    networks:
+      - frontend-network
+      - backend-network
 
-[![English](https://img.shields.io/badge/lang-English-blue.svg)](README_EN.md)
-![Python](https://img.shields.io/badge/python-v3.10%2B-blue.svg)
-![Docker](https://img.shields.io/badge/docker--compose-ready-green.svg)
-![License](https://img.shields.io/badge/license-MIT-yellow.svg)
-![Architecture](https://img.shields.io/badge/architecture-clean-orange.svg)
-![Tests](https://img.shields.io/badge/tests-passing-brightgreen.svg)
+  # 1. THE BRAIN: API RAG
+  api-rag:
+    build:
+      context: ./api-rag
+    env_file:
+      - .env
+    depends_on:
+      vector-db:
+        condition: service_started
+      slm-engine:
+        condition: service_started
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.api-rag.rule=PathPrefix(`/`)
+      - traefik.http.routers.api-rag.entrypoints=websecure
+      - traefik.http.routers.api-rag.tls=true
+      - traefik.http.routers.api-rag.middlewares=api-ratelimit@docker,secureHeaders@file
+      - traefik.http.services.api-rag.loadbalancer.server.port=8080
+      - traefik.http.middlewares.api-ratelimit.ratelimit.average=25
+      - traefik.http.middlewares.api-ratelimit.ratelimit.burst=50
+      - traefik.docker.network=zyrabit-brain-api_backend-network
+    networks:
+      - backend-network
+      - model-network
 
----
+  # 2. THE MUSCLE: SLM Server
+  slm-engine:
+    image: ollama/ollama:latest
+    container_name: slm-engine
+    volumes:
+      - ./ollama-models:/root/.ollama
+    networks:
+      - model-network
 
-## 📖 Descripción
+  # 3. THE MEMORY: Vector DB
+  vector-db:
+    image: chromadb/chroma:latest
+    container_name: vector-db
+    volumes:
+      - ./chroma-data:/chroma/chroma
+    networks:
+      - backend-network
 
-**Zyrabit SLM Secure Suite** es una solución de IA local que combina un modelo de lenguaje pequeño (**Small Language Models - SLMs**) con un motor de recuperación‑aumentada (RAG) y una capa de **Zero‑Trust**.
+  # 4. THE MONITOR (Scraper): Prometheus
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    volumes:
+      - ./config/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus-data:/prometheus
+    ports:
+      - "9091:9090"
+    networks:
+      - backend-network
 
-### 🧬 Nuestra Filosofía
-*   **Eficiencia**: Ejecución optimizada para hardware de consumo (Mac M1/M2, Consumer GPUs).
-*   **Velocidad**: Menor latencia gracias a modelos compactos (Phi-3, Mistral).
-*   **Soberanía**: Tus datos nunca salen de tu infraestructura. Todo corre localmente.
+  # 5. THE MONITOR (Dashboard): Grafana
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./config/grafana/datasources:/etc/grafana/provisioning/datasources
+      - ./config/grafana/dashboards:/etc/grafana/provisioning/dashboards
+      - ./config/grafana/dashboards:/var/lib/grafana/dashboards
+    depends_on:
+      - prometheus
+    networks:
+      - backend-network
 
----
+  loki:
+    image: grafana/loki:latest
+    container_name: loki
+    command: -config.file=/etc/loki/local-config.yaml
+    profiles: [ "observability-extra" ]
+    ports:
+      - "3100:3100"
+    networks:
+      - backend-network
 
-## 🛠️ Entorno Validado
+  docs-portal:
+    build:
+      context: ../docs-portal
+    container_name: docs-portal
+    profiles: [ "docs" ]
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.docs.rule=PathPrefix(`/docs-portal`)
+      - traefik.http.routers.docs.entrypoints=websecure
+      - traefik.http.routers.docs.tls=true
+      - traefik.http.services.docs.loadbalancer.server.port=3001
+      - traefik.http.middlewares.docs-stripprefix.stripprefix.prefixes=/docs-portal
+      - traefik.http.routers.docs.middlewares=docs-stripprefix@docker,secureHeaders@file
+    networks:
+      - frontend-network
 
-| Plataforma | CPU | RAM | OS |
-|------------|-----|-----|----|
-| MacBook Pro (M1 Pro) | 8‑core | 16 GB | macOS Sequoia 15.1 |
-| Linux (Ubuntu 22.04) | 4‑core | 8 GB | - |
-| Windows (WSL2) | 4‑core | 8 GB | - |
+  n8n:
+    image: n8nio/n8n:latest
+    container_name: n8n
+    profiles: [ "automation" ]
+    environment:
+      - N8N_HOST=localhost
+      - N8N_PORT=5678
+      - N8N_PROTOCOL=https
+      - N8N_PATH=/n8n
+      - WEBHOOK_URL=https://localhost/n8n/
+      - N8N_SECURE_COOKIE=false
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.n8n.rule=PathPrefix(`/n8n`)
+      - traefik.http.routers.n8n.entrypoints=websecure
+      - traefik.http.routers.n8n.tls=true
+      - traefik.http.routers.n8n.middlewares=secureHeaders@file
+      - traefik.http.services.n8n.loadbalancer.server.port=5678
+      - traefik.docker.network=zyrabit-brain-api_backend-network
+    volumes:
+      - ./n8n-data:/home/node/.n8n
+    networks:
+      - backend-network
 
-> **Nota Windows:** Use WSL2 para ejecutar Docker y los scripts.
+networks:
+  frontend-network:
+    driver: bridge
+  backend-network:
+    driver: bridge
+  model-network:
+    driver: bridge
+    internal: true
 
----
-
-## 📦 Instalación
-
-Instalación ultra-rápida (estilo bootstrap):
-
-```bash
-curl -sSL https://zyrabit.com/install.sh | bash
-```
-
-O instalación local:
-
-1. **Prerequisitos**
-   - Docker & Docker‑Compose
-   - Python 3.10 +
-   - `git` (opcional)
-2. **Clonar el repositorio**
-   ```bash
-   git clone https://github.com/Zyrabit-tech/zyrabit-SLM.git
-   cd zyrabit-SLM
-   ```
-3. **Entorno virtual**
-   ```bash
-   python3 -m venv .venv
-   source .venv/bin/activate   # macOS / Linux
-   # .venv\Scripts\activate   # Windows
-   pip3 install -r requirements.txt
-   ```
-4. **Infraestructura**
-   ```bash
-   chmod +x zyra-up.sh
-   ./zyra-up.sh install
-   ```
-5. **Opciones del instalador**
-   ```bash
-   ./zyra-up.sh doctor   # valida entorno y perfil hardware
-   ./zyra-up.sh start    # solo arranca infraestructura
-   ./zyra-up.sh install  # arranca + descarga modelos base
-   ```
-   El script detecta NVIDIA/Metal/CPU y usa `qwen2.5:7b` por defecto (`qwen2.5:1.5b` en equipos con menos RAM).
-   
-   Scripts oficiales de setup:
-   - `install.sh`: bootstrap remoto/local (clona y ejecuta `zyra-up.sh install`)
-   - `zyra-up.sh`: instalador principal y orquestador del stack
-6. **Ejecutar la UI**
-   ```bash
-   streamlit run slm_console.py
-   ```
-   Accede a `http://localhost:8501`.
-
----
-
-## 🚀 Uso rápido
-
-```bash
-# CLI segura
-python secure_agent.py "Mi email es juan@example.com y mi saldo es $1,200.00"
-```
-
-El agente aplica anonimización reversible por tokens (`<USER_EMAIL_1>`, etc.) antes de inferencia y restaura el resultado para el usuario.
-
-## 🔐 Endurecimiento de red y entrada
-
-- Reverse proxy con Traefik como punto de entrada único (`https://localhost`).
-- Redirección HTTP→HTTPS y rate limiting para endpoints críticos.
-- Segmentación de redes Docker:
-  - `frontend-network`
-  - `backend-network`
-  - `model-network` con `internal: true`
-
-## 📈 Observabilidad
-
-Endpoint Prometheus real en `/metrics`, incluyendo:
-
-- `zyrabit_token_latency_ms_per_token`
-- `zyrabit_token_usage_total`
-- `zyrabit_security_hits_total`
-
-## 🔌 MCP Bridge
-
-- Config estándar: `mcp/config.json`
-- Endpoint en API: `GET /mcp/config.json`
-- JSON-RPC MCP: `POST /mcp`
-- Todas las operaciones del bridge se sanitizan antes de exponerse.
-
-## 📚 Portal de documentación
-
-Se incluye contenedor opcional de docs (Docusaurus):
-
-```bash
-cd zyrabit-brain-api
-docker compose --profile docs up -d docs-portal
-```
-
-Además, se incluye `llms-full.md` como referencia técnica optimizada para agentes de IA.
-
----
-
-## 🧪 Tests
-
-Ejecuta la suite de pruebas con:
-```bash
-cd zyrabit-brain-api/api-rag
-python3 -m pytest -q
-```
-Los tests cubren sanitización PII, integración de endpoints, seguridad del payload al SLM y contrato MCP.
-
----
-
-## 📜 Licencia
-
-MIT © Zyrabit 2025
+volumes:
+  prometheus-data:
+  grafana-data:

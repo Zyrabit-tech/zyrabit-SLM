@@ -8,3 +8,4 @@ This portal documents the local-first AI platform for secure RAG and MCP workloa
 - Full local observability with Prometheus and Grafana.
 - Hardened Docker topology with segmented networks.
 - MCP bridge to local resources with sanitization-first behavior.
+- Hexagonal integration model for n8n and future external adapters.

@@ -5,6 +5,7 @@ from fastapi import FastAPI, HTTPException, UploadFile, File, Request
 from pydantic import BaseModel
 from prometheus_fastapi_instrumentator import Instrumentator
 from . import mcp_bridge
+from .adapters.n8n_adapter import N8nAdapter, N8nIntegrationPolicy
 
 # --- CONFIGURATION ---
 # Reads environment variables. Ensure you have a .env file or export them.
@@ -27,6 +28,10 @@ _instrumentator = Instrumentator(
     excluded_handlers=["/docs", "/openapi.json"],
 )
 _instrumentator.instrument(app)
+n8n_adapter = N8nAdapter(
+    policy=N8nIntegrationPolicy.from_env(),
+    execute_automation=services.execute_automation_request,
+)
 
 # --- DTOs (Data Transfer Objects) con Pydantic ---
 
@@ -72,6 +77,36 @@ async def mcp_jsonrpc(request: Request):
     payload = await request.json()
     response, status_code = mcp_bridge.handle_jsonrpc(payload)
     return JSONResponse(content=response, status_code=status_code)
+
+
+@app.post("/v1/integrations/n8n/webhook", tags=["Integrations"])
+async def n8n_webhook(request: Request):
+    """
+    Receives n8n webhook calls through a secured integration adapter.
+    """
+    raw_body = await request.body()
+    authorization_header = request.headers.get("authorization", "")
+    signature_header = request.headers.get("x-zyrabit-signature", "")
+
+    try:
+        payload = await request.json()
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=f"Invalid JSON payload: {exc}")
+
+    try:
+        n8n_adapter.authorize_request(
+            authorization_header=authorization_header,
+            signature_header=signature_header,
+            raw_body=raw_body,
+        )
+    except PermissionError as exc:
+        raise HTTPException(status_code=401, detail=str(exc))
+
+    try:
+        result = n8n_adapter.handle_payload(payload)
+        return result
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
 
 
 @app.post("/v1/chat", response_model=ChatResponse, tags=["Agentic Router"])

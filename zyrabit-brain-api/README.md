@@ -22,6 +22,8 @@ Stack backend para RAG local seguro, puente MCP y observabilidad.
 - Endpoints MCP:
   - `GET /mcp/config.json`
   - `POST /mcp`
+- Endpoint de integración n8n (adapter + políticas):
+  - `POST /v1/integrations/n8n/webhook`
 
 ## Inicio rapido
 
@@ -57,6 +59,14 @@ DB_URL=http://vector-db:8000
 MODEL_NAME=qwen2.5:7b
 ```
 
+Variables para integracion n8n (adapter webhook):
+
+```bash
+N8N_SERVICE_TOKEN=replace-with-strong-token
+N8N_WEBHOOK_SIGNING_SECRET=replace-with-hmac-secret
+N8N_REQUIRE_SIGNATURE=true
+```
+
 ## Ejemplos de uso
 
 Verificar entorno y configuracion:
@@ -71,10 +81,24 @@ Levantar infraestructura:
 ./zyra-up.sh start
 ```
 
+Levantar stack manualmente con Docker Compose:
+
+```bash
+cd zyrabit-brain-api
+docker compose up -d
+```
+
 Levantar e instalar modelos base:
 
 ```bash
 ./zyra-up.sh install
+```
+
+Descargar modelos manualmente (sin flujo automático):
+
+```bash
+docker compose exec -T slm-engine ollama pull qwen2.5:7b
+docker compose exec -T slm-engine ollama pull mxbai-embed-large
 ```
 
 Consultar salud de la API:
@@ -89,6 +113,16 @@ Enviar una consulta al router:
 curl -k https://localhost/v1/chat \
   -H "Content-Type: application/json" \
   -d '{"text":"Explica la arquitectura de Zyrabit"}'
+```
+
+Enviar evento desde n8n al adapter:
+
+```bash
+curl -k https://localhost/v1/integrations/n8n/webhook \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer ${N8N_SERVICE_TOKEN}" \
+  -H "X-Zyrabit-Signature: sha256=<hmac_sha256_del_body>" \
+  -d '{"text":"Resume estado de observabilidad","workflow_id":"wf-001","execution_id":"exec-001"}'
 ```
 
 ## Capas de abstraccion
@@ -130,6 +164,7 @@ La solucion esta organizada por capas para separar responsabilidades:
 - `prometheus` + `grafana`: monitoreo.
 - `loki` (perfil opcional): logs centralizados.
 - `docs-portal` (perfil opcional): portal de documentacion.
+- `n8n` (perfil opcional `automation`): automatizacion por webhook, publicado via Traefik (`/n8n`).
 
 Redes:
 
@@ -155,3 +190,11 @@ Suites clave:
 
 - Politica global: `../SECURITY.md`
 - Config MCP estatico: `../mcp/config.json`
+
+## Politicas de integracion (n8n y futuros adapters)
+
+- **Single entrypoint**: todo acceso externo por Traefik (`https://localhost`), sin puertos publicos adicionales por servicio.
+- **Token de servicio**: `Authorization: Bearer <token>` obligatorio para adapters de automatizacion.
+- **Integridad de webhook**: firma HMAC SHA-256 en `X-Zyrabit-Signature` cuando `N8N_REQUIRE_SIGNATURE=true`.
+- **Contrato estable**: payload minimo `{ "text": "..." }`; metadatos opcionales `workflow_id`, `execution_id`.
+- **Arquitectura hexagonal**: nuevas integraciones (Make, Strapi, DB connectors) deben implementar su propio adapter sobre un port, sin acoplar el dominio a proveedores externos.

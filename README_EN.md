@@ -74,6 +74,13 @@ Or local setup:
     Official setup scripts:
     - `install.sh`: remote/local bootstrap (clones repo and runs `zyra-up.sh install`)
     - `zyra-up.sh`: main installer and stack orchestrator
+    
+    Manual model pull (without running `install`):
+    ```bash
+    docker compose -f zyrabit-brain-api/docker-compose.yml up -d slm-engine
+    docker compose -f zyrabit-brain-api/docker-compose.yml exec -T slm-engine ollama pull qwen2.5:7b
+    docker compose -f zyrabit-brain-api/docker-compose.yml exec -T slm-engine ollama pull mxbai-embed-large
+    ```
 6.  **Run the UI**
     ```bash
     streamlit run slm_console.py
@@ -125,6 +132,21 @@ docker compose --profile docs up -d docs-portal
 ```
 
 A machine-friendly technical digest is available in `llms-full.md`.
+
+## 🧭 Documentation map (non-overlapping)
+
+Each README has a clear scope:
+
+- `README.md`: product-level overview, quick setup, and global usage.
+- `README_EN.md` (this file): English mirror of the root README.
+- `zyrabit-brain-api/README.md`: backend operations (compose, endpoints, networks, profiles).
+- `zyrabit-brain-api/README_EN.md`: English mirror of backend operations.
+
+Maintenance rule:
+
+- root docs for onboarding and global workflows.
+- backend docs for API/infrastructure internals.
+- avoid copy-pasting full sections between root and backend; link when needed.
 
 -----
 

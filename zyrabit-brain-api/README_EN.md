@@ -22,6 +22,8 @@ Backend stack for secure local RAG, MCP bridge, and observability.
 - MCP endpoints:
   - `GET /mcp/config.json`
   - `POST /mcp`
+- n8n integration endpoint (adapter + policies):
+  - `POST /v1/integrations/n8n/webhook`
 
 ## Quick start
 
@@ -43,6 +45,21 @@ Or from this folder:
 docker compose up -d
 ```
 
+Recommended environment variables for n8n webhook adapter:
+
+```bash
+N8N_SERVICE_TOKEN=replace-with-strong-token
+N8N_WEBHOOK_SIGNING_SECRET=replace-with-hmac-secret
+N8N_REQUIRE_SIGNATURE=true
+```
+
+Manual model pull (without automatic installer flow):
+
+```bash
+docker compose exec -T slm-engine ollama pull qwen2.5:7b
+docker compose exec -T slm-engine ollama pull mxbai-embed-large
+```
+
 ## Service topology
 
 - `traefik`: ingress, TLS redirect, rate-limiting.
@@ -52,12 +69,21 @@ docker compose up -d
 - `prometheus` + `grafana`: local monitoring.
 - `loki` (optional profile): extended logs.
 - `docs-portal` (optional profile): local docs container.
+- `n8n` (optional `automation` profile): automation workflow engine published through Traefik (`/n8n`).
 
 Networks:
 
 - `frontend-network`
 - `backend-network`
 - `model-network` (`internal: true`)
+
+## Integration policies (n8n and future adapters)
+
+- **Single entrypoint**: all public traffic goes through Traefik (`https://localhost`), no extra public service ports.
+- **Service token**: `Authorization: Bearer <token>` required for automation adapters.
+- **Webhook integrity**: HMAC SHA-256 signature in `X-Zyrabit-Signature` when `N8N_REQUIRE_SIGNATURE=true`.
+- **Stable contract**: minimum payload `{ "text": "..." }`; optional metadata `workflow_id`, `execution_id`.
+- **Hexagonal boundary**: every new external tool (Make, Strapi, DB connectors) should add a dedicated adapter over a port, without coupling core domain logic to provider APIs.
 
 ## Testing
 
