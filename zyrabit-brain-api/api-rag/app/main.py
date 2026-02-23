@@ -147,12 +147,12 @@ def chat_router(query: ChatQuery):
 @app.post("/v1/ingest", tags=["Ingestion"])
 async def ingest_document(file: UploadFile = File(...)):
     """
-    Endpoint to ingest PDF documents into the knowledge base.
+    Endpoint to ingest PDF, TXT or Markdown documents into the knowledge base.
 
-    - **Validation**: Only .pdf and .docx files (only PDF implemented for now).
+    - **Validation**: Only .pdf, .txt and .md files.
     - **Size**: Max 800MB (validated by server config, basic logic here).
     """
-    ALLOWED_EXTENSIONS = {".pdf"}
+    ALLOWED_EXTENSIONS = {".pdf", ".txt", ".md"}
     MAX_SIZE_MB = 800
 
     # 1. Validate extension

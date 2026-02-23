@@ -51,12 +51,20 @@ El script `zyra-up.sh` valida el valor efectivo de variables requeridas antes de
   - `MODEL_NAME`
 - Se rechazan valores vacios o invalidos como `undefined`, `null`, `none`.
 
+Plantilla completa: copia `example.env` a `.env` y ajusta valores:
+
+```bash
+cp example.env .env
+```
+
 Ejemplo minimo para `.env` (opcional si ya exportas variables en servidor):
 
 ```bash
 SLM_URL=http://slm-engine:11434/api/generate
 DB_URL=http://vector-db:8000
 MODEL_NAME=qwen2.5:7b
+PROMETHEUS_BASIC_AUTH=admin:$2y$05$...   # htpasswd -nbB admin 'password'
+GRAFANA_BASIC_AUTH=admin:$2y$05$...      # idem
 ```
 
 Variables para integracion n8n (adapter webhook):
@@ -134,6 +142,8 @@ curl -k https://localhost/v1/chat \
   -H "Content-Type: application/json" \
   -d '{"text":"Explica la arquitectura de Zyrabit"}'
 ```
+
+Ver ejemplos completos: `docs/CURL_EXAMPLES.md` y workflow n8n en `docs/n8n_zyrabit_webhook_workflow.json`.
 
 Enviar evento desde n8n al adapter:
 

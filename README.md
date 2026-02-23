@@ -149,10 +149,20 @@ docker compose --profile docs up -d docs-portal
 
 ## Tests
 
+Unit and integration tests:
+
 ```bash
 cd zyrabit-brain-api/api-rag
 python3 -m pytest -q
 ```
+
+Prueba final (imágenes, ingesta, API, RAG):
+
+```bash
+./scripts/run_final_tests.sh
+```
+
+Este script: construye imágenes, levanta el stack, ingesta documentos de muestra, y valida que la IA pueda responder sobre el proyecto (RAG).
 
 ## Licencia
 

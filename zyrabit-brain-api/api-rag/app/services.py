@@ -1,5 +1,7 @@
 import os
+import re
 import time
+from urllib.parse import urlparse
 
 import requests
 
@@ -16,6 +18,18 @@ from .security import PipelineContext, build_security_pipeline
 SLM_URL = os.getenv("SLM_URL", "http://slm-engine:11434/api/generate")
 # Defaulting to phi3 as per setup script, but overridable
 MODEL_NAME = os.getenv("MODEL_NAME", "phi3")
+DB_URL = os.getenv("DB_URL", "http://vector-db:8000")
+COLLECTION_NAME = os.getenv("RAG_COLLECTION", "zyrabit_knowledge")
+EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "mxbai-embed-large")
+CHUNK_SIZE = 1000
+CHUNK_OVERLAP = 200
+RAG_N_RESULTS = 5
+
+# Spam/off-topic patterns that trigger reject_query
+REJECT_PATTERNS = [
+    r"\bviagra\b", r"\bcasino\b", r"\bcrypto\s*scam\b",
+    r"comprar\s+barato\s+ahora", r"click\s+here\s+now",
+]
 
 # --- SYSTEM PROMPT LOADING ---
 def load_system_prompt() -> str:
@@ -103,38 +117,122 @@ def call_direct_slm(prompt: str) -> str:
     response, _ = query_secure_slm(prompt)
     return response
 
+def _parse_db_url(url: str) -> tuple[str, int]:
+    """Parse DB_URL into (host, port) for ChromaDB HttpClient."""
+    parsed = urlparse(url)
+    host = parsed.hostname or "localhost"
+    port = parsed.port or 8000
+    return host, port
+
+
 def get_slm_router_decision(text: str) -> str:
     """
-    Decides whether to use RAG or Direct SLM.
-    Simple keyword-based router for now.
+    Decides whether to use RAG, Direct SLM, or reject.
+    Keyword-based router with spam detection.
     """
-    # In a real system, this would be another SLM call or a classifier.
-    # For now, if it asks about "Zyrabit" or specific docs, use RAG.
-    keywords = ["zyrabit", "architecture", "security", "slm", "rag"]
-    if any(k in text.lower() for k in keywords):
+    text_lower = text.lower()
+    # Reject spam/off-topic
+    for pattern in REJECT_PATTERNS:
+        if re.search(pattern, text_lower, re.IGNORECASE):
+            return "reject_query"
+    # RAG for project/tech topics
+    keywords = ["zyrabit", "architecture", "security", "slm", "rag", "chromadb", "ollama", "docker"]
+    if any(k in text_lower for k in keywords):
         return "search_rag_database"
     return "direct_SLM_answer"
+
 
 def execute_rag_pipeline(text: str) -> str:
     """
     Executes the RAG pipeline: Retrieve -> Augment -> Generate.
-    Placeholder implementation.
+    Uses ChromaDB for retrieval and Ollama for generation.
     """
-    # 1. Retrieve (Mock)
-    context = "Zyrabit SLM is a secure, local AI architecture."
-    
-    # 2. Augment
-    augmented_prompt = f"Context: {context}\n\nQuestion: {text}\n\nAnswer:"
-    
-    # 3. Generate with security layer enabled
-    response, _ = query_secure_slm(augmented_prompt)
-    return response
+    try:
+        import chromadb
+        from langchain_community.embeddings import OllamaEmbeddings
 
-def process_and_ingest_file(file_path: str):
+        host, port = _parse_db_url(DB_URL)
+        client = chromadb.HttpClient(host=host, port=port)
+        collection = client.get_or_create_collection(name=COLLECTION_NAME)
+
+        embeddings = OllamaEmbeddings(model=EMBEDDING_MODEL)
+        query_embedding = embeddings.embed_query(text)
+
+        results = collection.query(
+            query_embeddings=[query_embedding],
+            n_results=RAG_N_RESULTS,
+        )
+
+        docs = results.get("documents", [[]])
+        if docs and docs[0]:
+            context = "\n\n".join(docs[0])
+        else:
+            context = "No relevant documents found in the knowledge base."
+
+        augmented_prompt = f"Context from knowledge base:\n{context}\n\nQuestion: {text}\n\nAnswer based on the context:"
+        response, _ = query_secure_slm(augmented_prompt)
+        return response
+
+    except Exception as e:
+        return (
+            f"Lo siento, ocurrió un error al procesar tu consulta con la base de datos "
+            f"de conocimiento: {str(e)}"
+        )
+
+
+def process_and_ingest_file(file_path: str) -> dict:
     """
-    Mock ingestion function.
+    Ingest PDF or TXT file into ChromaDB.
+    Returns status dict with chunks_processed.
     """
-    return {"status": "success", "filename": os.path.basename(file_path), "chunks": 10}
+    ext = os.path.splitext(file_path)[1].lower()
+    if ext == ".pdf":
+        from langchain_community.document_loaders import PyPDFLoader
+        loader = PyPDFLoader(file_path)
+        docs = loader.load()
+    elif ext in (".txt", ".md"):
+        from langchain_community.document_loaders import TextLoader
+        loader = TextLoader(file_path, encoding="utf-8")
+        docs = loader.load()
+    else:
+        raise ValueError(f"Unsupported file type: {ext}")
+
+    if not docs:
+        return {"status": "success", "filename": os.path.basename(file_path), "chunks_processed": 0}
+
+    from langchain.text_splitter import RecursiveCharacterTextSplitter
+    from langchain_community.embeddings import OllamaEmbeddings
+    import chromadb
+
+    text_splitter = RecursiveCharacterTextSplitter(
+        chunk_size=CHUNK_SIZE,
+        chunk_overlap=CHUNK_OVERLAP,
+    )
+    chunks = text_splitter.split_documents(docs)
+
+    embeddings = OllamaEmbeddings(model=EMBEDDING_MODEL)
+    documents_to_add = [c.page_content for c in chunks]
+    metadatas_to_add = [c.metadata for c in chunks]
+    embedded_chunks = embeddings.embed_documents(documents_to_add)
+
+    host, port = _parse_db_url(DB_URL)
+    client = chromadb.HttpClient(host=host, port=port)
+    collection = client.get_or_create_collection(name=COLLECTION_NAME)
+
+    ids = [f"chunk_{abs(hash(c.page_content)) % 10**10}_{i}" for i, c in enumerate(chunks)]
+    collection.add(
+        embeddings=embedded_chunks,
+        documents=documents_to_add,
+        metadatas=metadatas_to_add,
+        ids=ids,
+    )
+
+    return {
+        "status": "success",
+        "filename": os.path.basename(file_path),
+        "chunks_processed": len(chunks),
+        "message": "Documento ingestado correctamente en la base de conocimiento.",
+    }
 
 
 def execute_automation_request(text: str) -> str:

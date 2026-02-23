@@ -61,11 +61,11 @@ def test_ingest_document_success(mock_process_file):
 
 def test_ingest_document_invalid_file_type():
     """
-    Prueba que el endpoint rechace archivos que no sean PDF.
+    Prueba que el endpoint rechace archivos que no sean PDF, TXT o MD.
     """
-    # GIVEN
-    txt_content = b"This is a text file"
-    files = {"file": ("document.txt", BytesIO(txt_content), "text/plain")}
+    # GIVEN - .exe is not allowed
+    exe_content = b"MZ fake executable"
+    files = {"file": ("malware.exe", BytesIO(exe_content), "application/octet-stream")}
 
     # WHEN
     response = client.post("/v1/ingest", files=files)
@@ -83,7 +83,7 @@ def test_ingest_document_invalid_file_type():
 
 # --- PRUEBA 5: Chat Router - Error Handling ---
 
-@patch('app.services.get_SLM_router_decision')
+@patch('app.services.get_slm_router_decision')
 @patch('app.services.execute_rag_pipeline')
 def test_chat_router_handles_service_exceptions(
         mock_rag_pipeline, mock_router_decision):
@@ -109,10 +109,10 @@ def test_chat_router_handles_service_exceptions(
 
 # --- PRUEBA 6: Chat Router - Decision Fallback ---
 
-@patch('app.services.get_SLM_router_decision')
-@patch('app.services.call_direct_SLM')
+@patch('app.services.get_slm_router_decision')
+@patch('app.services.call_direct_slm')
 def test_chat_router_handles_unknown_decision(
-        mock_direct_SLM, mock_router_decision):
+        mock_direct_slm, mock_router_decision):
     """
     Prueba que el router maneje una decisión desconocida del SLM.
     Si get_SLM_router_decision retorna algo inesperado, debería manejarlo.
