@@ -34,11 +34,18 @@ REJECT_PATTERNS = [
 
 # --- SYSTEM PROMPT LOADING ---
 def load_system_prompt() -> str:
-    """Loads the system prompt from the txt file.
+    """Loads the system prompt from the mounted file or fallback.
     
     Returns:
         str: The system prompt content, or empty string if file not found.
     """
+    external_prompt_path = "/app/prompts/agent.md"
+    try:
+        with open(external_prompt_path, "r", encoding="utf-8") as f:
+            return f.read().strip()
+    except FileNotFoundError:
+        pass # Fallback to internal
+
     prompt_path = os.path.join(os.path.dirname(__file__), "system_prompt.txt")
     try:
         with open(prompt_path, "r", encoding="utf-8") as f:
@@ -46,9 +53,6 @@ def load_system_prompt() -> str:
     except FileNotFoundError:
         logger.warning("system_prompt.txt not found at %s", prompt_path)
         return ""
-
-# Load system prompt once at module initialization
-SYSTEM_PROMPT = load_system_prompt()
 
 def print_header(title: str):
     """Prints a styled header to the console."""
@@ -81,8 +85,9 @@ def query_secure_slm(prompt: str) -> tuple[str, float]:
         logger.info("Security pipeline detected no sensitive entities.")
 
     # PHASE B: LOCAL INFERENCE (Air-Gapped)
-    # Construct prompt with system context
-    full_prompt = f"{SYSTEM_PROMPT}\n\nUser: {sanitized_prompt}\nAssistant:" if SYSTEM_PROMPT else sanitized_prompt
+    # Construct prompt with system context dynamically so it reflects changes to agent.md
+    system_prompt_text = load_system_prompt()
+    full_prompt = f"{system_prompt_text}\n\nUser: {sanitized_prompt}\nAssistant:" if system_prompt_text else sanitized_prompt
     
     try:
         provider = create_inference_provider()
@@ -133,8 +138,8 @@ def get_slm_router_decision(text: str) -> str:
     for pattern in REJECT_PATTERNS:
         if re.search(pattern, text_lower, re.IGNORECASE):
             return "reject_query"
-    # RAG for project/tech topics
-    keywords = ["zyrabit", "architecture", "security", "slm", "rag", "chromadb", "ollama", "docker"]
+    # Provide helpful orientation if it's casually generic but harmless.
+    keywords = ["zyrabit", "architecture", "security", "slm", "rag", "chromadb", "ollama", "docker", "pyme", "n8n", "automat", "zapier"]
     if any(k in text_lower for k in keywords):
         return "search_rag_database"
     return "direct_SLM_answer"
@@ -154,7 +159,15 @@ def execute_rag_pipeline_with_metadata(text: str) -> Tuple[str, int]:
         client = chromadb.HttpClient(host=host, port=port)
         collection = client.get_or_create_collection(name=COLLECTION_NAME)
 
-        embeddings = OllamaEmbeddings(model=EMBEDDING_MODEL)
+        # Explicitly configure embeddings base_url for Langchain
+        slm_url = os.getenv("SLM_URL", "http://localhost:11434/api/generate")
+        parsed_slm = urlparse(slm_url)
+        base_ollama_url = f"{parsed_slm.scheme}://{parsed_slm.netloc}"
+        
+        embeddings = OllamaEmbeddings(
+            model=EMBEDDING_MODEL,
+            base_url=base_ollama_url
+        )
         query_embedding = embeddings.embed_query(text)
 
         results = collection.query(
@@ -234,7 +247,15 @@ def process_and_ingest_file(file_path: str) -> dict:
         CHUNK_OVERLAP,
     )
 
-    embeddings = OllamaEmbeddings(model=EMBEDDING_MODEL)
+    # Explicitly configure embeddings base_url for Langchain
+    slm_url = os.getenv("SLM_URL", "http://localhost:11434/api/generate")
+    parsed_slm = urlparse(slm_url)
+    base_ollama_url = f"{parsed_slm.scheme}://{parsed_slm.netloc}"
+
+    embeddings = OllamaEmbeddings(
+        model=EMBEDDING_MODEL,
+        base_url=base_ollama_url
+    )
     documents_to_add = [c.page_content for c in chunks]
     source_name = os.path.basename(file_path)
     metadatas_to_add = []

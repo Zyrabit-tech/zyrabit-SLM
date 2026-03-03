@@ -26,6 +26,7 @@ services:
   api-rag:
     build:
       context: ./api-rag
+    container_name: api-rag
     env_file:
       - .env
     environment:
@@ -51,11 +52,14 @@ services:
       - model-network
     volumes:
       - ./secrets:/run/secrets:ro
+      - ./prompts:/app/prompts:ro
 
   # 2. THE MUSCLE: SLM Server
   slm-engine:
     image: ollama/ollama:latest
     container_name: slm-engine
+    environment:
+      - OLLAMA_NUM_PARALLEL=${OLLAMA_NUM_PARALLEL:-1}
     volumes:
       - ./ollama-models:/root/.ollama
     networks:
@@ -65,6 +69,10 @@ services:
   vector-db:
     image: chromadb/chroma:latest
     container_name: vector-db
+    environment:
+      - ANONYMIZED_TELEMETRY=False
+      - CHROMA_OTEL_COLLECTION_ENDPOINT=http://localhost:4317
+      - CHROMA_OTEL_SERVICE_NAME=zyrabit-vector-db
     volumes:
       - ./chroma-data:/chroma/chroma
     networks:

@@ -2,6 +2,7 @@ fastapi
 uvicorn[standard]
 langchain
 langchain-community
+langchain-text-splitters>=0.0.1
 langchain-ollama    
 chromadb-client     
 prometheus-fastapi-instrumentator 

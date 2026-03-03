@@ -139,6 +139,14 @@ detect_accelerator() {
   echo "cpu"
 }
 
+detect_cores() {
+  if [[ "$(uname -s)" == "Darwin" ]]; then
+    sysctl -n hw.logicalcpu 2>/dev/null || echo 4
+    return
+  fi
+  nproc 2>/dev/null || echo 4
+}
+
 resolve_model_name() {
   local model_default model_low_ram ram_gb
   model_default="${ZYRABIT_MODEL_DEFAULT:-qwen2.5:7b}"
@@ -158,17 +166,27 @@ resolve_model_name() {
 
 apply_accelerator_profile() {
   local accelerator="$1"
+  local cores
+  cores="$(detect_cores)"
+
+  # Adjust parallelism dynamically. CPU handles ~4 threads well per parallel request.
+  if [[ "${cores}" -ge 8 ]]; then
+    export OLLAMA_NUM_PARALLEL=2
+  else
+    export OLLAMA_NUM_PARALLEL=1
+  fi
+  
   case "${accelerator}" in
     nvidia)
       log_ok "NVIDIA GPU detected. Using CUDA-capable container runtime if configured."
       export OLLAMA_NUM_GPU=999
       ;;
     metal)
-      log_ok "Apple Silicon detected. Optimizing for Metal backend."
+      log_ok "Apple Silicon detected. Optimizing for Metal backend. Cores: ${cores} (Parallel: ${OLLAMA_NUM_PARALLEL})"
       export OLLAMA_NUM_GPU=1
       ;;
     *)
-      log_warn "CPU-only mode detected. Quantized model is recommended."
+      log_warn "CPU-only mode detected. Quantized model is recommended. Cores: ${cores} (Parallel: ${OLLAMA_NUM_PARALLEL})"
       ;;
   esac
 }
@@ -227,10 +245,11 @@ run_install() {
 }
 
 run_doctor() {
-  local accelerator model_name ram_gb
+  local accelerator model_name ram_gb cores
   require_compose_file
   validate_required_env_vars
   ram_gb="$(detect_ram_gb)"
+  cores="$(detect_cores)"
   accelerator="$(detect_accelerator)"
   model_name="$(resolve_model_name)"
 
@@ -238,6 +257,7 @@ run_doctor() {
   echo "--------------"
   echo "compose_file: ${COMPOSE_FILE}"
   echo "ram_gb: ${ram_gb}"
+  echo "logical_cores: ${cores}"
   echo "accelerator: ${accelerator}"
   echo "selected_model: ${model_name}"
 

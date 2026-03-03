@@ -142,6 +142,15 @@ curl -k https://localhost/metrics | grep zyrabit_token_latency_ms_per_token
 curl -k https://localhost/metrics | grep zyrabit_security_hits_total
 ```
 
+### 🧠 Personalizar el System Prompt (Agent)
+
+La personalidad del Agente de RAG (SLM) y sus reglas están definidas en un archivo externo montado dinámicamente. Esto te permite modificar la conducta del asistente en caliente sin necesidad de reconstruir la imagen de Docker.
+
+1. Abre y edita el archivo: `zyrabit-brain-api/prompts/agent.md`.
+2. Guarda los cambios. El backend los tomará en cuenta en las peticiones posteriores automáticamente.
+   
+*(Nota: El archivo se ignora en los commits locales mediante `.gitignore` para no pisar la configuración de cada usuario. Si necesitas restablecerlo, clona o copia el contenido de `prompts/agent.example.md`)*.
+
 ## Cómo abrir cada componente local
 
 - UI chat: `http://localhost:8501`
