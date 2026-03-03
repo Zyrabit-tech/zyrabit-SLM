@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 from typing import Any, Dict, List, Tuple
 from urllib.parse import unquote, urlparse
@@ -14,6 +15,7 @@ from .services import query_secure_slm
 MCP_PROTOCOL_VERSION = "2025-01-01"
 MCP_SERVER_NAME = "zyrabit-mcp-bridge"
 MCP_SERVER_VERSION = "0.1.0"
+logger = logging.getLogger("uvicorn.error")
 
 
 def _allowed_roots() -> List[str]:
@@ -35,6 +37,30 @@ def _resolve_file_uri(uri: str) -> str:
         raise ValueError("Only file:// URIs are supported.")
     path = unquote(parsed.path if parsed.scheme == "file" else uri)
     return os.path.abspath(path)
+
+
+def _resource_index() -> Dict[str, str]:
+    """
+    Build a catalog of readable files inside allowed roots.
+
+    Paths used for actual file access are sourced from filesystem enumeration,
+    not directly from request input.
+    """
+    index: Dict[str, str] = {}
+    for root in _allowed_roots():
+        if os.path.isfile(root):
+            abs_path = os.path.abspath(root)
+            index[f"file://{abs_path}"] = abs_path
+            continue
+
+        if not os.path.isdir(root):
+            continue
+
+        for current_root, _, files in os.walk(root):
+            for filename in files:
+                abs_path = os.path.abspath(os.path.join(current_root, filename))
+                index[f"file://{abs_path}"] = abs_path
+    return index
 
 
 def get_config() -> Dict[str, Any]:
@@ -94,14 +120,17 @@ def list_tools() -> List[Dict[str, Any]]:
 
 
 def list_resources() -> List[Dict[str, Any]]:
-    return [
-        {
-            "uri": "file:///tmp",
-            "name": "tmp-root",
-            "description": "Temporary directory (example allowed root).",
-            "mimeType": "text/plain",
-        }
-    ]
+    resources: List[Dict[str, Any]] = []
+    for uri in sorted(_resource_index().keys()):
+        resources.append(
+            {
+                "uri": uri,
+                "name": os.path.basename(uri) or uri,
+                "description": "Allowed local resource.",
+                "mimeType": "text/plain",
+            }
+        )
+    return resources
 
 
 def _tool_secure_chat(arguments: Dict[str, Any]) -> Dict[str, Any]:
@@ -125,14 +154,12 @@ def _tool_sanitize_text(arguments: Dict[str, Any]) -> Dict[str, Any]:
 def _tool_read_local_resource(arguments: Dict[str, Any]) -> Dict[str, Any]:
     uri = str(arguments.get("uri", ""))
     should_sanitize = bool(arguments.get("sanitize", True))
-    path = _resolve_file_uri(uri)
 
-    if not _is_allowed_path(path):
-        raise PermissionError("Path is outside MCP allowed roots.")
-    if not os.path.exists(path):
-        raise FileNotFoundError("Resource not found.")
-    if os.path.isdir(path):
-        raise IsADirectoryError("Directory reads are not supported.")
+    requested_path = _resolve_file_uri(uri)
+    canonical_uri = f"file://{requested_path}"
+    path = _resource_index().get(canonical_uri)
+    if not path:
+        raise PermissionError("Resource is not available in MCP allowed catalog.")
 
     with open(path, "r", encoding="utf-8", errors="ignore") as file:
         content = file.read()
@@ -218,7 +245,8 @@ def handle_jsonrpc(payload: Dict[str, Any]) -> Tuple[Dict[str, Any], int]:
     except FileNotFoundError as exc:
         return error(-32002, str(exc), status=404)
     except Exception as exc:  # pragma: no cover - guardrail path
-        return error(-32000, str(exc), status=500)
+        logger.exception("Unhandled MCP bridge error method=%s request_id=%s", method, request_id)
+        return error(-32000, "Internal MCP bridge error.", status=500)
 
 
 def json_config_string() -> str:

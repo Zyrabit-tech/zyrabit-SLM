@@ -1,3 +1,4 @@
+import logging
 import os
 import re
 import tempfile
@@ -18,6 +19,7 @@ from .adapters.n8n_adapter import N8nAdapter, N8nIntegrationPolicy
 SLM_URL = os.getenv("SLM_URL", "http://localhost:11434")
 # Default for local ChromaDB
 DB_URL = os.getenv("DB_URL", "http://localhost:8000")
+logger = logging.getLogger("uvicorn.error")
 
 # --- FastAPI Initialization ---
 app = FastAPI(
@@ -76,7 +78,12 @@ def mcp_config():
 
 @app.post("/mcp", tags=["MCP"])
 async def mcp_jsonrpc(request: Request):
-    payload = await request.json()
+    try:
+        payload = await request.json()
+    except Exception:
+        logger.exception("Invalid MCP JSON payload")
+        raise HTTPException(status_code=400, detail="Invalid MCP JSON payload.")
+
     response, status_code = mcp_bridge.handle_jsonrpc(payload)
     return JSONResponse(content=response, status_code=status_code)
 
@@ -92,8 +99,9 @@ async def n8n_webhook(request: Request):
 
     try:
         payload = await request.json()
-    except Exception as exc:
-        raise HTTPException(status_code=400, detail=f"Invalid JSON payload: {exc}")
+    except Exception:
+        logger.exception("Invalid n8n JSON payload")
+        raise HTTPException(status_code=400, detail="Invalid JSON payload.")
 
     try:
         n8n_adapter.authorize_request(
@@ -122,13 +130,27 @@ def chat_router(query: ChatQuery):
     3.  **reject_query**: Rejects the query if it is out of scope.
     """
     start_time = time.time()
+    request_id = str(uuid.uuid4())
     # 1. The router decides what to do
     decision = services.get_slm_router_decision(query.text)
+    logger.info(
+        "Chat request routed request_id=%s decision=%s query_length=%s",
+        request_id,
+        decision,
+        len(query.text or ""),
+    )
 
     # 2. The "badass" if/elif/else executes the decision
     if decision == "search_rag_database":
         response_text, rag_hits = services.execute_rag_pipeline_with_metadata(query.text)
         latency_ms = round((time.time() - start_time) * 1000, 2)
+        logger.info(
+            "Chat request completed request_id=%s decision=%s rag_hits=%s latency_ms=%s",
+            request_id,
+            decision,
+            rag_hits,
+            latency_ms,
+        )
         return ChatResponse(
             response=response_text,
             metadata={
@@ -141,6 +163,12 @@ def chat_router(query: ChatQuery):
     elif decision == "direct_SLM_answer":
         response_text = services.call_direct_slm(query.text)
         latency_ms = round((time.time() - start_time) * 1000, 2)
+        logger.info(
+            "Chat request completed request_id=%s decision=%s rag_hits=0 latency_ms=%s",
+            request_id,
+            decision,
+            latency_ms,
+        )
         return ChatResponse(
             response=response_text,
             metadata={
@@ -232,6 +260,13 @@ async def ingest_document(file: UploadFile = File(...)):
     except HTTPException:
         raise
     except Exception:
+        logger.exception(
+            "Ingest failed ingest_id=%s filename=%s content_type=%s temp_file_path=%s",
+            ingest_id,
+            original_filename,
+            content_type,
+            temp_file_path,
+        )
         raise HTTPException(status_code=500, detail="Error procesando el archivo.")
     finally:
         await file.close()
