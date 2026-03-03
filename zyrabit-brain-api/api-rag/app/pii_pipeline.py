@@ -14,7 +14,8 @@ AMOUNT_REGEX = re.compile(r"(?:USD|EUR|MXN|\$)\s?\d+(?:,\d{3})*(?:\.\d{2})?")
 PHONE_REGEX = re.compile(r"\b(?:\+?1[\s.-]?)?(?:\(?\d{3}\)?[\s.-]?){2}\d{4}\b")
 SSN_REGEX = re.compile(r"\b\d{3}-\d{2}-\d{4}\b")
 NAME_CONTEXT_REGEX = re.compile(
-    r"\b(?:my name is|i am|i'm|me llamo|mi nombre es)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+){0,2})\b"
+    r"\b(?:my name is|i am|i'm|me llamo|mi nombre es)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+){0,2})\b",
+    re.IGNORECASE,
 )
 
 TOKEN_PREFIX = {

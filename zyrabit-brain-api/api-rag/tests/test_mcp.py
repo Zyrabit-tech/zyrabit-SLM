@@ -31,7 +31,7 @@ def test_mcp_tools_list():
 
 
 def test_mcp_read_resource_sanitizes_by_default():
-    with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as tmp:
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False, dir="/tmp") as tmp:
         tmp.write("email alice@example.com and ssn 123-45-6789")
         uri = f"file://{tmp.name}"
 

@@ -72,10 +72,10 @@ def test_ingest_md_file_success(mock_process):
 
 # --- RAG pipeline (mocked ChromaDB + Ollama) ---
 
-@patch("app.services.execute_rag_pipeline")
+@patch("app.services.execute_rag_pipeline_with_metadata")
 def test_chat_rag_includes_context_in_response(mock_rag):
     """RAG flow: chat with RAG decision returns context-aware response."""
-    mock_rag.return_value = "Zyrabit uses ChromaDB for vector storage and Ollama for inference."
+    mock_rag.return_value = ("Zyrabit uses ChromaDB for vector storage and Ollama for inference.", 2)
     # This tests the full flow; execute_rag_pipeline internals are tested in Docker E2E
     response = client.post(
         "/v1/chat",
@@ -87,12 +87,12 @@ def test_chat_rag_includes_context_in_response(mock_rag):
 
 # --- Full chat flow ---
 
-@patch("app.services.execute_rag_pipeline")
+@patch("app.services.execute_rag_pipeline_with_metadata")
 @patch("app.services.get_slm_router_decision")
 def test_chat_rag_flow_returns_response(mock_router, mock_rag):
     """Full chat flow: RAG query returns augmented response."""
     mock_router.return_value = "search_rag_database"
-    mock_rag.return_value = "Zyrabit combina SLMs con RAG y seguridad Zero-Trust."
+    mock_rag.return_value = ("Zyrabit combina SLMs con RAG y seguridad Zero-Trust.", 1)
 
     response = client.post(
         "/v1/chat",
@@ -101,6 +101,7 @@ def test_chat_rag_flow_returns_response(mock_router, mock_rag):
     assert response.status_code == 200
     data = response.json()
     assert "response" in data
+    assert data["metadata"]["route_decision"] == "search_rag_database"
     assert "Zyrabit" in data["response"] or "RAG" in data["response"]
 
 

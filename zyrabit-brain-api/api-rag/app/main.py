@@ -1,4 +1,9 @@
 import os
+import re
+import tempfile
+import time
+import uuid
+from typing import Optional
 from . import services
 from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi import FastAPI, HTTPException, UploadFile, File, Request
@@ -28,6 +33,7 @@ _instrumentator = Instrumentator(
     excluded_handlers=["/docs", "/openapi.json"],
 )
 _instrumentator.instrument(app)
+_instrumentator.expose(app, include_in_schema=False)
 n8n_adapter = N8nAdapter(
     policy=N8nIntegrationPolicy.from_env(),
     execute_automation=services.execute_automation_request,
@@ -42,11 +48,7 @@ class ChatQuery(BaseModel):
 
 class ChatResponse(BaseModel):
     response: str
-
-
-@app.on_event("startup")
-async def startup_event():
-    _instrumentator.expose(app, include_in_schema=False)
+    metadata: Optional[dict] = None
 
 # --- API Endpoints ---
 
@@ -119,17 +121,34 @@ def chat_router(query: ChatQuery):
     2.  **direct_SLM_answer**: Asks the SLM directly for general knowledge.
     3.  **reject_query**: Rejects the query if it is out of scope.
     """
+    start_time = time.time()
     # 1. The router decides what to do
     decision = services.get_slm_router_decision(query.text)
 
     # 2. The "badass" if/elif/else executes the decision
     if decision == "search_rag_database":
-        response_text = services.execute_rag_pipeline(query.text)
-        return ChatResponse(response=response_text)
+        response_text, rag_hits = services.execute_rag_pipeline_with_metadata(query.text)
+        latency_ms = round((time.time() - start_time) * 1000, 2)
+        return ChatResponse(
+            response=response_text,
+            metadata={
+                "route_decision": decision,
+                "rag_hits": rag_hits,
+                "latency_ms": latency_ms,
+            },
+        )
 
     elif decision == "direct_SLM_answer":
         response_text = services.call_direct_slm(query.text)
-        return ChatResponse(response=response_text)
+        latency_ms = round((time.time() - start_time) * 1000, 2)
+        return ChatResponse(
+            response=response_text,
+            metadata={
+                "route_decision": decision,
+                "rag_hits": 0,
+                "latency_ms": latency_ms,
+            },
+        )
 
     elif decision == "reject_query":
         raise HTTPException(
@@ -153,37 +172,71 @@ async def ingest_document(file: UploadFile = File(...)):
     - **Size**: Max 800MB (validated by server config, basic logic here).
     """
     ALLOWED_EXTENSIONS = {".pdf", ".txt", ".md"}
+    ALLOWED_MIME_BY_EXT = {
+        ".pdf": {"application/pdf", "application/octet-stream"},
+        ".txt": {"text/plain", "application/octet-stream"},
+        ".md": {"text/markdown", "text/plain", "application/octet-stream"},
+    }
     MAX_SIZE_MB = 800
+    CHUNK_SIZE_BYTES = 1024 * 1024  # 1MB
+    ingest_id = str(uuid.uuid4())
 
     # 1. Validate extension
-    file_ext = os.path.splitext(file.filename)[1].lower()
+    original_filename = file.filename or "uploaded_file"
+    file_ext = os.path.splitext(original_filename)[1].lower()
     if file_ext not in ALLOWED_EXTENSIONS:
         raise HTTPException(
             status_code=400,
             detail=f"Tipo de archivo no permitido. Solo se aceptan: {ALLOWED_EXTENSIONS}")
 
-    # 2. Save temporarily for processing
-    temp_file_path = f"/tmp/{file.filename}"
+    content_type = (file.content_type or "").lower()
+    allowed_mime_types = ALLOWED_MIME_BY_EXT[file_ext]
+    if content_type and content_type not in allowed_mime_types:
+        raise HTTPException(
+            status_code=400,
+            detail=f"MIME no permitido para {file_ext}. Tipos aceptados: {sorted(allowed_mime_types)}",
+        )
+
+    # 2. Save temporarily for processing using a server-generated path
+    temp_file_path = None
     try:
-        with open(temp_file_path, "wb") as buffer:
-            # We could read in chunks to validate size, but for simplicity:
-            content = await file.read()
-            if len(content) > MAX_SIZE_MB * 1024 * 1024:
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"El archivo excede el tamaño máximo de {MAX_SIZE_MB}MB.")
-            buffer.write(content)
+        total_size = 0
+        with tempfile.NamedTemporaryFile(
+            mode="wb",
+            suffix=file_ext,
+            prefix="ingest_",
+            dir="/tmp",
+            delete=False,
+        ) as temp_file:
+            temp_file_path = temp_file.name
+            while True:
+                chunk = await file.read(CHUNK_SIZE_BYTES)
+                if not chunk:
+                    break
+                total_size += len(chunk)
+                if total_size > MAX_SIZE_MB * 1024 * 1024:
+                    raise HTTPException(
+                        status_code=413,
+                        detail=f"El archivo excede el tamaño máximo de {MAX_SIZE_MB}MB.",
+                    )
+                temp_file.write(chunk)
 
         # 3. Process ingestion
         result = services.process_and_ingest_file(temp_file_path)
+        ui_filename = re.sub(r"[^A-Za-z0-9._-]", "_", os.path.basename(original_filename))
+        ui_filename = ui_filename[:80] if ui_filename else "uploaded_file"
+        result["filename"] = ui_filename
+        result["ingest_id"] = ingest_id
         return result
 
-    except Exception as e:
-        raise HTTPException(status_code=500,
-                            detail=f"Error procesando el archivo: {str(e)}")
+    except HTTPException:
+        raise
+    except Exception:
+        raise HTTPException(status_code=500, detail="Error procesando el archivo.")
     finally:
+        await file.close()
         # Cleanup
-        if os.path.exists(temp_file_path):
+        if temp_file_path and os.path.exists(temp_file_path):
             os.remove(temp_file_path)
 
 # To run locally with `uvicorn main:app --reload`

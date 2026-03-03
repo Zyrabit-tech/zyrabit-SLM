@@ -63,10 +63,14 @@ docker compose exec -T slm-engine ollama list 2>/dev/null || log_warn "Ollama mo
 echo ""
 log_info "Step 3: Running pytest..."
 cd "${API_RAG_DIR}"
-if python3 -m pytest -q --ignore=tests/test_ingest_script.py --ignore=app/test/test_services.py 2>/dev/null; then
-    log_ok "pytest passed (excluding known problematic tests)."
+PYTHON_BIN="python3"
+if [ -x "${ROOT_DIR}/.venv/bin/python" ]; then
+    PYTHON_BIN="${ROOT_DIR}/.venv/bin/python"
+fi
+if "${PYTHON_BIN}" -m pytest -q 2>/dev/null; then
+    log_ok "pytest passed."
 else
-    log_warn "Some pytest may have failed. Continuing with API tests."
+    log_warn "Some pytest failed. Continuing with API tests."
 fi
 cd "${ROOT_DIR}"
 
