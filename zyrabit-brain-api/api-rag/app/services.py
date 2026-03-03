@@ -1,3 +1,4 @@
+import logging
 import os
 import re
 from typing import Tuple
@@ -23,6 +24,7 @@ EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "mxbai-embed-large")
 CHUNK_SIZE = 1000
 CHUNK_OVERLAP = 200
 RAG_N_RESULTS = 5
+logger = logging.getLogger("uvicorn.error")
 
 # Spam/off-topic patterns that trigger reject_query
 REJECT_PATTERNS = [
@@ -42,7 +44,7 @@ def load_system_prompt() -> str:
         with open(prompt_path, "r", encoding="utf-8") as f:
             return f.read().strip()
     except FileNotFoundError:
-        print(f"⚠️  WARNING: system_prompt.txt not found at {prompt_path}")
+        logger.warning("system_prompt.txt not found at %s", prompt_path)
         return ""
 
 # Load system prompt once at module initialization
@@ -71,10 +73,12 @@ def query_secure_slm(prompt: str) -> tuple[str, float]:
     observe_security_hits(pipeline_context.detected_entities)
 
     if pipeline_context.token_map:
-        print(f"   ⚠️  THREAT DETECTED. DATA REDACTED.")
-        print(f"   SENT:     {sanitized_prompt}")
+        logger.info(
+            "Security pipeline redacted sensitive entities before inference. entity_hits=%s",
+            pipeline_context.detected_entities,
+        )
     else:
-        print("   ✅ Input clean. Forwarding to core.")
+        logger.info("Security pipeline detected no sensitive entities.")
 
     # PHASE B: LOCAL INFERENCE (Air-Gapped)
     # Construct prompt with system context
@@ -142,6 +146,7 @@ def execute_rag_pipeline_with_metadata(text: str) -> Tuple[str, int]:
     Uses ChromaDB for retrieval and Ollama for generation.
     """
     try:
+        logger.info("RAG pipeline start query_length=%s", len(text or ""))
         import chromadb
         from langchain_community.embeddings import OllamaEmbeddings
 
@@ -165,11 +170,17 @@ def execute_rag_pipeline_with_metadata(text: str) -> Tuple[str, int]:
         else:
             context = "No relevant documents found in the knowledge base."
 
+        logger.info(
+            "RAG retrieval complete collection=%s hits=%s",
+            COLLECTION_NAME,
+            rag_hits,
+        )
         augmented_prompt = f"Context from knowledge base:\n{context}\n\nQuestion: {text}\n\nAnswer based on the context:"
         response, _ = query_secure_slm(augmented_prompt)
         return response, rag_hits
 
     except Exception as e:
+        logger.exception("RAG pipeline failed collection=%s", COLLECTION_NAME)
         return (
             f"Lo siento, ocurrió un error al procesar tu consulta con la base de datos "
             f"de conocimiento: {str(e)}"
@@ -190,6 +201,7 @@ def process_and_ingest_file(file_path: str) -> dict:
     Returns status dict with chunks_processed.
     """
     ext = os.path.splitext(file_path)[1].lower()
+    logger.info("Ingest pipeline start file_path=%s ext=%s", file_path, ext)
     if ext == ".pdf":
         from langchain_community.document_loaders import PyPDFLoader
         loader = PyPDFLoader(file_path)
@@ -202,6 +214,7 @@ def process_and_ingest_file(file_path: str) -> dict:
         raise ValueError(f"Unsupported file type: {ext}")
 
     if not docs:
+        logger.info("Ingest pipeline completed with zero documents file_path=%s", file_path)
         return {"status": "success", "filename": os.path.basename(file_path), "chunks_processed": 0}
 
     from langchain.text_splitter import RecursiveCharacterTextSplitter
@@ -213,10 +226,29 @@ def process_and_ingest_file(file_path: str) -> dict:
         chunk_overlap=CHUNK_OVERLAP,
     )
     chunks = text_splitter.split_documents(docs)
+    logger.info(
+        "Ingest split complete source_docs=%s chunks=%s chunk_size=%s overlap=%s",
+        len(docs),
+        len(chunks),
+        CHUNK_SIZE,
+        CHUNK_OVERLAP,
+    )
 
     embeddings = OllamaEmbeddings(model=EMBEDDING_MODEL)
     documents_to_add = [c.page_content for c in chunks]
-    metadatas_to_add = [c.metadata for c in chunks]
+    source_name = os.path.basename(file_path)
+    metadatas_to_add = []
+    for idx, chunk in enumerate(chunks):
+        chunk_meta = chunk.metadata if isinstance(chunk.metadata, dict) else {}
+        safe_meta = {
+            "source_name": source_name,
+            "chunk_index": idx,
+        }
+        if "page" in chunk_meta:
+            safe_meta["page"] = chunk_meta["page"]
+        if "page_label" in chunk_meta:
+            safe_meta["page_label"] = chunk_meta["page_label"]
+        metadatas_to_add.append(safe_meta)
     embedded_chunks = embeddings.embed_documents(documents_to_add)
 
     host, port = _parse_db_url(DB_URL)
@@ -229,6 +261,11 @@ def process_and_ingest_file(file_path: str) -> dict:
         documents=documents_to_add,
         metadatas=metadatas_to_add,
         ids=ids,
+    )
+    logger.info(
+        "Ingest persisted chunks collection=%s chunks=%s",
+        COLLECTION_NAME,
+        len(chunks),
     )
 
     return {
