@@ -1,22 +1,21 @@
 import os
 import re
-import time
+from typing import Tuple
 from urllib.parse import urlparse
 
-import requests
-
+from .inference_factory import create_inference_provider
 from .metrics import (
     approximate_token_count,
     observe_latency_per_token,
     observe_security_hits,
     observe_token_usage,
 )
+from .ports.inference_port import InferenceProviderError, InferenceRequest
 from .security import PipelineContext, build_security_pipeline
 
 # --- CONFIGURATION ---
 # Use environment variables or default to local settings
-SLM_URL = os.getenv("SLM_URL", "http://slm-engine:11434/api/generate")
-# Defaulting to phi3 as per setup script, but overridable
+# Defaulting to phi3 as per setup script, but overridable.
 MODEL_NAME = os.getenv("MODEL_NAME", "phi3")
 DB_URL = os.getenv("DB_URL", "http://vector-db:8000")
 COLLECTION_NAME = os.getenv("RAG_COLLECTION", "zyrabit_knowledge")
@@ -81,34 +80,29 @@ def query_secure_slm(prompt: str) -> tuple[str, float]:
     # Construct prompt with system context
     full_prompt = f"{SYSTEM_PROMPT}\n\nUser: {sanitized_prompt}\nAssistant:" if SYSTEM_PROMPT else sanitized_prompt
     
-    payload = {
-        "model": MODEL_NAME,
-        "prompt": full_prompt,
-        "stream": False
-    }
-    
     try:
-        start_time = time.time()
-        response = requests.post(SLM_URL, json=payload)
-        end_time = time.time()
-        
-        if response.status_code == 200:
-            res_json = response.json()
-            masked_response = res_json.get("response", "")
-            restored_response = pipeline.process_response(masked_response, pipeline_context)
-            latency = end_time - start_time
+        provider = create_inference_provider()
+        model_name = os.getenv("MODEL_NAME", MODEL_NAME)
+        result = provider.generate(
+            InferenceRequest(
+                model=model_name,
+                prompt=full_prompt,
+                stream=False,
+            )
+        )
+        masked_response = result.text
+        restored_response = pipeline.process_response(masked_response, pipeline_context)
+        latency = result.latency_seconds
 
-            input_tokens = approximate_token_count(prompt)
-            output_tokens = approximate_token_count(restored_response)
-            observe_token_usage(input_tokens=input_tokens, output_tokens=output_tokens)
-            observe_latency_per_token(latency_seconds=latency, output_tokens=output_tokens)
+        input_tokens = approximate_token_count(prompt)
+        output_tokens = approximate_token_count(restored_response)
+        observe_token_usage(input_tokens=input_tokens, output_tokens=output_tokens)
+        observe_latency_per_token(latency_seconds=latency, output_tokens=output_tokens)
 
-            return restored_response, latency
-        else:
-            return f"Server Error: {response.text}", 0.0
-            
-    except requests.exceptions.ConnectionError:
-        return "❌ ERROR: Cannot connect to Ollama (slm-engine). Is the Docker container running?", 0.0
+        return restored_response, latency
+
+    except InferenceProviderError as exc:
+        return f"❌ ERROR: {exc}", 0.0
 
 def call_direct_slm(prompt: str) -> str:
     """
@@ -142,7 +136,7 @@ def get_slm_router_decision(text: str) -> str:
     return "direct_SLM_answer"
 
 
-def execute_rag_pipeline(text: str) -> str:
+def execute_rag_pipeline_with_metadata(text: str) -> Tuple[str, int]:
     """
     Executes the RAG pipeline: Retrieve -> Augment -> Generate.
     Uses ChromaDB for retrieval and Ollama for generation.
@@ -164,20 +158,30 @@ def execute_rag_pipeline(text: str) -> str:
         )
 
         docs = results.get("documents", [[]])
+        rag_hits = 0
         if docs and docs[0]:
             context = "\n\n".join(docs[0])
+            rag_hits = len(docs[0])
         else:
             context = "No relevant documents found in the knowledge base."
 
         augmented_prompt = f"Context from knowledge base:\n{context}\n\nQuestion: {text}\n\nAnswer based on the context:"
         response, _ = query_secure_slm(augmented_prompt)
-        return response
+        return response, rag_hits
 
     except Exception as e:
         return (
             f"Lo siento, ocurrió un error al procesar tu consulta con la base de datos "
             f"de conocimiento: {str(e)}"
-        )
+        ), 0
+
+
+def execute_rag_pipeline(text: str) -> str:
+    """
+    Backward-compatible wrapper for existing callers/tests.
+    """
+    response, _ = execute_rag_pipeline_with_metadata(text)
+    return response
 
 
 def process_and_ingest_file(file_path: str) -> dict:
