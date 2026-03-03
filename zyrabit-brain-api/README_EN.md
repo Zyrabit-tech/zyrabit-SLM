@@ -53,6 +53,29 @@ N8N_WEBHOOK_SIGNING_SECRET=replace-with-hmac-secret
 N8N_REQUIRE_SIGNATURE=true
 ```
 
+Inference provider layer is pluggable via contract + factory:
+
+- Port: `app/ports/inference_port.py`
+- Factory: `app/inference_factory.py`
+- Adapters: `ollama_*` and `openai_compatible`
+
+Core variables:
+
+```bash
+INFERENCE_PROVIDER=ollama
+SLM_URL=http://slm-engine:11434/api/generate
+MODEL_NAME=qwen2.5:7b
+INFERENCE_TIMEOUT_SECONDS=120
+```
+
+Hybrid mode (host Ollama + Docker orchestration):
+
+```bash
+INFERENCE_PROVIDER=ollama_host
+SLM_URL=http://host.docker.internal:11434/api/generate
+MODEL_NAME=qwen2.5:7b
+```
+
 In production, use file-based secrets or Vault (never hardcoded values):
 
 ```bash

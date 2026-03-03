@@ -4,6 +4,8 @@
 
 Stack backend para RAG local seguro, puente MCP y observabilidad.
 
+> Runtime recomendado local: **Python 3.12** para evitar incompatibilidades con dependencias legacy en Python 3.14+.
+
 ## Contenido de esta carpeta
 
 - `api-rag/`: API en FastAPI y flujo de seguridad.
@@ -60,11 +62,28 @@ cp example.env .env
 Ejemplo minimo para `.env` (opcional si ya exportas variables en servidor):
 
 ```bash
+INFERENCE_PROVIDER=ollama
 SLM_URL=http://slm-engine:11434/api/generate
 DB_URL=http://vector-db:8000
 MODEL_NAME=qwen2.5:7b
+INFERENCE_TIMEOUT_SECONDS=120
 PROMETHEUS_BASIC_AUTH=admin:$2y$05$...   # htpasswd -nbB admin 'password'
 GRAFANA_BASIC_AUTH=admin:$2y$05$...      # idem
+```
+
+### Proveedores de inferencia intercambiables (factory + adapters)
+
+La capa de inferencia usa contrato por puerto (`app/ports/inference_port.py`) con factory (`app/inference_factory.py`) y adapters:
+
+- `ollama` / `ollama_host` / `ollama_docker` -> `SLM_URL=/api/generate`
+- `openai_compatible` -> `INFERENCE_BASE_URL=/v1/chat/completions`
+
+Ejemplo modo hibrido (Ollama nativo host + resto en Docker):
+
+```bash
+INFERENCE_PROVIDER=ollama_host
+SLM_URL=http://host.docker.internal:11434/api/generate
+MODEL_NAME=qwen2.5:7b
 ```
 
 Variables para integracion n8n (adapter webhook):
@@ -141,6 +160,38 @@ Enviar una consulta al router:
 curl -k https://localhost/v1/chat \
   -H "Content-Type: application/json" \
   -d '{"text":"Explica la arquitectura de Zyrabit"}'
+```
+
+Respuesta de `POST /v1/chat`:
+
+```json
+{
+  "response": "...",
+  "metadata": {
+    "route_decision": "search_rag_database",
+    "rag_hits": 2,
+    "latency_ms": 305.44
+  }
+}
+```
+
+Ingestar documento:
+
+```bash
+curl -k -X POST https://localhost/v1/ingest \
+  -F "file=@api-rag/sample_docs/zyrabit_project_overview.txt"
+```
+
+Respuesta de `POST /v1/ingest`:
+
+```json
+{
+  "status": "success",
+  "filename": "zyrabit_project_overview.txt",
+  "chunks_processed": 4,
+  "message": "Documento ingestado correctamente en la base de conocimiento.",
+  "ingest_id": "..."
+}
 ```
 
 Ver ejemplos completos: `docs/CURL_EXAMPLES.md` y workflow n8n en `docs/n8n_zyrabit_webhook_workflow.json`.
