@@ -62,25 +62,27 @@ def test_end_to_end_reject_query_flow(mock_router_decision):
 def test_ingest_then_query_flow(
         mock_process_file,
         mock_router_decision,
-        mock_rag_pipeline):
-    mock_process_file.return_value = {
-        "status": "success",
-        "filename": "clean_architecture.pdf",
-        "ingest_id": "abc123",
-        "chunks_processed": 50,
-        "message": "Documento ingestado correctamente en la base de conocimiento."}
+        mock_rag_pipeline,
+        tmp_path):
+    with patch('app.main.INGEST_DIR', str(tmp_path)):
+        mock_process_file.return_value = {
+            "status": "success",
+            "filename": "clean_architecture.pdf",
+            "ingest_id": "abc123",
+            "chunks_processed": 50,
+            "message": "Documento ingestado correctamente en la base de conocimiento."}
 
-    pdf_content = b"%PDF-1.4 fake clean architecture book"
-    files = {
-        "file": (
-            "clean_architecture.pdf",
-            BytesIO(pdf_content),
-            "application/pdf")
-    }
-    ingest_response = client.post("/v1/ingest", files=files)
-    assert ingest_response.status_code == 200
-    assert ingest_response.json()["status"] == "success"
-    assert "ingest_id" in ingest_response.json()
+        pdf_content = b"%PDF-1.4 fake clean architecture book"
+        files = {
+            "file": (
+                "clean_architecture.pdf",
+                BytesIO(pdf_content),
+                "application/pdf")
+        }
+        ingest_response = client.post("/v1/ingest", files=files)
+        assert ingest_response.status_code == 200
+        assert ingest_response.json()["status"] == "success"
+        assert "ingest_id" in ingest_response.json()
 
     mock_router_decision.return_value = "search_rag_database"
     mock_rag_pipeline.return_value = (

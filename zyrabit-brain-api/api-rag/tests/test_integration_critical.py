@@ -40,34 +40,36 @@ def test_router_rejects_spam():
 # --- Ingest API ---
 
 @patch("app.services.process_and_ingest_file")
-def test_ingest_txt_file_success(mock_process):
+def test_ingest_txt_file_success(mock_process, tmp_path):
     """Ingest endpoint accepts .txt files."""
-    mock_process.return_value = {
-        "status": "success",
-        "chunks_processed": 5,
-        "message": "Documento ingestado correctamente.",
-    }
-    content = b"Zyrabit is a local AI solution with RAG."
-    files = {"file": ("zyrabit.txt", BytesIO(content), "text/plain")}
-    response = client.post("/v1/ingest", files=files)
-    assert response.status_code == 200
-    assert response.json()["status"] == "success"
-    assert response.json()["chunks_processed"] == 5
+    with patch('app.main.INGEST_DIR', str(tmp_path)):
+        mock_process.return_value = {
+            "status": "success",
+            "chunks_processed": 5,
+            "message": "Documento ingestado correctamente.",
+        }
+        content = b"Zyrabit is a local AI solution with RAG."
+        files = {"file": ("zyrabit.txt", BytesIO(content), "text/plain")}
+        response = client.post("/v1/ingest", files=files)
+        assert response.status_code == 200
+        assert response.json()["status"] == "success"
+        assert response.json()["chunks_processed"] == 5
 
 
 @patch("app.services.process_and_ingest_file")
-def test_ingest_md_file_success(mock_process):
+def test_ingest_md_file_success(mock_process, tmp_path):
     """Ingest endpoint accepts .md files."""
-    mock_process.return_value = {
-        "status": "success",
-        "chunks_processed": 3,
-        "message": "Documento ingestado correctamente.",
-    }
-    content = b"# Zyrabit\n\nLocal AI with RAG."
-    files = {"file": ("readme.md", BytesIO(content), "text/markdown")}
-    response = client.post("/v1/ingest", files=files)
-    assert response.status_code == 200
-    assert response.json()["status"] == "success"
+    with patch('app.main.INGEST_DIR', str(tmp_path)):
+        mock_process.return_value = {
+            "status": "success",
+            "chunks_processed": 3,
+            "message": "Documento ingestado correctamente.",
+        }
+        content = b"# Zyrabit\n\nLocal AI with RAG."
+        files = {"file": ("readme.md", BytesIO(content), "text/markdown")}
+        response = client.post("/v1/ingest", files=files)
+        assert response.status_code == 200
+        assert response.json()["status"] == "success"
 
 
 # --- RAG pipeline (mocked ChromaDB + Ollama) ---
