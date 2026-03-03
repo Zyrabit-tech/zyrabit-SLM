@@ -101,3 +101,9 @@ secrets.yaml
 !README.md
 !README_EN.md
 !zyrabit-brain-api/example.env
+
+# Private Postman assets
+postman/private/
+
+# Private local ops toolkit
+ops-private/

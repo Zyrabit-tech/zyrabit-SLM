@@ -23,6 +23,44 @@ Redes Docker:
 - `backend-network`
 - `model-network` (`internal: true`)
 
+## Instalación de Ollama (Nativo vs Docker)
+
+Por defecto, Zyrabit levanta Ollama dentro de Docker (`slm-engine`). Sin embargo, para aprovechar al máximo tu hardware (GPU/Metal) en Mac o Windows, y evitar problemas de rendimiento o configuración de red, **recomendamos instalar Ollama de forma nativa** (como subproceso del sistema operativo).
+
+### 🍎 macOS
+1. Descarga Ollama desde [ollama.com/download/mac](https://ollama.com/download/mac).
+2. Descomprime e instala la aplicación `Ollama.app`.
+3. Abre la aplicación; Ollama se ejecutará en segundo plano (tendrás un icono en la barra de menú).
+4. El servicio estará disponible internamente en `http://localhost:11434`.
+
+### 🪟 Windows
+1. Descarga el instalador desde [ollama.com/download/windows](https://ollama.com/download/windows).
+2. Ejecuta `OllamaSetup.exe`.
+3. Ollama se iniciará automáticamente y estará disponible en la bandeja del sistema.
+4. El servicio estará disponible internamente en `http://localhost:11434`.
+
+### 🐧 Ubuntu / Linux
+Puedes usar la opción de Docker que viene por defecto, o instalarlo nativamente ejecutando este comando en tu terminal:
+```bash
+curl -fsSL https://ollama.com/install.sh | sh
+```
+
+### ⚙️ Configurar Zyrabit para usar Ollama Nativo
+Si decides usar la versión nativa, dile a Zyrabit dónde encontrar a Ollama editando el archivo `zyrabit-brain-api/.env` (cópialo de `example.env` si no lo has hecho):
+
+- **Mac / Windows**:
+  ```env
+  INFERENCE_PROVIDER=ollama_host
+  SLM_URL=http://host.docker.internal:11434/api/generate
+  ```
+- **Linux** (Usa la IP de tu host de docker, ej. `172.17.0.1` o `localhost` si ejecutas sin Docker):
+  ```env
+  INFERENCE_PROVIDER=ollama_host
+  SLM_URL=http://172.17.0.1:11434/api/generate
+  ```
+
+*(Opcional) Una vez configurado de esta forma, puedes detener/comentar el servicio `slm-engine` en tu `docker-compose.yml` para ahorrar memoria.*
+
 ## Arranque rápido (UI + API)
 
 1. Prerrequisitos:

@@ -4,6 +4,9 @@ import time
 from typing import Dict, List
 
 import requests
+import urllib3
+
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 import streamlit as st
 
 # --- PATH CONFIGURATION ---

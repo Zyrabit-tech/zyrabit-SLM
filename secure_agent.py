@@ -13,6 +13,9 @@ import sys
 import time
 import argparse
 import requests
+import urllib3
+
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 # Configuration
 API_URL = os.getenv("API_URL", "https://localhost/v1/chat")

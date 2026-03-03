@@ -19,13 +19,16 @@ ENV_FILE="${SCRIPT_DIR}/zyrabit-brain-api/.env"
 
 usage() {
   cat <<'EOF'
-Usage: ./zyra-up.sh [command]
+Usage: ./zyra-up.sh [command] [options]
 
 Commands:
   install   Start stack and pull required models (default)
   start     Start stack only
   doctor    Validate environment and print detected runtime profile
   help      Show this help message
+
+Options:
+  --profile <name>  Start Docker Compose with a specific profile (e.g., n8n, docs, observability-extra)
 EOF
 }
 
@@ -174,8 +177,21 @@ run_start() {
   require_compose_file
   validate_required_env_vars
   require_docker
-  log_info "Starting secure stack via Docker Compose..."
-  docker compose -f "${COMPOSE_FILE}" up -d
+  
+  local compose_args=("-f" "${COMPOSE_FILE}")
+  
+  if [[ -n "${PROFILE}" ]]; then
+    if [[ "${PROFILE}" == "n8n" ]]; then
+       PROFILE="automation"
+    fi
+    compose_args+=("--profile" "${PROFILE}")
+    log_info "Starting secure stack via Docker Compose with profile: ${PROFILE}..."
+  else
+    log_info "Starting secure stack via Docker Compose..."
+  fi
+  
+  compose_args+=("up" "-d")
+  docker compose "${compose_args[@]}"
   log_ok "Infrastructure started."
 }
 
@@ -237,7 +253,27 @@ run_doctor() {
   fi
 }
 
-COMMAND="${1:-install}"
+PROFILE=""
+COMMAND="install"
+
+while [[ "$#" -gt 0 ]]; do
+  case "$1" in
+    --profile)
+      PROFILE="$2"
+      shift 2
+      ;;
+    install|start|doctor|help|-h|--help)
+      COMMAND="$1"
+      shift
+      ;;
+    *)
+      log_err "Unknown argument: $1"
+      usage
+      exit 1
+      ;;
+  esac
+done
+
 case "${COMMAND}" in
   install)
     run_install
