@@ -2,12 +2,14 @@ fastapi
 uvicorn[standard]
 langchain
 langchain-community
+langchain-text-splitters>=0.0.1
 langchain-ollama    
 chromadb-client     
 prometheus-fastapi-instrumentator 
+prometheus-client
 python-dotenv      
 pytest
 pytest-mock
 httpx
-pypdf
+pymupdf>=1.23.0
 python-multipart

@@ -1,0 +1,27 @@
+{
+  "protocolVersion": "2025-01-01",
+  "server": {
+    "name": "zyrabit-mcp-bridge",
+    "version": "0.1.0"
+  },
+  "transport": {
+    "type": "http-jsonrpc",
+    "endpoint": "https://localhost/mcp"
+  },
+  "capabilities": {
+    "tools": {
+      "listChanged": false
+    },
+    "resources": {
+      "subscribe": false,
+      "listChanged": false
+    },
+    "prompts": {
+      "listChanged": false
+    }
+  },
+  "security": {
+    "sanitization": "always-on",
+    "allowedPathsEnv": "MCP_ALLOWED_PATHS"
+  }
+}

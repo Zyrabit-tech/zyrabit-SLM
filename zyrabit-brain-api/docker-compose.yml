@@ -1,73 +1,192 @@
 services:
+  traefik:
+    image: traefik:latest
+    container_name: zyrabit-traefik
+    command:
+      - --api.dashboard=true
+      - --providers.docker=true
+      - --providers.docker.exposedbydefault=false
+      - --providers.file.filename=/etc/traefik/dynamic.yml
+      - --entryPoints.web.address=:80
+      - --entryPoints.web.http.redirections.entryPoint.to=websecure
+      - --entryPoints.web.http.redirections.entryPoint.scheme=https
+      - --entryPoints.websecure.address=:443
+      - --entryPoints.websecure.http.tls=true
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./traefik/dynamic.yml:/etc/traefik/dynamic.yml:ro
+    networks:
+      - frontend-network
+      - backend-network
+
   # 1. THE BRAIN: API RAG
   api-rag:
     build:
       context: ./api-rag
-    ports:
-      - "8080:8080"
+    container_name: api-rag
     env_file:
       - .env
+    environment:
+      - N8N_SERVICE_TOKEN_FILE=/run/secrets/n8n_service_token
+      - N8N_WEBHOOK_SIGNING_SECRET_FILE=/run/secrets/n8n_webhook_signing_secret
     depends_on:
       vector-db:
         condition: service_started
       slm-engine:
         condition: service_started
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.api-rag.rule=PathPrefix(`/`)
+      - traefik.http.routers.api-rag.entrypoints=websecure
+      - traefik.http.routers.api-rag.tls=true
+      - traefik.http.routers.api-rag.middlewares=api-ratelimit@docker,secureHeaders@file
+      - traefik.http.services.api-rag.loadbalancer.server.port=8080
+      - traefik.http.middlewares.api-ratelimit.ratelimit.average=25
+      - traefik.http.middlewares.api-ratelimit.ratelimit.burst=50
+      - traefik.docker.network=zyrabit-brain-api_backend-network
     networks:
-      - rag-net
+      - backend-network
+      - model-network
+    volumes:
+      - ./secrets:/run/secrets:ro
+      - ./prompts:/app/prompts:ro
+      - ./document_source:/app/document_source
 
   # 2. THE MUSCLE: SLM Server
   slm-engine:
     image: ollama/ollama:latest
     container_name: slm-engine
-    ports:
-      - "11434:11434"
+    environment:
+      - OLLAMA_NUM_PARALLEL=${OLLAMA_NUM_PARALLEL:-1}
     volumes:
       - ./ollama-models:/root/.ollama
     networks:
-      - rag-net
+      - model-network
 
   # 3. THE MEMORY: Vector DB
   vector-db:
     image: chromadb/chroma:latest
     container_name: vector-db
-    ports:
-      - "8001:8000"
+    environment:
+      - ANONYMIZED_TELEMETRY=False
+      - CHROMA_OTEL_COLLECTION_ENDPOINT=http://localhost:4317
+      - CHROMA_OTEL_SERVICE_NAME=zyrabit-vector-db
     volumes:
       - ./chroma-data:/chroma/chroma
     networks:
-      - rag-net
+      - backend-network
 
   # 4. THE MONITOR (Scraper): Prometheus
   prometheus:
     image: prom/prometheus:latest
     container_name: prometheus
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --web.external-url=https://localhost/prometheus
+      - --web.route-prefix=/prometheus
     volumes:
       - ./config/prometheus.yml:/etc/prometheus/prometheus.yml
       - prometheus-data:/prometheus
-    ports:
-      - "9091:9090"
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.prometheus.rule=PathPrefix(`/prometheus`)
+      - traefik.http.routers.prometheus.entrypoints=websecure
+      - traefik.http.routers.prometheus.tls=true
+      - traefik.http.routers.prometheus.middlewares=prometheus-auth@docker,secureHeaders@file
+      - traefik.http.middlewares.prometheus-auth.basicauth.users=${PROMETHEUS_BASIC_AUTH:?set PROMETHEUS_BASIC_AUTH}
+      - traefik.http.services.prometheus.loadbalancer.server.port=9090
+      - traefik.docker.network=zyrabit-brain-api_backend-network
     networks:
-      - rag-net
+      - backend-network
 
   # 5. THE MONITOR (Dashboard): Grafana
   grafana:
     image: grafana/grafana:latest
     container_name: grafana
-    ports:
-      - "3000:3000"
+    environment:
+      - GF_SERVER_ROOT_URL=https://localhost/grafana
+      - GF_SERVER_SERVE_FROM_SUB_PATH=true
     volumes:
       - grafana-data:/var/lib/grafana
       - ./config/grafana/datasources:/etc/grafana/provisioning/datasources
       - ./config/grafana/dashboards:/etc/grafana/provisioning/dashboards
       - ./config/grafana/dashboards:/var/lib/grafana/dashboards
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.grafana.rule=PathPrefix(`/grafana`)
+      - traefik.http.routers.grafana.entrypoints=websecure
+      - traefik.http.routers.grafana.tls=true
+      - traefik.http.routers.grafana.middlewares=grafana-auth@docker,secureHeaders@file
+      - traefik.http.middlewares.grafana-auth.basicauth.users=${GRAFANA_BASIC_AUTH:?set GRAFANA_BASIC_AUTH}
+      - traefik.http.services.grafana.loadbalancer.server.port=3000
+      - traefik.docker.network=zyrabit-brain-api_backend-network
     depends_on:
       - prometheus
     networks:
-      - rag-net
+      - backend-network
+
+  loki:
+    image: grafana/loki:latest
+    container_name: loki
+    command: -config.file=/etc/loki/local-config.yaml
+    profiles: [ "observability-extra" ]
+    ports:
+      - "3100:3100"
+    networks:
+      - backend-network
+
+  docs-portal:
+    build:
+      context: ../docs-portal
+    container_name: docs-portal
+    profiles: [ "docs" ]
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.docs.rule=PathPrefix(`/docs-portal`)
+      - traefik.http.routers.docs.entrypoints=websecure
+      - traefik.http.routers.docs.tls=true
+      - traefik.http.services.docs.loadbalancer.server.port=3001
+      - traefik.http.middlewares.docs-stripprefix.stripprefix.prefixes=/docs-portal
+      - traefik.http.routers.docs.middlewares=docs-stripprefix@docker,secureHeaders@file
+    networks:
+      - frontend-network
+
+  n8n:
+    image: n8nio/n8n:latest
+    container_name: n8n
+    profiles: [ "automation" ]
+    environment:
+      - N8N_HOST=localhost
+      - N8N_PORT=5678
+      - N8N_PROTOCOL=https
+      - N8N_PATH=/n8n
+      - WEBHOOK_URL=https://localhost/n8n/
+      - N8N_SECURE_COOKIE=false
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.n8n.rule=PathPrefix(`/n8n`)
+      - traefik.http.routers.n8n.entrypoints=websecure
+      - traefik.http.routers.n8n.tls=true
+      - traefik.http.routers.n8n.middlewares=secureHeaders@file
+      - traefik.http.services.n8n.loadbalancer.server.port=5678
+      - traefik.docker.network=zyrabit-brain-api_backend-network
+    volumes:
+      - ./n8n-data:/home/node/.n8n
+    networks:
+      - backend-network
 
 networks:
-  rag-net:
+  frontend-network:
     driver: bridge
+  backend-network:
+    driver: bridge
+  model-network:
+    driver: bridge
+    internal: true
 
 volumes:
   prometheus-data:

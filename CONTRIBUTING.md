@@ -1,151 +1,91 @@
-# 🤝 Cómo Contribuir a Zyrabit SLM
+# Contribuir a Zyrabit SLM (ES)
 
-¡Gracias por tu interés en contribuir! Este proyecto es open-source porque creemos en el poder de la comunidad.
+[English version](CONTRIBUTING_EN.md)
 
-Para mantener la armonía, la calidad del código y la sanidad mental de los maintainers (¡y la tuya!), hemos establecido un conjunto de guías. El objetivo no es la burocracia, es facilitar la revisión y la integración de tu increíble trabajo.
+## Reglas base
 
-## 🧠 Filosofía de Contribución
+- Toda contribución entra por Pull Request.
+- La rama base del PR debe ser `beta`.
+- No se aceptan PRs directos a `main`.
+- Código, variables y commits en inglés.
+- Un PR = un propósito claro.
 
-*   **Un PR, Un Propósito**: Cada Pull Request (PR) debe resolver un problema o agregar una funcionalidad. PRs gigantes que hacen 10 cosas a la vez serán (amablemente) rechazados.
-*   **La Calidad no es Negociable**: Un PR sin pruebas o que rompe las existentes no será mergeado.
-*   **Comunica Primero, Programa Después**: Si planeas una feature grande o un refactor complejo, abre un Issue primero. Discutamos el enfoque antes de que inviertas horas de código.
+## Flujo recomendado
 
-## 🚀 El Flujo de Trabajo: El Camino a beta
+1. Haz fork y clona.
+2. Configura upstream.
+3. Sincroniza `beta`.
+4. Crea rama desde `beta`.
+5. Implementa cambios + pruebas.
+6. Abre PR hacia `beta`.
 
-Tenemos un flujo estricto para proteger la estabilidad. La rama `main` representa la última versión estable, y NADIE pushea o hace PRs directamente a ella.
-
-La rama de integración es `beta`.
-
-> [!WARNING]
-> **NUNCA HAGAS UN PULL REQUEST A `main`**
-> Todo PR que apunte a `main` será cerrado automáticamente.
-
-Tu flujo de trabajo debe ser:
-
-1.  **Haz Fork**: Crea un fork del repositorio a tu propia cuenta de GitHub.
-2.  **Clona tu Fork**:
-    ```bash
-    git clone https://github.com/TU_USUARIO/zyrabit-SLM.git
-    ```
-3.  **Configura el Upstream** (Solo lo haces una vez):
-    ```bash
-    cd zyrabit-SLM
-    git remote add upstream https://github.com/Zyrabit-tech/zyrabit-SLM.git
-    ```
-4.  **Sincroniza tu Fork**: Antes de empezar a programar, asegúrate de tener lo último de `beta`.
-    ```bash
-    git fetch upstream
-    git checkout beta
-    git pull upstream beta
-    ```
-5.  **Crea tu Rama**: Crea tu rama de feature a partir de `beta`.
-    ```bash
-    git checkout -b mi-feature-genial
-    ```
-6.  **Programa y Commitea**: Haz tu magia. Usa la Convención de Commits (ver abajo).
-7.  **Push a tu Fork**:
-    ```bash
-    git push -u origin mi-feature-genial
-    ```
-8.  **Abre el Pull Request**:
-    *   Ve a GitHub y abre un PR.
-    *   La rama base debe ser **`beta`**.
-    *   La rama de comparación debe ser `mi-feature-genial`.
-    *   Llena la Plantilla de PR con detalle.
-
-## 💬 Convención de Commits
-
-Para mantener un historial limpio y legible, usamos **Conventional Commits**.
-
-> [!IMPORTANT]
-> **Todos los commits DEBEN estar en inglés**. Esto facilita la colaboración internacional y mantiene consistencia con el código.
-
-Tu commit DEBE tener este formato:
-`type(scope): short description`
-
-*   **type**: `feat` (new feature), `fix` (bug fix), `docs` (documentation), `style` (formatting), `refactor` (code), `test` (tests), `chore` (maintenance).
-*   **(scope)** (Optional): `api`, `docker`, `ingest`, `readme`, etc.
-*   **description**: Lowercase, imperative ("add", "fix", "update").
-
-**Ejemplos:**
-*   `feat(api): add /v1/ingest endpoint`
-*   `fix(ingest): fix PDF validation`
-*   `docs(contributing): update project name`
-*   `test(security): add PII sanitization tests`
-
-## 📝 Estándares de Código
-
-### Nomenclatura (Naming Conventions)
-
-> [!IMPORTANT]
-> **Todo el código debe estar en inglés**: variables, funciones, clases, comentarios de documentación.
-
-**Variables y Funciones**: Usa `snake_case` en inglés
-*   ✅ `user_input`, `sanitize_data()`, `process_pdf_file()`
-*   ❌ `entrada_usuario`, `sanitizarDatos()`, `procesarArchivoPDF()`
-
-**Clases**: Usa `PascalCase` en inglés
-*   ✅ `VectorDatabase`, `SecureAgent`, `OllamaClient`
-*   ❌ `BaseDeDatosVectorial`, `AgenteSeguro`
-
-**Diccionarios y Configuración**: Usa `snake_case` para las keys
-```python
-# ✅ Correcto
-config = {
-    "model_name": "phi3",
-    "max_tokens": 1000,
-    "enable_sanitization": True
-}
-
-# ❌ Incorrecto
-config = {
-    "nombreModelo": "phi3",
-    "maxTokens": 1000
-}
-```
-
-**Comentarios**:
-*   Docstrings (documentación de funciones/clases): **Obligatorio en inglés**
-*   Comentarios inline: Preferiblemente en inglés, pero se permite español para claridad interna
-
-### Seguridad de Dependencias
-
-Antes de agregar una nueva dependencia a `requirements.txt`, **debes verificar su seguridad**:
+Comandos:
 
 ```bash
-# Instalar herramientas de seguridad
-pip install pip-audit safety
+git clone https://github.com/TU_USUARIO/zyrabit-SLM.git
+cd zyrabit-SLM
+git remote add upstream https://github.com/Zyrabit-tech/zyrabit-SLM.git
+git fetch upstream
+git checkout beta
+git pull upstream beta
+git checkout -b feat/mi-cambio
+```
 
-# Escanear dependencias actuales
-pip-audit
-safety check
+## Convención de commits
 
-# Verificar una dependencia específica antes de agregarla
-pip install <nueva-dependencia>
+Formato obligatorio:
+
+```text
+type(scope): short description
+```
+
+Tipos válidos: `feat`, `fix`, `docs`, `refactor`, `test`, `chore`.
+
+Ejemplos:
+
+- `feat(api): add chat metadata for route decision`
+- `fix(security): prevent pii leak in model payload`
+- `docs(readme): add ui verification guide`
+
+## Checklist para abrir PR
+
+- [ ] PR apunta a `beta`.
+- [ ] Tests pasan localmente.
+- [ ] Documentación actualizada (ES/EN cuando aplique).
+- [ ] Sin secretos en commits.
+- [ ] Commit messages en formato convencional.
+
+## Verificación local mínima
+
+```bash
+./.venv/bin/python -m pytest -q -c zyrabit-brain-api/api-rag/pytest.ini
+streamlit run slm_console.py
+./scripts/run_final_tests.sh
+```
+
+Checklist extendido: `validation/pr-checklist.md`
+
+## Seguridad de dependencias
+
+Antes de agregar librerías:
+
+```bash
+pip install pip-audit
 pip-audit
 ```
 
-**Requisitos para PRs que agregan dependencias:**
-- [ ] Ejecutar `pip-audit` y `safety check`
-- [ ] Incluir resultados del escaneo en la descripción del PR
-- [ ] Justificar por qué la dependencia es necesaria
-- [ ] Verificar que no haya vulnerabilidades conocidas
+Si agregas dependencias, documenta en el PR:
 
-## 📋 Plantilla de Pull Request
+- justificación técnica,
+- impacto esperado,
+- resultado del escaneo.
 
-Un PR es tu carta de presentación. Véndele tu solución.
+## GitHub Actions
 
-**Checklist Básico:**
-- [ ] Mis commits siguen la convención.
-- [ ] Mi código sigue las buenas prácticas.
-- [ ] Agregué o actualicé las pruebas necesarias.
-- [ ] La documentación está actualizada.
-- [ ] Mi PR apunta a la rama **`beta`**.
+Los workflows validan automáticamente:
 
-## 🆘 ¿Atorado?
+- política de contribución (base `beta`),
+- pruebas en `api-rag`,
+- auditoría de dependencias.
 
-No sufras en silencio.
-*   **Abre un Issue**: Con el label `pregunta` o `ayuda`.
-*   **Crea un Draft PR**: Y explica dónde estás atorado.
-
-Estamos aquí para construir juntos.
+Si CI falla, corrige antes de pedir review.

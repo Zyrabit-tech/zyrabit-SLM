@@ -1,11 +1,11 @@
-from ingest import check_ollama_model, load_documents, split_documents, populate_vector_db
-import pytest
-from unittest.mock import patch, MagicMock
 import sys
 import os
+import pytest
+from unittest.mock import patch, MagicMock
 
 # Importar las funciones del script de ingesta
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../../scripts'))
+from ingest import check_ollama_model, load_documents, split_documents, populate_vector_db
 
 # --- PRUEBA 1: Verificar Modelo Ollama Disponible ---
 
@@ -133,7 +133,7 @@ def test_split_documents_correct_chunks():
 # --- PRUEBA 4: Poblar Vector DB ---
 
 
-@patch('chromadb.HttpClient')
+@patch('ingest.chromadb.HttpClient')
 @patch('ingest.OllamaEmbeddings')
 def test_populate_vector_db_batching(mock_embeddings, mock_chroma_client):
     """
@@ -168,7 +168,7 @@ def test_populate_vector_db_batching(mock_embeddings, mock_chroma_client):
     mock_collection.count.assert_called_once()
 
 
-@patch('chromadb.HttpClient')
+@patch('ingest.chromadb.HttpClient')
 def test_populate_vector_db_connection_error(mock_chroma_client):
     """
     Prueba que populate_vector_db termine si no puede conectar a ChromaDB.

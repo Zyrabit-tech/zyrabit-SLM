@@ -1,0 +1,15 @@
+http:
+  middlewares:
+    secureHeaders:
+      headers:
+        browserXssFilter: true
+        contentTypeNosniff: true
+        frameDeny: true
+        stsIncludeSubdomains: true
+        stsPreload: true
+        stsSeconds: 31536000
+
+tls:
+  options:
+    default:
+      minVersion: VersionTLS12

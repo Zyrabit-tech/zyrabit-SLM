@@ -1,0 +1,176 @@
+# Zyrabit Brain API
+
+[Main README](README.md)
+
+Backend stack for secure local RAG, MCP bridge, and observability.
+
+## What this folder contains
+
+- `api-rag/`: FastAPI service and security pipeline.
+- `docker-compose.yml`: local orchestration with segmented networks.
+- `config/`: Prometheus/Grafana provisioning.
+- `traefik/`: reverse-proxy dynamic security config.
+
+## Core capabilities
+
+- Interceptor-based PII anonymization before SLM inference.
+- Reversible token de-anonymization after response generation.
+- Prometheus metrics at `/metrics`:
+  - `zyrabit_token_latency_ms_per_token`
+  - `zyrabit_token_usage_total`
+  - `zyrabit_security_hits_total`
+- MCP endpoints:
+  - `GET /mcp/config.json`
+  - `POST /mcp`
+- n8n integration endpoint (adapter + policies):
+  - `POST /v1/integrations/n8n/webhook`
+
+## Quick start
+
+From repository root:
+
+```bash
+chmod +x zyra-up.sh
+./zyra-up.sh install
+```
+
+Setup script roles from repository root:
+
+- `install.sh`: bootstrap wrapper for first-time setup.
+- `zyra-up.sh`: primary setup and lifecycle entrypoint.
+
+Or from this folder:
+
+```bash
+docker compose up -d
+```
+
+Recommended environment variables for n8n webhook adapter:
+
+```bash
+N8N_SERVICE_TOKEN=replace-with-strong-token
+N8N_WEBHOOK_SIGNING_SECRET=replace-with-hmac-secret
+N8N_REQUIRE_SIGNATURE=true
+```
+
+Inference provider layer is pluggable via contract + factory:
+
+- Port: `app/ports/inference_port.py`
+- Factory: `app/inference_factory.py`
+- Adapters: `ollama_*` and `openai_compatible`
+
+Core variables:
+
+```bash
+INFERENCE_PROVIDER=ollama
+SLM_URL=http://slm-engine:11434/api/generate
+MODEL_NAME=qwen2.5:7b
+INFERENCE_TIMEOUT_SECONDS=120
+```
+
+Hybrid mode (host Ollama + Docker orchestration):
+
+```bash
+INFERENCE_PROVIDER=ollama_host
+SLM_URL=http://host.docker.internal:11434/api/generate
+MODEL_NAME=qwen2.5:7b
+```
+
+In production, use file-based secrets or Vault (never hardcoded values):
+
+```bash
+N8N_SERVICE_TOKEN_FILE=/run/secrets/n8n_service_token
+N8N_WEBHOOK_SIGNING_SECRET_FILE=/run/secrets/n8n_webhook_signing_secret
+```
+
+Basic-auth credentials for observability routes in Traefik:
+
+```bash
+PROMETHEUS_BASIC_AUTH=<user:htpasswd_hash>
+GRAFANA_BASIC_AUTH=<user:htpasswd_hash>
+```
+
+Hash generation example:
+
+```bash
+htpasswd -nbB admin 'change-this'
+```
+
+Manual model pull (without automatic installer flow):
+
+```bash
+docker compose exec -T slm-engine ollama pull qwen2.5:7b
+docker compose exec -T slm-engine ollama pull mxbai-embed-large
+```
+
+## Service topology
+
+- `traefik`: ingress, TLS redirect, rate-limiting.
+- `api-rag`: FastAPI core.
+- `slm-engine`: Ollama inference engine.
+- `vector-db`: ChromaDB persistence layer.
+- `prometheus` + `grafana`: local monitoring.
+- `loki` (optional profile): extended logs.
+- `docs-portal` (optional profile): local docs container.
+- `n8n` (optional `automation` profile): automation workflow engine published through Traefik (`/n8n`).
+
+Networks:
+
+- `frontend-network`
+- `backend-network`
+- `model-network` (`internal: true`)
+
+## Integration policies (n8n and future adapters)
+
+- **Single entrypoint**: all public traffic goes through Traefik (`https://localhost`), no extra public service ports.
+- **Service token**: `Authorization: Bearer <token>` required for automation adapters.
+- **Webhook integrity**: HMAC SHA-256 signature in `X-Zyrabit-Signature` when `N8N_REQUIRE_SIGNATURE=true`.
+- **Stable contract**: minimum payload `{ "text": "..." }`; optional metadata `workflow_id`, `execution_id`.
+- **Hexagonal boundary**: every new external tool (Make, Strapi, DB connectors) should add a dedicated adapter over a port, without coupling core domain logic to provider APIs.
+- **Production secrets**: use `_FILE` variables with Docker Secrets or on-prem Vault, never plain secrets in `docker-compose.yml`.
+
+## Observability without public ports
+
+- `grafana` is published at `https://localhost/grafana`.
+- `prometheus` is published at `https://localhost/prometheus`.
+- Both are behind Traefik and protected with `basicauth` middleware.
+
+## Template for new adapters (Make)
+
+A reusable template is included at:
+
+- `api-rag/app/adapters/make_adapter_blueprint.py`
+
+It demonstrates:
+
+- bearer-token validation
+- HMAC signature validation
+- external payload normalization into a stable internal contract
+
+## Next step: feedback-driven local re-training
+
+Recommended evolution path for a local super-fine-tuning pipeline:
+
+1. Emit a `model_miss_detected` event from `automation_port`.
+2. Persist curated examples in a local feedback dataset.
+3. Trigger controlled offline fine-tuning jobs (LoRA/PEFT).
+4. Version and promote tuned models through automated evaluation gates.
+
+## Testing
+
+```bash
+cd api-rag
+python3 -m pytest -q
+```
+
+Focus suites:
+
+- `tests/test_security.py`: critical PII and pipeline behavior.
+- `tests/test_services_security.py`: no raw PII reaches model payload.
+- `tests/test_integration.py`: API integration.
+- `tests/test_mcp.py`: MCP interface and sanitization behavior.
+
+## Security references
+
+- Repository-wide security policy: `../SECURITY.md`
+- MCP static config: `../mcp/config.json`
