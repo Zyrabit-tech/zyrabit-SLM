@@ -34,7 +34,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Removed
 - Removed legacy `setup_slm.sh` to eliminate duplicate setup paths and reduce operational drift.
 
-## [1.0.0-beta] - 2026-02-23
+## [1.0.0] - 2026-02-23
 
 ### Added
-- Initial beta release baseline.
+- Initial stable release.

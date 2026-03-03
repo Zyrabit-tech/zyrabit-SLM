@@ -95,6 +95,9 @@ if "messages" not in st.session_state:
 if "ingest_history" not in st.session_state:
     st.session_state.ingest_history: List[Dict[str, str]] = []
 
+if "uploader_key" not in st.session_state:
+    st.session_state.uploader_key = 0
+
 
 with st.sidebar:
     st.header("Node Status")
@@ -113,6 +116,7 @@ with st.sidebar:
         "Upload files (.pdf, .txt, .md)",
         type=["pdf", "txt", "md"],
         accept_multiple_files=True,
+        key=str(st.session_state.uploader_key)
     )
 
     ingest_clicked = st.button(
@@ -139,93 +143,92 @@ with st.sidebar:
             progress.progress((index + 1) / len(uploaded_files))
         progress.empty()
         st.success("Ingestion completed.")
+        st.session_state.uploader_key += 1
+        st.rerun()
 
-
-col_chat, col_state = st.columns([3, 2])
-
-with col_state:
+    st.markdown("---")
     st.subheader("Knowledge State")
     if not st.session_state.ingest_history:
         st.info("No documents ingested in this session.")
     else:
         for item in st.session_state.ingest_history[:8]:
-            status_label = "OK" if item["status"] == "success" else "ERROR"
+            status_label = "✅" if item["status"] == "success" else "❌"
             st.write(
-                f"[{status_label}] {item['filename']} | chunks={item['chunks_processed']} | ingest_id={item['ingest_id']}"
+                f"{status_label} **{item['filename']}** | chunks={item['chunks_processed']}"
             )
             st.caption(item["message"])
 
-with col_chat:
-    st.subheader("Secure Chat")
-    for message in st.session_state.messages:
-        with st.chat_message(message["role"]):
-            st.markdown(str(message["content"]))
-            if message.get("metadata"):
-                _render_route_badge(message["metadata"])
-            if message.get("sanitized") and message["role"] == "user":
-                with st.expander("Sanitized Preview", expanded=False):
-                    st.code(str(message["sanitized"]), language="text")
 
-    prompt = st.chat_input("Ask about your documents or architecture...")
-    if prompt:
-        sanitized_text, was_sanitized = sanitize_pii(prompt)
-        user_message = {"role": "user", "content": prompt}
+st.subheader("Secure Chat")
+for message in st.session_state.messages:
+    with st.chat_message(message["role"]):
+        st.markdown(str(message["content"]))
+        if message.get("metadata"):
+            _render_route_badge(message["metadata"])
+        if message.get("sanitized") and message["role"] == "user":
+            with st.expander("Sanitized Preview", expanded=False):
+                st.code(str(message["sanitized"]), language="text")
+
+prompt = st.chat_input("Ask about your documents or architecture...")
+if prompt:
+    sanitized_text, was_sanitized = sanitize_pii(prompt)
+    user_message = {"role": "user", "content": prompt}
+    if was_sanitized:
+        user_message["sanitized"] = sanitized_text
+    st.session_state.messages.append(user_message)
+
+    with st.chat_message("user"):
+        st.markdown(prompt)
         if was_sanitized:
-            user_message["sanitized"] = sanitized_text
-        st.session_state.messages.append(user_message)
+            with st.expander("Sanitized Preview", expanded=False):
+                st.code(sanitized_text, language="text")
 
-        with st.chat_message("user"):
-            st.markdown(prompt)
-            if was_sanitized:
-                with st.expander("Sanitized Preview", expanded=False):
-                    st.code(sanitized_text, language="text")
+    payload = {"text": prompt}
+    with st.chat_message("assistant"):
+        with st.spinner("Thinking..."):
+            try:
+                start_time = time.time()
+                response = requests.post(
+                    API_URL,
+                    json=payload,
+                    verify=VERIFY_TLS,
+                    timeout=REQUEST_TIMEOUT,
+                )
+                end_time = time.time()
 
-        payload = {"text": prompt}
-        with st.chat_message("assistant"):
-            with st.spinner("Thinking..."):
-                try:
-                    start_time = time.time()
-                    response = requests.post(
-                        API_URL,
-                        json=payload,
-                        verify=VERIFY_TLS,
-                        timeout=REQUEST_TIMEOUT,
-                    )
-                    end_time = time.time()
+                if response.status_code == 200:
+                    data = response.json()
+                    answer = data.get("response", "No response content.")
+                    metadata = data.get("metadata", {})
+                    if "latency_ms" not in metadata:
+                        metadata["latency_ms"] = round((end_time - start_time) * 1000, 2)
 
-                    if response.status_code == 200:
-                        data = response.json()
-                        answer = data.get("response", "No response content.")
-                        metadata = data.get("metadata", {})
-                        if "latency_ms" not in metadata:
-                            metadata["latency_ms"] = round((end_time - start_time) * 1000, 2)
+                    st.markdown(answer)
+                    if metadata:
+                        _render_route_badge(metadata)
 
-                        st.markdown(answer)
-                        if metadata:
-                            _render_route_badge(metadata)
-
-                        st.session_state.messages.append(
-                            {
-                                "role": "assistant",
-                                "content": answer,
-                                "metadata": metadata,
-                            }
-                        )
-                    else:
-                        error_msg = _parse_api_error(response)
-                        st.error(f"API Error {response.status_code}: {error_msg}")
-                        st.session_state.messages.append(
-                            {
-                                "role": "assistant",
-                                "content": f"API Error {response.status_code}: {error_msg}",
-                            }
-                        )
-                except requests.exceptions.RequestException as exc:
-                    st.error(f"Connection error: {exc}")
                     st.session_state.messages.append(
                         {
                             "role": "assistant",
-                            "content": f"Connection error: {exc}",
+                            "content": answer,
+                            "metadata": metadata,
                         }
                     )
+                else:
+                    error_msg = _parse_api_error(response)
+                    st.error(f"API Error {response.status_code}: {error_msg}")
+                    st.session_state.messages.append(
+                        {
+                            "role": "assistant",
+                            "content": f"API Error {response.status_code}: {error_msg}",
+                        }
+                    )
+            except requests.exceptions.RequestException as exc:
+                st.error(f"Connection error: {exc}")
+                st.session_state.messages.append(
+                    {
+                        "role": "assistant",
+                        "content": f"Connection error: {exc}",
+                    }
+                )
 

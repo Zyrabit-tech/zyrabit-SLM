@@ -53,6 +53,7 @@ services:
     volumes:
       - ./secrets:/run/secrets:ro
       - ./prompts:/app/prompts:ro
+      - ./document_source:/app/document_source
 
   # 2. THE MUSCLE: SLM Server
   slm-engine:

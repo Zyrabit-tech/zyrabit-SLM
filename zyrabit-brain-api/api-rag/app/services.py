@@ -139,7 +139,11 @@ def get_slm_router_decision(text: str) -> str:
         if re.search(pattern, text_lower, re.IGNORECASE):
             return "reject_query"
     # Provide helpful orientation if it's casually generic but harmless.
-    keywords = ["zyrabit", "architecture", "security", "slm", "rag", "chromadb", "ollama", "docker", "pyme", "n8n", "automat", "zapier"]
+    keywords = [
+        "zyrabit", "architecture", "security", "slm", "rag", "chromadb", 
+        "ollama", "docker", "pyme", "n8n", "automat", "zapier",
+        "resum", "documento", "pdf", "texto", "archivo", "one pager"
+    ]
     if any(k in text_lower for k in keywords):
         return "search_rag_database"
     return "direct_SLM_answer"
@@ -216,8 +220,8 @@ def process_and_ingest_file(file_path: str) -> dict:
     ext = os.path.splitext(file_path)[1].lower()
     logger.info("Ingest pipeline start file_path=%s ext=%s", file_path, ext)
     if ext == ".pdf":
-        from langchain_community.document_loaders import PyPDFLoader
-        loader = PyPDFLoader(file_path)
+        from langchain_community.document_loaders import PyMuPDFLoader
+        loader = PyMuPDFLoader(file_path)
         docs = loader.load()
     elif ext in (".txt", ".md"):
         from langchain_community.document_loaders import TextLoader
@@ -226,11 +230,20 @@ def process_and_ingest_file(file_path: str) -> dict:
     else:
         raise ValueError(f"Unsupported file type: {ext}")
 
+    # Debug: log extracted text lengths per page
+    total_chars = sum(len(d.page_content) for d in docs) if docs else 0
+    logger.info(
+        "Ingest extraction complete pages=%s total_chars=%s per_page=%s",
+        len(docs) if docs else 0,
+        total_chars,
+        [len(d.page_content) for d in docs] if docs else [],
+    )
+
     if not docs:
         logger.info("Ingest pipeline completed with zero documents file_path=%s", file_path)
         return {"status": "success", "filename": os.path.basename(file_path), "chunks_processed": 0}
 
-    from langchain.text_splitter import RecursiveCharacterTextSplitter
+    from langchain_text_splitters import RecursiveCharacterTextSplitter
     from langchain_community.embeddings import OllamaEmbeddings
     import chromadb
 

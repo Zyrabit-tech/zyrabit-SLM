@@ -1,7 +1,6 @@
 import logging
 import os
 import re
-import tempfile
 import time
 import uuid
 from typing import Optional
@@ -191,13 +190,17 @@ def chat_router(query: ChatQuery):
             detail=f"Error interno: Decisión del router desconocida ('{decision}').")
 
 
+INGEST_DIR = os.getenv("INGEST_DIR", "/app/document_source")
+
+
 @app.post("/v1/ingest", tags=["Ingestion"])
 async def ingest_document(file: UploadFile = File(...)):
     """
     Endpoint to ingest PDF, TXT or Markdown documents into the knowledge base.
 
+    Files are persisted in the secure document vault for auditing and re-indexing.
     - **Validation**: Only .pdf, .txt and .md files.
-    - **Size**: Max 800MB (validated by server config, basic logic here).
+    - **Size**: Max 800MB.
     """
     ALLOWED_EXTENSIONS = {".pdf", ".txt", ".md"}
     ALLOWED_MIME_BY_EXT = {
@@ -225,35 +228,55 @@ async def ingest_document(file: UploadFile = File(...)):
             detail=f"MIME no permitido para {file_ext}. Tipos aceptados: {sorted(allowed_mime_types)}",
         )
 
-    # 2. Save temporarily for processing using a server-generated path
-    temp_file_path = None
+    # 2. Sanitize filename and build vault path
+    sanitized_basename = re.sub(r"[^A-Za-z0-9._-]", "_", os.path.basename(original_filename))
+    # Truncate the stem but ALWAYS preserve the file extension
+    stem, ext_part = os.path.splitext(sanitized_basename)
+    safe_filename = (stem[:75] + ext_part) if sanitized_basename else f"uploaded_file{file_ext}"
+    vault_path = os.path.join(INGEST_DIR, safe_filename)
+
+    # 3. Path traversal protection
+    resolved_path = os.path.realpath(vault_path)
+    resolved_vault = os.path.realpath(INGEST_DIR)
+    if not resolved_path.startswith(resolved_vault + os.sep) and resolved_path != resolved_vault:
+        logger.warning(
+            "Path traversal attempt blocked ingest_id=%s filename=%s resolved=%s",
+            ingest_id, original_filename, resolved_path,
+        )
+        raise HTTPException(
+            status_code=400,
+            detail="Nombre de archivo no permitido (posible path traversal).",
+        )
+
     try:
+        # 4. Write file to vault (persisted)
+        os.makedirs(INGEST_DIR, exist_ok=True)
         total_size = 0
-        with tempfile.NamedTemporaryFile(
-            mode="wb",
-            suffix=file_ext,
-            prefix="ingest_",
-            dir="/tmp",
-            delete=False,
-        ) as temp_file:
-            temp_file_path = temp_file.name
+        with open(vault_path, "wb") as dest:
             while True:
                 chunk = await file.read(CHUNK_SIZE_BYTES)
                 if not chunk:
                     break
                 total_size += len(chunk)
                 if total_size > MAX_SIZE_MB * 1024 * 1024:
+                    # Clean up oversized file
+                    dest.close()
+                    if os.path.exists(vault_path):
+                        os.remove(vault_path)
                     raise HTTPException(
                         status_code=413,
                         detail=f"El archivo excede el tamaño máximo de {MAX_SIZE_MB}MB.",
                     )
-                temp_file.write(chunk)
+                dest.write(chunk)
 
-        # 3. Process ingestion
-        result = services.process_and_ingest_file(temp_file_path)
-        ui_filename = re.sub(r"[^A-Za-z0-9._-]", "_", os.path.basename(original_filename))
-        ui_filename = ui_filename[:80] if ui_filename else "uploaded_file"
-        result["filename"] = ui_filename
+        logger.info(
+            "File saved to vault ingest_id=%s path=%s size_bytes=%s",
+            ingest_id, vault_path, total_size,
+        )
+
+        # 5. Process ingestion from vault path
+        result = services.process_and_ingest_file(vault_path)
+        result["filename"] = safe_filename
         result["ingest_id"] = ingest_id
         return result
 
@@ -261,18 +284,39 @@ async def ingest_document(file: UploadFile = File(...)):
         raise
     except Exception:
         logger.exception(
-            "Ingest failed ingest_id=%s filename=%s content_type=%s temp_file_path=%s",
+            "Ingest failed ingest_id=%s filename=%s content_type=%s vault_path=%s",
             ingest_id,
             original_filename,
             content_type,
-            temp_file_path,
+            vault_path,
         )
         raise HTTPException(status_code=500, detail="Error procesando el archivo.")
     finally:
         await file.close()
-        # Cleanup
-        if temp_file_path and os.path.exists(temp_file_path):
-            os.remove(temp_file_path)
+
+
+@app.get("/v1/documents", tags=["Ingestion"])
+def list_documents():
+    """
+    Lists all documents currently stored in the secure document vault.
+    """
+    vault_path = os.path.realpath(INGEST_DIR)
+    if not os.path.isdir(vault_path):
+        return {"documents": [], "total": 0}
+
+    docs = []
+    for entry in sorted(os.listdir(vault_path)):
+        if entry.startswith("."):
+            continue
+        full_path = os.path.join(vault_path, entry)
+        if os.path.isfile(full_path):
+            stat = os.stat(full_path)
+            docs.append({
+                "filename": entry,
+                "size_bytes": stat.st_size,
+                "modified": stat.st_mtime,
+            })
+    return {"documents": docs, "total": len(docs)}
 
 # To run locally with `uvicorn main:app --reload`
 if __name__ == "__main__":

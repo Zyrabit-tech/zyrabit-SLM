@@ -11,5 +11,5 @@ python-dotenv
 pytest
 pytest-mock
 httpx
-pypdf
+pymupdf>=1.23.0
 python-multipart
