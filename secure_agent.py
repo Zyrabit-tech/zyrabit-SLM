@@ -12,8 +12,19 @@ import os
 import sys
 import time
 import argparse
-import requests
-import urllib3
+try:
+    import requests
+    import urllib3
+except ImportError:
+    import sys as _sys
+    print(
+        "❌ Missing dependencies. Activate the virtual environment first:\n"
+        "\n"
+        "    source .venv/bin/activate\n"
+        "    python3 secure_agent.py \"your prompt here\"\n"
+    )
+    _sys.exit(1)
+
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 

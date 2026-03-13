@@ -148,15 +148,37 @@ with st.sidebar:
 
     st.markdown("---")
     st.subheader("Knowledge State")
-    if not st.session_state.ingest_history:
-        st.info("No documents ingested in this session.")
-    else:
+
+    # Show session ingestion results first
+    if st.session_state.ingest_history:
         for item in st.session_state.ingest_history[:8]:
             status_label = "✅" if item["status"] == "success" else "❌"
             st.write(
                 f"{status_label} **{item['filename']}** | chunks={item['chunks_processed']}"
             )
             st.caption(item["message"])
+        st.markdown("---")
+
+    # Fetch persisted documents from vault via API
+    DOCUMENTS_URL = os.getenv("DOCUMENTS_URL", "https://localhost/v1/documents")
+    try:
+        docs_resp = requests.get(DOCUMENTS_URL, timeout=3, verify=VERIFY_TLS)
+        if docs_resp.status_code == 200:
+            docs_data = docs_resp.json()
+            vault_docs = docs_data.get("documents", [])
+            total = docs_data.get("total", len(vault_docs))
+            if vault_docs:
+                st.metric("Documents in Vault", total)
+                for doc in vault_docs[:10]:
+                    size_kb = round(doc.get("size_bytes", 0) / 1024, 1)
+                    st.caption(f"📄 {doc['filename']} ({size_kb} KB)")
+            else:
+                st.info("No documents in the knowledge vault yet.")
+        else:
+            st.info("No documents ingested in this session.")
+    except requests.exceptions.RequestException:
+        if not st.session_state.ingest_history:
+            st.info("No documents ingested in this session.")
 
 
 st.subheader("Secure Chat")
