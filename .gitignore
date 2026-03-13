@@ -48,7 +48,62 @@ chroma-data/
 zyrabit-brain-api/grafana-data/
 zyrabit-brain-api/prometheus-data/
 zyrabit-brain-api/chroma-data/
+zyrabit-brain-api/n8n-data/
 zyrabit-brain-api/.ai/
 zyrabit-brain-api/ollama-models/
 zyrabit-brain-api/.DS_Store
+
+# SQLite / runtime
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
+*.db
+crash.journal
+
+# Node / frontend
+node_modules/
+docs-portal/node_modules/
+
+# Python build
+*.egg-info/
+.eggs/
+dist/
+build/
+
+# Cursor / IDE
+.cursor/
 .continue/prompts/new-prompt.md
+
+# ==========================================
+# Production Readiness Exclusions
+# ==========================================
+
+# Internal Tracking and Checklists
+TEMP_QA_E2E_CHECKLIST.md
+TEMP_TASK_TRACKING.md
+TEMP_*.md
+AGENT.md
+
+# Internal / Weirdly-named tests and drafts
+TEMP_*test*.py
+*test_interno*.py
+*draft*.py
+*temp*.py
+
+# Keys and Credentials (Security)
+*.key
+*.pem
+*.env*
+credentials.json
+secrets.yaml
+
+# Re-allow important project readmes and env template
+!README.md
+!README_EN.md
+!zyrabit-brain-api/example.env
+
+# Private Postman assets
+postman/private/
+
+# Private local ops toolkit
+ops-private/

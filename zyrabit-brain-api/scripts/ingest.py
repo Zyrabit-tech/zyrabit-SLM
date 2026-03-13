@@ -1,9 +1,29 @@
 import os
-import chromadb
-from langchain_community.document_loaders import PyPDFLoader
-from langchain_community.embeddings import OllamaEmbeddings
-from langchain.text_splitter import RecursiveCharacterTextSplitter
+from types import SimpleNamespace
 import sys
+
+try:
+    from langchain_community.document_loaders import PyPDFLoader
+except Exception:
+    PyPDFLoader = None
+
+try:
+    from langchain_community.embeddings import OllamaEmbeddings
+except Exception:
+    OllamaEmbeddings = None
+
+try:
+    from langchain.text_splitter import RecursiveCharacterTextSplitter
+except Exception:
+    try:
+        from langchain_text_splitters import RecursiveCharacterTextSplitter
+    except Exception:
+        RecursiveCharacterTextSplitter = None
+
+try:
+    import chromadb
+except Exception:
+    chromadb = SimpleNamespace(HttpClient=None)
 
 # --- Configuration ---
 SOURCE_DIRECTORY = "document_source"
@@ -20,6 +40,15 @@ CHUNK_OVERLAP = 200
 
 def check_ollama_model(model_name):
     """Verifies if the embedding model is available in Ollama."""
+    global OllamaEmbeddings
+    if OllamaEmbeddings is None:
+        try:
+            from langchain_community.embeddings import OllamaEmbeddings as _OllamaEmbeddings
+            OllamaEmbeddings = _OllamaEmbeddings
+        except Exception as exc:
+            print(f"Error importando OllamaEmbeddings: {exc}")
+            return False
+
     print(
         f"Verificando si el modelo '{model_name}' está disponible en Ollama...")
     try:
@@ -40,6 +69,15 @@ def check_ollama_model(model_name):
 
 def load_documents(source_dir):
     """Loads and reads PDFs from the source directory."""
+    global PyPDFLoader
+    if PyPDFLoader is None:
+        try:
+            from langchain_community.document_loaders import PyPDFLoader as _PyPDFLoader
+            PyPDFLoader = _PyPDFLoader
+        except Exception as exc:
+            print(f"Error importando PyPDFLoader: {exc}")
+            sys.exit(1)
+
     print(f"\nCargando documentos desde: '{source_dir}'")
     if not os.path.exists(source_dir):
         print(
@@ -73,6 +111,11 @@ def load_documents(source_dir):
 
 def split_documents(docs):
     """Splits documents into chunks."""
+    global RecursiveCharacterTextSplitter
+    if RecursiveCharacterTextSplitter is None:
+        print("Error: RecursiveCharacterTextSplitter no está disponible en el entorno.")
+        sys.exit(1)
+
     print(
         f"\nDividiendo documentos en chunks (Tamaño: {CHUNK_SIZE}, Superposición: {CHUNK_OVERLAP})...")
     text_splitter = RecursiveCharacterTextSplitter(
@@ -87,6 +130,14 @@ def split_documents(docs):
 def populate_vector_db(chunks, embeddings):
     """Connects to ChromaDB and populates the database."""
     print(f"\nConectando a ChromaDB en {CHROMA_HOST}:{CHROMA_PORT}...")
+    if chromadb.HttpClient is None:
+        try:
+            import chromadb as chromadb_runtime
+        except Exception as exc:
+            print(f"Error importando chromadb: {exc}")
+            sys.exit(1)
+        globals()["chromadb"] = chromadb_runtime
+
     try:
         client = chromadb.HttpClient(host=CHROMA_HOST, port=CHROMA_PORT)
         print("Conexión a ChromaDB exitosa.")

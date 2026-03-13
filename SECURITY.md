@@ -1,5 +1,7 @@
 # Security Policy
 
+> This document is maintained in English only, by project policy.
+
 ## 🔒 Reporting Security Vulnerabilities
 
 If you discover a security vulnerability in Zyrabit SLM, please **do not** open a public issue. Instead:
@@ -51,19 +53,22 @@ pip-audit
 
 This project implements Privacy by Design. When handling user data:
 
-1. **Never Log PII**: Emails, phone numbers, credit cards, SSNs must never appear in logs
-2. **Sanitize Before SLM**: Use the `SecureAgent` class to redact PII before sending to the model
-3. **Test Sanitization**: Add tests for new PII patterns in `tests/test_security.py`
+1. **Never Log PII**: Emails, phone numbers, credit cards, SSNs must never appear in logs.
+2. **Sanitize Before SLM**: All inference paths must pass through the centralized interceptor pipeline in `zyrabit-brain-api/api-rag/app/pii_pipeline.py`.
+3. **De-anonymize Only on Exit**: The SLM works with tokens only; raw values are restored after model response.
+4. **Test Sanitization**: Add tests for new PII patterns in `zyrabit-brain-api/api-rag/tests/test_security.py`.
 
 ### Supported PII Patterns
 
 Currently sanitized patterns:
 - Email addresses
-- Phone numbers (US format)
+- Phone numbers (US style)
 - Credit card numbers
-- Social Security Numbers (SSN)
+- Social Security numbers (SSN)
+- Monetary amounts
+- Person names from contextual expressions (e.g. "my name is ...")
 
-To add new patterns, update `SecureAgent.patterns` in `secure_agent.py`.
+To add new patterns, extend interceptors/detectors in `zyrabit-brain-api/api-rag/app/pii_pipeline.py` and keep `test_security.py` updated.
 
 ## 🚨 Known Security Considerations
 
@@ -77,16 +82,22 @@ This project is designed for **local or on-premise deployment**. Key security fe
 
 ### Docker Network Isolation
 
-Services communicate via internal Docker network (`zyrabit-network`). Only the API port (8080) is exposed to the host.
+Services are split into three networks:
+
+- `frontend-network`: proxy and UI surface
+- `backend-network`: API, vector DB, observability
+- `model-network`: model inference path (`internal: true`)
+
+Only proxy entrypoints are exposed to host by default.
 
 ## 📊 Security Audit History
 
 | Date | Tool | Vulnerabilities Found | Status |
 |------|------|----------------------|--------|
-| 2025-11-28 | pip-audit | 0 | ✅ Clean |
-| 2025-11-28 | safety | 0 | ✅ Clean |
+| 2026-03-12 | pip-audit | 0 | ✅ Clean |
+| 2026-03-12 | safety | 0 | ✅ Clean |
 
-*Last updated: 2025-11-28*
+*Last updated: 2026-03-12*
 
 ## 🔄 Security Update Process
 
@@ -96,6 +107,19 @@ Services communicate via internal Docker network (`zyrabit-network`). Only the A
 4. **Test**: Run full test suite
 5. **Deploy**: Merge to `beta`, then `main`
 6. **Notify**: Update this document and notify users if critical
+
+## ✅ Security Validation Checklist
+
+Before merge:
+
+1. Run unit/integration tests:
+   ```bash
+   cd zyrabit-brain-api/api-rag
+   python3 -m pytest -q
+   ```
+2. Verify no PII reaches model payload (`test_services_security.py`).
+3. Verify `/metrics` includes custom security and usage counters.
+4. Verify MCP `resources/read` sanitizes by default.
 
 ## 📚 Additional Resources
 

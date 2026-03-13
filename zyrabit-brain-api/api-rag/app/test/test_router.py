@@ -11,7 +11,7 @@ client = TestClient(app)
 
 
 @patch('app.services.execute_rag_pipeline')
-@patch('app.services.get_SLM_router_decision')
+@patch('app.services.get_slm_router_decision')
 def test_router_sends_tech_queries_to_RAG(
         mock_router_decision, mock_rag_pipeline):
     """
@@ -36,17 +36,17 @@ def test_router_sends_tech_queries_to_RAG(
 # --- PRUEBA 2: El Router sabe cuándo NO usar RAG (Conocimiento General) ---
 
 
-@patch('app.services.call_direct_SLM')
+@patch('app.services.call_direct_slm')
 @patch('app.services.execute_rag_pipeline')
-@patch('app.services.get_SLM_router_decision')
+@patch('app.services.get_slm_router_decision')
 def test_router_sends_general_queries_to_DIRECT_SLM(
-        mock_router_decision, mock_rag_pipeline, mock_direct_SLM):
+        mock_router_decision, mock_rag_pipeline, mock_direct_slm):
     """
     Prueba que una pregunta sobre el clima sea enrutada a 'direct_SLM_answer'.
     """
     # 1. GIVEN
     mock_router_decision.return_value = "direct_SLM_answer"
-    mock_direct_SLM.return_value = "[Respuesta SLM Directa para: ¿Cómo estará el clima mañana?]"
+    mock_direct_slm.return_value = "[Respuesta SLM Directa para: ¿Cómo estará el clima mañana?]"
 
     query = {"text": "¿Cómo estará el clima mañana?"}
 
@@ -56,7 +56,7 @@ def test_router_sends_general_queries_to_DIRECT_SLM(
     # 3. THEN
     mock_router_decision.assert_called_once_with(query['text'])
     mock_rag_pipeline.assert_not_called()
-    mock_direct_SLM.assert_called_once_with(query['text'])
+    mock_direct_slm.assert_called_once_with(query['text'])
 
     assert response.status_code == 200
     assert "Respuesta SLM Directa para" in response.json()['response']
@@ -65,7 +65,7 @@ def test_router_sends_general_queries_to_DIRECT_SLM(
 
 
 @patch('app.services.execute_rag_pipeline')
-@patch('app.services.get_SLM_router_decision')
+@patch('app.services.get_slm_router_decision')
 def test_router_REJECTS_out_of_scope_queries(
         mock_router_decision, mock_rag_pipeline):
     """

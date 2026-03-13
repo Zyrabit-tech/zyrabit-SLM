@@ -1,209 +1,300 @@
-RAG-Stack-Local 🚀
+# Zyrabit Brain API
 
-Tu propio "cerebro" de IA, 100% open-sources
+[English version](README_EN.md)
 
-Este proyecto te da el stack completo para correr un sistema de Retrieval-Augmented Generation (RAG) en tu propia máquina o servidor. Olvídate de APIs de terceros, facturas impredecibles y de mandar tus datos sensibles a la nube de alguien más.
+Stack backend para RAG local seguro, puente MCP y observabilidad.
 
-Aquí, tú tienes el control.
+> Runtime recomendado local: **Python 3.12** para evitar incompatibilidades con dependencias legacy en Python 3.14+.
 
-🧠 La Filosofía: Por Qué Construimos Esto
+## Contenido de esta carpeta
 
-Vivimos una revolución de IA, pero la mayoría de las soluciones nos piden sacrificar el control por la conveniencia. Este proyecto se basa en 4 principios:
+- `api-rag/`: API en FastAPI y flujo de seguridad.
+- `docker-compose.yml`: orquestacion local del stack.
+- `config/`: provisionamiento de Prometheus y Grafana.
+- `traefik/`: configuracion de reverse proxy y reglas de seguridad.
 
-Control Total (Self-Hosted): Tus modelos, tus datos, tus reglas. Todo corre en tu hardware (local o en la nube que tú elijas). No más dependencia de APIs externas.
+## Capacidades principales
 
-Arquitectura Desacoplada: Inspirado en microservicios. El "Cerebro" (API), el "Músculo" (SLM) y la "Memoria" (VectorDB) son contenedores separados. ¿Necesitas escalar la GPU? Escala solo el "Músculo". ¿Quieres cambiar de Chroma a Qdrant? Cambia solo la "Memoria".
+- Anonimizacion de PII basada en interceptores antes de inferencia.
+- Desanonimizacion reversible de tokens al responder al usuario.
+- Metricas Prometheus en `/metrics`:
+  - `zyrabit_token_latency_ms_per_token`
+  - `zyrabit_token_usage_total`
+  - `zyrabit_security_hits_total`
+- Endpoints MCP:
+  - `GET /mcp/config.json`
+  - `POST /mcp`
+- Endpoint de integración n8n (adapter + políticas):
+  - `POST /v1/integrations/n8n/webhook`
 
-Portabilidad (Docker): docker compose up. Funciona en el Mac M2 de tu dev, funciona en un Droplet de DigitalOcean con GPU, y funciona en tu server bare-metal. Sin drama.
+## Inicio rapido
 
-Observabilidad Primero: No volamos a ciegas. El stack incluye Prometheus y Grafana desde el día cero. Si es lento, sabrás por qué es lento (CPU, VRAM, I/O...).
+Desde la raiz del repositorio:
 
-🏗️ Arquitectura del Stack
+```bash
+chmod +x zyra-up.sh
+./zyra-up.sh install
+```
 
-Este es el plan. Usamos docker-compose para orquestar 5 servicios que se hablan entre sí en una red interna.
+Scripts principales de instalacion:
 
+- `install.sh`: bootstrap remoto/local para primera ejecucion.
+- `zyra-up.sh`: entrada principal para validar entorno y levantar stack.
 
+## Validacion de variables de entorno
 
+El script `zyra-up.sh` valida el valor efectivo de variables requeridas antes de arrancar:
 
-🛠️ Tech Stack
+- Prioriza variables del entorno del servidor (por ejemplo CI/CD o systemd).
+- Si no existen en runtime, usa `zyrabit-brain-api/.env` como fallback.
+- Deben existir y tener valor valido:
+  - `SLM_URL`
+  - `DB_URL`
+  - `MODEL_NAME`
+- Se rechazan valores vacios o invalidos como `undefined`, `null`, `none`.
 
-API (Cerebro): FastAPI (Python)
+Plantilla completa: copia `example.env` a `.env` y ajusta valores:
 
-Servidor SLM (Músculo): Ollama
+```bash
+cp example.env .env
+```
 
-VectorDB (Memoria): ChromaDB
+Ejemplo minimo para `.env` (opcional si ya exportas variables en servidor):
 
-Orquestación: Docker-Compose
+```bash
+INFERENCE_PROVIDER=ollama
+SLM_URL=http://slm-engine:11434/api/generate
+DB_URL=http://vector-db:8000
+MODEL_NAME=qwen2.5:7b
+INFERENCE_TIMEOUT_SECONDS=120
+PROMETHEUS_BASIC_AUTH=admin:$2y$05$...   # htpasswd -nbB admin 'password'
+GRAFANA_BASIC_AUTH=admin:$2y$05$...      # idem
+```
 
-Monitoreo: Prometheus & Grafana
+### Proveedores de inferencia intercambiables (factory + adapters)
 
-🚀 Cómo Empezar
+La capa de inferencia usa contrato por puerto (`app/ports/inference_port.py`) con factory (`app/inference_factory.py`) y adapters:
 
-Prerrequisitos
+- `ollama` / `ollama_host` / `ollama_docker` -> `SLM_URL=/api/generate`
+- `openai_compatible` -> `INFERENCE_BASE_URL=/v1/chat/completions`
 
-Docker
+Ejemplo modo hibrido (Ollama nativo host + resto en Docker):
 
-Docker Compose
+```bash
+INFERENCE_PROVIDER=ollama_host
+SLM_URL=http://host.docker.internal:11434/api/generate
+MODEL_NAME=qwen2.5:7b
+```
 
-git
+Variables para integracion n8n (adapter webhook):
 
-(Opcional, pero recomendado) Un host con GPU NVIDIA y los drivers de NVIDIA + NVIDIA Container Toolkit.
+```bash
+N8N_SERVICE_TOKEN=replace-with-strong-token
+N8N_WEBHOOK_SIGNING_SECRET=replace-with-hmac-secret
+N8N_REQUIRE_SIGNATURE=true
+```
 
-Instalación
+En produccion, usa secretos por archivo o Vault (no hardcode):
 
-Clona el repositorio:
+```bash
+N8N_SERVICE_TOKEN_FILE=/run/secrets/n8n_service_token
+N8N_WEBHOOK_SIGNING_SECRET_FILE=/run/secrets/n8n_webhook_signing_secret
+```
 
-git clone [https://github.com/TU_USUARIO/TU_REPO.git](https://github.com/TU_USUARIO/TU_REPO.git)
-cd TU_REPO
+Credenciales de autenticacion basica para observabilidad en Traefik:
 
+```bash
+PROMETHEUS_BASIC_AUTH=<usuario:hash_htpasswd>
+GRAFANA_BASIC_AUTH=<usuario:hash_htpasswd>
+```
 
-Crea los directorios para los volúmenes:
-(Esto evita problemas de permisos con Docker)
+Ejemplo para generar hash:
 
-mkdir -p ollama-models
-mkdir -p chroma-data
+```bash
+htpasswd -nbB admin 'cambia-esto'
+```
 
+## Ejemplos de uso
 
-Levanta el stack:
+Verificar entorno y configuracion:
 
+```bash
+./zyra-up.sh doctor
+```
+
+Levantar infraestructura:
+
+```bash
+./zyra-up.sh start
+```
+
+Levantar stack manualmente con Docker Compose:
+
+```bash
+cd zyrabit-brain-api
 docker compose up -d
+```
+
+Levantar e instalar modelos base:
+
+```bash
+./zyra-up.sh install
+```
+
+Descargar modelos manualmente (sin flujo automático):
+
+```bash
+docker compose exec -T slm-engine ollama pull qwen2.5:7b
+docker compose exec -T slm-engine ollama pull mxbai-embed-large
+```
+
+Consultar salud de la API:
+
+```bash
+curl -k https://localhost/health
+```
+
+Enviar una consulta al router:
+
+```bash
+curl -k https://localhost/v1/chat \
+  -H "Content-Type: application/json" \
+  -d '{"text":"Explica la arquitectura de Zyrabit"}'
+```
+
+Respuesta de `POST /v1/chat`:
+
+```json
+{
+  "response": "...",
+  "metadata": {
+    "route_decision": "search_rag_database",
+    "rag_hits": 2,
+    "latency_ms": 305.44
+  }
+}
+```
 
+Ingestar documento:
 
-Baja tu primer modelo (ej: Phi-3):
+```bash
+curl -k -X POST https://localhost/v1/ingest \
+  -F "file=@api-rag/sample_docs/zyrabit_project_overview.txt"
+```
 
-docker compose exec SLM-server ollama pull phi3
+Respuesta de `POST /v1/ingest`:
 
+```json
+{
+  "status": "success",
+  "filename": "zyrabit_project_overview.txt",
+  "chunks_processed": 4,
+  "message": "Documento ingestado correctamente en la base de conocimiento.",
+  "ingest_id": "..."
+}
+```
 
-(Revisa la sección de "Elegir tu Modelo" para más opciones)
+Ver ejemplos completos: `docs/CURL_EXAMPLES.md` y workflow n8n en `docs/n8n_zyrabit_webhook_workflow.json`.
 
-Carga tus documentos (Ingesta):
+Enviar evento desde n8n al adapter:
 
-Coloca tus archivos (PDFs, .txt, .md) en una carpeta (ej. ./documentos-fuente).
+```bash
+curl -k https://localhost/v1/integrations/n8n/webhook \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer ${N8N_SERVICE_TOKEN}" \
+  -H "X-Zyrabit-Signature: sha256=<hmac_sha256_del_body>" \
+  -d '{"text":"Resume estado de observabilidad","workflow_id":"wf-001","execution_id":"exec-001"}'
+```
 
-Instala las dependencias para el script de ingesta (en tu máquina local, no en Docker):
+## Capas de abstraccion
 
-pip install -r ingest/requirements.txt
+La solucion esta organizada por capas para separar responsabilidades:
 
+1. **Capa de entrada (Edge/Ingress)**
+   - `traefik` recibe trafico y aplica TLS, redirecciones y rate limiting.
+2. **Capa de aplicacion**
+   - `api-rag` expone endpoints HTTP y coordina la logica.
+3. **Capa de seguridad**
+   - Pipeline de anonymizacion/desanonimizacion de datos sensibles.
+4. **Capa de inferencia**
+   - `slm-engine` (Ollama) ejecuta el modelo local.
+5. **Capa de conocimiento**
+   - `vector-db` almacena y recupera embeddings/contexto.
+6. **Capa de observabilidad**
+   - `prometheus`, `grafana` y opcionalmente `loki`.
 
-Ejecuta el script (asegúrate que vector-db expone el puerto 8001:8000 en tu docker-compose.yml para esto):
+## Patrones aplicados
 
-python3 ingest/ingest.py --source_dir ./documentos-fuente
+- **Interceptor Pipeline**: cadena de transformaciones para sanitizar input/output.
+- **Router Pattern**: el endpoint `/v1/chat` decide entre flujo RAG o respuesta directa.
+- **Facade/API Gateway**: FastAPI y Traefik simplifican acceso al sistema distribuido.
+- **Defense in Depth**: redes segmentadas + sanitizacion + reverse proxy.
 
+## Arquitectura utilizada
 
-Prueba el API
+- **Arquitectura por servicios (micro-servicios locales)** orquestada con Docker Compose.
+- **Estilo Clean / Layered** dentro de `api-rag` para aislar transporte, servicios y seguridad.
+- **Topologia Zero-Trust local**: nada de datos sensibles sale fuera de la infraestructura.
 
-Una vez que tus documentos estén cargados, puedes hacer una consulta:
+## Topologia de servicios
 
-curl -X POST http://localhost:8080/v1/chat \
-     -H "Content-Type: application/json" \
-     -d '{
-           "text": "¿Cuál es la filosofía de Clean Architecture?"
-         }'
+- `traefik`: ingress, HTTPS y politicas de entrada.
+- `api-rag`: nucleo FastAPI.
+- `slm-engine`: motor de inferencia local.
+- `vector-db`: capa de persistencia semantica.
+- `prometheus` + `grafana`: monitoreo.
+- `loki` (perfil opcional): logs centralizados.
+- `docs-portal` (perfil opcional): portal de documentacion.
+- `n8n` (perfil opcional `automation`): automatizacion por webhook, publicado via Traefik (`/n8n`).
 
+Redes:
 
-Revisa tus dashboards:
+- `frontend-network`
+- `backend-network`
+- `model-network` (`internal: true`)
 
-Prometheus: http://localhost:9090
+## Testing
 
-Grafana: http://localhost:3000
+```bash
+cd api-rag
+python3 -m pytest -q
+```
 
-🤖 Eligiendo tu Modelo: Local vs. MVP vs. Producción
+Suites clave:
 
-No todos los modelos son iguales. Elige el motor adecuado para tu carrera.
+- `tests/test_security.py`: comportamiento de sanitizacion PII.
+- `tests/test_services_security.py`: evita fuga de PII al payload del modelo.
+- `tests/test_integration.py`: integracion API.
+- `tests/test_mcp.py`: contrato MCP y sanitizacion.
 
-Etapa
+## Referencias de seguridad
 
-Objetivo
+- Politica global: `../SECURITY.md`
+- Config MCP estatico: `../mcp/config.json`
 
-Modelos Recomendados (Ejemplos)
+## Politicas de integracion (n8n y futuros adapters)
 
-Hardware Mínimo
+- **Single entrypoint**: todo acceso externo por Traefik (`https://localhost`), sin puertos publicos adicionales por servicio.
+- **Token de servicio**: `Authorization: Bearer <token>` obligatorio para adapters de automatizacion.
+- **Integridad de webhook**: firma HMAC SHA-256 en `X-Zyrabit-Signature` cuando `N8N_REQUIRE_SIGNATURE=true`.
+- **Contrato estable**: payload minimo `{ "text": "..." }`; metadatos opcionales `workflow_id`, `execution_id`.
+- **Arquitectura hexagonal**: nuevas integraciones (Make, Strapi, DB connectors) deben implementar su propio adapter sobre un port, sin acoplar el dominio a proveedores externos.
+- **Secrets en produccion**: usar `_FILE` con Docker Secrets o un Vault on-prem, nunca secretos en claro en `docker-compose.yml`.
 
-Local (Dev)
+## Observabilidad sin puertos publicos
 
-Velocidad, fricción CERO.
+- `grafana` se publica por `https://localhost/grafana`.
+- `prometheus` se publica por `https://localhost/prometheus`.
+- Ambos quedan detras de Traefik con middleware `basicauth` configurable por variables de entorno.
 
-phi3:mini, deepseek-coder:6.7b-instruct-q4
+## Plantilla para nuevos adapters (Make)
 
-8GB RAM (CPU) / 8GB VRAM (GPU)
+Se incluye plantilla base en:
 
-MVP (Team)
+- `api-rag/app/adapters/make_adapter_blueprint.py`
 
-Validar valor, buen balance.
+La plantilla implementa el mismo contrato del `AutomationPort` y sirve como referencia para:
 
-qwen:14b-chat-q5_K_M, deepseek-coder:33b-instruct-q4
-
-16-32GB VRAM (GPU Mediana: T4, A10G)
-
-Producción
-
-Performance, razonamiento SOTA.
-
-codestral:latest, qwen:72b-chat-q4_K_M
-
-40GB+ VRAM (GPU Grande: A100, H100)
-
-💡 Conceptos Clave: Pesos vs. Contexto
-
-Para entender RAG, debes entender esta diferencia:
-
-Pesos (Parámetros): Es el Cerebro del SLM. Es el conocimiento permanente que el modelo "aprendió" durante su entrenamiento (meses de cómputo en supercomputadoras). Es estático y pesado (gigas).
-
-Analogía: La educación de un doctor en la facultad de medicina. Sabe qué es la diabetes, el cáncer y cómo funciona el cuerpo humano.
-
-Contexto (Ventana de Contexto): Es la Memoria RAM del SLM. Es la información temporal que le das en este instante. Es volátil y se limpia con cada nueva petición.
-
-Analogía: El expediente del paciente que le das al doctor.
-
-Por qué RAG es una genialidad: No intentamos re-entrenar al doctor (modificar los pesos). Simplemente le pasamos el expediente correcto (el contexto de tu VectorDB) junto con la pregunta. El modelo usa su conocimiento (pesos) para analizar la información temporal (contexto) y darte una respuesta experta.
-
-📜 Filosofía de Código y Pruebas
-
-
-Stateless API: El api-rag NO debe guardar estado. Todo estado persistente vive en vector-db o ollama-models.
-
-Configuración por Entorno: Cero hardcoding. URLs, nombres de modelos y tokens se manejan con variables de entorno (.env y docker-compose.yml).
-
-Lógica Clara: El código de prompting debe ser fácil de encontrar y modificar.
-
-Pruebas
-
-Un PR sin pruebas es un PR roto. Exigimos:
-
-Unit Tests (Pytest): Prueba funciones puras (ej. chunkers, prompt_formatters). Mockea (simula) las llamadas a los servicios SLM-server y vector-db.
-
-Integration Tests: Prueba el flujo completo. Usa un docker-compose.override.yml para levantar una base de datos de prueba y un modelo ligero, y confirma que el endpoint /query devuelve una respuesta.
-
-Pruebas de Calidad (RAG): (Avanzado) Mantén un "set dorado" de preguntas y respuestas esperadas para medir la calidad de la recuperación (¿Encontró el chunk correcto?) y la calidad de la generación.
-
-🤝 Cómo Contribuir (¡Eres bienvenido!)
-
-Este es un proyecto open-source. Estamos felices de recibir forks, issues y Pull Requests.
-
-El Proceso (Fork & Pull)
-
-Habla primero: Si quieres agregar una feature grande, crea un Issue primero para discutirla.
-
-Haz Fork del repositorio a tu propia cuenta de GitHub.
-
-Crea una rama para tu feature: git checkout -b feat/mi-feature-genial
-
-Programa (y añade pruebas, ¡por favor!).
-
-Asegúrate que el linter pase (ej. black . y ruff .).
-
-Haz un Pull Request desde tu rama a la rama main de este repositorio.
-
-Llena la plantilla de PR: Describe qué hace tu PR, por qué es necesario y cómo podemos probarlo.
-
-Revisa CONTRIBUTING.md para reglas más detalladas.
-
-📄 Licencia
-
-Este proyecto está bajo la Licencia MIT. Eres libre de usarlo, modificarlo y distribuirlo, incluso para uso comercial, siempre y cuando mantengas el aviso de licencia original.
-
-
-![Python](https://img.shields.io/badge/python-v3.10+-blue.svg)
-![Docker](https://img.shields.io/badge/docker-compose-ready-green.svg)
-![License](https://img.shields.io/badge/license-MIT-yellow.svg)
-![Architecture](https://img.shields.io/badge/architecture-clean-orange.svg)
+- validacion de token
+- validacion de firma HMAC
+- normalizacion de payload externo a contrato interno estable

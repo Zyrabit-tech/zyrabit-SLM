@@ -1,0 +1,60 @@
+{
+  "name": "Zyrabit Chat Webhook",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "manual-trigger-1",
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://host.docker.internal/v1/integrations/n8n/webhook",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer zyrabit-service-token"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\"text\": \"¿Qué es Zyrabit?\", \"workflow_id\": \"zyrabit-test\", \"execution_id\": \"1\"}",
+        "options": {
+          "allowUnauthorizedCerts": true
+        }
+      },
+      "id": "http-zyrabit-1",
+      "name": "Zyrabit Webhook",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [460, 300]
+    }
+  ],
+  "connections": {
+    "Manual Trigger": {
+      "main": [
+        [
+          {
+            "node": "Zyrabit Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "1",
+  "meta": {
+    "instanceId": "zyrabit-integration"
+  }
+}
