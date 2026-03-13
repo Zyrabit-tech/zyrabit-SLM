@@ -22,9 +22,14 @@ jobs:
       - name: Validate PR base branch policy
         if: github.event_name == 'pull_request'
         run: |
-          echo "PR base branch: ${{ github.base_ref }}"
-          if [ "${{ github.base_ref }}" != "beta" ]; then
-            echo "ERROR: Pull requests must target 'beta'."
+          echo "PR: ${{ github.head_ref }} → ${{ github.base_ref }}"
+          if [ "${{ github.base_ref }}" = "main" ] && [ "${{ github.head_ref }}" != "beta" ]; then
+            echo "❌ ERROR: Only 'beta' can merge into 'main'."
+            echo "   Your branch '${{ github.head_ref }}' must target 'beta' first."
+            exit 1
+          fi
+          if [ "${{ github.base_ref }}" != "beta" ] && [ "${{ github.base_ref }}" != "main" ]; then
+            echo "❌ ERROR: Pull requests must target 'beta' or 'main'."
             exit 1
           fi
       - name: Policy check summary

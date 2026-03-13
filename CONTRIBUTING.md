@@ -7,6 +7,7 @@
 - Toda contribución entra por Pull Request.
 - La rama base del PR debe ser `beta`.
 - No se aceptan PRs directos a `main`.
+- Solo `beta` puede hacer PR a `main`.
 - Código, variables y commits en inglés.
 - Un PR = un propósito claro.
 

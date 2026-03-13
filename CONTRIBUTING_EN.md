@@ -7,6 +7,7 @@
 - All contributions go through Pull Requests.
 - PR base branch must be `beta`.
 - Direct PRs to `main` are not accepted.
+- Only `beta` can open a PR into `main`.
 - Code, variables, and commits must be in English.
 - One PR = one clear purpose.
 
