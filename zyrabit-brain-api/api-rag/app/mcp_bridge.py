@@ -241,9 +241,11 @@ def handle_jsonrpc(payload: Dict[str, Any]) -> Tuple[Dict[str, Any], int]:
             return ok({"prompts": []})
         return error(-32601, f"Method not found: {method}", status=404)
     except PermissionError as exc:
-        return error(-32001, str(exc), status=403)
+        logger.warning("MCP permission error method=%s request_id=%s: %s", method, request_id, exc)
+        return error(-32001, "Permission denied for requested resource.", status=403)
     except FileNotFoundError as exc:
-        return error(-32002, str(exc), status=404)
+        logger.warning("MCP file not found method=%s request_id=%s: %s", method, request_id, exc)
+        return error(-32002, "Requested resource not found.", status=404)
     except Exception as exc:  # pragma: no cover - guardrail path
         logger.exception("Unhandled MCP bridge error method=%s request_id=%s", method, request_id)
         return error(-32000, "Internal MCP bridge error.", status=500)
