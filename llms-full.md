@@ -26,6 +26,8 @@ Entity types currently handled:
 - `name` (context-based detection)
 - `card` (with Luhn validation)
 - `amount`
+- `phone` (US-style numbers)
+- `ssn` (Social Security numbers)
 
 ## Observability
 

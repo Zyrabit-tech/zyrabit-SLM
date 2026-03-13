@@ -4,6 +4,8 @@
 
 Backend stack for secure local RAG, MCP bridge, and observability.
 
+> Recommended local runtime: **Python 3.12** to avoid incompatibilities with legacy dependencies on Python 3.14+.
+
 ## What this folder contains
 
 - `api-rag/`: FastAPI service and security pipeline.
@@ -39,36 +41,44 @@ Setup script roles from repository root:
 - `install.sh`: bootstrap wrapper for first-time setup.
 - `zyra-up.sh`: primary setup and lifecycle entrypoint.
 
-Or from this folder:
+## Environment variable validation
+
+The `zyra-up.sh` script validates effective variable values before starting:
+
+- Prioritizes runtime environment variables (e.g. CI/CD or systemd).
+- Falls back to `zyrabit-brain-api/.env` if not found at runtime.
+- Must exist and have a valid value:
+  - `SLM_URL`
+  - `DB_URL`
+  - `MODEL_NAME`
+- Empty or invalid values like `undefined`, `null`, `none` are rejected.
+
+Full template: copy `example.env` to `.env` and adjust values:
 
 ```bash
-docker compose up -d
+cp example.env .env
 ```
 
-Recommended environment variables for n8n webhook adapter:
-
-```bash
-N8N_SERVICE_TOKEN=replace-with-strong-token
-N8N_WEBHOOK_SIGNING_SECRET=replace-with-hmac-secret
-N8N_REQUIRE_SIGNATURE=true
-```
-
-Inference provider layer is pluggable via contract + factory:
-
-- Port: `app/ports/inference_port.py`
-- Factory: `app/inference_factory.py`
-- Adapters: `ollama_*` and `openai_compatible`
-
-Core variables:
+Minimal `.env` example (optional if variables are already exported on your server):
 
 ```bash
 INFERENCE_PROVIDER=ollama
 SLM_URL=http://slm-engine:11434/api/generate
+DB_URL=http://vector-db:8000
 MODEL_NAME=qwen2.5:7b
 INFERENCE_TIMEOUT_SECONDS=120
+PROMETHEUS_BASIC_AUTH=admin:$2y$05$...   # htpasswd -nbB admin 'password'
+GRAFANA_BASIC_AUTH=admin:$2y$05$...      # idem
 ```
 
-Hybrid mode (host Ollama + Docker orchestration):
+### Pluggable inference providers (factory + adapters)
+
+The inference layer uses a contract-based port (`app/ports/inference_port.py`) with a factory (`app/inference_factory.py`) and adapters:
+
+- `ollama` / `ollama_host` / `ollama_docker` -> `SLM_URL=/api/generate`
+- `openai_compatible` -> `INFERENCE_BASE_URL=/v1/chat/completions`
+
+Hybrid mode example (native host Ollama + rest in Docker):
 
 ```bash
 INFERENCE_PROVIDER=ollama_host
@@ -76,7 +86,15 @@ SLM_URL=http://host.docker.internal:11434/api/generate
 MODEL_NAME=qwen2.5:7b
 ```
 
-In production, use file-based secrets or Vault (never hardcoded values):
+n8n integration variables (adapter webhook):
+
+```bash
+N8N_SERVICE_TOKEN=replace-with-strong-token
+N8N_WEBHOOK_SIGNING_SECRET=replace-with-hmac-secret
+N8N_REQUIRE_SIGNATURE=true
+```
+
+In production, use file-based secrets or Vault (never hardcode):
 
 ```bash
 N8N_SERVICE_TOKEN_FILE=/run/secrets/n8n_service_token
@@ -96,12 +114,127 @@ Hash generation example:
 htpasswd -nbB admin 'change-this'
 ```
 
-Manual model pull (without automatic installer flow):
+## Usage examples
+
+Verify environment and configuration:
+
+```bash
+./zyra-up.sh doctor
+```
+
+Start infrastructure:
+
+```bash
+./zyra-up.sh start
+```
+
+Start stack manually with Docker Compose:
+
+```bash
+cd zyrabit-brain-api
+docker compose up -d
+```
+
+Start and install base models:
+
+```bash
+./zyra-up.sh install
+```
+
+Pull models manually (without automatic installer flow):
 
 ```bash
 docker compose exec -T slm-engine ollama pull qwen2.5:7b
 docker compose exec -T slm-engine ollama pull mxbai-embed-large
 ```
+
+Check API health:
+
+```bash
+curl -k https://localhost/health
+```
+
+Send a query to the router:
+
+```bash
+curl -k https://localhost/v1/chat \
+  -H "Content-Type: application/json" \
+  -d '{"text":"Explain the Zyrabit architecture"}'
+```
+
+`POST /v1/chat` response:
+
+```json
+{
+  "response": "...",
+  "metadata": {
+    "route_decision": "search_rag_database",
+    "rag_hits": 2,
+    "latency_ms": 305.44
+  }
+}
+```
+
+Ingest a document:
+
+```bash
+curl -k -X POST https://localhost/v1/ingest \
+  -F "file=@api-rag/sample_docs/zyrabit_project_overview.txt"
+```
+
+`POST /v1/ingest` response:
+
+```json
+{
+  "status": "success",
+  "filename": "zyrabit_project_overview.txt",
+  "chunks_processed": 4,
+  "message": "Documento ingestado correctamente en la base de conocimiento.",
+  "ingest_id": "..."
+}
+```
+
+See full examples: `docs/CURL_EXAMPLES.md` and n8n workflow in `docs/n8n_zyrabit_webhook_workflow.json`.
+
+Send an event from n8n to the adapter:
+
+```bash
+curl -k https://localhost/v1/integrations/n8n/webhook \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer ${N8N_SERVICE_TOKEN}" \
+  -H "X-Zyrabit-Signature: sha256=<hmac_sha256_of_body>" \
+  -d '{"text":"Summarize observability status","workflow_id":"wf-001","execution_id":"exec-001"}'
+```
+
+## Abstraction layers
+
+The solution is organized by layers to separate responsibilities:
+
+1. **Edge/Ingress layer**
+   - `traefik` receives traffic and applies TLS, redirects, and rate limiting.
+2. **Application layer**
+   - `api-rag` exposes HTTP endpoints and coordinates business logic.
+3. **Security layer**
+   - Anonymization/de-anonymization pipeline for sensitive data.
+4. **Inference layer**
+   - `slm-engine` (Ollama) runs the local model.
+5. **Knowledge layer**
+   - `vector-db` stores and retrieves embeddings/context.
+6. **Observability layer**
+   - `prometheus`, `grafana`, and optionally `loki`.
+
+## Applied patterns
+
+- **Interceptor Pipeline**: chain of transformations to sanitize input/output.
+- **Router Pattern**: the `/v1/chat` endpoint decides between RAG flow or direct response.
+- **Facade/API Gateway**: FastAPI and Traefik simplify access to the distributed system.
+- **Defense in Depth**: segmented networks + sanitization + reverse proxy.
+
+## Architecture
+
+- **Service-oriented architecture (local micro-services)** orchestrated with Docker Compose.
+- **Clean / Layered style** inside `api-rag` to isolate transport, services, and security.
+- **Local Zero-Trust topology**: no sensitive data leaves the infrastructure.
 
 ## Service topology
 

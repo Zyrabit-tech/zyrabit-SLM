@@ -16,8 +16,8 @@ from .security import PipelineContext, build_security_pipeline
 
 # --- CONFIGURATION ---
 # Use environment variables or default to local settings
-# Defaulting to phi3 as per setup script, but overridable.
-MODEL_NAME = os.getenv("MODEL_NAME", "phi3")
+# Defaulting to qwen2.5:7b as per setup script, but overridable.
+MODEL_NAME = os.getenv("MODEL_NAME", "qwen2.5:7b")
 DB_URL = os.getenv("DB_URL", "http://vector-db:8000")
 COLLECTION_NAME = os.getenv("RAG_COLLECTION", "zyrabit_knowledge")
 EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "mxbai-embed-large")
@@ -128,6 +128,25 @@ def _parse_db_url(url: str) -> tuple[str, int]:
     return host, port
 
 
+def _create_embeddings():
+    """Create OllamaEmbeddings configured from environment (SRP: single source of truth)."""
+    from langchain_community.embeddings import OllamaEmbeddings
+
+    slm_url = os.getenv("SLM_URL", "http://localhost:11434/api/generate")
+    parsed_slm = urlparse(slm_url)
+    base_ollama_url = f"{parsed_slm.scheme}://{parsed_slm.netloc}"
+    return OllamaEmbeddings(model=EMBEDDING_MODEL, base_url=base_ollama_url)
+
+
+def _get_chroma_collection():
+    """Get or create the ChromaDB collection for RAG knowledge (SRP: single source of truth)."""
+    import chromadb
+
+    host, port = _parse_db_url(DB_URL)
+    client = chromadb.HttpClient(host=host, port=port)
+    return client.get_or_create_collection(name=COLLECTION_NAME)
+
+
 def get_slm_router_decision(text: str) -> str:
     """
     Decides whether to use RAG, Direct SLM, or reject.
@@ -156,22 +175,8 @@ def execute_rag_pipeline_with_metadata(text: str) -> Tuple[str, int]:
     """
     try:
         logger.info("RAG pipeline start query_length=%s", len(text or ""))
-        import chromadb
-        from langchain_community.embeddings import OllamaEmbeddings
-
-        host, port = _parse_db_url(DB_URL)
-        client = chromadb.HttpClient(host=host, port=port)
-        collection = client.get_or_create_collection(name=COLLECTION_NAME)
-
-        # Explicitly configure embeddings base_url for Langchain
-        slm_url = os.getenv("SLM_URL", "http://localhost:11434/api/generate")
-        parsed_slm = urlparse(slm_url)
-        base_ollama_url = f"{parsed_slm.scheme}://{parsed_slm.netloc}"
-        
-        embeddings = OllamaEmbeddings(
-            model=EMBEDDING_MODEL,
-            base_url=base_ollama_url
-        )
+        collection = _get_chroma_collection()
+        embeddings = _create_embeddings()
         query_embedding = embeddings.embed_query(text)
 
         results = collection.query(
@@ -244,8 +249,6 @@ def process_and_ingest_file(file_path: str) -> dict:
         return {"status": "success", "filename": os.path.basename(file_path), "chunks_processed": 0}
 
     from langchain_text_splitters import RecursiveCharacterTextSplitter
-    from langchain_community.embeddings import OllamaEmbeddings
-    import chromadb
 
     text_splitter = RecursiveCharacterTextSplitter(
         chunk_size=CHUNK_SIZE,
@@ -260,15 +263,7 @@ def process_and_ingest_file(file_path: str) -> dict:
         CHUNK_OVERLAP,
     )
 
-    # Explicitly configure embeddings base_url for Langchain
-    slm_url = os.getenv("SLM_URL", "http://localhost:11434/api/generate")
-    parsed_slm = urlparse(slm_url)
-    base_ollama_url = f"{parsed_slm.scheme}://{parsed_slm.netloc}"
-
-    embeddings = OllamaEmbeddings(
-        model=EMBEDDING_MODEL,
-        base_url=base_ollama_url
-    )
+    embeddings = _create_embeddings()
     documents_to_add = [c.page_content for c in chunks]
     source_name = os.path.basename(file_path)
     metadatas_to_add = []
@@ -285,9 +280,7 @@ def process_and_ingest_file(file_path: str) -> dict:
         metadatas_to_add.append(safe_meta)
     embedded_chunks = embeddings.embed_documents(documents_to_add)
 
-    host, port = _parse_db_url(DB_URL)
-    client = chromadb.HttpClient(host=host, port=port)
-    collection = client.get_or_create_collection(name=COLLECTION_NAME)
+    collection = _get_chroma_collection()
 
     ids = [f"chunk_{abs(hash(c.page_content)) % 10**10}_{i}" for i, c in enumerate(chunks)]
     collection.add(

@@ -192,6 +192,78 @@ def chat_router(query: ChatQuery):
 
 INGEST_DIR = os.getenv("INGEST_DIR", "/app/document_source")
 
+ALLOWED_EXTENSIONS = {".pdf", ".txt", ".md"}
+ALLOWED_MIME_BY_EXT = {
+    ".pdf": {"application/pdf", "application/octet-stream"},
+    ".txt": {"text/plain", "application/octet-stream"},
+    ".md": {"text/markdown", "text/plain", "application/octet-stream"},
+}
+MAX_SIZE_MB = 800
+CHUNK_SIZE_BYTES = 1024 * 1024  # 1MB
+
+
+def _validate_ingest_file(filename: str, content_type: str) -> tuple:
+    """Validate file extension and MIME type. Returns (safe_filename, file_ext)."""
+    file_ext = os.path.splitext(filename)[1].lower()
+    if file_ext not in ALLOWED_EXTENSIONS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Tipo de archivo no permitido. Solo se aceptan: {ALLOWED_EXTENSIONS}")
+
+    ct = (content_type or "").lower()
+    allowed_mime_types = ALLOWED_MIME_BY_EXT[file_ext]
+    if ct and ct not in allowed_mime_types:
+        raise HTTPException(
+            status_code=400,
+            detail=f"MIME no permitido para {file_ext}. Tipos aceptados: {sorted(allowed_mime_types)}",
+        )
+
+    sanitized_basename = re.sub(r"[^A-Za-z0-9._-]", "_", os.path.basename(filename))
+    stem, ext_part = os.path.splitext(sanitized_basename)
+    safe_filename = (stem[:75] + ext_part) if sanitized_basename else f"uploaded_file{file_ext}"
+    return safe_filename, file_ext
+
+
+async def _save_to_vault(file: UploadFile, safe_filename: str, ingest_id: str) -> str:
+    """Write uploaded file to vault with size limit and path traversal protection. Returns vault_path."""
+    vault_path = os.path.join(INGEST_DIR, safe_filename)
+
+    resolved_path = os.path.realpath(vault_path)
+    resolved_vault = os.path.realpath(INGEST_DIR)
+    if not resolved_path.startswith(resolved_vault + os.sep) and resolved_path != resolved_vault:
+        logger.warning(
+            "Path traversal attempt blocked ingest_id=%s filename=%s resolved=%s",
+            ingest_id, safe_filename, resolved_path,
+        )
+        raise HTTPException(
+            status_code=400,
+            detail="Nombre de archivo no permitido (posible path traversal).",
+        )
+
+    os.makedirs(INGEST_DIR, exist_ok=True)
+    total_size = 0
+    with open(vault_path, "wb") as dest:
+        while True:
+            chunk = await file.read(CHUNK_SIZE_BYTES)
+            if not chunk:
+                break
+            total_size += len(chunk)
+            if total_size > MAX_SIZE_MB * 1024 * 1024:
+                dest.close()
+                if os.path.exists(vault_path):
+                    os.remove(vault_path)
+                raise HTTPException(
+                    status_code=413,
+                    detail=f"El archivo excede el tamaño máximo de {MAX_SIZE_MB}MB.",
+                )
+            dest.write(chunk)
+
+    logger.info(
+        "File saved to vault ingest_id=%s path=%s size_bytes=%s",
+        ingest_id, vault_path, total_size,
+    )
+    return vault_path
+
 
 @app.post("/v1/ingest", tags=["Ingestion"])
 async def ingest_document(file: UploadFile = File(...)):
@@ -202,79 +274,14 @@ async def ingest_document(file: UploadFile = File(...)):
     - **Validation**: Only .pdf, .txt and .md files.
     - **Size**: Max 800MB.
     """
-    ALLOWED_EXTENSIONS = {".pdf", ".txt", ".md"}
-    ALLOWED_MIME_BY_EXT = {
-        ".pdf": {"application/pdf", "application/octet-stream"},
-        ".txt": {"text/plain", "application/octet-stream"},
-        ".md": {"text/markdown", "text/plain", "application/octet-stream"},
-    }
-    MAX_SIZE_MB = 800
-    CHUNK_SIZE_BYTES = 1024 * 1024  # 1MB
     ingest_id = str(uuid.uuid4())
-
-    # 1. Validate extension
     original_filename = file.filename or "uploaded_file"
-    file_ext = os.path.splitext(original_filename)[1].lower()
-    if file_ext not in ALLOWED_EXTENSIONS:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Tipo de archivo no permitido. Solo se aceptan: {ALLOWED_EXTENSIONS}")
+    content_type = file.content_type or ""
 
-    content_type = (file.content_type or "").lower()
-    allowed_mime_types = ALLOWED_MIME_BY_EXT[file_ext]
-    if content_type and content_type not in allowed_mime_types:
-        raise HTTPException(
-            status_code=400,
-            detail=f"MIME no permitido para {file_ext}. Tipos aceptados: {sorted(allowed_mime_types)}",
-        )
-
-    # 2. Sanitize filename and build vault path
-    sanitized_basename = re.sub(r"[^A-Za-z0-9._-]", "_", os.path.basename(original_filename))
-    # Truncate the stem but ALWAYS preserve the file extension
-    stem, ext_part = os.path.splitext(sanitized_basename)
-    safe_filename = (stem[:75] + ext_part) if sanitized_basename else f"uploaded_file{file_ext}"
-    vault_path = os.path.join(INGEST_DIR, safe_filename)
-
-    # 3. Path traversal protection
-    resolved_path = os.path.realpath(vault_path)
-    resolved_vault = os.path.realpath(INGEST_DIR)
-    if not resolved_path.startswith(resolved_vault + os.sep) and resolved_path != resolved_vault:
-        logger.warning(
-            "Path traversal attempt blocked ingest_id=%s filename=%s resolved=%s",
-            ingest_id, original_filename, resolved_path,
-        )
-        raise HTTPException(
-            status_code=400,
-            detail="Nombre de archivo no permitido (posible path traversal).",
-        )
+    safe_filename, _ = _validate_ingest_file(original_filename, content_type)
 
     try:
-        # 4. Write file to vault (persisted)
-        os.makedirs(INGEST_DIR, exist_ok=True)
-        total_size = 0
-        with open(vault_path, "wb") as dest:
-            while True:
-                chunk = await file.read(CHUNK_SIZE_BYTES)
-                if not chunk:
-                    break
-                total_size += len(chunk)
-                if total_size > MAX_SIZE_MB * 1024 * 1024:
-                    # Clean up oversized file
-                    dest.close()
-                    if os.path.exists(vault_path):
-                        os.remove(vault_path)
-                    raise HTTPException(
-                        status_code=413,
-                        detail=f"El archivo excede el tamaño máximo de {MAX_SIZE_MB}MB.",
-                    )
-                dest.write(chunk)
-
-        logger.info(
-            "File saved to vault ingest_id=%s path=%s size_bytes=%s",
-            ingest_id, vault_path, total_size,
-        )
-
-        # 5. Process ingestion from vault path
+        vault_path = await _save_to_vault(file, safe_filename, ingest_id)
         result = services.process_and_ingest_file(vault_path)
         result["filename"] = safe_filename
         result["ingest_id"] = ingest_id
@@ -284,11 +291,10 @@ async def ingest_document(file: UploadFile = File(...)):
         raise
     except Exception:
         logger.exception(
-            "Ingest failed ingest_id=%s filename=%s content_type=%s vault_path=%s",
+            "Ingest failed ingest_id=%s filename=%s content_type=%s",
             ingest_id,
             original_filename,
             content_type,
-            vault_path,
         )
         raise HTTPException(status_code=500, detail="Error procesando el archivo.")
     finally:

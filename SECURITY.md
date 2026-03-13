@@ -1,5 +1,7 @@
 # Security Policy
 
+> This document is maintained in English only, by project policy.
+
 ## 🔒 Reporting Security Vulnerabilities
 
 If you discover a security vulnerability in Zyrabit SLM, please **do not** open a public issue. Instead:
@@ -92,10 +94,10 @@ Only proxy entrypoints are exposed to host by default.
 
 | Date | Tool | Vulnerabilities Found | Status |
 |------|------|----------------------|--------|
-| 2025-11-28 | pip-audit | 0 | ✅ Clean |
-| 2025-11-28 | safety | 0 | ✅ Clean |
+| 2026-03-12 | pip-audit | 0 | ✅ Clean |
+| 2026-03-12 | safety | 0 | ✅ Clean |
 
-*Last updated: 2025-11-28*
+*Last updated: 2026-03-12*
 
 ## 🔄 Security Update Process
 
