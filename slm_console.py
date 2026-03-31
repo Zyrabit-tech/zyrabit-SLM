@@ -181,76 +181,138 @@ with st.sidebar:
             st.info("No documents ingested in this session.")
 
 
-st.subheader("Secure Chat")
-for message in st.session_state.messages:
-    with st.chat_message(message["role"]):
-        st.markdown(str(message["content"]))
-        if message.get("metadata"):
-            _render_route_badge(message["metadata"])
-        if message.get("sanitized") and message["role"] == "user":
-            with st.expander("Sanitized Preview", expanded=False):
-                st.code(str(message["sanitized"]), language="text")
+tab_chat, tab_support = st.tabs(["💬 Chat Principal", "🛠️ Soporte de Instalación"])
 
-prompt = st.chat_input("Ask about your documents or architecture...")
-if prompt:
-    sanitized_text, was_sanitized = sanitize_pii(prompt)
-    user_message = {"role": "user", "content": prompt}
-    if was_sanitized:
-        user_message["sanitized"] = sanitized_text
-    st.session_state.messages.append(user_message)
+with tab_chat:
+    st.subheader("Secure Chat")
+    for message in st.session_state.messages:
+        with st.chat_message(message["role"]):
+            st.markdown(str(message["content"]))
+            if message.get("metadata"):
+                _render_route_badge(message["metadata"])
+            if message.get("sanitized") and message["role"] == "user":
+                with st.expander("Sanitized Preview", expanded=False):
+                    st.code(str(message["sanitized"]), language="text")
 
-    with st.chat_message("user"):
-        st.markdown(prompt)
+    prompt = st.chat_input("Ask about your documents or architecture...", key="main_chat")
+    if prompt:
+        sanitized_text, was_sanitized = sanitize_pii(prompt)
+        user_message = {"role": "user", "content": prompt}
         if was_sanitized:
-            with st.expander("Sanitized Preview", expanded=False):
-                st.code(sanitized_text, language="text")
+            user_message["sanitized"] = sanitized_text
+        st.session_state.messages.append(user_message)
 
-    payload = {"text": prompt}
-    with st.chat_message("assistant"):
-        with st.spinner("Thinking..."):
-            try:
-                start_time = time.time()
-                response = requests.post(
-                    API_URL,
-                    json=payload,
-                    verify=VERIFY_TLS,
-                    timeout=REQUEST_TIMEOUT,
-                )
-                end_time = time.time()
+        with st.chat_message("user"):
+            st.markdown(prompt)
+            if was_sanitized:
+                with st.expander("Sanitized Preview", expanded=False):
+                    st.code(sanitized_text, language="text")
 
-                if response.status_code == 200:
-                    data = response.json()
-                    answer = data.get("response", "No response content.")
-                    metadata = data.get("metadata", {})
-                    if "latency_ms" not in metadata:
-                        metadata["latency_ms"] = round((end_time - start_time) * 1000, 2)
+        payload = {"text": prompt}
+        with st.chat_message("assistant"):
+            with st.spinner("Thinking..."):
+                try:
+                    start_time = time.time()
+                    response = requests.post(
+                        API_URL,
+                        json=payload,
+                        verify=VERIFY_TLS,
+                        timeout=REQUEST_TIMEOUT,
+                    )
+                    end_time = time.time()
 
-                    st.markdown(answer)
-                    if metadata:
-                        _render_route_badge(metadata)
+                    if response.status_code == 200:
+                        data = response.json()
+                        answer = data.get("response", "No response content.")
+                        metadata = data.get("metadata", {})
+                        if "latency_ms" not in metadata:
+                            metadata["latency_ms"] = round((end_time - start_time) * 1000, 2)
 
+                        st.markdown(answer)
+                        if metadata:
+                            _render_route_badge(metadata)
+
+                        st.session_state.messages.append(
+                            {
+                                "role": "assistant",
+                                "content": answer,
+                                "metadata": metadata,
+                            }
+                        )
+                    else:
+                        error_msg = _parse_api_error(response)
+                        st.error(f"API Error {response.status_code}: {error_msg}")
+                        st.session_state.messages.append(
+                            {
+                                "role": "assistant",
+                                "content": f"API Error {response.status_code}: {error_msg}",
+                            }
+                        )
+                except requests.exceptions.RequestException as exc:
+                    st.error(f"Connection error: {exc}")
                     st.session_state.messages.append(
                         {
                             "role": "assistant",
-                            "content": answer,
-                            "metadata": metadata,
+                            "content": f"Connection error: {exc}",
                         }
                     )
-                else:
-                    error_msg = _parse_api_error(response)
-                    st.error(f"API Error {response.status_code}: {error_msg}")
-                    st.session_state.messages.append(
-                        {
-                            "role": "assistant",
-                            "content": f"API Error {response.status_code}: {error_msg}",
-                        }
-                    )
-            except requests.exceptions.RequestException as exc:
-                st.error(f"Connection error: {exc}")
-                st.session_state.messages.append(
-                    {
-                        "role": "assistant",
-                        "content": f"Connection error: {exc}",
-                    }
-                )
+
+with tab_support:
+    st.subheader("Asistente de Despliegue MCP")
+    st.info("Este agente puede invocar herramientas reales en tu servidor (via el servicio `mcp-server`) para diagnosticar el estado del contenedor Docker.")
+    
+    col1, col2 = st.columns([1, 4])
+    with col1:
+        if st.button("🚀 Diagnóstico Rápido", type="primary", use_container_width=True):
+            with st.spinner("Analizando contenedores Docker..."):
+                try:
+                    res = requests.get("http://localhost:8001/diagnose", timeout=15)
+                    if res.status_code == 200:
+                        diag_data = res.json()
+                        st.session_state.support_messages = st.session_state.get("support_messages", [])
+                        sys_prompt = {"role": "system", "content": "Eres el experto en despliegue de Zyrabit. Usa los logs del sistema para guiar al usuario. Si detectas que falta la GPU, sugiere el modo 'Ollama Nativo'."}
+                        if sys_prompt not in st.session_state.support_messages:
+                            st.session_state.support_messages.insert(0, sys_prompt)
+                        
+                        diag_msg = f"**Diagnóstico detectado:**\n```\n{diag_data.get('status', '')}\n```\n\n**Sugerencia:** {diag_data.get('suggested_fix', '')}"
+                        st.session_state.support_messages.append({"role": "assistant", "content": diag_msg})
+                        st.success("Diagnóstico completado")
+                        st.rerun()
+                    else:
+                        st.error(f"Error MCP Server: {res.status_code}")
+                except Exception as e:
+                    st.error(f"Falla de conexión al MCP: {e}. ¿Está corriendo el mcp-server?")
+                    
+    with col2:
+        st.caption("Usa el diagnóstico rápido para consultar los contenedores actualmente en ejecución en la máquina Host, gracias a volume binding de Docker.")
+
+    if "support_messages" not in st.session_state:
+        st.session_state.support_messages = []
+        
+    for msg in st.session_state.support_messages:
+        if msg["role"] != "system":
+            with st.chat_message(msg["role"]):
+                st.markdown(msg["content"])
+
+    support_prompt = st.chat_input("Pregunta algo al técnico de Zyrabit...", key="support_chat")
+    if support_prompt:
+        # Note: here we simulate interaction using the base API or directly adding messages.
+        # En una arquitectura completa la consulta pasaría de nuevo a Ollama inyectando los tools.
+        st.session_state.support_messages.append({"role": "user", "content": support_prompt})
+        with st.chat_message("user"):
+            st.markdown(support_prompt)
+            
+        with st.chat_message("assistant"):
+            with st.spinner("Analizando log y guía..."):
+                # Se podría pasar a la API normal adjuntando el system prompt y docs
+                fast_payload = {"text": f"SYSTEM: Eres el experto en despliegue de Zyrabit. Usa los logs del sistema para guiar al usuario. Si detectas que falta la GPU, sugiere el modo 'Ollama Nativo'. USER: {support_prompt}"}
+                try:
+                    s_res = requests.post(API_URL, json=fast_payload, verify=VERIFY_TLS, timeout=REQUEST_TIMEOUT)
+                    if s_res.status_code == 200:
+                        s_ans = s_res.json().get("response", "")
+                        st.markdown(s_ans)
+                        st.session_state.support_messages.append({"role": "assistant", "content": s_ans})
+                except Exception as x:
+                    st.error("Error al consultar asistencia")
+
 
