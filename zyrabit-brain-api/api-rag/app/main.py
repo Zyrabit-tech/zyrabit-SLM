@@ -180,7 +180,7 @@ def chat_router(query: ChatQuery):
     elif decision == "reject_query":
         raise HTTPException(
             status_code=400,
-            detail="Query out of scope. Please ask questions related to the allowed topics."
+            detail="Consulta fuera de alcance. Por favor, haz preguntas relacionadas con los temas permitidos."
         )
 
     # Fallback in case the decision is none of the expected ones
