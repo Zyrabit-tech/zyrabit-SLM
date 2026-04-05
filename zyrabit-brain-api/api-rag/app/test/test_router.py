@@ -10,7 +10,7 @@ client = TestClient(app)
 # --- PRUEBA 1: El Router sabe cuándo usar RAG ---
 
 
-@patch('app.services.execute_rag_pipeline')
+@patch('app.services.execute_rag_pipeline_with_metadata')
 @patch('app.services.get_slm_router_decision')
 def test_router_sends_tech_queries_to_RAG(
         mock_router_decision, mock_rag_pipeline):
@@ -19,7 +19,7 @@ def test_router_sends_tech_queries_to_RAG(
     """
     # 1. GIVEN
     mock_router_decision.return_value = "search_rag_database"
-    mock_rag_pipeline.return_value = "[Respuesta RAG para: ¿Qué opina Robert C. Martin sobre los frameworks?]"
+    mock_rag_pipeline.return_value = ("[Respuesta RAG para: ¿Qué opina Robert C. Martin sobre los frameworks?]", 1)
 
     query = {"text": "¿Qué opina Robert C. Martin sobre los frameworks?"}
 
@@ -37,7 +37,7 @@ def test_router_sends_tech_queries_to_RAG(
 
 
 @patch('app.services.call_direct_slm')
-@patch('app.services.execute_rag_pipeline')
+@patch('app.services.execute_rag_pipeline_with_metadata')
 @patch('app.services.get_slm_router_decision')
 def test_router_sends_general_queries_to_DIRECT_SLM(
         mock_router_decision, mock_rag_pipeline, mock_direct_slm):
@@ -64,7 +64,7 @@ def test_router_sends_general_queries_to_DIRECT_SLM(
 # --- PRUEBA 3: El Router sabe cuándo RECHAZAR (El Guardrail) ---
 
 
-@patch('app.services.execute_rag_pipeline')
+@patch('app.services.execute_rag_pipeline_with_metadata')
 @patch('app.services.get_slm_router_decision')
 def test_router_REJECTS_out_of_scope_queries(
         mock_router_decision, mock_rag_pipeline):

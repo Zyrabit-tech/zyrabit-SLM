@@ -1,27 +1,38 @@
-FROM python:3.12-slim
+# STAGE 1: Builder
+FROM python:3.12-slim AS builder
 
-# Set environment variables to prevent Python from writing .pyc files
-# and to ensure stdout/stderr are unbuffered.
+WORKDIR /app
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY requirements.txt .
+
+RUN pip install --upgrade pip && \
+    pip install --no-cache-dir --user -r requirements.txt
+
+# STAGE 2: Runtime
+FROM python:3.12-slim-bookworm
+
 WORKDIR /app
 
-# Install system dependencies if required (e.g. for some pip packages)
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends build-essential curl && \
-    rm -rf /var/lib/apt/lists/*
+# Ensure base debian is up to date for CVEs like systemd/tar
+RUN apt-get update && apt-get upgrade -y && rm -rf /var/lib/apt/lists/*
 
-# Install Python dependencies
-COPY requirements.txt .
-RUN pip install --upgrade pip && \
-    pip install --no-cache-dir -r requirements.txt
-
-# Copy project files into the container
+COPY --from=builder /root/.local /root/.local
 COPY . .
 
-# Expose the Streamlit default port
+ENV PATH=/root/.local/bin:$PATH
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+
 EXPOSE 8501
 
-# Run the Streamlit UI
+RUN useradd -m zyrabituser && chown -R zyrabituser:zyrabituser /app
+USER zyrabituser
+
 ENTRYPOINT ["streamlit", "run", "slm_console.py", "--server.address=0.0.0.0"]

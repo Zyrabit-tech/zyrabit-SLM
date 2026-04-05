@@ -27,6 +27,7 @@ def test_health_check_returns_ok_status():
 
 # --- PRUEBA 2: Ingest Document - Success ---
 
+@patch('app.main.INGEST_DIR', '/tmp/test_ingest_dir')
 @patch('app.services.process_and_ingest_file')
 def test_ingest_document_success(mock_process_file):
     """
@@ -84,7 +85,7 @@ def test_ingest_document_invalid_file_type():
 # --- PRUEBA 5: Chat Router - Error Handling ---
 
 @patch('app.services.get_slm_router_decision')
-@patch('app.services.execute_rag_pipeline')
+@patch('app.services.execute_rag_pipeline_with_metadata')
 def test_chat_router_handles_service_exceptions(
         mock_rag_pipeline, mock_router_decision):
     """
@@ -94,7 +95,7 @@ def test_chat_router_handles_service_exceptions(
     mock_router_decision.return_value = "search_rag_database"
     # Simulamos que el pipeline RAG retorna un mensaje de error (ya maneja la
     # excepción internamente)
-    mock_rag_pipeline.return_value = "Lo siento, ocurrió un error al procesar tu consulta con la base de datos de conocimiento."
+    mock_rag_pipeline.return_value = ("Lo siento, ocurrió un error al procesar tu consulta con la base de datos de conocimiento.", 0)
 
     query = {"text": "¿Qué es clean architecture?"}
 
