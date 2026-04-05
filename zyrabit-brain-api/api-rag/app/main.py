@@ -40,7 +40,7 @@ n8n_adapter = N8nAdapter(
     execute_automation=services.execute_automation_request,
 )
 
-# --- DTOs (Data Transfer Objects) con Pydantic ---
+# --- DTOs (Data Transfer Objects) with Pydantic ---
 
 
 class ChatQuery(BaseModel):
@@ -187,7 +187,7 @@ def chat_router(query: ChatQuery):
     else:
         raise HTTPException(
             status_code=500,
-            detail=f"Error interno: Decisión del router desconocida ('{decision}').")
+            detail=f"Internal error: Unknown router decision ('{decision}').")
 
 
 INGEST_DIR = os.getenv("INGEST_DIR", "/app/document_source")
@@ -208,14 +208,14 @@ def _validate_ingest_file(filename: str, content_type: str) -> tuple:
     if file_ext not in ALLOWED_EXTENSIONS:
         raise HTTPException(
             status_code=400,
-            detail=f"Tipo de archivo no permitido. Solo se aceptan: {ALLOWED_EXTENSIONS}")
+            detail=f"File type not allowed. Only accepted: {ALLOWED_EXTENSIONS}")
 
     ct = (content_type or "").lower()
     allowed_mime_types = ALLOWED_MIME_BY_EXT[file_ext]
     if ct and ct not in allowed_mime_types:
         raise HTTPException(
             status_code=400,
-            detail=f"MIME no permitido para {file_ext}. Tipos aceptados: {sorted(allowed_mime_types)}",
+            detail=f"MIME not allowed for {file_ext}. Accepted types: {sorted(allowed_mime_types)}",
         )
 
     sanitized_basename = re.sub(r"[^A-Za-z0-9._-]", "_", os.path.basename(filename))
@@ -237,7 +237,7 @@ async def _save_to_vault(file: UploadFile, safe_filename: str, ingest_id: str) -
         )
         raise HTTPException(
             status_code=400,
-            detail="Nombre de archivo no permitido (posible path traversal).",
+            detail="Filename not allowed (possible path traversal).",
         )
 
     os.makedirs(INGEST_DIR, exist_ok=True)
@@ -254,7 +254,7 @@ async def _save_to_vault(file: UploadFile, safe_filename: str, ingest_id: str) -
                     os.remove(vault_path)
                 raise HTTPException(
                     status_code=413,
-                    detail=f"El archivo excede el tamaño máximo de {MAX_SIZE_MB}MB.",
+                    detail=f"File exceeds maximum size of {MAX_SIZE_MB}MB.",
                 )
             dest.write(chunk)
 
@@ -296,7 +296,7 @@ async def ingest_document(file: UploadFile = File(...)):
             original_filename,
             content_type,
         )
-        raise HTTPException(status_code=500, detail="Error procesando el archivo.")
+        raise HTTPException(status_code=500, detail="Error processing the file.")
     finally:
         await file.close()
 

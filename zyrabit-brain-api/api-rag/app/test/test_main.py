@@ -7,12 +7,12 @@ from app.main import app
 
 client = TestClient(app)
 
-# --- PRUEBA 1: Health Check ---
+# --- TEST 1: Health Check ---
 
 
 def test_health_check_returns_ok_status():
     """
-    Prueba que el endpoint /health retorna status ok y las URLs configuradas.
+    Test that /health returns status ok and configured URLs.
     """
     # WHEN
     response = client.get("/health")
@@ -25,20 +25,21 @@ def test_health_check_returns_ok_status():
     assert "db_url" in data
 
 
-# --- PRUEBA 2: Ingest Document - Success ---
+# --- TEST 2: Ingest Document - Success ---
 
+@patch('app.main.INGEST_DIR', '/tmp/test_ingest_dir')
 @patch('app.services.process_and_ingest_file')
 def test_ingest_document_success(mock_process_file):
     """
-    Prueba que la ingesta de un PDF válido sea exitosa.
+    Test that ingesting a valid PDF document succeeds.
     """
     # GIVEN
     mock_process_file.return_value = {
         "status": "success",
         "chunks_processed": 150,
-        "message": "Documento ingestada correctamente en la base de conocimiento."}
+        "message": "Document ingested successfully into knowledge base."}
 
-    # Crear un archivo PDF falso
+    # Create a fake PDF file
     pdf_content = b"%PDF-1.4 fake pdf content"
     files = {
         "file": (
@@ -57,11 +58,11 @@ def test_ingest_document_success(mock_process_file):
     mock_process_file.assert_called_once()
 
 
-# --- PRUEBA 3: Ingest Document - Invalid File Type ---
+# --- TEST 3: Ingest Document - Invalid File Type ---
 
 def test_ingest_document_invalid_file_type():
     """
-    Prueba que el endpoint rechace archivos que no sean PDF, TXT o MD.
+    Test that the endpoint rejects files that are not PDF, TXT, or MD.
     """
     # GIVEN - .exe is not allowed
     exe_content = b"MZ fake executable"
@@ -72,29 +73,28 @@ def test_ingest_document_invalid_file_type():
 
     # THEN
     assert response.status_code == 400
-    assert "no permitido" in response.json()["detail"].lower()
+    assert "not allowed" in response.json()["detail"].lower()
 
 
-# --- PRUEBA 4: Ingest Document - File Too Large ---
-# NOTA: Este test se omite porque la validación de tamaño en memoria puede causar problemas
-# En producción, el tamaño se validaría con configuración del servidor (nginx, etc.)
-# y este test requeriría demasiada memoria para ser práctico
+# --- TEST 4: Ingest Document - File Too Large ---
+# NOTE: This test is omitted because in-memory size validation can cause issues
+# In production, payload size would be validated via server configuration (nginx, etc.)
+# and this test would require too much memory to be practical.
 
 
-# --- PRUEBA 5: Chat Router - Error Handling ---
+# --- TEST 5: Chat Router - Error Handling ---
 
 @patch('app.services.get_slm_router_decision')
-@patch('app.services.execute_rag_pipeline')
+@patch('app.services.execute_rag_pipeline_with_metadata')
 def test_chat_router_handles_service_exceptions(
         mock_rag_pipeline, mock_router_decision):
     """
-    Prueba que el router maneje excepciones cuando los servicios fallan.
+    Test that the router handles exceptions when backend services fail.
     """
     # GIVEN
     mock_router_decision.return_value = "search_rag_database"
-    # Simulamos que el pipeline RAG retorna un mensaje de error (ya maneja la
-    # excepción internamente)
-    mock_rag_pipeline.return_value = "Lo siento, ocurrió un error al procesar tu consulta con la base de datos de conocimiento."
+    # Simulate the RAG pipeline throwing an error (handled internally)
+    mock_rag_pipeline.return_value = ("Lo siento, ocurrió un error al procesar tu consulta con la base de datos de conocimiento.", 0)
 
     query = {"text": "¿Qué es clean architecture?"}
 
@@ -102,23 +102,23 @@ def test_chat_router_handles_service_exceptions(
     response = client.post("/v1/chat", json=query)
 
     # THEN
-    # El servicio debe devolver un mensaje de error controlado
+    # The service must return a controlled error message
     assert response.status_code == 200
     assert "error" in response.json()["response"].lower()
 
 
-# --- PRUEBA 6: Chat Router - Decision Fallback ---
+# --- TEST 6: Chat Router - Decision Fallback ---
 
 @patch('app.services.get_slm_router_decision')
 @patch('app.services.call_direct_slm')
 def test_chat_router_handles_unknown_decision(
         mock_direct_slm, mock_router_decision):
     """
-    Prueba que el router maneje una decisión desconocida del SLM.
-    Si get_SLM_router_decision retorna algo inesperado, debería manejarlo.
+    Test that the router handles an unknown SLM routing decision.
+    If get_slm_router_decision returns an unknown decision, it must raise HTTP 500.
     """
     # GIVEN
-    # Simulamos una decisión que no es ninguna de las esperadas
+    # Simulate a decision that is not recognized
     mock_router_decision.return_value = "unknown_decision"
 
     query = {"text": "¿Qué es Python?"}
@@ -127,6 +127,6 @@ def test_chat_router_handles_unknown_decision(
     response = client.post("/v1/chat", json=query)
 
     # THEN
-    # El endpoint debería retornar un 500 con un mensaje de error
+    # The endpoint should return a 500 status code
     assert response.status_code == 500
-    assert "desconocida" in response.json()["detail"].lower()
+    assert "unknown" in response.json()["detail"].lower()

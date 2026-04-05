@@ -2,24 +2,24 @@ import pytest
 from fastapi.testclient import TestClient
 from unittest.mock import patch
 
-# Ahora sí podemos importar la app
+# Now we can safely import the app
 from app.main import app
 
 client = TestClient(app)
 
-# --- PRUEBA 1: El Router sabe cuándo usar RAG ---
+# --- TEST 1: The Router knows when to use RAG ---
 
 
-@patch('app.services.execute_rag_pipeline')
+@patch('app.services.execute_rag_pipeline_with_metadata')
 @patch('app.services.get_slm_router_decision')
 def test_router_sends_tech_queries_to_RAG(
         mock_router_decision, mock_rag_pipeline):
     """
-    Prueba que una pregunta sobre Robert C. Martin sea enrutada a 'search_rag_database'.
+    Test that a question about Robert C. Martin is routed to 'search_rag_database'.
     """
     # 1. GIVEN
     mock_router_decision.return_value = "search_rag_database"
-    mock_rag_pipeline.return_value = "[Respuesta RAG para: ¿Qué opina Robert C. Martin sobre los frameworks?]"
+    mock_rag_pipeline.return_value = ("[Respuesta RAG para: ¿Qué opina Robert C. Martin sobre los frameworks?]", 1)
 
     query = {"text": "¿Qué opina Robert C. Martin sobre los frameworks?"}
 
@@ -33,16 +33,16 @@ def test_router_sends_tech_queries_to_RAG(
     assert response.status_code == 200
     assert "Respuesta RAG para" in response.json()['response']
 
-# --- PRUEBA 2: El Router sabe cuándo NO usar RAG (Conocimiento General) ---
+# --- TEST 2: The Router knows when NOT to use RAG (General Knowledge) ---
 
 
 @patch('app.services.call_direct_slm')
-@patch('app.services.execute_rag_pipeline')
+@patch('app.services.execute_rag_pipeline_with_metadata')
 @patch('app.services.get_slm_router_decision')
 def test_router_sends_general_queries_to_DIRECT_SLM(
         mock_router_decision, mock_rag_pipeline, mock_direct_slm):
     """
-    Prueba que una pregunta sobre el clima sea enrutada a 'direct_SLM_answer'.
+    Test that a general question is routed to 'direct_SLM_answer'.
     """
     # 1. GIVEN
     mock_router_decision.return_value = "direct_SLM_answer"
@@ -61,15 +61,15 @@ def test_router_sends_general_queries_to_DIRECT_SLM(
     assert response.status_code == 200
     assert "Respuesta SLM Directa para" in response.json()['response']
 
-# --- PRUEBA 3: El Router sabe cuándo RECHAZAR (El Guardrail) ---
+# --- TEST 3: The Router knows when to REJECT (Guardrail) ---
 
 
-@patch('app.services.execute_rag_pipeline')
+@patch('app.services.execute_rag_pipeline_with_metadata')
 @patch('app.services.get_slm_router_decision')
 def test_router_REJECTS_out_of_scope_queries(
         mock_router_decision, mock_rag_pipeline):
     """
-    Prueba que el router rechaza consultas fuera de alcance.
+    Test that the router rejects out-of-scope queries.
     """
     # 1. GIVEN
     mock_router_decision.return_value = "reject_query"
