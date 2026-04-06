@@ -15,25 +15,26 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Ensure PR comes from beta
+      - name: Ensure PR comes from beta (only if targeting main)
         run: |
-          if [ "${{ github.head_ref }}" != "beta" ]; then
+          if [ "${{ github.base_ref }}" = "main" ] && [ "${{ github.head_ref }}" != "beta" ]; then
             echo "❌ ERROR: Pull requests to main must originate from beta."
             exit 1
           fi
 
-      - name: Compare VERSION with main
+      - name: Compare VERSION with target branch
         run: |
-          git fetch origin main || echo "Main branch might not exist locally"
+          TARGET_BRANCH="${{ github.base_ref }}"
+          git fetch origin $TARGET_BRANCH || echo "Base branch '$TARGET_BRANCH' might not exist locally"
           
           CURRENT_VERSION=$(cat VERSION | tr -d '\n' | xargs)
-          MAIN_VERSION=$(git show origin/main:VERSION 2>/dev/null | tr -d '\n' | xargs || echo "0.0.0")
+          BASE_VERSION=$(git show origin/$TARGET_BRANCH:VERSION 2>/dev/null | tr -d '\n' | xargs || echo "0.0.0")
 
           echo "Current PR version: $CURRENT_VERSION"
-          echo "Main branch version: $MAIN_VERSION"
+          echo "Target branch ($TARGET_BRANCH) version: $BASE_VERSION"
 
-          if [ "$CURRENT_VERSION" = "$MAIN_VERSION" ]; then
-            echo "❌ ERROR: The version in the VERSION file has not been incremented from main. Please bump the version in the VERSION file."
+          if [ "$CURRENT_VERSION" = "$BASE_VERSION" ]; then
+            echo "❌ ERROR: The version in the VERSION file has not been incremented from $TARGET_BRANCH. Please bump the version in the VERSION file."
             exit 1
           fi
 
