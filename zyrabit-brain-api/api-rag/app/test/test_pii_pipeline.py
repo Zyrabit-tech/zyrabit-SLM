@@ -1,4 +1,3 @@
-import pytest
 from app.pii_pipeline import (
     anonymize_text,
     deanonymize_text,

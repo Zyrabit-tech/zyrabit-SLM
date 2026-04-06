@@ -1,7 +1,10 @@
 import os
 import subprocess
+import logging
 from fastapi import FastAPI
 from pydantic import BaseModel
+
+logger = logging.getLogger(__name__)
 
 try:
     from fastmcp import FastMCP # Independent package
@@ -21,8 +24,9 @@ def get_install_guide() -> str:
             try:
                 with open(path, "r", encoding="utf-8") as f:
                     content += f"\n# {os.path.basename(path)}\n" + f.read() + "\n"
-            except Exception:
-                pass
+            except Exception as e:
+                # Non-fatal: skip files that cannot be read but log for debugging.
+                logger.warning("Failed to read install guide file '%s': %s", path, e)
     if not content:
         content = "No se pudieron encontrar las guías de instalación locales."
     return content
