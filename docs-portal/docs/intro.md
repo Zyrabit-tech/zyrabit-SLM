@@ -4,7 +4,7 @@ This portal documents the local-first AI platform for secure RAG and MCP workloa
 
 ## What you get
 
-- Secure prompt anonymization before model inference.
+- Heuristic-based prompt scrubbing (PII Guard) before model inference.
 - Full local observability with Prometheus and Grafana.
 - Hardened Docker topology with segmented networks.
 - MCP bridge to local resources with sanitization-first behavior.

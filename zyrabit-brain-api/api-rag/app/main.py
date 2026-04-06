@@ -65,9 +65,31 @@ async def root():
 @app.get("/health", tags=["Monitoring"])
 def health_check():
     """
-    Health check endpoint to verify the service is active.
+    Health check endpoint to verify the service, DB, and SLM engine status.
     """
-    return {"status": "ok", "SLM_url": SLM_URL, "db_url": DB_URL}
+    # 1. Base status
+    status = {"status": "ok", "api": "online", "db": DB_URL}
+
+    # 2. Check SLM (Ollama)
+    try:
+        # Check if Ollama is up (using tags or version)
+        import requests as r
+        ollama_health = r.get(f"{SLM_URL}/api/tags", timeout=2)
+        if ollama_health.status_code == 200:
+            status["slm"] = "online"
+            
+            # 3. Check if model is loaded (optional/heuristic)
+            # Ollama doesn't have a simple 'is_loaded' for a specific model without /api/show
+            # but we can at least confirm the service is responsive.
+            status["model_ready"] = True 
+        else:
+            status["slm"] = "degraded"
+            status["model_ready"] = False
+    except Exception:
+        status["slm"] = "offline"
+        status["model_ready"] = False
+
+    return status
 
 
 @app.get("/mcp/config.json", tags=["MCP"])

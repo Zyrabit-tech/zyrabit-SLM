@@ -101,10 +101,27 @@ if "uploader_key" not in st.session_state:
 
 with st.sidebar:
     st.header("Node Status")
+    
+    # Initialize health state
+    backend_online = False
+    model_ready = False
+    slm_status = "unknown"
+    
     try:
         health_response = requests.get(HEALTH_URL, timeout=3, verify=VERIFY_TLS)
         if health_response.status_code == 200:
+            h_data = health_response.json()
+            backend_online = True
+            model_ready = h_data.get("model_ready", False)
+            slm_status = h_data.get("slm", "unknown")
+            
             st.success("Core API: ONLINE")
+            if slm_status == "online":
+                st.success(f"SLM Engine: {slm_status.upper()}")
+            elif slm_status == "degraded":
+                st.warning(f"SLM Engine: {slm_status.upper()}")
+            else:
+                st.error(f"SLM Engine: {slm_status.upper()}")
         else:
             st.warning(f"Core API: DEGRADED ({health_response.status_code})")
     except requests.exceptions.RequestException:
@@ -180,6 +197,20 @@ with st.sidebar:
         if not st.session_state.ingest_history:
             st.info("No documents ingested in this session.")
 
+
+# --- MAIN UI LOGIC ---
+if not backend_online:
+    st.error("### 🛑 Engine Sleeping or Connection Lost")
+    st.info("No se pudo establecer conexión con el Backend de Zyrabit. Por favor, verifica que los contenedores estén corriendo o intenta reintentar la conexión.")
+    if st.button("🔄 Reintentar Conexión"):
+        st.rerun()
+    st.stop()
+
+if not model_ready:
+    with st.status("🚀 Zyrabit está despertando al modelo...", expanded=True) as status:
+        st.write("Cargando pesos a VRAM / Inicializando engine...")
+        time.sleep(1) # Simulación de chequeo
+        status.update(label="El modelo está tardando en responder. Esto es normal en el primer arranque.", state="running")
 
 tab_chat, tab_support = st.tabs(["💬 Chat Principal", "🛠️ Soporte de Instalación"])
 
