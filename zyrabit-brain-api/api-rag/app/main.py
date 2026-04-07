@@ -68,7 +68,6 @@ async def root():
 @app.get("/health", tags=["Monitoring"])
 def health_check():
     """
-    """
     Heartbeat endpoint verifying connectivity to core dependencies (Air-Gapped).
     Returns 503 if any mandatory service is unreachable.
     """
