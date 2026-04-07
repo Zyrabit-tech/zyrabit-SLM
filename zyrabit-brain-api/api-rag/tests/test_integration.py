@@ -1,5 +1,5 @@
 from fastapi.testclient import TestClient
-from unittest.mock import patch
+from unittest.mock import patch, MagicMock
 from io import BytesIO
 
 from app.main import app
@@ -123,11 +123,30 @@ def test_multiple_queries_flow(
     mock_direct_slm.assert_called_once()
 
 
-def test_health_check_before_operations():
+@patch('app.inference_factory.create_inference_provider')
+@patch('chromadb.HttpClient')
+def test_health_check_before_operations(mock_chroma_client, mock_inference_provider):
+    """
+    Smoke test for the health endpoint ensuring core connectivity probes are active.
+    """
+    # GIVEN: Mock success for all dependencies
+    mock_provider = MagicMock()
+    mock_provider.health.return_value = {"ok": True}
+    mock_inference_provider.return_value = mock_provider
+    
+    mock_db = MagicMock()
+    mock_db.heartbeat.return_value = 12345
+    mock_chroma_client.return_value = mock_db
+
+    # WHEN
     response = client.get("/health")
+
+    # THEN
     assert response.status_code == 200
     data = response.json()
     assert data["status"] == "ok"
+    assert data["slm"] == "online"
+    assert data["db"] == "online"
 
 @patch('app.services.execute_rag_pipeline_with_metadata')
 @patch('app.services.call_direct_slm')

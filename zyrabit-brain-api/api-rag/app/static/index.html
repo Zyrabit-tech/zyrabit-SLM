@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en" class="light">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" type="image/png" href="/static/img/favicon.png">
+    <title>Zyrabit SLM Console</title>
+    <!-- Tailwind CSS (Localizado) -->
+    <script src="js/tailwind.min.js"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        zyrabit: {
+                            primary: '#3f5a6d',
+                            secondary: '#6090b4',
+                            bg: '#fdfdfd',
+                            surface: '#e2ecf4',
+                            muted: '#a9c4d9',
+                            ring: '#6090b4',
+                            border: '#a9c4d9',
+                            text: '#323439',
+                            subtext: '#3f5a6d',
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['system-ui', '-apple-system', 'BlinkMacSystemFont', '"Segoe UI"', 'Roboto', '"Helvetica Neue"', 'Arial', 'sans-serif'],
+                        mono: ['ui-monospace', 'SFMono-Regular', 'Menlo', 'Monaco', 'Consolas', '"Liberation Mono"', '"Courier New"', 'monospace'],
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            font-family: ui-sans-serif, system-ui;
+            background-color: #fdfdfd;
+            color: #323439;
+        }
+
+        .scrollbar-hide::-webkit-scrollbar {
+            display: none;
+        }
+
+        .message-bubble {
+            max-width: 85%;
+        }
+
+        .glass {
+            background: rgba(226, 236, 244, 0.8);
+            backdrop-filter: blur(8px);
+        }
+    </style>
+</head>
+
+<body class="bg-zyrabit-bg text-zyrabit-text h-screen overflow-hidden flex font-sans">
+
+    <!-- SIDEBAR -->
+    <aside class="w-72 bg-zyrabit-surface border-r border-zyrabit-border p-6 flex flex-col hidden md:flex">
+        <div class="flex items-center gap-3 mb-10 text-center justify-center">
+            <img src="img/logo.png" alt="Zyrabit Logo" class="w-16 h-16 object-contain">
+        </div>
+
+        <nav class="flex-1 space-y-8">
+            <div>
+                <h2 class="text-[10px] font-bold text-zyrabit-muted uppercase tracking-widest mb-4">Node Health</h2>
+                <div id="health-api" class="flex items-center gap-2 mb-3">
+                    <div class="w-2 h-2 rounded-full bg-gray-300 status-dot"></div>
+                    <span class="text-xs font-medium">Core API:</span>
+                    <span class="text-[10px] font-bold text-gray-400 label">PENDING</span>
+                </div>
+                <div id="health-slm" class="flex items-center gap-2 mb-3">
+                    <div class="w-2 h-2 rounded-full bg-gray-300 status-dot"></div>
+                    <span class="text-xs font-medium">SLM Engine:</span>
+                    <span class="text-[10px] font-bold text-gray-400 label">PENDING</span>
+                </div>
+                <div id="health-db" class="flex items-center gap-2">
+                    <div class="w-2 h-2 rounded-full bg-gray-300 status-dot"></div>
+                    <span class="text-xs font-medium">Vector DB:</span>
+                    <span class="text-[10px] font-bold text-gray-400 label">PENDING</span>
+                </div>
+            </div>
+
+            <div class="pt-6 border-t border-zyrabit-border/50">
+                <h2 class="text-[10px] font-bold text-zyrabit-muted uppercase tracking-widest mb-4">Storage</h2>
+                <button onclick="ZyrabitApp.toggleIngestTab()"
+                    class="w-full py-2 px-3 hover:bg-zyrabit-primary/5 rounded-lg text-xs transition text-left flex items-center gap-2 text-zyrabit-subtext font-medium">
+                    <span>📄</span> Manage Documents
+                </button>
+            </div>
+
+            <div class="pt-6 border-t border-zyrabit-border/50">
+                <h2 class="text-[10px] font-bold text-zyrabit-muted uppercase tracking-widest mb-4">System Utilities
+                </h2>
+                <button id="diagnose-btn"
+                    class="w-full py-2 px-3 border border-zyrabit-primary/20 text-zyrabit-primary hover:bg-zyrabit-primary/5 rounded-lg text-xs transition text-center flex items-center justify-center gap-2 font-bold">
+                    🚀 Run MCP Diagnosis
+                </button>
+            </div>
+        </nav>
+
+        <div class="mt-auto pt-6 text-[10px] text-zyrabit-muted">
+            Sovereign Architecture v1.2.0<br>
+            MIT © <span id="current-year"></span> Zyrabit SLM Suite
+        </div>
+    </aside>
+
+    <!-- MAIN CHAT -->
+    <main class="flex-1 flex flex-col relative h-screen bg-zyrabit-bg">
+
+        <!-- HEADER -->
+        <header
+            class="h-16 border-b border-zyrabit-border flex items-center justify-between px-6 glass absolute top-0 w-full z-10">
+            <div class="flex items-center gap-4">
+                <span id="model-badge"
+                    class="px-3 py-1 bg-zyrabit-surface rounded-md text-[10px] font-mono text-zyrabit-primary border border-zyrabit-border">MODEL:
+                    INITIALIZING...</span>
+                <div id="warmup-pill"
+                    class="hidden px-3 py-1 bg-yellow-500/10 text-yellow-600 rounded-md text-[10px] animate-pulse border border-yellow-500/20 font-bold">
+                    ⚠️ Model Warming Up...
+                </div>
+            </div>
+            <div class="flex items-center gap-4">
+                <span class="text-[10px] uppercase font-bold text-zyrabit-muted tracking-widest">Secure Gateway</span>
+            </div>
+        </header>
+
+        <!-- CHAT LIST -->
+        <div id="chat-container" class="flex-1 overflow-y-auto p-6 pt-24 space-y-6 scrollbar-hide">
+            <div class="flex justify-center py-10">
+                <div class="text-center opacity-40">
+                    <div class="text-3xl mb-4">🛡️</div>
+                    <p class="text-[10px] font-bold uppercase tracking-widest text-zyrabit-primary">Sovereign Knowledge
+                        Base</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- INPUT AREA -->
+        <div class="p-6 bg-zyrabit-bg/80 glass border-t border-zyrabit-border">
+            <form id="chat-form" class="max-w-4xl mx-auto relative">
+                <div class="flex flex-col gap-2 mb-3">
+                    <div class="flex items-center gap-2 px-2">
+                        <input type="checkbox" id="pii-scrub" checked class="accent-zyrabit-primary h-3 w-3">
+                        <label for="pii-scrub"
+                            class="text-[9px] text-zyrabit-muted uppercase tracking-tighter cursor-pointer hover:text-zyrabit-text font-bold">Heuristic
+                            Data Scrubbing (PII Guard)</label>
+                    </div>
+                </div>
+                <div class="relative flex gap-3">
+                    <textarea id="chat-input" rows="1"
+                        class="flex-1 bg-white border border-zyrabit-border rounded-xl py-3 px-4 focus:ring-2 focus:ring-zyrabit-primary/20 focus:border-zyrabit-primary outline-none transition resize-none placeholder-gray-400 text-sm shadow-sm"
+                        placeholder="Ask something about architecture or your documents..."></textarea>
+                    <button type="submit"
+                        class="px-6 bg-zyrabit-primary hover:bg-zyrabit-secondary text-white rounded-xl flex items-center justify-center transition shadow-lg shadow-zyrabit-primary/20 flex-shrink-0 text-xs font-bold tracking-widest">
+                        SEND
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <!-- OVERLAY: CIRCUIT BREAKER -->
+        <div id="circuit-breaker"
+            class="hidden absolute inset-0 bg-white/60 backdrop-blur-sm z-50 flex items-center justify-center p-10">
+            <div class="max-w-md w-full bg-white border border-red-200 p-8 rounded-2xl text-center shadow-xl">
+                <div class="text-5xl mb-6">🛰️</div>
+                <h2 class="text-xl font-bold mb-2 text-red-600">CONNECTION LOST</h2>
+                <p class="text-zyrabit-muted mb-8 text-xs leading-relaxed">The Zyrabit engine is asleep or the API is
+                    unreachable. Verify your sovereign infrastructure.</p>
+                <button onclick="location.reload()"
+                    class="w-full py-4 bg-zyrabit-primary hover:bg-zyrabit-secondary text-white rounded-xl font-bold transition shadow-sm">
+                    🔄 RETRY CONNECTION
+                </button>
+            </div>
+        </div>
+
+        <!-- OVERLAY: INGEST TAB -->
+        <div id="ingest-tab"
+            class="hidden absolute right-0 top-0 h-full w-full md:w-[450px] bg-white border-l border-zyrabit-border shadow-2xl z-40 p-6 flex flex-col">
+            <div class="flex items-center justify-between mb-8">
+                <h2 class="text-lg font-bold tracking-tight text-zyrabit-primary">Data Ingestion</h2>
+                <button onclick="ZyrabitApp.toggleIngestTab()"
+                    class="text-gray-400 hover:text-zyrabit-text transition text-2xl">×</button>
+            </div>
+
+            <div id="drop-zone"
+                class="border-2 border-dashed border-zyrabit-border rounded-xl p-8 text-center hover:border-zyrabit-primary transition cursor-pointer mb-6 bg-zyrabit-surface/30">
+                <div class="text-3xl mb-4 text-zyrabit-muted">📁</div>
+                <p class="text-xs text-zyrabit-text font-medium">Drop your files here</p>
+                <p class="text-[9px] text-zyrabit-muted mt-1 uppercase font-bold">PDF, TXT, MD</p>
+                <input type="file" id="file-input" multiple class="hidden">
+            </div>
+
+            <div class="flex-1 overflow-y-auto space-y-4 pr-2">
+                <h3 class="text-[10px] font-bold text-zyrabit-muted uppercase tracking-widest pl-1">Document Vault</h3>
+                <div id="vault-list" class="space-y-2">
+                    <div
+                        class="animate-pulse text-zyrabit-muted text-[10px] text-center py-10 uppercase tracking-widest">
+                        Searching vault...</div>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- App Logic (SOLID Refactored) -->
+    <script src="js/app.js"></script>
+</body>
+
+</html>

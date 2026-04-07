@@ -9,11 +9,21 @@ client = TestClient(app)
 
 # --- TEST 1: Health Check ---
 
+@patch('app.inference_factory.create_inference_provider')
+@patch('chromadb.HttpClient')
+def test_health_check_returns_ok_status(mock_chroma_client, mock_inference_provider):
+    """
+    Test that /health returns status ok and configured URLs when systems are online.
+    """
+    # GIVEN
+    mock_provider = MagicMock()
+    mock_provider.health.return_value = {"ok": True}
+    mock_inference_provider.return_value = mock_provider
+    
+    mock_db = MagicMock()
+    mock_db.heartbeat.return_value = 12345
+    mock_chroma_client.return_value = mock_db
 
-def test_health_check_returns_ok_status():
-    """
-    Test that /health returns status ok and configured URLs.
-    """
     # WHEN
     response = client.get("/health")
 
@@ -21,7 +31,9 @@ def test_health_check_returns_ok_status():
     assert response.status_code == 200
     data = response.json()
     assert data["status"] == "ok"
-    assert "SLM_url" in data
+    assert data["slm"] == "online"
+    assert data["db"] == "online"
+    assert "ollama_url" in data
     assert "db_url" in data
 
 
