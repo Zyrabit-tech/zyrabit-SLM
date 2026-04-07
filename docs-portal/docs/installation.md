@@ -44,26 +44,40 @@ docker compose -f zyrabit-brain-api/docker-compose.yml exec -T slm-engine ollama
 
 ## Air-gapped workflow
 
-Prepare images on an online machine:
+Prepare images and models on an online machine:
 
+1. **Pull Images**:
 ```bash
-docker pull traefik:latest
+docker pull zyrabitcore/zyrabit-slm:latest
 docker pull ollama/ollama:latest
 docker pull chromadb/chroma:latest
-docker pull prom/prometheus:latest
-docker pull grafana/grafana:latest
-docker pull n8nio/n8n:latest
-docker save -o zyrabit-images.tar \
-  traefik:latest ollama/ollama:latest chromadb/chroma:latest \
-  prom/prometheus:latest grafana/grafana:latest n8nio/n8n:latest
+# ... (see zyrabit-brain-api/docker-compose.yml for full list)
 ```
 
-Transfer `zyrabit-images.tar` by controlled media and load offline:
+2. **Save Images**:
+```bash
+docker save -o zyrabit-images.tar zyrabitcore/zyrabit-slm ollama/ollama chromadb/chroma
+```
 
+3. **Pre-populate Models**:
+Download the model blobs to a local directory:
+```bash
+# On online machine
+docker run -v $(pwd)/models:/root/.ollama ollama/ollama pull llama3
+```
+
+Transfer `zyrabit-images.tar` and the `models` folder to your offline server.
+
+4. **Load and Run Offline**:
 ```bash
 docker load -i zyrabit-images.tar
+# Map the pre-populated models volume in your docker run or compose
+docker run -d -v /path/to/models:/root/.ollama --name slm-engine ollama/ollama:latest
 ./zyra-up.sh start
 ```
+
+> [!IMPORTANT]
+> Ensure the model blobs are correctly placed in the mapped volume to prevent the engine from attempting an internet connection.
 
 ## Single-entry observability access
 

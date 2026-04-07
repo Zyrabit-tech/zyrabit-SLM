@@ -68,6 +68,7 @@ async def root():
 @app.get("/health", tags=["Monitoring"])
 def health_check():
     """
+    """
     Heartbeat endpoint verifying connectivity to core dependencies (Air-Gapped).
     Returns 503 if any mandatory service is unreachable.
     """
@@ -100,6 +101,7 @@ def health_check():
         "api": "online",
         "slm": ollama_status,
         "db": db_status,
+        "model_ready": (ollama_status == "online"),
         "ollama_url": SLM_URL,
         "db_url": DB_URL
     }

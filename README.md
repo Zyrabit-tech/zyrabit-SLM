@@ -5,7 +5,7 @@
 [![Docker](https://img.shields.io/badge/docker--compose-ready-green.svg)](https://docs.docker.com/compose/)
 [![License](https://img.shields.io/badge/license-MIT-yellow.svg)](LICENSE)
 
-Local AI suite with **SLM + RAG + Zero-Trust security layer**.
+Local AI suite with **SLM + RAG + Heuristic-based Data Scrubbing (PII Guard)**.
 
 ## What this project runs
 
@@ -126,13 +126,16 @@ curl -k -X POST https://localhost/v1/chat \
 
 Expected: `400` + `detail` (`reject_query` route).
 
-### 4) Token replacement via PII sanitization
+### 4) Heuristic-based Data Scrubbing (PII Sanitization)
 
 ```bash
 python secure_agent.py "My email is john@example.com and my account is 4532-1234-5678-9012"
 ```
 
-The pipeline anonymizes entities (for example `<USER_EMAIL_1>`) before inference and restores them in the final response.
+The pipeline uses **heuristic-based pattern matching (Regex)** to anonymize entities (for example `<USER_EMAIL_1>`) before inference and restores them in the final response. 
+
+> [!NOTE]
+> This is a prevention layer for accidental data leaks, not a replacement for legal-grade auditing.
 
 ### 5) Token and security metrics
 
@@ -200,20 +203,40 @@ This repository includes workflows in `.github/workflows` to:
 - run automated tests
 - run dependency security audits
 
-## Docker Hub
+## Docker Hub & Air-Gapped Deployment
 
-Zyrabit SLM is available on Docker Hub:
-[zyrabitcore/zyrabit-slm](https://hub.docker.com/repository/docker/zyrabitcore/zyrabit-slm/general)
+Zyrabit SLM resides on Docker Hub:
+[hub.docker.com/r/zyrabitcore/zyrabit-slm](https://hub.docker.com/r/zyrabitcore/zyrabit-slm)
 
-To pull the latest image:
-```bash
-docker pull zyrabitcore/zyrabit-slm:latest
-```
+### 📥 Descarga de Imágenes y Modelos
 
-To push a new tag to this repository:
-```bash
-docker push zyrabitcore/zyrabit-slm:<tagname>
-```
+1. **Imagen de la Consola:**
+   ```bash
+   docker pull zyrabitcore/zyrabit-slm:latest
+   ```
+
+2. **Descarga del Modelo (SLM):**
+   Si usas el motor integrado (`slm-engine`), descarga el modelo deseado:
+   ```bash
+   docker exec -it slm-engine ollama pull llama3
+   ```
+
+### 🛡️ Despliegue Air-Gapped (Sin Internet)
+
+Para entornos restringidos donde no hay acceso a internet, debes pre-poblar los modelos y mapear el volumen al motor:
+
+1. Descarga el modelo en una máquina con internet.
+2. Copia la carpeta de modelos a tu servidor seguro.
+3. Mapea el volumen en el arranque:
+   ```bash
+   docker run -d \
+     -v /tu/ruta/local/models:/root/.ollama \
+     --name slm-engine \
+     ollama/ollama:latest
+   ```
+
+> [!IMPORTANT]
+> Asegúrate de que los blobs del modelo ya existan en esa ruta para evitar el intento de descarga automática durante el primer arranque.
 
 ## License
 
