@@ -32,6 +32,7 @@ COPY --from=builder /root/.local /home/zyrabituser/.local
 
 # Copiamos código
 COPY ./app ./app
+COPY ./app/static ./app/static
 
 # Ajuste el PATH
 ENV PATH=/home/zyrabituser/.local/bin:$PATH

@@ -7,9 +7,12 @@ from typing import Optional
 from . import services
 from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi import FastAPI, HTTPException, UploadFile, File, Request
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from prometheus_fastapi_instrumentator import Instrumentator
-from . import mcp_bridge
+from . import mcp_bridge, inference_factory
+import chromadb
+from urllib.parse import urlparse
 from .adapters.n8n_adapter import N8nAdapter, N8nIntegrationPolicy
 
 # --- CONFIGURATION ---
@@ -65,31 +68,47 @@ async def root():
 @app.get("/health", tags=["Monitoring"])
 def health_check():
     """
-    Health check endpoint to verify the service, DB, and SLM engine status.
+    Heartbeat endpoint verifying connectivity to core dependencies (Air-Gapped).
+    Returns 503 if any mandatory service is unreachable.
     """
-    # 1. Base status
-    status = {"status": "ok", "api": "online", "db": DB_URL}
+    ollama_status = "offline"
+    db_status = "offline"
+    dependency_failure = False
 
-    # 2. Check SLM (Ollama)
+    # 1. Check Ollama (SLM Engine)
     try:
-        # Check if Ollama is up (using tags or version)
-        import requests as r
-        ollama_health = r.get(f"{SLM_URL}/api/tags", timeout=2)
-        if ollama_health.status_code == 200:
-            status["slm"] = "online"
-            
-            # 3. Check if model is loaded (optional/heuristic)
-            # Ollama doesn't have a simple 'is_loaded' for a specific model without /api/show
-            # but we can at least confirm the service is responsive.
-            status["model_ready"] = True 
+        provider = inference_factory.create_inference_provider()
+        h = provider.health()
+        if h.get("ok"):
+            ollama_status = "online"
         else:
-            status["slm"] = "degraded"
-            status["model_ready"] = False
+            dependency_failure = True
     except Exception:
-        status["slm"] = "offline"
-        status["model_ready"] = False
+        dependency_failure = True
 
-    return status
+    # 2. Check ChromaDB (Vector Store)
+    try:
+        parsed = urlparse(DB_URL)
+        client = chromadb.HttpClient(host=parsed.hostname or "localhost", port=parsed.port or 8000)
+        client.heartbeat() # Throws if unreachable
+        db_status = "online"
+    except Exception:
+        dependency_failure = True
+
+    payload = {
+        "status": "error" if dependency_failure else "ok",
+        "api": "online",
+        "slm": ollama_status,
+        "db": db_status,
+        "model_ready": (ollama_status == "online"),
+        "ollama_url": SLM_URL,
+        "db_url": DB_URL
+    }
+
+    if dependency_failure:
+        return JSONResponse(status_code=503, content=payload)
+    
+    return payload
 
 
 @app.get("/mcp/config.json", tags=["MCP"])
@@ -345,6 +364,15 @@ def list_documents():
                 "modified": stat.st_mtime,
             })
     return {"documents": docs, "total": len(docs)}
+
+
+# --- Frontend Static Serving ---
+# This mounts the static files (HTML/JS/CSS) at the root.
+# It should be defined AFTER all API routes to avoid collisions.
+static_dir = os.path.join(os.path.dirname(__file__), "static")
+if os.path.isdir(static_dir):
+    app.mount("/", StaticFiles(directory=static_dir, html=True), name="static")
+
 
 # To run locally with `uvicorn main:app --reload`
 if __name__ == "__main__":
