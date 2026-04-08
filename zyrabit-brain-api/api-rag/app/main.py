@@ -14,6 +14,7 @@ from .infrastructure.inference.ollama_inference_adapter import OllamaInferenceAd
 from .infrastructure.persistence.chroma_adapter import ChromaAdapter
 from .domain.use_cases import ChatUseCase
 from .domain.services.gatekeeper import Gatekeeper
+from .inference_factory import create_inference_provider
 from . import services # Temporary until fully migrated
 
 # --- CONFIGURATION ---
@@ -26,7 +27,7 @@ logger = logging.getLogger("uvicorn.error")
 
 # --- Dependency Factories ---
 def get_inference_adapter():
-    return OllamaInferenceAdapter(endpoint=f"{SLM_URL}/api/generate")
+    return create_inference_provider()
 
 def get_vector_store_adapter():
     from langchain_ollama import OllamaEmbeddings
