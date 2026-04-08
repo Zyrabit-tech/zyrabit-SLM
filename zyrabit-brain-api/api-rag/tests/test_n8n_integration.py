@@ -5,7 +5,7 @@ import pathlib
 from fastapi.testclient import TestClient
 
 from app.main import app
-from app.adapters.n8n_adapter import N8nAdapter, N8nIntegrationPolicy
+from app.infrastructure.integrations.n8n_adapter import N8nAdapter, N8nIntegrationPolicy
 
 
 client = TestClient(app)
@@ -26,7 +26,7 @@ def _build_adapter() -> N8nAdapter:
 
 
 def test_n8n_webhook_accepts_valid_token_and_signature(monkeypatch):
-    monkeypatch.setattr("app.main.n8n_adapter", _build_adapter())
+    monkeypatch.setattr("app.api.v1.endpoints.integrations.n8n_adapter", _build_adapter())
     raw_body = b'{"text":"run report","workflow_id":"wf-1","execution_id":"ex-1"}'
     headers = {
         "authorization": "Bearer test-token",
@@ -48,7 +48,7 @@ def test_n8n_webhook_accepts_valid_token_and_signature(monkeypatch):
 
 
 def test_n8n_webhook_rejects_invalid_token(monkeypatch):
-    monkeypatch.setattr("app.main.n8n_adapter", _build_adapter())
+    monkeypatch.setattr("app.api.v1.endpoints.integrations.n8n_adapter", _build_adapter())
     raw_body = b'{"text":"run report"}'
     headers = {
         "authorization": "Bearer bad-token",

@@ -55,7 +55,14 @@ class GeminiInferenceAdapter(InferenceProviderPort):
         try:
             generated_text = body['candidates'][0]['content']['parts'][0]['text']
         except (KeyError, IndexError):
-            logger.error(f"Invalid Gemini response: {body}")
+            body_keys = list(body.keys()) if isinstance(body, dict) else []
+            candidate_count = len(body.get("candidates", [])) if isinstance(body, dict) else 0
+            logger.error(
+                "Invalid Gemini response format. top_level_keys=%s candidate_count=%d",
+                body_keys,
+                candidate_count,
+            )
+            logger.debug(f"Raw body keys: {body_keys}") # Safer than logging whole body
             raise InferenceProviderError("Gemini returned an unexpected response format.")
 
         return InferenceResult(

@@ -6,6 +6,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
+from contextlib import asynccontextmanager
 from prometheus_fastapi_instrumentator import Instrumentator
 from urllib.parse import urlparse
 
@@ -48,17 +49,22 @@ def get_chat_use_case():
         system_prompt=system_prompt
     )
 
+# --- Lifecycle ---
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup Phase
+    from .auto_ingest import run_auto_ingest
+    run_auto_ingest()
+    yield
+    # Shutdown Phase (placeholder)
+
 # --- FastAPI & Socket.io Setup ---
 app = FastAPI(
     title="Zyrabit SLM API",
     description="Hexagonal RAG-Ops API with Socket.io streaming.",
     version="1.3.0",
+    lifespan=lifespan
 )
-
-@app.on_event("startup")
-async def startup_event():
-    from .auto_ingest import run_auto_ingest
-    run_auto_ingest()
 
 app.add_middleware(
     CORSMiddleware,

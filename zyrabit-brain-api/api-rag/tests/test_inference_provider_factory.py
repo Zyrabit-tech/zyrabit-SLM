@@ -3,10 +3,8 @@ from unittest.mock import MagicMock, patch
 import pytest
 import requests
 
-from app.adapters.ollama_inference_adapter import OllamaInferenceAdapter
-from app.adapters.openai_compatible_inference_adapter import (
-    OpenAICompatibleInferenceAdapter,
-)
+from app.infrastructure.inference.ollama_inference_adapter import OllamaInferenceAdapter
+from app.infrastructure.inference.gemini_inference_adapter import GeminiInferenceAdapter
 from app.inference_factory import create_inference_provider
 from app.ports.inference_port import InferenceProviderError, InferenceRequest
 
@@ -21,17 +19,17 @@ def test_factory_defaults_to_ollama_provider():
 @patch.dict(
     "os.environ",
     {
-        "INFERENCE_PROVIDER": "openai_compatible",
-        "INFERENCE_BASE_URL": "http://localhost:9000/v1/chat/completions",
-        "INFERENCE_API_KEY": "secret",
+        "INFERENCE_PROVIDER": "gemini",
+        "GEMINI_API_KEY": "secret-key",
+        "MODEL_NAME": "gemini-1.5-flash-test",
     },
     clear=True,
 )
-def test_factory_builds_openai_compatible_provider():
+def test_factory_builds_gemini_provider():
     provider = create_inference_provider()
-    assert isinstance(provider, OpenAICompatibleInferenceAdapter)
-    assert provider.endpoint == "http://localhost:9000/v1/chat/completions"
-    assert provider.api_key == "secret"
+    assert isinstance(provider, GeminiInferenceAdapter)
+    assert provider.api_key == "secret-key"
+    assert provider.model == "gemini-1.5-flash-test"
 
 
 @patch.dict("os.environ", {"INFERENCE_PROVIDER": "unknown_provider"}, clear=True)
@@ -40,7 +38,7 @@ def test_factory_rejects_unknown_provider():
         create_inference_provider()
 
 
-@patch("app.adapters.ollama_inference_adapter.requests.post")
+@patch("app.infrastructure.inference.ollama_inference_adapter.requests.post")
 def test_ollama_adapter_generate_returns_normalized_result(mock_post):
     mock_response = MagicMock()
     mock_response.status_code = 200
@@ -61,7 +59,7 @@ def test_ollama_adapter_generate_returns_normalized_result(mock_post):
     assert kwargs["json"]["prompt"] == "hello"
 
 
-@patch("app.adapters.ollama_inference_adapter.requests.post")
+@patch("app.infrastructure.inference.ollama_inference_adapter.requests.post")
 def test_ollama_adapter_connection_error_raises_domain_error(mock_post):
     mock_post.side_effect = requests.exceptions.ConnectionError("network down")
     provider = OllamaInferenceAdapter(endpoint="http://localhost:11434/api/generate")
