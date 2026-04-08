@@ -11,9 +11,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     && rm -rf /var/lib/apt/lists/*
 
+# Create virtual environment
+RUN python -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+
 COPY requirements.txt .
 RUN pip install --upgrade pip && \
-    pip install --no-cache-dir --user -r requirements.txt
+    pip install --no-cache-dir -r requirements.txt
 
 # STAGE 2: Runtime
 FROM python:3.12-slim-bookworm
@@ -21,23 +25,20 @@ FROM python:3.12-slim-bookworm
 WORKDIR /app
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1
+    PYTHONUNBUFFERED=1 \
+    PATH="/opt/venv/bin:$PATH"
 
 RUN apt-get update && apt-get upgrade -y && rm -rf /var/lib/apt/lists/*
 
-RUN addgroup --system zyrabituser && adduser --system --group zyrabituser
+# Copiamos el virtual environment
+COPY --from=builder /opt/venv /opt/venv
 
-# Copiamos paquetes pip
-COPY --from=builder /root/.local /home/zyrabituser/.local
+RUN addgroup --system zyrabituser && adduser --system --group zyrabituser
 
 # Copiamos código
 COPY ./app ./app
-COPY ./app/static ./app/static
 
-# Ajuste el PATH
-ENV PATH=/home/zyrabituser/.local/bin:$PATH
-
-RUN chown -R zyrabituser:zyrabituser /app /home/zyrabituser/.local
+RUN chown -R zyrabituser:zyrabituser /app
 
 USER zyrabituser
 

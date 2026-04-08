@@ -289,7 +289,29 @@ Recommended evolution path for a local super-fine-tuning pipeline:
 3. Trigger controlled offline fine-tuning jobs (LoRA/PEFT).
 4. Version and promote tuned models through automated evaluation gates.
 
+## Python Environment Management (Managed Environment)
+
+> [!TIP]
+> To avoid "module not found" errors (like `pytest`), it is highly recommended to work within a virtual environment.
+
+1. **Create the virtual environment:**
+   ```bash
+   python3 -m venv .venv
+   ```
+
+2. **Activate it:**
+   - macOS / Linux: `source .venv/bin/activate`
+   - Windows: `.\.venv\Scripts\activate`
+
+3. **Install dependencies:**
+   ```bash
+   pip install -r requirements.txt
+   pip install -r api-rag/requirements.txt
+   ```
+
 ## Testing
+
+Ensure your environment is activated before running the tests.
 
 ```bash
 cd api-rag

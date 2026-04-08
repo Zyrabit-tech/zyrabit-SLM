@@ -54,6 +54,12 @@ services:
       - ./secrets:/run/secrets:ro
       - ./prompts:/app/prompts:ro
       - ./document_source:/app/document_source
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080/v1/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
 
   # 2. THE MUSCLE: SLM Server
   slm-engine:
@@ -65,6 +71,11 @@ services:
       - ./ollama-models:/root/.ollama
     networks:
       - model-network
+    healthcheck:
+      test: ["CMD-SHELL", "ollama list || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
 
   # 3. THE MEMORY: Vector DB
   vector-db:
@@ -78,6 +89,11 @@ services:
       - ./chroma-data:/chroma/chroma
     networks:
       - backend-network
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8000/api/v1/heartbeat || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
   # 4. THE MONITOR (Scraper): Prometheus
   prometheus:
