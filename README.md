@@ -190,6 +190,8 @@ Local PR checklist: `validation/pr-checklist.md`
 
 ## Docs and contribution
 
+- Architecture Guide: [HEXAGONAL_ARCHITECTURE.md](file:///Users/abrahamgomez/tech/zyrabit-SLM/zyrabit-brain-api/api-rag/app/HEXAGONAL_ARCHITECTURE.md)
+- Agent Governance: [AGENTS.md](file:///Users/abrahamgomez/tech/zyrabit-SLM/.gemini/AGENTS.md)
 - Contribution rules (ES): `CONTRIBUTING.md`
 - Contribution rules (EN): `CONTRIBUTING_EN.md`
 - Backend technical doc (ES): `zyrabit-brain-api/README.md`

@@ -1,4 +1,4 @@
-# Zyrabit Brain API
+# Zyrabit SLM
 
 [Main README](README.md)
 

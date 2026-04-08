@@ -2,13 +2,13 @@
 
 from typing import Dict, Tuple
 
-from .pii_pipeline import AnonymizationResult, anonymize_text as _anonymize_text
-from .pii_pipeline import (
+from .security.pii_pipeline import AnonymizationResult, anonymize_text as _anonymize_text
+from .security.pii_pipeline import (
     InterceptorPipeline,
     PipelineContext,
     build_default_pipeline,
 )
-from .pii_pipeline import deanonymize_text as _deanonymize_text
+from .security.pii_pipeline import deanonymize_text as _deanonymize_text
 
 
 def anonymize_text(text: str) -> AnonymizationResult:

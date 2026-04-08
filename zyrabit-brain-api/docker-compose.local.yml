@@ -1,0 +1,61 @@
+services:
+  # 1. THE BRAIN: API RAG
+  api-rag:
+    build:
+      context: ./api-rag
+    container_name: api-rag
+    env_file:
+      - .env
+    environment:
+      - N8N_SERVICE_TOKEN_FILE=/run/secrets/n8n_service_token
+      - N8N_WEBHOOK_SIGNING_SECRET_FILE=/run/secrets/n8n_webhook_signing_secret
+      - SLM_URL=http://slm-engine:11434
+      - DB_URL=http://vector-db:8000
+    depends_on:
+      vector-db:
+        condition: service_started
+      slm-engine:
+        condition: service_started
+    ports:
+      - "8080:8080" # Direct HTTP access
+    networks:
+      - backend-network
+      - model-network
+    volumes:
+      - ./secrets:/run/secrets:ro
+      - ./prompts:/app/prompts:ro
+      - ./document_source:/app/document_source
+      - ../README.md:/app/README.md:ro # For auto-ingest
+
+  # 2. THE MUSCLE: SLM Server
+  slm-engine:
+    image: ollama/ollama:latest
+    container_name: slm-engine
+    environment:
+      - OLLAMA_NUM_PARALLEL=${OLLAMA_NUM_PARALLEL:-1}
+    ports:
+      - "11434:11434"
+    volumes:
+      - ./ollama-models:/root/.ollama
+    networks:
+      - model-network
+
+  # 3. THE MEMORY: Vector DB
+  vector-db:
+    image: chromadb/chroma:latest
+    container_name: vector-db
+    environment:
+      - ANONYMIZED_TELEMETRY=False
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./chroma-data:/chroma/chroma
+    networks:
+      - backend-network
+
+networks:
+  backend-network:
+    driver: bridge
+  model-network:
+    driver: bridge
+    internal: true

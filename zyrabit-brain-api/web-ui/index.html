@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en" class="light">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" type="image/png" href="/img/logo.png">
+    <title>Zyrabit SLM Console</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        zyrabit: {
+                            primary: '#3f5a6d',
+                            secondary: '#6090b4',
+                            bg: '#fdfdfd',
+                            surface: '#e2ecf4',
+                            muted: '#a9c4d9',
+                            ring: '#6090b4',
+                            border: '#a9c4d9',
+                            text: '#323439',
+                            subtext: '#3f5a6d',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        .scrollbar-hide::-webkit-scrollbar { display: none; }
+        .glass { background: rgba(226, 236, 244, 0.8); backdrop-filter: blur(8px); }
+        #gdpr-panel { transition: transform 0.3s ease; }
+    </style>
+</head>
+
+<body class="bg-zyrabit-bg text-zyrabit-text h-screen overflow-hidden flex font-sans">
+
+    <!-- SIDEBAR -->
+    <aside class="w-72 bg-zyrabit-surface border-r border-zyrabit-border p-6 flex flex-col hidden md:flex">
+        <div class="flex items-center gap-3 mb-10 text-center justify-center">
+            <img src="/img/logo.png" alt="Zyrabit Logo" class="w-16 h-16 object-contain">
+        </div>
+
+        <nav class="flex-1 space-y-8">
+            <div>
+                <h2 class="text-[10px] font-bold text-zyrabit-muted uppercase tracking-widest mb-4">Node Health</h2>
+                <div id="health-api" class="flex items-center gap-2 mb-3">
+                    <div class="w-2 h-2 rounded-full bg-gray-300 status-dot"></div>
+                    <span class="text-xs font-medium">Core API:</span>
+                    <span class="text-[10px] font-bold text-gray-400 label">PENDING</span>
+                </div>
+                <div id="health-slm" class="flex items-center gap-2 mb-3">
+                    <div class="w-2 h-2 rounded-full bg-gray-300 status-dot"></div>
+                    <span class="text-xs font-medium">SLM Engine:</span>
+                    <span class="text-[10px] font-bold text-gray-400 label">PENDING</span>
+                </div>
+                <div id="health-db" class="flex items-center gap-2">
+                    <div class="w-2 h-2 rounded-full bg-gray-300 status-dot"></div>
+                    <span class="text-xs font-medium">Vector DB:</span>
+                    <span class="text-[10px] font-bold text-gray-400 label">PENDING</span>
+                </div>
+            </div>
+
+            <div>
+                <h2 class="text-[10px] font-bold text-zyrabit-muted uppercase tracking-widest mb-4">Security</h2>
+                <div class="space-y-2">
+                    <button id="toggle-gdpr" class="w-full py-2 px-3 hover:bg-zyrabit-primary/5 rounded-lg text-xs transition text-left flex items-center gap-2 text-zyrabit-subtext font-medium">
+                        🛡️ GDPR Transparency
+                    </button>
+                    <div class="flex items-center gap-2 px-3">
+                        <input type="checkbox" id="pii-scrub" checked class="accent-zyrabit-primary h-3 w-3">
+                        <label for="pii-scrub" class="text-[9px] text-zyrabit-muted uppercase font-bold cursor-pointer">PII Guard Active</label>
+                    </div>
+                </div>
+            </div>
+
+            <div class="pt-6 border-t border-zyrabit-border/50">
+                <h2 class="text-[10px] font-bold text-zyrabit-muted uppercase tracking-widest mb-4">Storage</h2>
+                <button id="toggle-ingest" class="w-full py-2 px-3 hover:bg-zyrabit-primary/5 rounded-lg text-xs transition text-left flex items-center gap-2 text-zyrabit-subtext font-medium">
+                    📄 Manage Documents
+                </button>
+            </div>
+        </nav>
+
+        <div class="mt-auto pt-6 text-[10px] text-zyrabit-muted">
+            Sovereign Architecture v2.0.0<br>
+            MIT © Zyrabit SLM Suite
+        </div>
+    </aside>
+
+    <!-- MAIN CHAT -->
+    <main class="flex-1 flex flex-col relative h-screen bg-zyrabit-bg">
+
+        <!-- HEADER -->
+        <header class="h-16 border-b border-zyrabit-border flex items-center justify-between px-6 glass absolute top-0 w-full z-10">
+            <div class="flex items-center gap-4">
+                <span id="model-badge" class="px-3 py-1 bg-zyrabit-surface rounded-md text-[10px] font-mono text-zyrabit-primary border border-zyrabit-border uppercase">Initializing...</span>
+                <div id="status-pill" class="px-3 py-1 bg-green-500/10 text-green-600 rounded-md text-[10px] border border-green-500/20 font-bold hidden">
+                    OLLAMA READY
+                </div>
+            </div>
+            <div class="flex items-center gap-4">
+                <span class="text-[10px] uppercase font-bold text-zyrabit-muted tracking-widest">Secure Gateway</span>
+            </div>
+        </header>
+
+        <!-- CHAT LIST -->
+        <div id="chat-container" class="flex-1 overflow-y-auto p-6 pt-24 space-y-6 scrollbar-hide">
+            <div class="flex justify-center py-20">
+                <div class="text-center opacity-40">
+                    <div class="text-4xl mb-6">🛡️</div>
+                    <p class="text-[10px] font-bold uppercase tracking-widest text-zyrabit-primary">Sovereign Knowledge Engine</p>
+                    <p class="text-[9px] mt-2 text-zyrabit-muted max-w-xs leading-relaxed">Secure, air-gapped responses from your local model.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- INPUT AREA -->
+        <div class="p-6 bg-zyrabit-bg/80 glass border-t border-zyrabit-border">
+            <form id="chat-form" class="max-w-4xl mx-auto flex gap-3">
+                <textarea id="chat-input" rows="1" class="flex-1 bg-white border border-zyrabit-border rounded-xl py-3 px-4 focus:ring-2 focus:ring-zyrabit-primary/20 focus:border-zyrabit-primary outline-none transition resize-none placeholder-gray-400 text-sm shadow-sm" placeholder="Ask about architecture, code or your docs..."></textarea>
+                <button type="submit" class="px-8 bg-zyrabit-primary hover:bg-zyrabit-secondary text-white rounded-xl flex items-center justify-center transition shadow-lg shadow-zyrabit-primary/20 flex-shrink-0 text-xs font-bold tracking-widest px-8">
+                    SEND
+                </button>
+            </form>
+        </div>
+
+        <!-- GDPR TRANSPARENCY PANEL -->
+        <div id="gdpr-panel" class="absolute right-0 top-0 h-full w-full md:w-[400px] bg-white border-l border-zyrabit-border shadow-2xl z-40 p-6 flex flex-col translate-x-full">
+            <div class="flex items-center justify-between mb-8">
+                <h2 class="text-lg font-bold tracking-tight text-zyrabit-primary">GDPR Transparency</h2>
+                <button id="close-gdpr" class="text-gray-400 hover:text-zyrabit-text transition text-2xl">×</button>
+            </div>
+            <div class="flex-1 overflow-y-auto space-y-4 font-mono text-[10px] bg-gray-50 p-4 rounded-xl border border-gray-100" id="gdpr-logs">
+                <div class="text-zyrabit-muted italic">[No events recorded]</div>
+            </div>
+        </div>
+
+        <!-- INGEST PANEL -->
+        <div id="ingest-panel" class="absolute right-0 top-0 h-full w-full md:w-[400px] bg-white border-l border-zyrabit-border shadow-2xl z-40 p-6 flex flex-col translate-x-full">
+            <div class="flex items-center justify-between mb-8">
+                <h2 class="text-lg font-bold tracking-tight text-zyrabit-primary">Data Ingestion</h2>
+                <button id="close-ingest" class="text-gray-400 hover:text-zyrabit-text transition text-2xl">×</button>
+            </div>
+            <div id="drop-zone" class="border-2 border-dashed border-zyrabit-border rounded-xl p-8 text-center hover:border-zyrabit-primary transition cursor-pointer bg-zyrabit-surface/30 mb-6">
+                <div class="text-3xl mb-4">📁</div>
+                <p class="text-xs font-medium">Drop files here</p>
+                <input type="file" id="file-input" multiple class="hidden">
+            </div>
+            <div id="vault-list" class="flex-1 overflow-y-auto space-y-2"></div>
+        </div>
+
+    </main>
+
+    <script type="module" src="/src/main.js"></script>
+</body>
+
+</html>
