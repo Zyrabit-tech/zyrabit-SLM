@@ -22,7 +22,7 @@ class OllamaInferenceAdapter(InferenceProviderPort):
     def __init__(
         self,
         endpoint: str,
-        default_timeout_seconds: float = 120.0,
+        default_timeout_seconds: float = 300.0,
         provider_name: str = "ollama",
     ) -> None:
         self.endpoint = endpoint.strip()

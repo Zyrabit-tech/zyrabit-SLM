@@ -18,3 +18,5 @@ requests>=2.32.6
 python-multipart==0.0.22
 python-socketio[asyncio]>=5.11.0
 python-engineio>=4.9.0
+unstructured>=0.12.5
+markdown>=3.5.0

@@ -17,7 +17,8 @@ ENV PATH="/opt/venv/bin:$PATH"
 
 COPY requirements.txt .
 RUN pip install --upgrade pip && \
-    pip install --no-cache-dir -r requirements.txt
+    pip install --no-cache-dir -r requirements.txt && \
+    python -m spacy download en_core_web_sm
 
 # STAGE 2: Runtime
 FROM python:3.12-slim-bookworm
@@ -38,7 +39,8 @@ RUN addgroup --system zyrabituser && adduser --system --group zyrabituser
 # Copiamos código
 COPY ./app ./app
 
-RUN chown -R zyrabituser:zyrabituser /app
+RUN mkdir -p /app/document_source && \
+    chown -R zyrabituser:zyrabituser /app
 
 USER zyrabituser
 

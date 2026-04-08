@@ -27,6 +27,25 @@ services:
       - ./document_source:/app/document_source
       - ../README.md:/app/README.md:ro # For auto-ingest
 
+  # 1.5 THE FACE: Web UI
+  web-ui:
+    build:
+      context: ./web-ui
+    container_name: web-ui
+    ports:
+      - "3000:80"
+    networks:
+      - backend-network
+    volumes:
+      - ./web-ui/public/img:/usr/share/nginx/html/img:ro
+    depends_on:
+      - api-rag
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
   # 2. THE MUSCLE: SLM Server
   slm-engine:
     image: ollama/ollama:latest

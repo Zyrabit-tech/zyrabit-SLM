@@ -62,9 +62,15 @@ else
     if curl -s -f http://localhost:11434/api/tags > /dev/null; then
         echo "SUCCESS: Docker Ollama is responding on port 11434."
     else
-        echo "WAITING: Docker Ollama is not responding on port 11434."
-        echo "Check if you have a native Ollama app blocking the port, or wait for the container to load models."
-        echo "Logs: docker compose $COMPOSE_FILES logs -f slm-engine"
+        # Check if API RAG already sees it (internal network works)
+        if curl -s http://localhost:8080/v1/health 2>/dev/null | grep -q '"slm": *"online"'; then
+            echo "INFO: Docker Ollama (Internal) is ONLINE and connected to API."
+            echo "      (Host access to :11434 is blocked but the system is working fine)"
+        else
+            echo "WAITING: Docker Ollama is not responding on port 11434."
+            echo "Check if you have a native Ollama app blocking the port, or wait for the container to load models."
+            echo "Logs: docker compose $COMPOSE_FILES logs -f slm-engine"
+        fi
     fi
 fi
 

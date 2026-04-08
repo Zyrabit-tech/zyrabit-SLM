@@ -67,13 +67,17 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# --- Instrumentation ---
+Instrumentator().instrument(app).expose(app)
+
 sio = socketio.AsyncServer(async_mode='asgi', cors_allowed_origins='*')
 sio_app = socketio.ASGIApp(sio)
 
 # --- Register Routers (Driving Adapters) ---
-from .api.v1.endpoints import chat, health
+from .api.v1.endpoints import chat, health, documents
 app.include_router(chat.router, prefix="/v1", tags=["Chat"])
 app.include_router(health.router, prefix="/v1", tags=["Monitoring"])
+app.include_router(documents.router, prefix="/v1", tags=["Documents"])
 
 # --- Socket.io Events (Driving Adapter) ---
 @sio.event
@@ -92,27 +96,33 @@ async def chat_message(sid, data):
         }, to=sid)
         return
 
-    use_case = get_chat_use_case()
-    if decision == "search_rag_database":
-        response, hits, latency = use_case.execute_rag(text, MODEL_NAME)
-    else:
-        response, latency = use_case.execute_direct_chat(text, MODEL_NAME)
-        hits = 0
+    try:
+        use_case = get_chat_use_case()
+        sources = []
+        if decision == "search_rag_database":
+            response, hits, latency, sources = use_case.execute_rag(text, MODEL_NAME)
+        else:
+            response, latency = use_case.execute_direct_chat(text, MODEL_NAME)
+            hits = 0
 
-    await sio.emit("chat_response", {
-        "response": response,
-        "metadata": {"decision": decision, "rag_hits": hits, "latency_ms": round(latency * 1000, 2)}
-    }, to=sid)
+        await sio.emit("chat_response", {
+            "response": response,
+            "metadata": {
+                "decision": decision, 
+                "rag_hits": hits, 
+                "latency_ms": round(latency * 1000, 2),
+                "sources": sources
+            }
+        }, to=sid)
+    except Exception as e:
+        logger.error(f"Error in chat_message handler: {e}")
+        await sio.emit("chat_response", {
+            "response": f"I encountered a secure gateway error: {str(e)}",
+            "metadata": {"decision": "error", "latency_ms": 0, "rag_hits": 0, "sources": []}
+        }, to=sid)
 
 # --- Mounting & Static ---
 app.mount("/socket.io", sio_app)
-
-static_dir = "/app/web-ui/dist"
-if not os.path.exists(static_dir):
-    static_dir = os.path.join(os.path.dirname(__file__), "static")
-
-if os.path.isdir(static_dir):
-    app.mount("/ui", StaticFiles(directory=static_dir, html=True), name="ui")
 
 @app.get("/", include_in_schema=False)
 async def root():

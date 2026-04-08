@@ -1,4 +1,4 @@
-# Zyrabit SLM Secure Suite (v1.0)
+# Zyrabit SLM Secure Suite
 
 [![Spanish](https://img.shields.io/badge/lang-Spanish-blue.svg)](README.md)
 [![Python](https://img.shields.io/badge/python-3.12%20recommended-blue.svg)](https://python.org)

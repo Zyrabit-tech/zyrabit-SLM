@@ -30,6 +30,7 @@ def get_slm_router_decision(query: str) -> str:
 
 def process_and_ingest_file(file_path: str) -> Dict[str, Any]:
     """Ingests a file into the vector database with support for PDF, MD, and TXT."""
+    from langchain_text_splitters import RecursiveCharacterTextSplitter
     
     logger.info(f"Processing file for ingestion: {file_path}")
     
@@ -46,6 +47,14 @@ def process_and_ingest_file(file_path: str) -> Dict[str, Any]:
             
         docs = loader.load()
         
+        # Split documents into chunks
+        text_splitter = RecursiveCharacterTextSplitter(
+            chunk_size=1000,
+            chunk_overlap=200,
+            length_function=len,
+        )
+        split_docs = text_splitter.split_documents(docs)
+        
         embeddings = OllamaEmbeddings(model="mxbai-embed-large", base_url=SLM_URL)
         parsed = urlparse(DB_URL)
         adapter = ChromaAdapter(
@@ -57,9 +66,14 @@ def process_and_ingest_file(file_path: str) -> Dict[str, Any]:
         
         use_case = IngestUseCase(vector_store=adapter)
         
-        chunks = [d.page_content for d in docs]
-        metadatas = [d.metadata for d in docs]
-        ids = [f"{os.path.basename(file_path)}_{i}" for i in range(len(docs))]
+        chunks = [d.page_content for d in split_docs]
+        metadatas = [d.metadata for d in split_docs]
+        # Add filename to metadata if not present for citations
+        for m in metadatas:
+            if "source" not in m:
+                m["source"] = os.path.basename(file_path)
+        
+        ids = [f"{os.path.basename(file_path)}_{i}" for i in range(len(split_docs))]
         
         use_case.ingest_text_chunks(chunks, metadatas, ids)
         

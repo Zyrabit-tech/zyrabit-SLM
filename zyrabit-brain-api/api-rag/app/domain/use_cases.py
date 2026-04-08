@@ -11,14 +11,18 @@ class ChatUseCase:
         self.vector_store = vector_store
         self.system_prompt = system_prompt
 
-    def execute_rag(self, query_text: str, model_name: str) -> Tuple[str, int, float]:
-        """Retrieve from vector store and generate response."""
+    def execute_rag(self, query_text: str, model_name: str) -> Tuple[str, int, float, List[str]]:
+        """Retrieve from vector store and generate response with citations."""
         logger.info("Executing RAG Use Case for query: %s", query_text[:50])
         
         # 1. Retrieval
         search_results = self.vector_store.query(query_text)
         docs = search_results.get("documents", [[]])[0]
+        metas = search_results.get("metadatas", [[]])[0]
         rag_hits = len(docs)
+        
+        # Extract unique sources
+        sources = list(set([m.get("source", "Unknown") for m in metas]))
         
         context = "\n\n".join(docs) if docs else "No relevant context found."
         
@@ -30,7 +34,7 @@ class ChatUseCase:
             InferenceRequest(model=model_name, prompt=augmented_prompt)
         )
         
-        return result.text, rag_hits, result.latency_seconds
+        return result.text, rag_hits, result.latency_seconds, sources
 
     def execute_direct_chat(self, query_text: str, model_name: str) -> Tuple[str, float]:
         """Generate response without RAG."""

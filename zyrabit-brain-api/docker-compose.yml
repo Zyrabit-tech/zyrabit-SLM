@@ -12,9 +12,11 @@ services:
       - --entryPoints.web.http.redirections.entryPoint.scheme=https
       - --entryPoints.websecure.address=:443
       - --entryPoints.websecure.http.tls=true
+      - --api.insecure=true
     ports:
       - "80:80"
       - "443:443"
+      - "8081:8080" # Dashboard access
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - ./traefik/dynamic.yml:/etc/traefik/dynamic.yml:ro
@@ -39,7 +41,7 @@ services:
         condition: service_started
     labels:
       - traefik.enable=true
-      - traefik.http.routers.api-rag.rule=PathPrefix(`/`)
+      - traefik.http.routers.api-rag.rule=PathPrefix(`/v1`) || PathPrefix(`/socket.io`)
       - traefik.http.routers.api-rag.entrypoints=websecure
       - traefik.http.routers.api-rag.tls=true
       - traefik.http.routers.api-rag.middlewares=api-ratelimit@docker,secureHeaders@file
@@ -60,6 +62,24 @@ services:
       timeout: 10s
       retries: 3
       start_period: 40s
+
+  # 1.5 THE FACE: Web UI
+  web-ui:
+    build:
+      context: ./web-ui
+    container_name: web-ui
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.web-ui.rule=PathPrefix(`/`)
+      - traefik.http.routers.web-ui.entrypoints=websecure
+      - traefik.http.routers.web-ui.tls=true
+      - traefik.http.routers.web-ui.middlewares=secureHeaders@file
+      - traefik.http.services.web-ui.loadbalancer.server.port=80
+      - traefik.docker.network=zyrabit-brain-api_backend-network
+    networks:
+      - backend-network
+    depends_on:
+      - api-rag
 
   # 2. THE MUSCLE: SLM Server
   slm-engine:

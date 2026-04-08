@@ -11,6 +11,10 @@ class LangchainEmbeddingAdapter:
     def __call__(self, input: List[str]) -> List[List[float]]:
         return self.langchain_embeddings.embed_documents(input)
 
+    def embed_query(self, input: str) -> List[float]:
+        """Specific method required by some ChromaDB versions/paths."""
+        return self.langchain_embeddings.embed_query(input)
+
     def name(self) -> str:
         return self.langchain_embeddings.__class__.__name__
 
