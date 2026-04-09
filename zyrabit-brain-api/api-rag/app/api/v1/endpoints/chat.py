@@ -1,11 +1,9 @@
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
-from typing import Optional, Dict, Any
+from typing import Optional
 import uuid
 import logging
 from ....domain.services.gatekeeper import Gatekeeper
-from ....domain.use_cases import ChatUseCase
-from .... import services # Still temporarily needed for some helpers
 
 logger = logging.getLogger("uvicorn.error")
 

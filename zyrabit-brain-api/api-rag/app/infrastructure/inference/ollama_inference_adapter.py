@@ -80,7 +80,7 @@ class OllamaInferenceAdapter(InferenceProviderPort):
         try:
             response = requests.get(tags_url, timeout=5.0)
             if response.status_code != 200:
-                return {"provider": self.provider_name, "ok": False, "reason": f"API error: {response.status_code}"}
+                return {"provider": self.provider_name, "ok": False, "reason": "Health check failed"}
             
             tags_data = response.json()
             models = [m.get("name") for m in tags_data.get("models", [])]
@@ -104,9 +104,10 @@ class OllamaInferenceAdapter(InferenceProviderPort):
                 "model_loaded": is_loaded,
                 "status": "READY" if is_loaded else "WARMING_UP"
             }
-        except requests.exceptions.RequestException as e:
+        except requests.exceptions.RequestException:
+            logger.exception("Ollama health check failed.")
             return {
                 "provider": self.provider_name,
                 "ok": False,
-                "reason": f"Cannot connect: {str(e)}"
+                "reason": "Cannot connect to inference provider"
             }
