@@ -38,4 +38,4 @@ jobs:
         run: pip-audit -r requirements.txt
 
       - name: Audit API dependencies
-        run: pip-audit -r zyrabit-brain-api/api-rag/requirements.txt
+        run: pip-audit -r zyrabit-slm/api-rag/requirements.txt

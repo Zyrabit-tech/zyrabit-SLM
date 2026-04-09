@@ -61,7 +61,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="Zyrabit SLM API",
     description="Hexagonal RAG-Ops API with Socket.io streaming.",
-    version="1.3.0",
+    version="1.4.0",
     lifespan=lifespan
 )
 
