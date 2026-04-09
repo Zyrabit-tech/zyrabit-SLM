@@ -9,6 +9,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.5.0] - 2026-04-08
+
+### Added
+- **Sovereign Agent Governance**: Established `AGENTS.md` with strict rules for AI Agent operations (no silent deletions).
+- **Hexagonal Architecture Realignment**: Deep structural refactor into `domain`, `ports`, `adapters`, `api`, and `core` layers.
+- **Gatekeeper Isolation**: Centralized SLM routing and security policy decision logic in `domain/services/gatekeeper.py`.
+- **Architectural Documentation**: Added `HEXAGONAL_ARCHITECTURE.md` to document the tiered structure.
+
+### Changed
+- Refactored `main.py` into a lean entry point.
+- Moved API endpoints to `api/v1/endpoints/`.
+- Moved all external adapters to `infrastructure/`.
+- Consolidated security and metrics into `core/`.
+- Updated `zyra-up.sh` with `--local`, `--model` flags and production cleanup.
+
+### Fixed
+- Improved health check to detect if the SLM model is currently loaded in RAM.
+- Handled `=` syntax for the `--model` flag in the setup script.
+
 ## [1.2.0] - 2026-04-06
 
 

@@ -8,8 +8,8 @@ import os
 from typing import Any, Dict, List, Tuple
 from urllib.parse import unquote, urlparse
 
-from .security import anonymize_text
-from .services import query_secure_slm
+from app.core.security import anonymize_text
+from app.services import query_secure_slm
 
 
 MCP_PROTOCOL_VERSION = "2025-01-01"

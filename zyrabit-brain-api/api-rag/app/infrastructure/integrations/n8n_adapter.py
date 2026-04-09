@@ -6,7 +6,7 @@ import os
 from dataclasses import dataclass
 from typing import Callable, Dict
 
-from ..ports.automation_port import AutomationPort
+from app.ports.automation_port import AutomationPort
 
 
 def _parse_bool(value: str, default: bool) -> bool:

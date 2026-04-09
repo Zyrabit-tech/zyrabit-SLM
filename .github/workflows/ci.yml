@@ -67,5 +67,28 @@ jobs:
 
       - name: Run API tests
         run: |
-          cd zyrabit-brain-api/api-rag
-          python -m pytest -q
+            cd zyrabit-brain-api/api-rag
+            python -m pytest -q
+
+  production-build-gate:
+    name: Production Build Gate
+    runs-on: ubuntu-latest
+    needs: tests
+    if: github.base_ref == 'main'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate Production Compose Configuration
+        run: |
+          cd zyrabit-brain-api
+          docker compose config -q
+          echo "✅ Production docker-compose.yml is valid."
+
+      - name: Integrity Check (Structure)
+        run: |
+          if [ ! -f zyrabit-brain-api/api-rag/app/HEXAGONAL_ARCHITECTURE.md ]; then
+            echo "❌ ERROR: HEXAGONAL_ARCHITECTURE.md is missing!"
+            exit 1
+          fi
+          echo "✅ Architectural documentation present."

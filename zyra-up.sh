@@ -29,6 +29,8 @@ Commands:
 
 Options:
   --profile <name>  Start Docker Compose with a specific profile (e.g., n8n, docs, observability-extra)
+  --local           Use the local composition (No SSL, port 8080)
+  --model <name>    Override the SLM model to use (e.g., llama3, mistral)
 EOF
 }
 
@@ -157,7 +159,9 @@ resolve_model_name() {
     model_default="${model_low_ram}"
   fi
 
-  if [[ -n "${ZYRABIT_MODEL:-}" ]]; then
+  if [[ -n "${OVERRIDE_MODEL:-}" ]]; then
+    echo "${OVERRIDE_MODEL}"
+  elif [[ -n "${ZYRABIT_MODEL:-}" ]]; then
     echo "${ZYRABIT_MODEL}"
   else
     echo "${model_default}"
@@ -191,6 +195,13 @@ apply_accelerator_profile() {
   esac
 }
 
+run_cleanup() {
+  log_info "Cleaning up old images and dangling containers..."
+  docker image prune -f
+  # Optional: docker system prune -f --volumes (Too aggressive?)
+  log_ok "Cleanup completed."
+}
+
 run_start() {
   require_compose_file
   validate_required_env_vars
@@ -209,6 +220,12 @@ run_start() {
   fi
   
   compose_args+=("up" "-d")
+  
+  if [[ "${COMPOSE_FILE}" != *"local"* ]]; then
+     # Production-like path: cleanup first
+     run_cleanup
+  fi
+
   docker compose "${compose_args[@]}"
   log_ok "Infrastructure started."
 }
@@ -238,10 +255,14 @@ run_install() {
   docker network disconnect zyrabit-brain-api_backend-network slm-engine || true
 
   log_ok "Zyrabit is ready."
-  echo
-  echo "API (Traefik HTTPS): https://localhost/health"
-  echo "Prometheus (Traefik): https://localhost/prometheus"
-  echo "Grafana (Traefik): https://localhost/grafana"
+  echo "URL (Selected): ${COMPOSE_FILE}"
+  if [[ "${COMPOSE_FILE}" == *"local"* ]]; then
+    echo "API (Direct HTTP): http://localhost:8080/health"
+  else
+    echo "API (Traefik HTTPS): https://localhost/health"
+    echo "Prometheus (Traefik): https://localhost/prometheus"
+    echo "Grafana (Traefik): https://localhost/grafana"
+  fi
 }
 
 run_doctor() {
@@ -274,6 +295,7 @@ run_doctor() {
 }
 
 PROFILE=""
+OVERRIDE_MODEL=""
 COMMAND="install"
 
 while [[ "$#" -gt 0 ]]; do
@@ -281,6 +303,18 @@ while [[ "$#" -gt 0 ]]; do
     --profile)
       PROFILE="$2"
       shift 2
+      ;;
+    --local)
+      COMPOSE_FILE="${SCRIPT_DIR}/zyrabit-brain-api/docker-compose.local.yml"
+      shift
+      ;;
+    --model)
+      OVERRIDE_MODEL="$2"
+      shift 2
+      ;;
+    --model=*)
+      OVERRIDE_MODEL="${1#*=}"
+      shift
       ;;
     install|start|doctor|help|-h|--help)
       COMMAND="$1"

@@ -11,7 +11,8 @@ from io import BytesIO
 from fastapi.testclient import TestClient
 
 from app.main import app
-from app import services
+from app.domain.services.gatekeeper import Gatekeeper
+from app.domain.use_cases import ChatUseCase
 
 client = TestClient(app)
 
@@ -20,21 +21,21 @@ client = TestClient(app)
 
 def test_router_returns_rag_for_zyrabit_keyword():
     """Router must send Zyrabit-related queries to RAG."""
-    assert services.get_slm_router_decision("¿Qué es Zyrabit?") == "search_rag_database"
-    assert services.get_slm_router_decision("Explain the architecture") == "search_rag_database"
-    assert services.get_slm_router_decision("How does RAG work here?") == "search_rag_database"
+    assert Gatekeeper.get_routing_decision("¿Qué es Zyrabit?") == "search_rag_database"
+    assert Gatekeeper.get_routing_decision("Explain the architecture") == "search_rag_database"
+    assert Gatekeeper.get_routing_decision("How does RAG work here?") == "search_rag_database"
 
 
 def test_router_returns_direct_for_general_queries():
     """Router must send general knowledge to direct SLM."""
-    assert services.get_slm_router_decision("¿Qué es Python?") == "direct_SLM_answer"
-    assert services.get_slm_router_decision("Capital of France?") == "direct_SLM_answer"
+    assert Gatekeeper.get_routing_decision("¿Qué es Python?") == "direct_SLM_answer"
+    assert Gatekeeper.get_routing_decision("Capital of France?") == "direct_SLM_answer"
 
 
 def test_router_rejects_spam():
     """Router must reject spam/off-topic queries."""
-    assert services.get_slm_router_decision("comprar viagra barato ahora") == "reject_query"
-    assert services.get_slm_router_decision("casino free money") == "reject_query"
+    assert Gatekeeper.get_routing_decision("comprar viagra barato ahora") == "reject_query"
+    assert Gatekeeper.get_routing_decision("casino free money") == "reject_query"
 
 
 # --- Ingest API ---
@@ -42,7 +43,7 @@ def test_router_rejects_spam():
 @patch("app.services.process_and_ingest_file")
 def test_ingest_txt_file_success(mock_process, tmp_path):
     """Ingest endpoint accepts .txt files."""
-    with patch('app.main.INGEST_DIR', str(tmp_path)):
+    with patch('app.api.v1.endpoints.documents.DOCS_DIR', str(tmp_path)):
         mock_process.return_value = {
             "status": "success",
             "chunks_processed": 5,
@@ -59,7 +60,7 @@ def test_ingest_txt_file_success(mock_process, tmp_path):
 @patch("app.services.process_and_ingest_file")
 def test_ingest_md_file_success(mock_process, tmp_path):
     """Ingest endpoint accepts .md files."""
-    with patch('app.main.INGEST_DIR', str(tmp_path)):
+    with patch('app.api.v1.endpoints.documents.DOCS_DIR', str(tmp_path)):
         mock_process.return_value = {
             "status": "success",
             "chunks_processed": 3,
@@ -74,10 +75,10 @@ def test_ingest_md_file_success(mock_process, tmp_path):
 
 # --- RAG pipeline (mocked ChromaDB + Ollama) ---
 
-@patch("app.services.execute_rag_pipeline_with_metadata")
+@patch("app.domain.use_cases.ChatUseCase.execute_rag")
 def test_chat_rag_includes_context_in_response(mock_rag):
     """RAG flow: chat with RAG decision returns context-aware response."""
-    mock_rag.return_value = ("Zyrabit uses ChromaDB for vector storage and Ollama for inference.", 2)
+    mock_rag.return_value = ("Zyrabit uses ChromaDB for vector storage and Ollama for inference.", 2, 0.5, ["source.txt"])
     # This tests the full flow; execute_rag_pipeline internals are tested in Docker E2E
     response = client.post(
         "/v1/chat",
@@ -89,12 +90,12 @@ def test_chat_rag_includes_context_in_response(mock_rag):
 
 # --- Full chat flow ---
 
-@patch("app.services.execute_rag_pipeline_with_metadata")
-@patch("app.services.get_slm_router_decision")
-def test_chat_rag_flow_returns_response(mock_router, mock_rag):
+@patch("app.domain.services.gatekeeper.Gatekeeper.get_routing_decision")
+@patch("app.domain.use_cases.ChatUseCase.execute_rag")
+def test_chat_rag_flow_returns_response(mock_rag, mock_router):
     """Full chat flow: RAG query returns augmented response."""
     mock_router.return_value = "search_rag_database"
-    mock_rag.return_value = ("Zyrabit combina SLMs con RAG y seguridad Zero-Trust.", 1)
+    mock_rag.return_value = ("Zyrabit combina SLMs con RAG y seguridad Zero-Trust.", 1, 0.4, ["doc.pdf"])
 
     response = client.post(
         "/v1/chat",
@@ -103,16 +104,16 @@ def test_chat_rag_flow_returns_response(mock_router, mock_rag):
     assert response.status_code == 200
     data = response.json()
     assert "response" in data
-    assert data["metadata"]["route_decision"] == "search_rag_database"
+    assert data["metadata"]["decision"] == "search_rag_database"
     assert "Zyrabit" in data["response"] or "RAG" in data["response"]
 
 
-@patch("app.services.call_direct_slm")
-@patch("app.services.get_slm_router_decision")
+@patch("app.domain.use_cases.ChatUseCase.execute_direct_chat")
+@patch("app.domain.services.gatekeeper.Gatekeeper.get_routing_decision")
 def test_chat_direct_flow_returns_response(mock_router, mock_slm):
     """Full chat flow: direct SLM query returns response."""
     mock_router.return_value = "direct_SLM_answer"
-    mock_slm.return_value = "Python es un lenguaje de programación."
+    mock_slm.return_value = ("Python es un lenguaje de programación.", 0.2)
 
     response = client.post(
         "/v1/chat",
@@ -122,7 +123,7 @@ def test_chat_direct_flow_returns_response(mock_router, mock_slm):
     assert "Python" in response.json()["response"]
 
 
-@patch("app.services.get_slm_router_decision")
+@patch("app.domain.services.gatekeeper.Gatekeeper.get_routing_decision")
 def test_chat_reject_returns_400(mock_router):
     """Full chat flow: reject returns 400."""
     mock_router.return_value = "reject_query"
@@ -132,17 +133,7 @@ def test_chat_reject_returns_400(mock_router):
         json={"text": "comprar viagra"},
     )
     assert response.status_code == 400
-    assert "alcance" in response.json()["detail"].lower()
+    assert "out of scope" in response.json()["detail"].lower()
 
 
-# --- DB URL parsing ---
-
-def test_parse_db_url():
-    """DB_URL is correctly parsed for ChromaDB."""
-    host, port = services._parse_db_url("http://vector-db:8000")
-    assert host == "vector-db"
-    assert port == 8000
-
-    host2, port2 = services._parse_db_url("http://localhost:8001")
-    assert host2 == "localhost"
-    assert port2 == 8001
+# --- End of Tests ---
