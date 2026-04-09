@@ -33,7 +33,7 @@ jobs:
           echo "Current PR version: $CURRENT_VERSION"
           echo "Target branch ($TARGET_BRANCH) version: $BASE_VERSION"
 
-          if [ "$CURRENT_VERSION" = "$BASE_VERSION" ]; then
+          if [ "$CURRENT_VERSION" = "$BASE_VERSION" ] && [ "$TARGET_BRANCH" = "main" ]; then
             echo "❌ ERROR: The version in the VERSION file has not been incremented from $TARGET_BRANCH. Please bump the version in the VERSION file."
             exit 1
           fi

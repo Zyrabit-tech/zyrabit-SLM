@@ -1,4 +1,4 @@
-# Zyrabit Brain API
+# Zyrabit SLM
 
 [English version](README_EN.md)
 
@@ -253,7 +253,29 @@ Redes:
 - `backend-network`
 - `model-network` (`internal: true`)
 
+## Manejo de Entorno (Managed Environment)
+
+> [!TIP]
+> Para evitar errores de "module not found" (como `pytest`), se recomienda encarecidamente trabajar dentro de un entorno virtual.
+
+1. **Crear el entorno virtual:**
+   ```bash
+   python3 -m venv .venv
+   ```
+
+2. **Activarlos:**
+   - macOS / Linux: `source .venv/bin/activate`
+   - Windows: `.\.venv\Scripts\activate`
+
+3. **Instalar dependencias:**
+   ```bash
+   pip install -r requirements.txt
+   pip install -r api-rag/requirements.txt
+   ```
+
 ## Testing
+
+Asegúrate de tener el entorno activado antes de correr los tests.
 
 ```bash
 cd api-rag

@@ -4,10 +4,8 @@ from __future__ import annotations
 
 import os
 
-from .adapters.ollama_inference_adapter import OllamaInferenceAdapter
-from .adapters.openai_compatible_inference_adapter import (
-    OpenAICompatibleInferenceAdapter,
-)
+from .infrastructure.inference.ollama_inference_adapter import OllamaInferenceAdapter
+from .infrastructure.inference.gemini_inference_adapter import GeminiInferenceAdapter
 from .ports.inference_port import InferenceProviderError, InferenceProviderPort
 
 
@@ -34,19 +32,18 @@ def create_inference_provider() -> InferenceProviderPort:
             provider_name=provider,
         )
 
-    if provider in {"openai", "openai_compatible", "openai-compatible"}:
-        return OpenAICompatibleInferenceAdapter(
-            endpoint=os.getenv(
-                "INFERENCE_BASE_URL",
-                "http://localhost:8000/v1/chat/completions",
-            ),
-            api_key=os.getenv("INFERENCE_API_KEY", ""),
-            default_timeout_seconds=timeout_seconds,
-            provider_name="openai_compatible",
+    if provider == "gemini":
+        api_key = os.getenv("GEMINI_API_KEY")
+        if not api_key:
+            raise InferenceProviderError("GEMINI_API_KEY is required for Gemini provider.")
+        
+        return GeminiInferenceAdapter(
+            api_key=api_key,
+            model=os.getenv("MODEL_NAME", "gemini-1.5-flash-latest"),
+            default_timeout_seconds=timeout_seconds
         )
 
     raise InferenceProviderError(
         "Unsupported INFERENCE_PROVIDER "
-        f"'{provider}'. Supported values: ollama, ollama_host, "
-        "ollama_docker, openai_compatible."
+        f"'{provider}'. Supported values: ollama, gemini."
     )

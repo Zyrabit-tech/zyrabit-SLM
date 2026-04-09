@@ -1,4 +1,4 @@
-from app.security import (
+from app.core.security import (
     PipelineContext,
     anonymize_text,
     build_security_pipeline,

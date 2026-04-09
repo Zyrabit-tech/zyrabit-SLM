@@ -1,333 +1,137 @@
-import logging
 import os
-import re
-from typing import Tuple
+import logging
+from typing import Dict, Any, Tuple
+from .infrastructure.persistence.chroma_adapter import ChromaAdapter
+from .infrastructure.inference.ollama_inference_adapter import OllamaInferenceAdapter
+from .domain.use_cases import IngestUseCase, ChatUseCase
+from .domain.services.gatekeeper import Gatekeeper
+from .ports.inference_port import InferenceRequest
 from urllib.parse import urlparse
+from langchain_ollama import OllamaEmbeddings
 
-from .inference_factory import create_inference_provider
-from .metrics import (
-    approximate_token_count,
-    observe_latency_per_token,
-    observe_security_hits,
-    observe_token_usage,
-)
-from .ports.inference_port import InferenceProviderError, InferenceRequest
-from .security import PipelineContext, build_security_pipeline
-
-# --- CONFIGURATION ---
-# Use environment variables or default to local settings
-# Defaulting to qwen2.5:7b as per setup script, but overridable.
-MODEL_NAME = os.getenv("MODEL_NAME", "qwen2.5:7b")
-DB_URL = os.getenv("DB_URL", "http://vector-db:8000")
-COLLECTION_NAME = os.getenv("RAG_COLLECTION", "zyrabit_knowledge")
-EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "mxbai-embed-large")
-CHUNK_SIZE = 1000
-CHUNK_OVERLAP = 200
-RAG_N_RESULTS = 5
 logger = logging.getLogger("uvicorn.error")
 
-# Spam/off-topic patterns that trigger reject_query
-REJECT_PATTERNS = [
-    r"\bviagra\b", r"\bcasino\b", r"\bcrypto\s*scam\b",
-    r"comprar\s+barato\s+ahora", r"click\s+here\s+now",
-]
+# --- Configuration ---
+SLM_URL = os.getenv("SLM_URL", "http://slm-engine:11434")
+DB_URL = os.getenv("DB_URL", "http://vector-db:8000")
+COLLECTION_NAME = os.getenv("RAG_COLLECTION", "zyrabit_knowledge")
 
-# --- SYSTEM PROMPT LOADING ---
 def load_system_prompt() -> str:
-    """Loads the system prompt from the mounted file or fallback.
-    
-    Returns:
-        str: The system prompt content, or empty string if file not found.
-    """
-    external_prompt_path = "/app/prompts/agent.md"
-    try:
-        with open(external_prompt_path, "r", encoding="utf-8") as f:
-            return f.read().strip()
-    except FileNotFoundError:
-        pass # Fallback to internal
-
+    """Loads the system prompt from the local file."""
     prompt_path = os.path.join(os.path.dirname(__file__), "system_prompt.txt")
-    try:
+    if os.path.exists(prompt_path):
         with open(prompt_path, "r", encoding="utf-8") as f:
             return f.read().strip()
-    except FileNotFoundError:
-        logger.warning("system_prompt.txt not found at %s", prompt_path)
-        return ""
+    return "You are a helpful Zyrabit assistant."
 
-def print_header(title: str):
-    """Prints a styled header to the console."""
-    print(f"\n{'='*60}")
-    print(f"🛡️ ZYRABIT SECURITY LAYER: {title}")
-    print(f"{'='*60}")
+def get_slm_router_decision(query: str) -> str:
+    """Determines if the query needs RAG or direct answer."""
+    return Gatekeeper.get_routing_decision(query)
 
-def query_secure_slm(prompt: str) -> tuple[str, float]:
-    """
-    Sends a sanitized prompt to the local SLM and returns the response and latency.
+def process_and_ingest_file(file_path: str) -> Dict[str, Any]:
+    """Ingests a file into the vector database with support for PDF, MD, and TXT."""
+    from langchain_text_splitters import RecursiveCharacterTextSplitter
     
-    Args:
-        prompt (str): The user's input prompt.
-        
-    Returns:
-        tuple[str, float]: A tuple containing the (response_text, latency_in_seconds).
-    """
-    # PHASE A: SANITIZATION (Interceptor pipeline)
-    pipeline = build_security_pipeline()
-    pipeline_context = PipelineContext()
-    sanitized_prompt = pipeline.process_request(prompt, pipeline_context)
-    observe_security_hits(pipeline_context.detected_entities)
-
-    if pipeline_context.token_map:
-        logger.info(
-            "Security pipeline redacted sensitive entities before inference. entity_hits=%s",
-            pipeline_context.detected_entities,
-        )
-    else:
-        logger.info("Security pipeline detected no sensitive entities.")
-
-    # PHASE B: LOCAL INFERENCE (Air-Gapped)
-    # Construct prompt with system context dynamically so it reflects changes to agent.md
-    system_prompt_text = load_system_prompt()
-    full_prompt = f"{system_prompt_text}\n\nUser: {sanitized_prompt}\nAssistant:" if system_prompt_text else sanitized_prompt
+    logger.info(f"Processing file for ingestion: {file_path}")
     
     try:
-        provider = create_inference_provider()
-        model_name = os.getenv("MODEL_NAME", MODEL_NAME)
-        result = provider.generate(
-            InferenceRequest(
-                model=model_name,
-                prompt=full_prompt,
-                stream=False,
-            )
+        if file_path.lower().endswith(".pdf"):
+            from langchain_community.document_loaders import PyMuPDFLoader
+            loader = PyMuPDFLoader(file_path)
+        elif file_path.lower().endswith(".md"):
+            from langchain_community.document_loaders import UnstructuredMarkdownLoader
+            loader = UnstructuredMarkdownLoader(file_path)
+        else:
+            from langchain_community.document_loaders import TextLoader
+            loader = TextLoader(file_path)
+            
+        docs = loader.load()
+        
+        # Split documents into chunks
+        text_splitter = RecursiveCharacterTextSplitter(
+            chunk_size=1000,
+            chunk_overlap=200,
+            length_function=len,
         )
-        masked_response = result.text
-        restored_response = pipeline.process_response(masked_response, pipeline_context)
-        latency = result.latency_seconds
+        split_docs = text_splitter.split_documents(docs)
+        
+        embeddings = OllamaEmbeddings(model="mxbai-embed-large", base_url=SLM_URL)
+        parsed = urlparse(DB_URL)
+        adapter = ChromaAdapter(
+            host=parsed.hostname or "localhost",
+            port=parsed.port or 8000,
+            collection_name=COLLECTION_NAME,
+            embedding_function=embeddings
+        )
+        
+        use_case = IngestUseCase(vector_store=adapter)
+        
+        chunks = [d.page_content for d in split_docs]
+        metadatas = [d.metadata for d in split_docs]
+        # Add filename to metadata if not present for citations
+        for m in metadatas:
+            if "source" not in m:
+                m["source"] = os.path.basename(file_path)
+        
+        ids = [f"{os.path.basename(file_path)}_{i}" for i in range(len(split_docs))]
+        
+        use_case.ingest_text_chunks(chunks, metadatas, ids)
+        
+        return {"status": "success", "chunks": len(chunks)}
+    except Exception as e:
+        logger.error(f"Ingestion error: {e}")
+        return {"status": "error", "message": "Failed to ingest document chunks."}
 
-        input_tokens = approximate_token_count(prompt)
-        output_tokens = approximate_token_count(restored_response)
-        observe_token_usage(input_tokens=input_tokens, output_tokens=output_tokens)
-        observe_latency_per_token(latency_seconds=latency, output_tokens=output_tokens)
+def query_secure_slm(prompt: str, model_name: str = "qwen2.5:7b") -> Tuple[str, float]:
+    """Secure direct SLM query with PII anonymization."""
+    from .core.security import anonymize_text, deanonymize_text
+    from .inference_factory import create_inference_provider
+    
+    # 1. Anonymize
+    anon_result = anonymize_text(prompt)
+    
+    # 2. Generate
+    adapter = create_inference_provider()
+    result = adapter.generate(InferenceRequest(model=model_name, prompt=anon_result.sanitized_text))
+    
+    # 3. Deanonymize
+    restored_text = deanonymize_text(result.text, anon_result.token_map)
+    
+    return restored_text, result.latency_seconds
 
-        return restored_response, latency
-
-    except InferenceProviderError as exc:
-        return f"❌ ERROR: {exc}", 0.0
-
-def call_direct_slm(prompt: str) -> str:
-    """
-    Direct call to SLM without sanitization (for general knowledge).
-    """
-    response, _ = query_secure_slm(prompt)
+def execute_rag_pipeline(query: str) -> str:
+    """Legacy helper for RAG pipeline."""
+    # We recreate the context here to avoid circular imports with main.py factories
+    embeddings = OllamaEmbeddings(model="mxbai-embed-large", base_url=SLM_URL)
+    parsed = urlparse(DB_URL)
+    vector_store = ChromaAdapter(
+        host=parsed.hostname or "localhost",
+        port=parsed.port or 8000,
+        collection_name=COLLECTION_NAME,
+        embedding_function=embeddings
+    )
+    inference_provider = OllamaInferenceAdapter(endpoint=f"{SLM_URL}/api/generate")
+    
+    use_case = ChatUseCase(
+        inference_provider=inference_provider,
+        vector_store=vector_store,
+        system_prompt=load_system_prompt()
+    )
+    
+    # Using a default model name or taking from env
+    model_name = os.getenv("MODEL_NAME", "qwen2.5:7b")
+    response, *_ = use_case.execute_rag(query, model_name)
     return response
 
-def _parse_db_url(url: str) -> tuple[str, int]:
-    """Parse DB_URL into (host, port) for ChromaDB HttpClient."""
-    parsed = urlparse(url)
-    host = parsed.hostname or "localhost"
-    port = parsed.port or 8000
-    return host, port
-
-
+# Internal helpers for legacy tests compatibility
 def _create_embeddings():
-    """Create OllamaEmbeddings configured from environment (SRP: single source of truth)."""
-    from langchain_community.embeddings import OllamaEmbeddings
-
-    slm_url = os.getenv("SLM_URL", "http://localhost:11434/api/generate")
-    parsed_slm = urlparse(slm_url)
-    base_ollama_url = f"{parsed_slm.scheme}://{parsed_slm.netloc}"
-    return OllamaEmbeddings(model=EMBEDDING_MODEL, base_url=base_ollama_url)
-
+    return OllamaEmbeddings(model="mxbai-embed-large", base_url=SLM_URL)
 
 def _get_chroma_collection():
-    """Get or create the ChromaDB collection for RAG knowledge (SRP: single source of truth)."""
-    import chromadb
-
-    host, port = _parse_db_url(DB_URL)
-    client = chromadb.HttpClient(host=host, port=port)
-    return client.get_or_create_collection(name=COLLECTION_NAME)
-
-
-def get_slm_router_decision(text: str) -> str:
-    """
-    Decides whether to use RAG, Direct SLM, or reject.
-    Keyword-based router with spam detection.
-    """
-    text_lower = text.lower()
-    # Reject spam/off-topic
-    for pattern in REJECT_PATTERNS:
-        if re.search(pattern, text_lower, re.IGNORECASE):
-            return "reject_query"
-    # Provide helpful orientation if it's casually generic but harmless.
-    keywords = [
-        "zyrabit", "architecture", "security", "slm", "rag", "chromadb", 
-        "ollama", "docker", "pyme", "n8n", "automat", "zapier",
-        "resum", "documento", "pdf", "texto", "archivo", "one pager"
-    ]
-    if any(k in text_lower for k in keywords):
-        return "search_rag_database"
-    return "direct_SLM_answer"
-
-
-def execute_rag_pipeline_with_metadata(text: str) -> Tuple[str, int]:
-    """
-    Executes the RAG pipeline: Retrieve -> Augment -> Generate.
-    Uses ChromaDB for retrieval and Ollama for generation.
-    """
-    try:
-        logger.info("RAG pipeline start query_length=%s", len(text or ""))
-        collection = _get_chroma_collection()
-        embeddings = _create_embeddings()
-        query_embedding = embeddings.embed_query(text)
-
-        results = collection.query(
-            query_embeddings=[query_embedding],
-            n_results=RAG_N_RESULTS,
-        )
-
-        docs = results.get("documents", [[]])
-        rag_hits = 0
-        if docs and docs[0]:
-            context = "\n\n".join(docs[0])
-            rag_hits = len(docs[0])
-        else:
-            context = "No relevant documents found in the knowledge base."
-
-        logger.info(
-            "RAG retrieval complete collection=%s hits=%s",
-            COLLECTION_NAME,
-            rag_hits,
-        )
-        augmented_prompt = f"Context from knowledge base:\n{context}\n\nQuestion: {text}\n\nAnswer based on the context:"
-        response, _ = query_secure_slm(augmented_prompt)
-        return response, rag_hits
-
-    except Exception as e:
-        logger.exception("RAG pipeline failed collection=%s", COLLECTION_NAME)
-        return (
-            f"Lo siento, ocurrió un error al procesar tu consulta con la base de datos "
-            f"de conocimiento: {str(e)}"
-        ), 0
-
-
-def execute_rag_pipeline(text: str) -> str:
-    """
-    Backward-compatible wrapper for existing callers/tests.
-    """
-    response, _ = execute_rag_pipeline_with_metadata(text)
-    return response
-
-
-def process_and_ingest_file(file_path: str) -> dict:
-    """
-    Ingest PDF or TXT file into ChromaDB.
-    Returns status dict with chunks_processed.
-    """
-    ext = os.path.splitext(file_path)[1].lower()
-    logger.info("Ingest pipeline start file_path=%s ext=%s", file_path, ext)
-    if ext == ".pdf":
-        from langchain_community.document_loaders import PyMuPDFLoader
-        loader = PyMuPDFLoader(file_path)
-        docs = loader.load()
-    elif ext in (".txt", ".md"):
-        from langchain_community.document_loaders import TextLoader
-        loader = TextLoader(file_path, encoding="utf-8")
-        docs = loader.load()
-    else:
-        raise ValueError(f"Unsupported file type: {ext}")
-
-    # Debug: log extracted text lengths per page
-    total_chars = sum(len(d.page_content) for d in docs) if docs else 0
-    logger.info(
-        "Ingest extraction complete pages=%s total_chars=%s per_page=%s",
-        len(docs) if docs else 0,
-        total_chars,
-        [len(d.page_content) for d in docs] if docs else [],
+    parsed = urlparse(DB_URL)
+    return ChromaAdapter(
+        host=parsed.hostname or "localhost",
+        port=parsed.port or 8000,
+        collection_name=COLLECTION_NAME,
+        embedding_function=_create_embeddings()
     )
-
-    if not docs:
-        logger.info("Ingest pipeline completed with zero documents file_path=%s", file_path)
-        return {"status": "success", "filename": os.path.basename(file_path), "chunks_processed": 0}
-
-    from langchain_text_splitters import RecursiveCharacterTextSplitter
-
-    text_splitter = RecursiveCharacterTextSplitter(
-        chunk_size=CHUNK_SIZE,
-        chunk_overlap=CHUNK_OVERLAP,
-    )
-    chunks = text_splitter.split_documents(docs)
-    logger.info(
-        "Ingest split complete source_docs=%s chunks=%s chunk_size=%s overlap=%s",
-        len(docs),
-        len(chunks),
-        CHUNK_SIZE,
-        CHUNK_OVERLAP,
-    )
-
-    embeddings = _create_embeddings()
-    documents_to_add = [c.page_content for c in chunks]
-    source_name = os.path.basename(file_path)
-    metadatas_to_add = []
-    for idx, chunk in enumerate(chunks):
-        chunk_meta = chunk.metadata if isinstance(chunk.metadata, dict) else {}
-        safe_meta = {
-            "source_name": source_name,
-            "chunk_index": idx,
-        }
-        if "page" in chunk_meta:
-            safe_meta["page"] = chunk_meta["page"]
-        if "page_label" in chunk_meta:
-            safe_meta["page_label"] = chunk_meta["page_label"]
-        metadatas_to_add.append(safe_meta)
-    embedded_chunks = embeddings.embed_documents(documents_to_add)
-
-    collection = _get_chroma_collection()
-
-    ids = [f"chunk_{abs(hash(c.page_content)) % 10**10}_{i}" for i, c in enumerate(chunks)]
-    collection.add(
-        embeddings=embedded_chunks,
-        documents=documents_to_add,
-        metadatas=metadatas_to_add,
-        ids=ids,
-    )
-    logger.info(
-        "Ingest persisted chunks collection=%s chunks=%s",
-        COLLECTION_NAME,
-        len(chunks),
-    )
-
-    return {
-        "status": "success",
-        "filename": os.path.basename(file_path),
-        "chunks_processed": len(chunks),
-        "message": "Documento ingestado correctamente en la base de conocimiento.",
-    }
-
-
-def execute_automation_request(text: str) -> str:
-    """
-    Executes automation-originated requests using the same routing rules as chat.
-    """
-    decision = get_slm_router_decision(text)
-    if decision == "search_rag_database":
-        return execute_rag_pipeline(text)
-    if decision == "direct_SLM_answer":
-        return call_direct_slm(text)
-    return "Automation request rejected by router policy."
-
-# --- EXECUTION ---
-if __name__ == "__main__":
-    print_header("INITIATING ZERO-TRUST PROTOCOL")
-
-    # CASE 1: HARMLESS QUERY
-    query_1 = "What is the capital of France?"
-    print(f"\n🗣️  User: {query_1}")
-    response, latency = query_secure_slm(query_1)
-    print(f"🤖 Zyrabit ({latency:.2f}s): {response.strip()}")
-
-    # CASE 2: DATA LEAK ATTEMPT (Whisper Leak Scenario)
-    query_2 = "Draft an email confirming I transferred $50,000.00 USD to account 4532-1234-5678-9012 using my credentials."
-    print(f"\n🗣️  User (Risky): {query_2}")
-    response, latency = query_secure_slm(query_2)
-    
-    print_header("SECURE MODEL RESPONSE")
-    print(f"🤖 Zyrabit ({latency:.2f}s): {response.strip()}")
