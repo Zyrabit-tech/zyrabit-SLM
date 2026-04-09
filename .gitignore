@@ -45,13 +45,13 @@ document_source/
 grafana-data/
 prometheus-data/
 chroma-data/
-zyrabit-brain-api/grafana-data/
-zyrabit-brain-api/prometheus-data/
-zyrabit-brain-api/chroma-data/
-zyrabit-brain-api/n8n-data/
-zyrabit-brain-api/.ai/
-zyrabit-brain-api/ollama-models/
-zyrabit-brain-api/.DS_Store
+zyrabit-slm/grafana-data/
+zyrabit-slm/prometheus-data/
+zyrabit-slm/chroma-data/
+zyrabit-slm/n8n-data/
+zyrabit-slm/.ai/
+zyrabit-slm/ollama-models/
+zyrabit-slm/.DS_Store
 
 # SQLite / runtime
 *.sqlite
@@ -100,7 +100,7 @@ secrets.yaml
 # Re-allow important project readmes and env template
 !README.md
 !README_EN.md
-!zyrabit-brain-api/example.env
+!zyrabit-slm/example.env
 
 # Private Postman assets
 postman/private/

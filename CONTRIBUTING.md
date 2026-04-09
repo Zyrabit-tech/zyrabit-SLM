@@ -59,12 +59,26 @@ Ejemplos:
 ## Verificación local mínima
 
 ```bash
-./.venv/bin/python -m pytest -q -c zyrabit-brain-api/api-rag/pytest.ini
+./.venv/bin/python -m pytest -q -c zyrabit-slm/api-rag/pytest.ini
 streamlit run slm_console.py
 ./scripts/run_final_tests.sh
 ```
 
 Checklist extendido: `validation/pr-checklist.md`
+
+## Estándares de Infraestructura
+
+Para mantener la consistencia y legibilidad del ecosistema Zyrabit, todo nuevo contenedor o servicio debe seguir el patrón de nomenclatura:
+
+`zyrabit-<función-descriptiva>`
+
+**Ejemplos operativos:**
+- API Principal: `zyrabit-api`
+- Interfaz Web: `zyrabit-web`
+- Motor de Inferencia: `zyrabit-engine`
+- Base de Datos: `zyrabit-db`
+
+Cualquier referencia interna (DNS) o variable de entorno (`SLM_URL`, `DB_URL`) debe apuntar a estos hostnames oficiales.
 
 ## Seguridad de dependencias
 

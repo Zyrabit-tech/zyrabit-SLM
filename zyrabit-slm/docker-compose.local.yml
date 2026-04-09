@@ -1,20 +1,20 @@
 services:
   # 1. THE BRAIN: API RAG
-  api-rag:
+  zyrabit-api:
     build:
       context: ./api-rag
-    container_name: api-rag
+    container_name: zyrabit-api
     env_file:
       - .env
     environment:
       - N8N_SERVICE_TOKEN_FILE=/run/secrets/n8n_service_token
       - N8N_WEBHOOK_SIGNING_SECRET_FILE=/run/secrets/n8n_webhook_signing_secret
-      - SLM_URL=http://slm-engine:11434
-      - DB_URL=http://vector-db:8000
+      - SLM_URL=http://zyrabit-engine:11434
+      - DB_URL=http://zyrabit-db:8000
     depends_on:
-      vector-db:
+      zyrabit-db:
         condition: service_started
-      slm-engine:
+      zyrabit-engine:
         condition: service_started
     ports:
       - "8080:8080" # Direct HTTP access
@@ -28,10 +28,10 @@ services:
       - ../README.md:/app/README.md:ro # For auto-ingest
 
   # 1.5 THE FACE: Web UI
-  web-ui:
+  zyrabit-web:
     build:
       context: ./web-ui
-    container_name: web-ui
+    container_name: zyrabit-web
     ports:
       - "3000:80"
     networks:
@@ -39,7 +39,7 @@ services:
     volumes:
       - ./web-ui/public/img:/usr/share/nginx/html/img:ro
     depends_on:
-      - api-rag
+      - zyrabit-api
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost"]
       interval: 30s
@@ -47,9 +47,9 @@ services:
       retries: 3
 
   # 2. THE MUSCLE: SLM Server
-  slm-engine:
+  zyrabit-engine:
     image: ollama/ollama:latest
-    container_name: slm-engine
+    container_name: zyrabit-engine
     environment:
       - OLLAMA_NUM_PARALLEL=${OLLAMA_NUM_PARALLEL:-1}
     ports:
@@ -60,9 +60,9 @@ services:
       - model-network
 
   # 3. THE MEMORY: Vector DB
-  vector-db:
+  zyrabit-db:
     image: chromadb/chroma:latest
-    container_name: vector-db
+    container_name: zyrabit-db
     environment:
       - ANONYMIZED_TELEMETRY=False
     ports:

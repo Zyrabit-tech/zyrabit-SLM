@@ -25,27 +25,27 @@ services:
       - backend-network
 
   # 1. THE BRAIN: API RAG
-  api-rag:
+  zyrabit-api:
     build:
       context: ./api-rag
-    container_name: api-rag
+    container_name: zyrabit-api
     env_file:
       - .env
     environment:
       - N8N_SERVICE_TOKEN_FILE=/run/secrets/n8n_service_token
       - N8N_WEBHOOK_SIGNING_SECRET_FILE=/run/secrets/n8n_webhook_signing_secret
     depends_on:
-      vector-db:
+      zyrabit-db:
         condition: service_started
-      slm-engine:
+      zyrabit-engine:
         condition: service_started
     labels:
       - traefik.enable=true
-      - traefik.http.routers.api-rag.rule=PathPrefix(`/v1`) || PathPrefix(`/socket.io`)
-      - traefik.http.routers.api-rag.entrypoints=websecure
-      - traefik.http.routers.api-rag.tls=true
-      - traefik.http.routers.api-rag.middlewares=api-ratelimit@docker,secureHeaders@file
-      - traefik.http.services.api-rag.loadbalancer.server.port=8080
+      - traefik.http.routers.zyrabit-api.rule=PathPrefix(`/v1`) || PathPrefix(`/socket.io`)
+      - traefik.http.routers.zyrabit-api.entrypoints=websecure
+      - traefik.http.routers.zyrabit-api.tls=true
+      - traefik.http.routers.zyrabit-api.middlewares=api-ratelimit@docker,secureHeaders@file
+      - traefik.http.services.zyrabit-api.loadbalancer.server.port=8080
       - traefik.http.middlewares.api-ratelimit.ratelimit.average=25
       - traefik.http.middlewares.api-ratelimit.ratelimit.burst=50
       - traefik.docker.network=zyrabit-brain-api_backend-network
@@ -64,27 +64,27 @@ services:
       start_period: 40s
 
   # 1.5 THE FACE: Web UI
-  web-ui:
+  zyrabit-web:
     build:
       context: ./web-ui
-    container_name: web-ui
+    container_name: zyrabit-web
     labels:
       - traefik.enable=true
-      - traefik.http.routers.web-ui.rule=PathPrefix(`/`)
-      - traefik.http.routers.web-ui.entrypoints=websecure
-      - traefik.http.routers.web-ui.tls=true
-      - traefik.http.routers.web-ui.middlewares=secureHeaders@file
-      - traefik.http.services.web-ui.loadbalancer.server.port=80
+      - traefik.http.routers.zyrabit-web.rule=PathPrefix(`/`)
+      - traefik.http.routers.zyrabit-web.entrypoints=websecure
+      - traefik.http.routers.zyrabit-web.tls=true
+      - traefik.http.routers.zyrabit-web.middlewares=secureHeaders@file
+      - traefik.http.services.zyrabit-web.loadbalancer.server.port=80
       - traefik.docker.network=zyrabit-brain-api_backend-network
     networks:
       - backend-network
     depends_on:
-      - api-rag
+      - zyrabit-api
 
   # 2. THE MUSCLE: SLM Server
-  slm-engine:
+  zyrabit-engine:
     image: ollama/ollama:latest
-    container_name: slm-engine
+    container_name: zyrabit-engine
     environment:
       - OLLAMA_NUM_PARALLEL=${OLLAMA_NUM_PARALLEL:-1}
     volumes:
@@ -98,9 +98,9 @@ services:
       retries: 5
 
   # 3. THE MEMORY: Vector DB
-  vector-db:
+  zyrabit-db:
     image: chromadb/chroma:latest
-    container_name: vector-db
+    container_name: zyrabit-db
     environment:
       - ANONYMIZED_TELEMETRY=False
       - CHROMA_OTEL_COLLECTION_ENDPOINT=http://localhost:4317
@@ -116,9 +116,9 @@ services:
       retries: 3
 
   # 4. THE MONITOR (Scraper): Prometheus
-  prometheus:
+  zyrabit-prometheus:
     image: prom/prometheus:latest
-    container_name: prometheus
+    container_name: zyrabit-prometheus
     command:
       - --config.file=/etc/prometheus/prometheus.yml
       - --storage.tsdb.path=/prometheus
@@ -129,20 +129,20 @@ services:
       - prometheus-data:/prometheus
     labels:
       - traefik.enable=true
-      - traefik.http.routers.prometheus.rule=PathPrefix(`/prometheus`)
-      - traefik.http.routers.prometheus.entrypoints=websecure
-      - traefik.http.routers.prometheus.tls=true
-      - traefik.http.routers.prometheus.middlewares=prometheus-auth@docker,secureHeaders@file
+      - traefik.http.routers.zyrabit-prometheus.rule=PathPrefix(`/prometheus`)
+      - traefik.http.routers.zyrabit-prometheus.entrypoints=websecure
+      - traefik.http.routers.zyrabit-prometheus.tls=true
+      - traefik.http.routers.zyrabit-prometheus.middlewares=prometheus-auth@docker,secureHeaders@file
       - traefik.http.middlewares.prometheus-auth.basicauth.users=${PROMETHEUS_BASIC_AUTH:?set PROMETHEUS_BASIC_AUTH}
-      - traefik.http.services.prometheus.loadbalancer.server.port=9090
+      - traefik.http.services.zyrabit-prometheus.loadbalancer.server.port=9090
       - traefik.docker.network=zyrabit-brain-api_backend-network
     networks:
       - backend-network
 
   # 5. THE MONITOR (Dashboard): Grafana
-  grafana:
+  zyrabit-grafana:
     image: grafana/grafana:latest
-    container_name: grafana
+    container_name: zyrabit-grafana
     environment:
       - GF_SERVER_ROOT_URL=https://localhost/grafana
       - GF_SERVER_SERVE_FROM_SUB_PATH=true
@@ -153,21 +153,21 @@ services:
       - ./config/grafana/dashboards:/var/lib/grafana/dashboards
     labels:
       - traefik.enable=true
-      - traefik.http.routers.grafana.rule=PathPrefix(`/grafana`)
-      - traefik.http.routers.grafana.entrypoints=websecure
-      - traefik.http.routers.grafana.tls=true
-      - traefik.http.routers.grafana.middlewares=grafana-auth@docker,secureHeaders@file
+      - traefik.http.routers.zyrabit-grafana.rule=PathPrefix(`/grafana`)
+      - traefik.http.routers.zyrabit-grafana.entrypoints=websecure
+      - traefik.http.routers.zyrabit-grafana.tls=true
+      - traefik.http.routers.zyrabit-grafana.middlewares=grafana-auth@docker,secureHeaders@file
       - traefik.http.middlewares.grafana-auth.basicauth.users=${GRAFANA_BASIC_AUTH:?set GRAFANA_BASIC_AUTH}
-      - traefik.http.services.grafana.loadbalancer.server.port=3000
+      - traefik.http.services.zyrabit-grafana.loadbalancer.server.port=3000
       - traefik.docker.network=zyrabit-brain-api_backend-network
     depends_on:
-      - prometheus
+      - zyrabit-prometheus
     networks:
       - backend-network
 
-  loki:
+  zyrabit-loki:
     image: grafana/loki:latest
-    container_name: loki
+    container_name: zyrabit-loki
     command: -config.file=/etc/loki/local-config.yaml
     profiles: [ "observability-extra" ]
     ports:
@@ -175,25 +175,25 @@ services:
     networks:
       - backend-network
 
-  docs-portal:
+  zyrabit-docs:
     build:
       context: ../docs-portal
-    container_name: docs-portal
+    container_name: zyrabit-docs
     profiles: [ "docs" ]
     labels:
       - traefik.enable=true
-      - traefik.http.routers.docs.rule=PathPrefix(`/docs-portal`)
-      - traefik.http.routers.docs.entrypoints=websecure
-      - traefik.http.routers.docs.tls=true
-      - traefik.http.services.docs.loadbalancer.server.port=3001
+      - traefik.http.routers.zyrabit-docs.rule=PathPrefix(`/docs-portal`)
+      - traefik.http.routers.zyrabit-docs.entrypoints=websecure
+      - traefik.http.routers.zyrabit-docs.tls=true
+      - traefik.http.services.zyrabit-docs.loadbalancer.server.port=3001
       - traefik.http.middlewares.docs-stripprefix.stripprefix.prefixes=/docs-portal
-      - traefik.http.routers.docs.middlewares=docs-stripprefix@docker,secureHeaders@file
+      - traefik.http.routers.zyrabit-docs.middlewares=docs-stripprefix@docker,secureHeaders@file
     networks:
       - frontend-network
 
-  n8n:
+  zyrabit-n8n:
     image: n8nio/n8n:latest
-    container_name: n8n
+    container_name: zyrabit-n8n
     profiles: [ "automation" ]
     environment:
       - N8N_HOST=localhost
@@ -204,11 +204,11 @@ services:
       - N8N_SECURE_COOKIE=false
     labels:
       - traefik.enable=true
-      - traefik.http.routers.n8n.rule=PathPrefix(`/n8n`)
-      - traefik.http.routers.n8n.entrypoints=websecure
-      - traefik.http.routers.n8n.tls=true
-      - traefik.http.routers.n8n.middlewares=secureHeaders@file
-      - traefik.http.services.n8n.loadbalancer.server.port=5678
+      - traefik.http.routers.zyrabit-n8n.rule=PathPrefix(`/n8n`)
+      - traefik.http.routers.zyrabit-n8n.entrypoints=websecure
+      - traefik.http.routers.zyrabit-n8n.tls=true
+      - traefik.http.routers.zyrabit-n8n.middlewares=secureHeaders@file
+      - traefik.http.services.zyrabit-n8n.loadbalancer.server.port=5678
       - traefik.docker.network=zyrabit-brain-api_backend-network
     volumes:
       - ./n8n-data:/home/node/.n8n
@@ -216,10 +216,10 @@ services:
       - backend-network
 
   # 6. SYSTEM ASSISTANT: MCP Installer Server
-  mcp-server:
+  zyrabit-mcp:
     build:
       context: ../mcp
-    container_name: mcp-server
+    container_name: zyrabit-mcp
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - ../README.md:/app/README.md:ro

@@ -12,8 +12,8 @@ from langchain_ollama import OllamaEmbeddings
 logger = logging.getLogger("uvicorn.error")
 
 # --- Configuration ---
-SLM_URL = os.getenv("SLM_URL", "http://slm-engine:11434")
-DB_URL = os.getenv("DB_URL", "http://vector-db:8000")
+SLM_URL = os.getenv("SLM_URL", "http://zyrabit-engine:11434")
+DB_URL = os.getenv("DB_URL", "http://zyrabit-db:8000")
 COLLECTION_NAME = os.getenv("RAG_COLLECTION", "zyrabit_knowledge")
 
 def load_system_prompt() -> str:
