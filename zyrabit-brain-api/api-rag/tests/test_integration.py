@@ -130,20 +130,20 @@ def test_multiple_queries_flow(
     mock_direct_slm.assert_called_once_with("Pregunta general 2", MODEL_NAME)
 
 
-@patch('app.inference_factory.create_inference_provider')
-@patch('app.infrastructure.persistence.chroma_adapter.chromadb.HttpClient')
-def test_health_check_before_operations(mock_chroma_client, mock_inference_provider):
+@patch('app.api.v1.endpoints.health.get_inference_adapter')
+@patch('app.api.v1.endpoints.health.get_vector_store_adapter')
+def test_health_check_before_operations(mock_get_db, mock_get_inf):
     """
     Smoke test for the health endpoint ensuring core connectivity probes are active.
     """
     # GIVEN: Mock success for all dependencies
     mock_provider = MagicMock()
     mock_provider.health.return_value = {"ok": True}
-    mock_inference_provider.return_value = mock_provider
+    mock_get_inf.return_value = mock_provider
     
     mock_db = MagicMock()
     mock_db.heartbeat.return_value = 12345
-    mock_chroma_client.return_value = mock_db
+    mock_get_db.return_value = mock_db
 
     # WHEN
     response = client.get("/v1/health")

@@ -92,7 +92,7 @@ def test_chat_rag_includes_context_in_response(mock_rag):
 
 @patch("app.domain.services.gatekeeper.Gatekeeper.get_routing_decision")
 @patch("app.domain.use_cases.ChatUseCase.execute_rag")
-def test_chat_rag_flow_returns_response(mock_router, mock_rag):
+def test_chat_rag_flow_returns_response(mock_rag, mock_router):
     """Full chat flow: RAG query returns augmented response."""
     mock_router.return_value = "search_rag_database"
     mock_rag.return_value = ("Zyrabit combina SLMs con RAG y seguridad Zero-Trust.", 1, 0.4, ["doc.pdf"])
