@@ -82,6 +82,7 @@ jobs:
       - name: Validate Production Compose Configuration
         run: |
           cd zyrabit-brain-api
+          touch .env
           PROMETHEUS_BASIC_AUTH="dummy:dummy" GRAFANA_BASIC_AUTH="dummy:dummy" OLLAMA_NUM_PARALLEL=1 docker compose config -q
           echo "✅ Production docker-compose.yml is valid."
 
