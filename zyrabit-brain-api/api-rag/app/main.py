@@ -1,7 +1,7 @@
 import logging
 import os
 import socketio
-from typing import Optional
+from typing import Dict, Any, Tuple
 from fastapi import FastAPI
 from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
@@ -11,10 +11,9 @@ from prometheus_fastapi_instrumentator import Instrumentator
 from urllib.parse import urlparse
 
 # Hexagonal Imports
-from .infrastructure.inference.ollama_inference_adapter import OllamaInferenceAdapter
 from .infrastructure.persistence.chroma_adapter import ChromaAdapter
 from .domain.use_cases import ChatUseCase
-from .domain.services.gatekeeper import Gatekeeper
+from app.domain.services.gatekeeper import Gatekeeper
 from .inference_factory import create_inference_provider
 from . import services # Temporary until fully migrated
 

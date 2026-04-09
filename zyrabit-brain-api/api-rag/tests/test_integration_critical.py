@@ -12,7 +12,6 @@ from fastapi.testclient import TestClient
 
 from app.main import app
 from app.domain.services.gatekeeper import Gatekeeper
-from app.domain.use_cases import ChatUseCase
 
 client = TestClient(app)
 

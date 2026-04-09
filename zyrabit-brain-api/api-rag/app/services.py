@@ -1,6 +1,6 @@
 import os
 import logging
-from typing import Dict, Any, List, Tuple
+from typing import Dict, Any, Tuple
 from .infrastructure.persistence.chroma_adapter import ChromaAdapter
 from .infrastructure.inference.ollama_inference_adapter import OllamaInferenceAdapter
 from .domain.use_cases import IngestUseCase, ChatUseCase
