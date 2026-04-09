@@ -8,7 +8,7 @@ logger = logging.getLogger("uvicorn.error")
 
 router = APIRouter()
 
-DOCS_DIR = os.getenv("DOCS_DIR", "/app/document_source")
+DOCS_DIR = os.getenv("DOCS_DIR", "./document_source")
 
 @router.get("/documents")
 async def list_documents():

@@ -18,12 +18,22 @@ def mock_infrastructure():
         # Setup Mock Inference
         mock_inf_instance = MagicMock()
         mock_inf_instance.health.return_value = {"ok": True, "status": "CONNECTED"}
+        mock_inf_instance.provider_name = "mock-provider"
         mock_inference.return_value = mock_inf_instance
         
-        yield {
-            "vector_store": mock_vdb_instance,
-            "inference": mock_inf_instance
-        }
+        # Patching the Use Case methods to be more resilient
+        with patch("app.domain.use_cases.ChatUseCase.execute_rag") as mock_rag, \
+             patch("app.domain.use_cases.ChatUseCase.execute_direct_chat") as mock_direct:
+            
+            mock_rag.return_value = ("Mocked RAG response", 1, 0.1, ["source.txt"])
+            mock_direct.return_value = ("Mocked direct response", 0.05)
+            
+            yield {
+                "vector_store": mock_vdb_instance,
+                "inference": mock_inf_instance,
+                "rag": mock_rag,
+                "direct": mock_direct
+            }
 
 @pytest.fixture(autouse=True)
 def mock_settings(monkeypatch):

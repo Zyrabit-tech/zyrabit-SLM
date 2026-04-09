@@ -39,8 +39,16 @@ async def chat_router(query: ChatQuery, request_id: str = Depends(lambda: str(uu
     chat_use_case = get_chat_use_case()
     
     if decision == "search_rag_database":
-        response, hits, latency = chat_use_case.execute_rag(query.text, MODEL_NAME)
-        return ChatResponse(response=response, metadata={"hits": hits, "latency": latency, "decision": decision})
+        response, hits, latency, sources = chat_use_case.execute_rag(query.text, MODEL_NAME)
+        return ChatResponse(
+            response=response, 
+            metadata={
+                "hits": hits, 
+                "latency": latency, 
+                "decision": decision,
+                "sources": sources
+            }
+        )
     else:
         response, latency = chat_use_case.execute_direct_chat(query.text, MODEL_NAME)
         return ChatResponse(response=response, metadata={"hits": 0, "latency": latency, "decision": decision})

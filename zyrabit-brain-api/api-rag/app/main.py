@@ -89,7 +89,7 @@ app.include_router(mcp.router, prefix="/mcp", tags=["MCP"]) # Root-level as expe
 app.include_router(integrations.router, prefix="/v1/integrations", tags=["Integrations"])
 
 # --- Legacy Compatibility ---
-INGEST_DIR = os.getenv("DOCS_DIR", "/app/document_source")
+INGEST_DIR = os.getenv("DOCS_DIR", "./document_source")
 
 # --- Socket.io Events (Driving Adapter) ---
 @sio.event

@@ -25,7 +25,7 @@ async def n8n_webhook(
     x_zyrabit_signature: Optional[str] = Header(None)
 ):
     """Secure webhook for n8n automation workflows."""
-    adapter = _build_n8n_adapter()
+    adapter = get_n8n_adapter()
     raw_body = await request.body()
     
     try:

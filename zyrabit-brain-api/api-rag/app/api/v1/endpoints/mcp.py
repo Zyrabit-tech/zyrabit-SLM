@@ -13,4 +13,5 @@ async def mcp_config():
 async def mcp_rpc(payload: Dict[str, Any]):
     """JSON-RPC endpoint for MCP tools and resources."""
     result, status_code = handle_jsonrpc(payload)
-    return Response(content=str(result).replace("'", '"'), media_type="application/json", status_code=status_code)
+    import json
+    return Response(content=json.dumps(result), media_type="application/json", status_code=status_code)

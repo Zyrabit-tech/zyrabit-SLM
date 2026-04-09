@@ -43,7 +43,7 @@ def test_router_rejects_spam():
 @patch("app.services.process_and_ingest_file")
 def test_ingest_txt_file_success(mock_process, tmp_path):
     """Ingest endpoint accepts .txt files."""
-    with patch('app.main.INGEST_DIR', str(tmp_path)):
+    with patch('app.api.v1.endpoints.documents.DOCS_DIR', str(tmp_path)):
         mock_process.return_value = {
             "status": "success",
             "chunks_processed": 5,
@@ -60,7 +60,7 @@ def test_ingest_txt_file_success(mock_process, tmp_path):
 @patch("app.services.process_and_ingest_file")
 def test_ingest_md_file_success(mock_process, tmp_path):
     """Ingest endpoint accepts .md files."""
-    with patch('app.main.INGEST_DIR', str(tmp_path)):
+    with patch('app.api.v1.endpoints.documents.DOCS_DIR', str(tmp_path)):
         mock_process.return_value = {
             "status": "success",
             "chunks_processed": 3,
@@ -75,7 +75,7 @@ def test_ingest_md_file_success(mock_process, tmp_path):
 
 # --- RAG pipeline (mocked ChromaDB + Ollama) ---
 
-@patch("app.services.execute_rag_pipeline_with_metadata")
+@patch("app.domain.use_cases.ChatUseCase.execute_rag")
 def test_chat_rag_includes_context_in_response(mock_rag):
     """RAG flow: chat with RAG decision returns context-aware response."""
     mock_rag.return_value = ("Zyrabit uses ChromaDB for vector storage and Ollama for inference.", 2, 0.5, ["source.txt"])
@@ -90,12 +90,12 @@ def test_chat_rag_includes_context_in_response(mock_rag):
 
 # --- Full chat flow ---
 
-@patch("app.services.execute_rag_pipeline_with_metadata")
-@patch("app.services.get_slm_router_decision")
+@patch("app.domain.services.gatekeeper.Gatekeeper.get_routing_decision")
+@patch("app.domain.use_cases.ChatUseCase.execute_rag")
 def test_chat_rag_flow_returns_response(mock_router, mock_rag):
     """Full chat flow: RAG query returns augmented response."""
     mock_router.return_value = "search_rag_database"
-    mock_rag.return_value = ("Zyrabit combina SLMs con RAG y seguridad Zero-Trust.", 1)
+    mock_rag.return_value = ("Zyrabit combina SLMs con RAG y seguridad Zero-Trust.", 1, 0.4, ["doc.pdf"])
 
     response = client.post(
         "/v1/chat",

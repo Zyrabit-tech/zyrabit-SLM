@@ -26,7 +26,8 @@ def test_end_to_end_rag_flow(mock_router_decision, mock_rag_pipeline):
     assert "framework" in data["response"].lower()
     assert "clean architecture" in data["response"].lower()
     mock_router_decision.assert_called_once_with(query["text"])
-    mock_rag_pipeline.assert_called_once_with(query["text"])
+    from app.main import MODEL_NAME
+    mock_rag_pipeline.assert_called_once_with(query["text"], MODEL_NAME)
 
 
 @patch('app.domain.use_cases.ChatUseCase.execute_direct_chat')
@@ -44,7 +45,8 @@ def test_end_to_end_direct_slm_flow(mock_router_decision, mock_direct_slm):
     assert "python" in data["response"].lower()
     assert "lenguaje" in data["response"].lower()
     mock_router_decision.assert_called_once_with(query["text"])
-    mock_direct_slm.assert_called_once_with(query["text"])
+    from app.main import MODEL_NAME
+    mock_direct_slm.assert_called_once_with(query["text"], MODEL_NAME)
 
 
 @patch('app.domain.services.gatekeeper.Gatekeeper.get_routing_decision')
@@ -66,7 +68,7 @@ def test_ingest_then_query_flow(
         mock_router_decision,
         mock_rag_pipeline,
         tmp_path):
-    with patch('app.main.INGEST_DIR', str(tmp_path)):
+    with patch('app.api.v1.endpoints.documents.DOCS_DIR', str(tmp_path)):
         mock_process_file.return_value = {
             "status": "success",
             "filename": "clean_architecture.pdf",
@@ -123,12 +125,13 @@ def test_multiple_queries_flow(
     assert response3.status_code == 400
 
     assert mock_router_decision.call_count == 3
-    mock_rag_pipeline.assert_called_once()
-    mock_direct_slm.assert_called_once()
+    from app.main import MODEL_NAME
+    mock_rag_pipeline.assert_called_once_with("Pregunta técnica 1", MODEL_NAME)
+    mock_direct_slm.assert_called_once_with("Pregunta general 2", MODEL_NAME)
 
 
 @patch('app.inference_factory.create_inference_provider')
-@patch('chromadb.HttpClient')
+@patch('app.infrastructure.persistence.chroma_adapter.chromadb.HttpClient')
 def test_health_check_before_operations(mock_chroma_client, mock_inference_provider):
     """
     Smoke test for the health endpoint ensuring core connectivity probes are active.
