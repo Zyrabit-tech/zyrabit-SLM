@@ -82,11 +82,22 @@ def process_and_ingest_file(file_path: str) -> Dict[str, Any]:
         logger.error(f"Ingestion error: {e}")
         return {"status": "error", "message": str(e)}
 
-def query_secure_slm(prompt: str, model_name: str) -> Tuple[str, float]:
-    """Legacy helper for direct SLM queries."""
-    adapter = OllamaInferenceAdapter(endpoint=f"{SLM_URL}/api/generate")
-    result = adapter.generate(InferenceRequest(model=model_name, prompt=prompt))
-    return result.text, result.latency_seconds
+def query_secure_slm(prompt: str, model_name: str = "qwen2.5:7b") -> Tuple[str, float]:
+    """Secure direct SLM query with PII anonymization."""
+    from .core.security import anonymize_text, deanonymize_text
+    from .inference_factory import create_inference_provider
+    
+    # 1. Anonymize
+    anon_result = anonymize_text(prompt)
+    
+    # 2. Generate
+    adapter = create_inference_provider()
+    result = adapter.generate(InferenceRequest(model=model_name, prompt=anon_result.sanitized_text))
+    
+    # 3. Deanonymize
+    restored_text = deanonymize_text(result.text, anon_result.token_map)
+    
+    return restored_text, result.latency_seconds
 
 def execute_rag_pipeline(query: str) -> str:
     """Legacy helper for RAG pipeline."""

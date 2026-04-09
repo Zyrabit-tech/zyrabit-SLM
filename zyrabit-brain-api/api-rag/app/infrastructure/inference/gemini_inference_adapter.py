@@ -25,12 +25,16 @@ class GeminiInferenceAdapter(InferenceProviderPort):
         self.model = model
         self.default_timeout_seconds = default_timeout_seconds
         self.provider_name = provider_name
-        self.endpoint = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
+        self.endpoint = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
 
     def generate(self, request: InferenceRequest) -> InferenceResult:
         model = request.model or self.model
-        # Re-build endpoint if model changed in request
-        endpoint = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={self.api_key}"
+        endpoint = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
+        
+        headers = {
+            "Content-Type": "application/json",
+            "x-goog-api-key": self.api_key
+        }
         
         payload = {
             "contents": [{
@@ -42,11 +46,11 @@ class GeminiInferenceAdapter(InferenceProviderPort):
         start_time = time.time()
         
         try:
-            response = requests.post(endpoint, json=payload, timeout=timeout)
+            response = requests.post(endpoint, json=payload, headers=headers, timeout=timeout)
             response.raise_for_status()
             body = response.json()
         except requests.exceptions.RequestException as exc:
-            logger.error(f"Gemini API error: {exc}")
+            logger.error("Gemini request failed due to network or API error.")
             raise InferenceProviderError(f"Gemini request failed: {exc}") from exc
 
         latency = time.time() - start_time
@@ -55,14 +59,7 @@ class GeminiInferenceAdapter(InferenceProviderPort):
         try:
             generated_text = body['candidates'][0]['content']['parts'][0]['text']
         except (KeyError, IndexError):
-            body_keys = list(body.keys()) if isinstance(body, dict) else []
-            candidate_count = len(body.get("candidates", [])) if isinstance(body, dict) else 0
-            logger.error(
-                "Invalid Gemini response format. top_level_keys=%s candidate_count=%d",
-                body_keys,
-                candidate_count,
-            )
-            logger.debug(f"Raw body keys: {body_keys}") # Safer than logging whole body
+            logger.error("Invalid Gemini response format. Parsing failed.")
             raise InferenceProviderError("Gemini returned an unexpected response format.")
 
         return InferenceResult(
