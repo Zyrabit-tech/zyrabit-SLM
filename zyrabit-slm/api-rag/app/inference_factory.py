@@ -27,7 +27,7 @@ def create_inference_provider() -> InferenceProviderPort:
 
     if provider in {"ollama", "ollama_host", "ollama_docker"}:
         return OllamaInferenceAdapter(
-            endpoint=os.getenv("SLM_URL", "http://slm-engine:11434/api/generate"),
+            endpoint=os.getenv("SLM_URL", "http://zyrabit-engine:11434/api/generate"),
             default_timeout_seconds=timeout_seconds,
             provider_name=provider,
         )

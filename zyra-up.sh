@@ -14,8 +14,8 @@ log_warn() { echo -e "${YELLOW}⚠${NC} $1"; }
 log_err() { echo -e "${RED}✖${NC} $1"; }
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-COMPOSE_FILE="${SCRIPT_DIR}/zyrabit-brain-api/docker-compose.yml"
-ENV_FILE="${SCRIPT_DIR}/zyrabit-brain-api/.env"
+COMPOSE_FILE="${SCRIPT_DIR}/zyrabit-slm/docker-compose.yml"
+ENV_FILE="${SCRIPT_DIR}/zyrabit-slm/.env"
 
 usage() {
   cat <<'EOF'
@@ -242,17 +242,17 @@ run_install() {
 
   log_info "Waiting for SLM endpoint..."
   for _ in {1..30}; do
-    if docker compose -f "${COMPOSE_FILE}" exec -T slm-engine ollama list >/dev/null 2>&1; then
+    if docker compose -f "${COMPOSE_FILE}" exec -T zyrabit-engine ollama list >/dev/null 2>&1; then
       break
     fi
     sleep 2
   done
 
   log_info "Ensuring base models are present..."
-  docker network connect zyrabit-brain-api_backend-network slm-engine || true
-  docker compose -f "${COMPOSE_FILE}" exec -T slm-engine ollama pull "${model_name}"
-  docker compose -f "${COMPOSE_FILE}" exec -T slm-engine ollama pull "mxbai-embed-large"
-  docker network disconnect zyrabit-brain-api_backend-network slm-engine || true
+  docker network connect zyrabit-slm_backend-network zyrabit-engine || true
+  docker compose -f "${COMPOSE_FILE}" exec -T zyrabit-engine ollama pull "${model_name}"
+  docker compose -f "${COMPOSE_FILE}" exec -T zyrabit-engine ollama pull "mxbai-embed-large"
+  docker network disconnect zyrabit-slm_backend-network zyrabit-engine || true
 
   log_ok "Zyrabit is ready."
   echo "URL (Selected): ${COMPOSE_FILE}"
@@ -305,7 +305,7 @@ while [[ "$#" -gt 0 ]]; do
       shift 2
       ;;
     --local)
-      COMPOSE_FILE="${SCRIPT_DIR}/zyrabit-brain-api/docker-compose.local.yml"
+      COMPOSE_FILE="${SCRIPT_DIR}/zyrabit-slm/docker-compose.local.yml"
       shift
       ;;
     --model)

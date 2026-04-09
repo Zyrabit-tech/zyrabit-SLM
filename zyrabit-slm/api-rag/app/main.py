@@ -18,8 +18,8 @@ from .inference_factory import create_inference_provider
 from . import services # Temporary until fully migrated
 
 # --- CONFIGURATION ---
-SLM_URL = os.getenv("SLM_URL", "http://slm-engine:11434")
-DB_URL = os.getenv("DB_URL", "http://vector-db:8000")
+SLM_URL = os.getenv("SLM_URL", "http://zyrabit-engine:11434")
+DB_URL = os.getenv("DB_URL", "http://zyrabit-db:8000")
 MODEL_NAME = os.getenv("MODEL_NAME", "qwen2.5:7b")
 COLLECTION_NAME = os.getenv("RAG_COLLECTION", "zyrabit_knowledge")
 
@@ -61,7 +61,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="Zyrabit SLM API",
     description="Hexagonal RAG-Ops API with Socket.io streaming.",
-    version="1.3.0",
+    version="1.4.0",
     lifespan=lifespan
 )
 

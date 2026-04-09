@@ -23,7 +23,7 @@ The script detects NVIDIA, Apple Silicon, or CPU-only hosts and selects model de
 ## Manual docker workflow
 
 ```bash
-cd zyrabit-brain-api
+cd zyrabit-slm
 docker compose up -d
 ```
 
@@ -37,9 +37,9 @@ docker compose --profile automation up -d n8n
 ## Manual model pull
 
 ```bash
-docker compose -f zyrabit-brain-api/docker-compose.yml up -d slm-engine
-docker compose -f zyrabit-brain-api/docker-compose.yml exec -T slm-engine ollama pull qwen2.5:7b
-docker compose -f zyrabit-brain-api/docker-compose.yml exec -T slm-engine ollama pull mxbai-embed-large
+docker compose -f zyrabit-slm/docker-compose.yml up -d slm-engine
+docker compose -f zyrabit-slm/docker-compose.yml exec -T slm-engine ollama pull qwen2.5:7b
+docker compose -f zyrabit-slm/docker-compose.yml exec -T slm-engine ollama pull mxbai-embed-large
 ```
 
 ## Air-gapped workflow
@@ -51,7 +51,7 @@ Prepare images and models on an online machine:
 docker pull zyrabitcore/zyrabit-slm:latest
 docker pull ollama/ollama:latest
 docker pull chromadb/chroma:latest
-# ... (see zyrabit-brain-api/docker-compose.yml for full list)
+# ... (see zyrabit-slm/docker-compose.yml for full list)
 ```
 
 2. **Save Images**:

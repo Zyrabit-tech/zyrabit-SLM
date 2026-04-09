@@ -13,7 +13,7 @@ from app.ports.inference_port import InferenceProviderError, InferenceRequest
 def test_factory_defaults_to_ollama_provider():
     provider = create_inference_provider()
     assert isinstance(provider, OllamaInferenceAdapter)
-    assert provider.endpoint == "http://slm-engine:11434/api/generate"
+    assert provider.endpoint == "http://zyrabit-engine:11434/api/generate"
 
 
 @patch.dict(

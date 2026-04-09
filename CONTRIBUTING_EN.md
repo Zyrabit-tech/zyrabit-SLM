@@ -66,6 +66,20 @@ streamlit run slm_console.py
 
 Extended checklist: `validation/pr-checklist.md`
 
+## Infrastructure Standards
+
+To maintain consistency and readability across the Zyrabit ecosystem, all new containers or services must follow the naming pattern:
+
+`zyrabit-<descriptive-function>`
+
+**Operational Examples:**
+- Main API: `zyrabit-api`
+- Web Interface: `zyrabit-web`
+- Inference Engine: `zyrabit-engine`
+- Database: `zyrabit-db`
+
+Any internal reference (DNS) or environment variable (`SLM_URL`, `DB_URL`) must point to these official hostnames.
+
 ## Dependency security
 
 Before adding dependencies:

@@ -24,10 +24,10 @@ TEMP_*.py
 chroma-data/
 grafana-data/
 prometheus-data/
-zyrabit-brain-api/chroma-data/
-zyrabit-brain-api/grafana-data/
-zyrabit-brain-api/prometheus-data/
-zyrabit-brain-api/.ai/
-zyrabit-brain-api/ollama-models/
+zyrabit-slm/chroma-data/
+zyrabit-slm/grafana-data/
+zyrabit-slm/prometheus-data/
+zyrabit-slm/.ai/
+zyrabit-slm/ollama-models/
 ollama-models/
 document_source/

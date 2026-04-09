@@ -46,7 +46,7 @@ curl -fsSL https://ollama.com/install.sh | sh
 ```
 
 ### ⚙️ Configuring Zyrabit to use Native Ollama
-If you choose the native route, tell Zyrabit where to find Ollama by editing the `zyrabit-brain-api/.env` file (copy from `example.env` if you haven't already):
+If you choose the native route, tell Zyrabit where to find Ollama by editing the `zyrabit-slm/.env` file (copy from `example.env` if you haven't already):
 
 - **Mac / Windows**:
   ```env
@@ -160,7 +160,7 @@ If you use local self-signed certs, run `curl` with `-k`.
 ### Docker mode (recommended)
 
 ```bash
-cd zyrabit-brain-api
+cd zyrabit-slm
 docker compose --profile docs up -d docs-portal
 ```
 
@@ -190,12 +190,12 @@ Local PR checklist: `validation/pr-checklist.md`
 
 ## Docs and contribution
 
-- Architecture Guide: [HEXAGONAL_ARCHITECTURE.md](file:///Users/abrahamgomez/tech/zyrabit-SLM/zyrabit-brain-api/api-rag/app/HEXAGONAL_ARCHITECTURE.md)
+- Architecture Guide: [HEXAGONAL_ARCHITECTURE.md](file:///Users/abrahamgomez/tech/zyrabit-SLM/zyrabit-slm/api-rag/app/HEXAGONAL_ARCHITECTURE.md)
 - Agent Governance: [AGENTS.md](file:///Users/abrahamgomez/tech/zyrabit-SLM/.gemini/AGENTS.md)
 - Contribution rules (ES): `CONTRIBUTING.md`
 - Contribution rules (EN): `CONTRIBUTING_EN.md`
-- Backend technical doc (ES): `zyrabit-brain-api/README.md`
-- Backend technical doc (EN): `zyrabit-brain-api/README_EN.md`
+- Backend technical doc (ES): `zyrabit-slm/README.md`
+- Backend technical doc (EN): `zyrabit-slm/README_EN.md`
 
 ## GitHub Actions (CI)
 
