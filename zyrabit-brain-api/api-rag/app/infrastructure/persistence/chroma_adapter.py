@@ -1,6 +1,6 @@
 import chromadb
 from typing import List, Dict, Any, Optional
-from ...ports.vector_store_port import VectorStorePort
+from app.ports.vector_store_port import VectorStorePort
 from urllib.parse import urlparse
 
 class LangchainEmbeddingAdapter:

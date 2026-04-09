@@ -133,7 +133,7 @@ def test_chat_reject_returns_400(mock_router):
         json={"text": "comprar viagra"},
     )
     assert response.status_code == 400
-    assert "alcance" in response.json()["detail"].lower()
+    assert "out of scope" in response.json()["detail"].lower()
 
 
 # --- End of Tests ---

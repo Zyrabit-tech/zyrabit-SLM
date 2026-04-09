@@ -5,6 +5,14 @@ import logging
 
 logger = logging.getLogger("uvicorn.error")
 
+from prometheus_client import Counter
+
+TOKEN_USAGE_COUNTER = Counter(
+    "zyrabit_token_usage_total",
+    "Total tokens consumed by SLM",
+    ["model", "provider"]
+)
+
 class ChatUseCase:
     def __init__(self, inference_provider: InferenceProviderPort, vector_store: VectorStorePort, system_prompt: str):
         self.inference_provider = inference_provider
@@ -34,6 +42,9 @@ class ChatUseCase:
             InferenceRequest(model=model_name, prompt=augmented_prompt)
         )
         
+        # Increment metrics (heuristic: 1 token ~= 4 chars)
+        TOKEN_USAGE_COUNTER.labels(model=model_name, provider=self.inference_provider.provider_name).inc(len(result.text) // 4)
+        
         return result.text, rag_hits, result.latency_seconds, sources
 
     def execute_direct_chat(self, query_text: str, model_name: str) -> Tuple[str, float]:
@@ -43,6 +54,9 @@ class ChatUseCase:
         result = self.inference_provider.generate(
             InferenceRequest(model=model_name, prompt=full_prompt)
         )
+        # Increment metrics
+        TOKEN_USAGE_COUNTER.labels(model=model_name, provider=self.inference_provider.provider_name).inc(len(result.text) // 4)
+        
         return result.text, result.latency_seconds
 
 class IngestUseCase:

@@ -8,7 +8,7 @@ from urllib.parse import urlparse
 
 import requests
 
-from ...ports.inference_port import (
+from app.ports.inference_port import (
     InferenceProviderError,
     InferenceProviderPort,
     InferenceRequest,

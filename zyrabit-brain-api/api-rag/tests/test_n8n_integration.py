@@ -26,7 +26,7 @@ def _build_adapter() -> N8nAdapter:
 
 
 def test_n8n_webhook_accepts_valid_token_and_signature(monkeypatch):
-    monkeypatch.setattr("app.api.v1.endpoints.integrations.n8n_adapter", _build_adapter())
+    monkeypatch.setattr("app.api.v1.endpoints.integrations.get_n8n_adapter", _build_adapter)
     raw_body = b'{"text":"run report","workflow_id":"wf-1","execution_id":"ex-1"}'
     headers = {
         "authorization": "Bearer test-token",
@@ -48,7 +48,7 @@ def test_n8n_webhook_accepts_valid_token_and_signature(monkeypatch):
 
 
 def test_n8n_webhook_rejects_invalid_token(monkeypatch):
-    monkeypatch.setattr("app.api.v1.endpoints.integrations.n8n_adapter", _build_adapter())
+    monkeypatch.setattr("app.api.v1.endpoints.integrations.get_n8n_adapter", _build_adapter)
     raw_body = b'{"text":"run report"}'
     headers = {
         "authorization": "Bearer bad-token",
@@ -66,7 +66,7 @@ def test_n8n_webhook_rejects_invalid_token(monkeypatch):
 
 
 def test_n8n_webhook_requires_text_field(monkeypatch):
-    monkeypatch.setattr("app.main.n8n_adapter", _build_adapter())
+    monkeypatch.setattr("app.api.v1.endpoints.integrations.get_n8n_adapter", lambda: _build_adapter())
     raw_body = b'{"workflow_id":"wf-1"}'
     headers = {
         "authorization": "Bearer test-token",

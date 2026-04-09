@@ -81,10 +81,15 @@ sio = socketio.AsyncServer(async_mode='asgi', cors_allowed_origins='*')
 sio_app = socketio.ASGIApp(sio)
 
 # --- Register Routers (Driving Adapters) ---
-from .api.v1.endpoints import chat, health, documents
+from app.api.v1.endpoints import chat, health, documents, mcp, integrations
 app.include_router(chat.router, prefix="/v1", tags=["Chat"])
 app.include_router(health.router, prefix="/v1", tags=["Monitoring"])
 app.include_router(documents.router, prefix="/v1", tags=["Documents"])
+app.include_router(mcp.router, prefix="/mcp", tags=["MCP"]) # Root-level as expected by some clients
+app.include_router(integrations.router, prefix="/v1/integrations", tags=["Integrations"])
+
+# --- Legacy Compatibility ---
+INGEST_DIR = os.getenv("DOCS_DIR", "/app/document_source")
 
 # --- Socket.io Events (Driving Adapter) ---
 @sio.event

@@ -55,12 +55,12 @@ def test_end_to_end_reject_query_flow(mock_router_decision):
     assert response.status_code == 400
     data = response.json()
     assert "detail" in data
-    assert "fuera de alcance" in data["detail"].lower()
+    assert "out of scope" in data["detail"].lower()
     mock_router_decision.assert_called_once_with(query["text"])
 
 @patch('app.domain.use_cases.ChatUseCase.execute_rag')
 @patch('app.domain.services.gatekeeper.Gatekeeper.get_routing_decision')
-@patch('app.api.v1.endpoints.documents.process_and_ingest_file')
+@patch('app.services.process_and_ingest_file')
 def test_ingest_then_query_flow(
         mock_process_file,
         mock_router_decision,

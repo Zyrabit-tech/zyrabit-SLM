@@ -2,7 +2,7 @@ import time
 import requests
 import logging
 from typing import Any, Dict
-from ...ports.inference_port import (
+from app.ports.inference_port import (
     InferenceProviderError,
     InferenceProviderPort,
     InferenceRequest,

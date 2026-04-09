@@ -4,7 +4,7 @@ from app import services
 from app.ports.inference_port import InferenceResult
 
 
-@patch("app.services.create_inference_provider")
+@patch("app.inference_factory.create_inference_provider")
 def test_query_secure_slm_never_sends_raw_pii(mock_provider_factory):
     # We no longer mock print because we sanitized logs in the adapter directly
     class DummyProvider:
