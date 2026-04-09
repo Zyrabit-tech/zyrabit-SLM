@@ -77,5 +77,6 @@ class GeminiInferenceAdapter(InferenceProviderPort):
             if response.status_code == 200:
                 return {"provider": self.provider_name, "ok": True, "status": "CONNECTED"}
             return {"provider": self.provider_name, "ok": False, "reason": f"API returned {response.status_code}"}
-        except Exception as e:
-            return {"provider": self.provider_name, "ok": False, "reason": str(e)}
+        except Exception:
+            logger.exception("Gemini health check failed.")
+            return {"provider": self.provider_name, "ok": False, "reason": "Health check failed"}

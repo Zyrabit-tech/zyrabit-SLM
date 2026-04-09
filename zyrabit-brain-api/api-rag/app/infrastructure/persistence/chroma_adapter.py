@@ -1,7 +1,7 @@
 import chromadb
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any
 from app.ports.vector_store_port import VectorStorePort
-from urllib.parse import urlparse
+
 
 class LangchainEmbeddingAdapter:
     """Wrapper to make LangChain embeddings compatible with native ChromaDB."""

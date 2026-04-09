@@ -1,5 +1,4 @@
 from fastapi import APIRouter
-import os
 import logging
 from ....main import get_inference_adapter, get_vector_store_adapter, MODEL_NAME
 

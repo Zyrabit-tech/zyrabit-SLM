@@ -66,7 +66,7 @@ def test_n8n_webhook_rejects_invalid_token(monkeypatch):
 
 
 def test_n8n_webhook_requires_text_field(monkeypatch):
-    monkeypatch.setattr("app.api.v1.endpoints.integrations.get_n8n_adapter", lambda: _build_adapter())
+    monkeypatch.setattr("app.api.v1.endpoints.integrations.get_n8n_adapter", _build_adapter)
     raw_body = b'{"workflow_id":"wf-1"}'
     headers = {
         "authorization": "Bearer test-token",

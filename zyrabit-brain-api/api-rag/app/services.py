@@ -80,7 +80,7 @@ def process_and_ingest_file(file_path: str) -> Dict[str, Any]:
         return {"status": "success", "chunks": len(chunks)}
     except Exception as e:
         logger.error(f"Ingestion error: {e}")
-        return {"status": "error", "message": str(e)}
+        return {"status": "error", "message": "Failed to ingest document chunks."}
 
 def query_secure_slm(prompt: str, model_name: str = "qwen2.5:7b") -> Tuple[str, float]:
     """Secure direct SLM query with PII anonymization."""
@@ -120,7 +120,7 @@ def execute_rag_pipeline(query: str) -> str:
     
     # Using a default model name or taking from env
     model_name = os.getenv("MODEL_NAME", "qwen2.5:7b")
-    response, _, _ = use_case.execute_rag(query, model_name)
+    response, *_ = use_case.execute_rag(query, model_name)
     return response
 
 # Internal helpers for legacy tests compatibility

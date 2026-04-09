@@ -1,7 +1,6 @@
 from fastapi import APIRouter, UploadFile, File, HTTPException
 import os
 import logging
-from typing import List, Dict, Any
 from .... import services
 
 logger = logging.getLogger("uvicorn.error")
@@ -38,9 +37,9 @@ async def ingest_document(file: UploadFile = File(...)):
         
         result = services.process_and_ingest_file(file_path)
         if result["status"] == "error":
-            raise HTTPException(status_code=500, detail=result["message"])
+            raise HTTPException(status_code=500, detail="Failed to ingest document.")
             
         return result
     except Exception as e:
         logger.error(f"Failed to ingest {file.filename}: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error during ingestion.")
