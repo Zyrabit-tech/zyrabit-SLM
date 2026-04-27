@@ -16,6 +16,7 @@ from .domain.use_cases import ChatUseCase
 from app.domain.services.gatekeeper import Gatekeeper
 from .inference_factory import create_inference_provider
 from . import services # Temporary until fully migrated
+from app.core import telemetry_metrics # Ensure KISS telemetry metrics are registered
 
 # --- CONFIGURATION ---
 SLM_URL = os.getenv("SLM_URL", "http://zyrabit-engine:11434")

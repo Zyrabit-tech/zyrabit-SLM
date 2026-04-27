@@ -3,6 +3,8 @@ import logging
 
 logger = logging.getLogger("uvicorn.error")
 
+from app.core.telemetry_metrics import zyrabit_security_hits_total
+
 # Spam/off-topic patterns that trigger reject_query
 REJECT_PATTERNS = [
     r"\bviagra\b", r"\bcasino\b", r"\bcrypto\s*scam\b",
@@ -36,6 +38,7 @@ class Gatekeeper:
         for pattern in REJECT_PATTERNS:
             if re.search(pattern, text_lower, re.IGNORECASE):
                 logger.warning("Gatekeeper intercepted spam/off-topic content: %s", pattern)
+                zyrabit_security_hits_total.labels(entity_type="spam", action="rejected").inc()
                 return "reject_query"
         
         # 2. Check for RAG keywords

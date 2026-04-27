@@ -8,6 +8,9 @@
 - La rama base del PR debe ser `beta`.
 - No se aceptan PRs directos a `main`.
 - Solo `beta` puede hacer PR a `main`.
+- **Versión de Python**: Estrictamente **Python 3.12**. (3.14+ es incompatible con las dependencias de RAG actualmente).
+- **Principio KISS**: Priorizar soluciones simples y legibles sobre abstracciones complejas (ej. métricas de negocio vs OTel completo).
+- **Clean Git Tree**: Mantener historial lineal; las ramas deben estar sincronizadas con `beta` antes del merge.
 - Código, variables y commits en inglés.
 - Un PR = un propósito claro.
 

@@ -8,6 +8,9 @@
 - PR base branch must be `beta`.
 - Direct PRs to `main` are not accepted.
 - Only `beta` can open a PR into `main`.
+- **Python Version**: Strictly **Python 3.12**. (3.14+ is currently incompatible with RAG dependencies).
+- **KISS Principle**: Favor simple, readable solutions over complex abstractions.
+- **Clean Git Tree**: Maintain linear history; feature branches must sync with `beta` before merging.
 - Code, variables, and commits must be in English.
 - One PR = one clear purpose.
 

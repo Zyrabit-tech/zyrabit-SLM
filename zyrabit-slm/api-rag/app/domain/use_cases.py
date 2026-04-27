@@ -5,13 +5,7 @@ import logging
 
 logger = logging.getLogger("uvicorn.error")
 
-from prometheus_client import Counter
-
-TOKEN_USAGE_COUNTER = Counter(
-    "zyrabit_token_usage_total",
-    "Total tokens consumed by SLM",
-    ["model", "provider"]
-)
+from app.core.telemetry_metrics import zyrabit_token_usage_total, zyrabit_token_latency_ms_per_token
 
 class ChatUseCase:
     def __init__(self, inference_provider: InferenceProviderPort, vector_store: VectorStorePort, system_prompt: str):
@@ -43,7 +37,9 @@ class ChatUseCase:
         )
         
         # Increment metrics (heuristic: 1 token ~= 4 chars)
-        TOKEN_USAGE_COUNTER.labels(model=model_name, provider=self.inference_provider.provider_name).inc(len(result.text) // 4)
+        tokens = max(1, len(result.text) // 4)
+        zyrabit_token_usage_total.labels(model=model_name, provider=self.inference_provider.provider_name).inc(tokens)
+        zyrabit_token_latency_ms_per_token.labels(model=model_name, provider=self.inference_provider.provider_name).observe((result.latency_seconds * 1000) / tokens)
         
         return result.text, rag_hits, result.latency_seconds, sources
 
@@ -55,7 +51,9 @@ class ChatUseCase:
             InferenceRequest(model=model_name, prompt=full_prompt)
         )
         # Increment metrics
-        TOKEN_USAGE_COUNTER.labels(model=model_name, provider=self.inference_provider.provider_name).inc(len(result.text) // 4)
+        tokens = max(1, len(result.text) // 4)
+        zyrabit_token_usage_total.labels(model=model_name, provider=self.inference_provider.provider_name).inc(tokens)
+        zyrabit_token_latency_ms_per_token.labels(model=model_name, provider=self.inference_provider.provider_name).observe((result.latency_seconds * 1000) / tokens)
         
         return result.text, result.latency_seconds
 

@@ -1,4 +1,4 @@
-from app.pii_pipeline import (
+from app.core.security.pii_pipeline import (
     anonymize_text,
     deanonymize_text,
     _is_luhn_valid,
