@@ -62,9 +62,9 @@ Examples:
 ## Minimum local verification
 
 ```bash
-./.venv/bin/python -m pytest -q -c zyrabit-brain-api/api-rag/pytest.ini
-streamlit run slm_console.py
-./scripts/run_final_tests.sh
+./.venv/bin/python -m pytest -q -c zyrabit-slm/api-rag/pytest.ini
+python secure_agent.py "Test query"
+./zyrabit-slm/scripts/build_and_verify.sh
 ```
 
 Extended checklist: `validation/pr-checklist.md`

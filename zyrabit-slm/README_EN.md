@@ -46,7 +46,7 @@ Setup script roles from repository root:
 The `zyra-up.sh` script validates effective variable values before starting:
 
 - Prioritizes runtime environment variables (e.g. CI/CD or systemd).
-- Falls back to `zyrabit-brain-api/.env` if not found at runtime.
+- Falls back to `zyrabit-slm/.env` if not found at runtime.
 - Must exist and have a valid value:
   - `SLM_URL`
   - `DB_URL`
@@ -131,7 +131,7 @@ Start infrastructure:
 Start stack manually with Docker Compose:
 
 ```bash
-cd zyrabit-brain-api
+cd zyrabit-slm
 docker compose up -d
 ```
 

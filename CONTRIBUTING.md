@@ -63,8 +63,8 @@ Ejemplos:
 
 ```bash
 ./.venv/bin/python -m pytest -q -c zyrabit-slm/api-rag/pytest.ini
-streamlit run slm_console.py
-./scripts/run_final_tests.sh
+python secure_agent.py "Consulta de prueba"
+./zyrabit-slm/scripts/build_and_verify.sh
 ```
 
 Checklist extendido: `validation/pr-checklist.md`

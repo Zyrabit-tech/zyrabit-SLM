@@ -7,11 +7,11 @@ Zyrabit is a local-first RAG platform with a Zero-Trust security layer and MCP b
 Core areas:
 
 - `secure_agent.py`: secure CLI client.
-- `zyrabit-brain-api/api-rag/app/main.py`: FastAPI API entrypoint.
-- `zyrabit-brain-api/api-rag/app/services.py`: routing and model orchestration.
-- `zyrabit-brain-api/api-rag/app/pii_pipeline.py`: PII sharding/anonymization pipeline.
-- `zyrabit-brain-api/api-rag/app/mcp_bridge.py`: MCP-compatible JSON-RPC bridge.
-- `zyrabit-brain-api/api-rag/app/core/telemetry_metrics.py`: Centralized business metrics (KISS).
+- `zyrabit-slm/api-rag/app/main.py`: FastAPI API entrypoint.
+- `zyrabit-slm/api-rag/app/services.py`: routing and model orchestration.
+- `zyrabit-slm/api-rag/app/core/security/pii_pipeline.py`: PII sharding/anonymization pipeline.
+- `zyrabit-slm/api-rag/app/api/v1/endpoints/mcp.py`: MCP-compatible endpoint.
+- `zyrabit-slm/api-rag/app/core/telemetry_metrics.py`: Centralized business metrics .
 
 ## Design Principles
 

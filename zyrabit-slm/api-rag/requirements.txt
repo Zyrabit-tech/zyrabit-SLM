@@ -2,7 +2,7 @@ fastapi==0.132.0
 uvicorn[standard]==0.41.0
 langchain==1.2.10
 langchain-community==0.4.1
-langchain-text-splitters==1.1.1
+langchain-text-splitters==1.1.2
 langchain-ollama==1.0.1
 chromadb-client==1.5.1
 prometheus-fastapi-instrumentator==7.1.0
@@ -12,11 +12,11 @@ pytest==9.0.3
 pytest-mock==3.15.1
 httpx==0.28.1
 pymupdf==1.27.2.2
-pypdf==6.9.2
+pypdf==6.10.2
 aiohttp==3.13.5
 requests==2.33.1
-python-multipart==0.0.22
-python-socketio[asyncio]==5.11.0
+python-multipart==0.0.26
+python-socketio[asyncio]==5.14.0
 python-engineio==4.9.0
 unstructured==0.22.23
-markdown==3.5.0
+markdown==3.8.1

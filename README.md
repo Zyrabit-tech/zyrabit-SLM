@@ -87,14 +87,6 @@ chmod +x zyra-up.sh
 ./zyra-up.sh start
 ```
 
-4. Start Streamlit UI:
-
-```bash
-source .venv/bin/activate
-streamlit run slm_console.py
-```
-
-UI: `http://localhost:8501`
 
 ## Functional verification (end-to-end)
 
@@ -147,7 +139,6 @@ curl -k https://localhost/metrics | grep zyrabit_security_hits_total
 
 ## How to open each local component
 
-- Chat UI: `http://localhost:8501`
 - API docs: `https://localhost/docs`
 - Grafana: `https://localhost/grafana`
 - Prometheus: `https://localhost/prometheus`

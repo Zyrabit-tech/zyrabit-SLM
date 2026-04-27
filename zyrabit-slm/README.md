@@ -46,7 +46,7 @@ Scripts principales de instalacion:
 El script `zyra-up.sh` valida el valor efectivo de variables requeridas antes de arrancar:
 
 - Prioriza variables del entorno del servidor (por ejemplo CI/CD o systemd).
-- Si no existen en runtime, usa `zyrabit-brain-api/.env` como fallback.
+- Si no existen en runtime, usa `zyrabit-slm/.env` como fallback.
 - Deben existir y tener valor valido:
   - `SLM_URL`
   - `DB_URL`
@@ -131,7 +131,7 @@ Levantar infraestructura:
 Levantar stack manualmente con Docker Compose:
 
 ```bash
-cd zyrabit-brain-api
+cd zyrabit-slm
 docker compose up -d
 ```
 

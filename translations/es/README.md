@@ -46,7 +46,7 @@ curl -fsSL https://ollama.com/install.sh | sh
 ```
 
 ### ⚙️ Configurar Zyrabit para usar Ollama Nativo
-Si decides usar la versión nativa, dile a Zyrabit dónde encontrar a Ollama editando el archivo `zyrabit-brain-api/.env` (cópialo de `example.env` si no lo has hecho):
+Si decides usar la versión nativa, dile a Zyrabit dónde encontrar a Ollama editando el archivo `zyrabit-slm/.env` (cópialo de `example.env` si no lo has hecho):
 
 - **Mac / Windows**:
   ```env
@@ -87,14 +87,6 @@ chmod +x zyra-up.sh
 ./zyra-up.sh start
 ```
 
-4. Levantar UI Streamlit:
-
-```bash
-source .venv/bin/activate
-streamlit run slm_console.py
-```
-
-UI: `http://localhost:8501`
 
 ## Verificación funcional (end-to-end)
 
@@ -149,7 +141,7 @@ curl -k https://localhost/metrics | grep zyrabit_security_hits_total
 
 La personalidad del Agente de RAG (SLM) y sus reglas están definidas en un archivo externo montado dinámicamente. Esto te permite modificar la conducta del asistente en caliente sin necesidad de reconstruir la imagen de Docker.
 
-1. Abre y edita el archivo: `zyrabit-brain-api/prompts/agent.md`.
+1. Abre y edita el archivo: `zyrabit-slm/prompts/agent.md`.
 2. Guarda los cambios. El backend los tomará en cuenta en las peticiones posteriores automáticamente.
    
 *(Nota: El archivo se ignora en los commits locales mediante `.gitignore` para no pisar la configuración de cada usuario. Si necesitas restablecerlo, clona o copia el contenido de `prompts/agent.example.md`)*.
@@ -169,7 +161,7 @@ Si usas certificados self-signed en local, utiliza `-k` en `curl`.
 ### Opción Docker (recomendada)
 
 ```bash
-cd zyrabit-brain-api
+cd zyrabit-slm
 docker compose --profile docs up -d docs-portal
 ```
 
@@ -188,7 +180,7 @@ Abrir: `http://localhost:3001`
 ## Validación de arquitectura
 
 ```bash
-./scripts/run_final_tests.sh
+./zyrabit-slm/scripts/build_and_verify.sh
 k6 run validation/k6/chat_steady.js
 k6 run validation/k6/chat_spike.js
 k6 run validation/k6/chat_soak.js
@@ -201,8 +193,8 @@ Checklist local PR: `validation/pr-checklist.md`
 
 - Reglas de contribución (ES): `CONTRIBUTING.md`
 - Contribution rules (EN): `CONTRIBUTING_EN.md`
-- Backend técnico (ES): `zyrabit-brain-api/README.md`
-- Backend technical (EN): `zyrabit-brain-api/README_EN.md`
+- Backend técnico (ES): `zyrabit-slm/README.md`
+- Backend technical (EN): `zyrabit-slm/README_EN.md`
 
 ## Docker Hub y Despliegue Air-Gapped
 

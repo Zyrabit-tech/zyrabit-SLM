@@ -35,9 +35,9 @@ VERIFY_TLS = os.getenv("VERIFY_TLS", "false").lower() == "true"
 
 # Shared security pipeline from backend package.
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
-BACKEND_PATH = os.path.join(CURRENT_DIR, "zyrabit-brain-api", "api-rag")
+BACKEND_PATH = os.path.join(CURRENT_DIR, "zyrabit-slm", "api-rag")
 sys.path.append(BACKEND_PATH)
-from app.security import PipelineContext, build_security_pipeline  # noqa: E402
+from app.core.security import PipelineContext, build_security_pipeline  # noqa: E402
 
 
 def query_secure_slm(prompt: str) -> (str, float):

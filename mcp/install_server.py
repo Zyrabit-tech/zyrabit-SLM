@@ -74,7 +74,7 @@ def suggest_fix(error_query: str) -> str:
 
 # Dual execution configuration:
 # - Execution as main script: starts standard MCP server via stdio for Cursor/Claude/Antigravity.
-# - Web alternative: FastAPI server mapping the tools (for Streamlit to easily consume via HTTP GET)
+# - Web alternative: FastAPI server mapping the tools (for generic HTTP REST consumption)
 app = FastAPI(title="Zyrabit Installer - Diagnostic API")
 
 class StatusResponse(BaseModel):
@@ -91,7 +91,7 @@ def diagnose_endpoint():
     return StatusResponse(status=status, suggested_fix=fix)
 
 # In current FastMCP we can inject the FastMCP Starlette app if using SSE transport,
-# but to keep a simple connection with Streamlit, we use pure FastAPI on top.
+# but to keep a simple connection via HTTP, we use pure FastAPI on top.
 
 import sys
 
