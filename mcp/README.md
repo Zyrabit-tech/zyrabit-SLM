@@ -6,7 +6,7 @@ Este módulo contiene un servidor MCP (Model Context Protocol) diseñado para ac
 
 1. **Herramientas de Diagnóstico (`check_system_status`, `suggest_fix`)**: Capaces de consultar el daemon de Docker (`docker ps`, `docker logs`) utilizando un volumen montado para identificar problemas en los servicios de Zyrabit (Ollama, Vector DB, Traefik, etc.).
 2. **Extracción de Contexto (`docs://install-guide`)**: Proporciona el contexto actualizado de `README.md` y `CONTRIBUTING.md` a cualquier cliente MCP para sugerencias alineadas a las mejores prácticas del proyecto.
-3. **Punto de Conexión HTTP (`/diagnose`)**: Facilita a la interfaz web (Streamlit) consumir un diagnóstico simplificado con un solo clic.
+3. **Punto de Conexión HTTP (`/diagnose`)**: Facilita el consumo de un diagnóstico simplificado a través de una API REST.
 
 ## 🔌 Integración con Clientes Externos (Claude Desktop, Cursor)
 
@@ -49,4 +49,4 @@ En tu IDE Cursor, ve a **Settings** > **Features** > **MCP Servers** y añade un
 
 El script `install_server.py` se puede arrancar de dos formas:
 1. `python install_server.py` -> Inicia el puente estándar de **`stdio`** usado por el ecosistema Protocol Context Model.
-2. `python install_server.py --http` -> Levanta una instancia de **`uvicorn`** en el puerto 8001 para la conectividad de Streamlit.
+2. `python install_server.py --http` -> Levanta una instancia de **`uvicorn`** en el puerto 8001 para conectividad vía HTTP (REST).

@@ -7,10 +7,16 @@ Zyrabit is a local-first RAG platform with a Zero-Trust security layer and MCP b
 Core areas:
 
 - `secure_agent.py`: secure CLI client.
-- `zyrabit-brain-api/api-rag/app/main.py`: FastAPI API entrypoint.
-- `zyrabit-brain-api/api-rag/app/services.py`: routing and model orchestration.
-- `zyrabit-brain-api/api-rag/app/pii_pipeline.py`: PII sharding/anonymization pipeline.
-- `zyrabit-brain-api/api-rag/app/mcp_bridge.py`: MCP-compatible JSON-RPC bridge.
+- `zyrabit-slm/api-rag/app/main.py`: FastAPI API entrypoint.
+- `zyrabit-slm/api-rag/app/services.py`: routing and model orchestration.
+- `zyrabit-slm/api-rag/app/core/security/pii_pipeline.py`: PII sharding/anonymization pipeline.
+- `zyrabit-slm/api-rag/app/api/v1/endpoints/mcp.py`: MCP-compatible endpoint.
+- `zyrabit-slm/api-rag/app/core/telemetry_metrics.py`: Centralized business metrics .
+
+## Design Principles
+
+- **KISS (Keep It Simple, Stupid)**: Observability and instrumentation must be lightweight. Avoid complex abstractions unless strictly required for high-volume distributed tracing. Prefer native Prometheus metrics for business value.
+- **Clean Git Tree**: All feature branches must originate from `beta`. Merge commits should be avoided in the `main` branch to maintain a linear and readable history. CI enforces a "Clean Tree" status for all production-ready releases.
 
 ## Security pipeline
 
@@ -35,9 +41,9 @@ Prometheus endpoint: `/metrics`
 
 Custom metrics:
 
-- `zyrabit_token_latency_ms_per_token`
-- `zyrabit_token_usage_total{direction=input|output|saved_vs_cloud}`
-- `zyrabit_security_hits_total{entity_type=*}`
+- `zyrabit_token_latency_ms_per_token{model=*, provider=*}`: Latency per token in ms.
+- `zyrabit_token_usage_total{model=*, provider=*}`: Heuristic token usage counter.
+- `zyrabit_security_hits_total{entity_type=*, action=rejected|masked}`: PII or spam interception tracker.
 
 ## Docker topology
 

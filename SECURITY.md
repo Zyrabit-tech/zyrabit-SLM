@@ -54,9 +54,9 @@ pip-audit
 This project implements Privacy by Design. When handling user data:
 
 1. **Never Log PII**: Emails, phone numbers, credit cards, SSNs must never appear in logs.
-2. **Sanitize Before SLM**: All inference paths must pass through the centralized interceptor pipeline in `zyrabit-brain-api/api-rag/app/pii_pipeline.py`.
+2. **Sanitize Before SLM**: All inference paths must pass through the centralized interceptor pipeline in `zyrabit-slm/api-rag/app/core/security/pii_pipeline.py`.
 3. **De-anonymize Only on Exit**: The SLM works with tokens only; raw values are restored after model response.
-4. **Test Sanitization**: Add tests for new PII patterns in `zyrabit-brain-api/api-rag/tests/test_security.py`.
+4. **Test Sanitization**: Add tests for new PII patterns in `zyrabit-slm/api-rag/tests/test_security.py`.
 
 ### Supported PII Patterns
 
@@ -68,7 +68,7 @@ Currently sanitized patterns:
 - Monetary amounts
 - Person names from contextual expressions (e.g. "my name is ...")
 
-To add new patterns, extend interceptors/detectors in `zyrabit-brain-api/api-rag/app/pii_pipeline.py` and keep `test_security.py` updated.
+To add new patterns, extend interceptors/detectors in `zyrabit-slm/api-rag/app/core/security/pii_pipeline.py` and keep `test_security.py` updated.
 
 ## 🚨 Known Security Considerations
 
@@ -114,7 +114,7 @@ Before merge:
 
 1. Run unit/integration tests:
    ```bash
-   cd zyrabit-brain-api/api-rag
+   cd zyrabit-slm/api-rag
    python3 -m pytest -q
    ```
 2. Verify no PII reaches model payload (`test_services_security.py`).

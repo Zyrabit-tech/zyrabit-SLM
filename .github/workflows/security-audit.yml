@@ -16,6 +16,9 @@ concurrency:
   group: security-audit-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
 jobs:
   dependency-audit:
     name: Dependency Audit (pip-audit)

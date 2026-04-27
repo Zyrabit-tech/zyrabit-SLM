@@ -48,7 +48,7 @@ services:
       - traefik.http.services.zyrabit-api.loadbalancer.server.port=8080
       - traefik.http.middlewares.api-ratelimit.ratelimit.average=25
       - traefik.http.middlewares.api-ratelimit.ratelimit.burst=50
-      - traefik.docker.network=zyrabit-brain-api_backend-network
+      - traefik.docker.network=zyrabit-slm_backend-network
     networks:
       - backend-network
       - model-network
@@ -75,7 +75,7 @@ services:
       - traefik.http.routers.zyrabit-web.tls=true
       - traefik.http.routers.zyrabit-web.middlewares=secureHeaders@file
       - traefik.http.services.zyrabit-web.loadbalancer.server.port=80
-      - traefik.docker.network=zyrabit-brain-api_backend-network
+      - traefik.docker.network=zyrabit-slm_backend-network
     networks:
       - backend-network
     depends_on:
@@ -135,7 +135,7 @@ services:
       - traefik.http.routers.zyrabit-prometheus.middlewares=prometheus-auth@docker,secureHeaders@file
       - traefik.http.middlewares.prometheus-auth.basicauth.users=${PROMETHEUS_BASIC_AUTH:?set PROMETHEUS_BASIC_AUTH}
       - traefik.http.services.zyrabit-prometheus.loadbalancer.server.port=9090
-      - traefik.docker.network=zyrabit-brain-api_backend-network
+      - traefik.docker.network=zyrabit-slm_backend-network
     networks:
       - backend-network
 
@@ -159,7 +159,7 @@ services:
       - traefik.http.routers.zyrabit-grafana.middlewares=grafana-auth@docker,secureHeaders@file
       - traefik.http.middlewares.grafana-auth.basicauth.users=${GRAFANA_BASIC_AUTH:?set GRAFANA_BASIC_AUTH}
       - traefik.http.services.zyrabit-grafana.loadbalancer.server.port=3000
-      - traefik.docker.network=zyrabit-brain-api_backend-network
+      - traefik.docker.network=zyrabit-slm_backend-network
     depends_on:
       - zyrabit-prometheus
     networks:
@@ -209,7 +209,7 @@ services:
       - traefik.http.routers.zyrabit-n8n.tls=true
       - traefik.http.routers.zyrabit-n8n.middlewares=secureHeaders@file
       - traefik.http.services.zyrabit-n8n.loadbalancer.server.port=5678
-      - traefik.docker.network=zyrabit-brain-api_backend-network
+      - traefik.docker.network=zyrabit-slm_backend-network
     volumes:
       - ./n8n-data:/home/node/.n8n
     networks:

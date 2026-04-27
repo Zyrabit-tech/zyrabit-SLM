@@ -8,6 +8,9 @@
 - PR base branch must be `beta`.
 - Direct PRs to `main` are not accepted.
 - Only `beta` can open a PR into `main`.
+- **Python Version**: Strictly **Python 3.12**. (3.14+ is currently incompatible with RAG dependencies).
+- **KISS Principle**: Favor simple, readable solutions over complex abstractions.
+- **Clean Git Tree**: Maintain linear history; feature branches must sync with `beta` before merging.
 - Code, variables, and commits must be in English.
 - One PR = one clear purpose.
 
@@ -59,9 +62,9 @@ Examples:
 ## Minimum local verification
 
 ```bash
-./.venv/bin/python -m pytest -q -c zyrabit-brain-api/api-rag/pytest.ini
-streamlit run slm_console.py
-./scripts/run_final_tests.sh
+./.venv/bin/python -m pytest -q -c zyrabit-slm/api-rag/pytest.ini
+python secure_agent.py "Test query"
+./zyrabit-slm/scripts/build_and_verify.sh
 ```
 
 Extended checklist: `validation/pr-checklist.md`
