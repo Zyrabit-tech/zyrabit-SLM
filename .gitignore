@@ -107,3 +107,6 @@ postman/private/
 
 # Private local ops toolkit
 ops-private/
+
+# Model weights cache
+zyrabit-slm/hf-cache/

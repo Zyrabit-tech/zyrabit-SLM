@@ -97,6 +97,32 @@ services:
       timeout: 10s
       retries: 5
 
+  # 2.5 THE SILICON BRIDGE: Tenstorrent TT-MLIR Simulation
+  zyrabit-tt-bridge:
+    build:
+      context: ../internal/engine/tenstorrent
+      args:
+        INSTALL_TENSTORRENT: ${INSTALL_TENSTORRENT:-false}
+        TENSTORRENT_PYPI_URL: ${TENSTORRENT_PYPI_URL:-https://pypi.eng.aws.tenstorrent.com/}
+    container_name: zyrabit-tt-bridge
+    profiles: [ "tenstorrent" ]
+    environment:
+      - ZYRABIT_TT_MODE=${ZYRABIT_TT_MODE:-mock}
+      - ZYRABIT_TT_MODEL_ID=${ZYRABIT_TT_MODEL_ID:-Qwen/Qwen2.5-1.5B-Instruct}
+      - ZYRABIT_TT_MIN_RAM_GB=${ZYRABIT_TT_MIN_RAM_GB:-24}
+      - ZYRABIT_TT_ALLOW_REMOTE_MODEL=${ZYRABIT_TT_ALLOW_REMOTE_MODEL:-false}
+    ports:
+      - "8090:8090"
+    networks:
+      - model-network
+    volumes:
+      - ./hf-cache:/root/.cache/huggingface/hub
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8090/v1/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
   # 3. THE MEMORY: Vector DB
   zyrabit-db:
     image: chromadb/chroma:latest
