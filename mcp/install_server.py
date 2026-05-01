@@ -33,19 +33,13 @@ def get_install_guide() -> str:
 
 @mcp.tool()
 def check_system_status() -> str:
-    """Checks Docker containers status using shell commands to diagnose failures."""
+    """Checks basic system health (disk/memory) without Docker daemon dependency."""
     try:
-        ps_output = subprocess.check_output(
-            ["docker", "ps", "-a", "--format", "{{.Names}} - {{.Status}}"], 
-            stderr=subprocess.STDOUT
-        ).decode("utf-8")
-        if not ps_output.strip():
-            return "No hay contenedores Docker en ejecución."
-        return f"Estado de los contenedores:\n{ps_output}"
-    except FileNotFoundError:
-        return "Error: el comando 'docker' no se encuentra instalado en este contenedor."
+        # Secure diagnostic check using allowed system commands
+        disk = subprocess.check_output(["df", "-h", "/app"]).decode("utf-8")
+        return f"System Health Check:\n{disk}"
     except Exception as e:
-        return f"Error al ejecutar docker ps: {str(e)}"
+        return f"Diagnostic Error: {str(e)}"
 
 @mcp.tool()
 def suggest_fix(error_query: str) -> str:

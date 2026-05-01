@@ -221,7 +221,6 @@ services:
       context: ../mcp
     container_name: zyrabit-mcp
     volumes:
-      - /var/run/docker.sock:/var/run/docker.sock:ro
       - ../README.md:/app/README.md:ro
       - ../CONTRIBUTING.md:/app/CONTRIBUTING.md:ro
     ports:
