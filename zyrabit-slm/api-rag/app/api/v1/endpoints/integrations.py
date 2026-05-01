@@ -1,45 +1,29 @@
-from fastapi import APIRouter, Request, Header, HTTPException
-from typing import Optional
-import logging
-from ....infrastructure.integrations.n8n_adapter import N8nAdapter, N8nIntegrationPolicy
-from ....main import get_chat_use_case, MODEL_NAME
+from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
+from app.api.v1.dependencies import get_chat_use_case
+from app.domain.use_cases.chat_use_case import ChatUseCase
 
-logger = logging.getLogger("uvicorn.error")
 router = APIRouter()
 
-def get_n8n_adapter() -> N8nAdapter:
-    policy = N8nIntegrationPolicy.from_env()
-    chat_use_case = get_chat_use_case()
-    
-    def execute_automation(text: str) -> str:
-        # For n8n, we perform a direct chat through the secure pipeline
-        response, _ = chat_use_case.execute_direct_chat(text, MODEL_NAME)
-        return response
-        
-    return N8nAdapter(policy=policy, execute_automation=execute_automation)
+class WebhookData(BaseModel):
+    event: str
+    payload: dict
 
-@router.post("/n8n/webhook")
-async def n8n_webhook(
-    request: Request,
-    authorization: Optional[str] = Header(None),
-    x_zyrabit_signature: Optional[str] = Header(None)
+@router.post("/webhook")
+async def handle_webhook(
+    data: WebhookData,
+    chat_use_case: ChatUseCase = Depends(get_chat_use_case)
 ):
-    """Secure webhook for n8n automation workflows."""
-    adapter = get_n8n_adapter()
-    raw_body = await request.body()
-    
+    """
+    Handle external integrations (like n8n) using the ChatUseCase.
+    """
     try:
-        adapter.authorize_request(
-            authorization_header=authorization or "",
-            signature_header=x_zyrabit_signature or "",
-            raw_body=raw_body
-        )
+        # Example: if event is a question, process it
+        if data.event == "user_query":
+            text = data.payload.get("text", "")
+            result = await chat_use_case.execute(text=text)
+            return {"status": "processed", "result": result}
         
-        payload = await request.json()
-        return adapter.handle_payload(payload)
-    except PermissionError as e:
-        logger.warning(f"Unauthorized n8n request: {e}")
-        raise HTTPException(status_code=401, detail=str(e))
+        return {"status": "received", "event": data.event}
     except Exception as e:
-        logger.error(f"Error processing n8n webhook: {e}")
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e))

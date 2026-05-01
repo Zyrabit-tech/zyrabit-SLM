@@ -1,5 +1,5 @@
 fastapi==0.132.0
-uvicorn[standard]==0.41.0
+uvicorn==0.41.0
 langchain==1.2.10
 langchain-community==0.4.1
 langchain-text-splitters==1.1.2

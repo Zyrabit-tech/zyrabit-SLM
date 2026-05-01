@@ -1,40 +1,27 @@
 import os
 import logging
-from . import services
+from app.domain.use_cases.ingest_use_case import IngestUseCase
 
 logger = logging.getLogger("uvicorn.error")
 
-def run_auto_ingest():
+def run_auto_ingest(vector_store):
     """
     Scans the repository for documentation files (README, docs) and ingests them.
+    Receives the vector_store from the lifespan manager.
     """
-    logger.info("Starting Zyrabit Auto-Ingest Protocol...")
+    logger.info("🚀 Starting Zyrabit Auto-Ingest Protocol...")
+    
+    ingest_use_case = IngestUseCase(vector_store)
     
     # 1. Path to README in the root (mounted in Docker)
     readme_path = "/app/README.md"
     if os.path.exists(readme_path):
         try:
-            logger.info("Ingesting root README.md...")
-            services.process_and_ingest_file(readme_path)
-            logger.info("README.md ingested successfully.")
+            logger.info("📄 Auto-Ingesting root README.md...")
+            # Note: execute is async, we wrap in a simple way for the bootstrap
+            import asyncio
+            asyncio.run(ingest_use_case.execute(readme_path))
         except Exception as e:
-            logger.error(f"Failed to ingest README.md: {e}")
-    else:
-        logger.warning(f"README.md not found at {readme_path}")
-
-    # 2. Path to other docs if any
-    docs_dir = "/app/docs"
-    if os.path.isdir(docs_dir):
-        for entry in os.listdir(docs_dir):
-            if entry.endswith((".md", ".txt")):
-                full_path = os.path.join(docs_dir, entry)
-                try:
-                    logger.info(f"Ingesting documentation: {entry}")
-                    services.process_and_ingest_file(full_path)
-                except Exception as e:
-                    logger.error(f"Failed to ingest {entry}: {e}")
-
-    logger.info("Auto-Ingest Protocol Completed.")
-
-if __name__ == "__main__":
-    run_auto_ingest()
+            logger.error(f"❌ Failed to auto-ingest README.md: {e}")
+    
+    logger.info("✅ Auto-Ingest Protocol Completed.")
