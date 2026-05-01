@@ -16,7 +16,8 @@ RUN python -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
 COPY requirements.txt .
-RUN pip install --upgrade pip && \
+# Actualizamos PIP para mitigar CVEs y luego instalamos dependencias
+RUN pip install --upgrade "pip>=25.0.1" && \
     pip install --no-cache-dir -r requirements.txt && \
     python -m spacy download en_core_web_sm
 
@@ -29,11 +30,15 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PATH="/opt/venv/bin:$PATH"
 
-RUN apt-get update && apt-get upgrade -y && rm -rf /var/lib/apt/lists/*
+# Hardening: Update system, cleanup and REMOVE pip to close attack vector
+RUN apt-get update && apt-get upgrade -y && \
+    apt-get purge -y --auto-remove python3-pip && \
+    rm -rf /var/lib/apt/lists/*
 
-# Copiamos el virtual environment
+# Copiamos solo lo necesario del builder
 COPY --from=builder /opt/venv /opt/venv
 
+# Crear usuario no-root
 RUN addgroup --system zyrabituser && adduser --system --group zyrabituser
 
 # Copiamos código

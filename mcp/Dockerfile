@@ -15,7 +15,7 @@ ENV PATH="/opt/venv/bin:$PATH"
 
 COPY requirements.txt .
 
-RUN pip install --upgrade pip && \
+RUN pip install --upgrade "pip>=25.0.1" && \
     pip install --no-cache-dir -r requirements.txt
 
 # STAGE 2: Runtime
@@ -27,8 +27,10 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PATH="/opt/venv/bin:$PATH"
 
+# Hardening: Update system, cleanup and REMOVE pip
 RUN apt-get update && apt-get upgrade -y && \
     apt-get install -y --no-install-recommends docker.io && \
+    apt-get purge -y --auto-remove python3-pip && \
     rm -rf /var/lib/apt/lists/*
 
 # Copiamos el virtual environment

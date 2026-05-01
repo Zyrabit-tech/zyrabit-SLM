@@ -7,6 +7,12 @@
 
 Local AI suite with **SLM + RAG + Heuristic-based Data Scrubbing (PII Guard)**.
 
+### 📚 Official Documentation
+Visit our documentation portal for detailed setup, configuration, and architecture guides:
+👉 **[https://Zyrabit-tech.github.io/zyrabit-SLM/](https://Zyrabit-tech.github.io/zyrabit-SLM/)**
+
+---
+
 ## What this project runs
 
 - `traefik`: local HTTPS entrypoint (`https://localhost`)
@@ -14,7 +20,7 @@ Local AI suite with **SLM + RAG + Heuristic-based Data Scrubbing (PII Guard)**.
 - `slm-engine`: local inference with Ollama
 - `vector-db`: ChromaDB knowledge store
 - `prometheus` + `grafana`: metrics and dashboards
-- `docs-portal` (optional)
+- `docs-portal` (GitHub Pages: [link](https://Zyrabit-tech.github.io/zyrabit-SLM/))
 - `n8n` (optional)
 
 Docker networks:
