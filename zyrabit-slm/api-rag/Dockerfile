@@ -11,15 +11,16 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     && rm -rf /var/lib/apt/lists/*
 
-# Create virtual environment
-RUN python -m venv /opt/venv
-ENV PATH="/opt/venv/bin:$PATH"
+# Install uv
+COPY --from=ghcr.io/astral-sh/setup-uv:latest /uv /uvx /bin/
 
 COPY requirements.txt .
-# Actualizamos PIP para mitigar CVEs y luego instalamos dependencias
-RUN pip install --upgrade "pip>=25.0.1" && \
-    pip install --no-cache-dir -r requirements.txt && \
-    python -m spacy download en_core_web_sm
+# Install dependencies using uv
+RUN uv venv /opt/venv
+ENV VIRTUAL_ENV=/opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+RUN uv pip install --no-cache -r requirements.txt && \
+    uv run python -m spacy download en_core_web_sm
 
 # STAGE 2: Runtime
 FROM python:3.12-slim-bookworm
