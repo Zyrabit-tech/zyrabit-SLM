@@ -1,9 +1,11 @@
 import chromadb
 import logging
+import requests
 from typing import List, Dict, Any, Optional
 from app.ports.vector_store_port import VectorStorePort
+from app.infrastructure.shared.config import SLM_URL, EMBEDDING_MODEL
 
-logger = logging.getLogger("uvicorn.error")
+logger = logging.getLogger("zyrabit.api")
 
 class SearchResult:
     """Standardized search result document."""
@@ -11,47 +13,46 @@ class SearchResult:
         self.page_content = content
         self.metadata = metadata
 
-class LangchainEmbeddingAdapter:
-    """Wrapper to make LangChain embeddings compatible with native ChromaDB."""
-    def __init__(self, langchain_embeddings: Any):
-        self.langchain_embeddings = langchain_embeddings
+class DirectOllamaEmbeddingFunction:
+    """
+    Bypasses buggy LangChain validation by calling Ollama API directly.
+    """
+    def __init__(self, model: str, base_url: str):
+        self.model = model
+        self.base_url = base_url.rstrip("/")
 
     def __call__(self, input: List[str]) -> List[List[float]]:
-        # Chroma passes a list of strings.
         try:
-            if not input:
-                return []
-            
-            # For a single query (standard RAG search)
-            if len(input) == 1:
-                return [self.langchain_embeddings.embed_query(input[0])]
-            
-            # For multiple documents (ingestion)
-            return self.langchain_embeddings.embed_documents(input)
+            response = requests.post(
+                f"{self.base_url}/api/embed",
+                json={
+                    "model": self.model,
+                    "input": input
+                }
+            )
+            response.raise_for_status()
+            data = response.json()
+            return data["embeddings"]
         except Exception as e:
-            logger.error(f"❌ Embedding call failed: {e}")
+            logger.error(f"❌ Direct Ollama Embedding failed: {e}")
             raise
 
-    def embed_query(self, input: str) -> List[float]:
-        return self.langchain_embeddings.embed_query(input)
-
-    def name(self) -> str:
-        return self.langchain_embeddings.__class__.__name__
-
 class ChromaAdapter(VectorStorePort):
-    def __init__(self, host: str, port: int, collection_name: str, embedding_function: Any):
+    def __init__(self, host: str, port: int, collection_name: str, embedding_function: Any = None):
         try:
             self.client = chromadb.HttpClient(host=host, port=port)
             
-            # Wrap if it's a LangChain embedding object
-            if hasattr(embedding_function, "embed_documents") and not hasattr(embedding_function, "name"):
-                embedding_function = LangchainEmbeddingAdapter(embedding_function)
+            # Use our direct, reliable embedding function
+            reliable_ef = DirectOllamaEmbeddingFunction(
+                model=EMBEDDING_MODEL,
+                base_url=SLM_URL
+            )
 
             self.collection = self.client.get_or_create_collection(
                 name=collection_name, 
-                embedding_function=embedding_function
+                embedding_function=reliable_ef
             )
-            logger.info(f"✅ Connected to ChromaDB collection: {collection_name}")
+            logger.info(f"✅ Connected to ChromaDB with Direct Ollama Embeddings")
         except Exception as e:
             logger.error(f"❌ Failed to initialize ChromaAdapter: {e}")
             raise
@@ -64,11 +65,9 @@ class ChromaAdapter(VectorStorePort):
             )
             
             documents = []
-            # Chroma returns { 'documents': [[...]], 'metadatas': [[...]], ... }
             if results.get("documents") and len(results["documents"]) > 0:
                 for i in range(len(results["documents"][0])):
                     content = results["documents"][0][i]
-                    # Safely handle metadatas
                     meta = {}
                     if results.get("metadatas") and len(results["metadatas"]) > 0:
                         meta = results["metadatas"][0][i] or {}

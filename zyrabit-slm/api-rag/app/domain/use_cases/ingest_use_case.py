@@ -2,7 +2,7 @@ import os
 import uuid
 import logging
 from typing import List, Dict, Any
-from app.infrastructure.shared.config import SLM_URL, DB_URL, RAG_COLLECTION
+from app.infrastructure.shared.config import SLM_URL, RAG_COLLECTION
 from app.infrastructure.shared.state_tracker import IngestionTracker
 
 logger = logging.getLogger("uvicorn.error")

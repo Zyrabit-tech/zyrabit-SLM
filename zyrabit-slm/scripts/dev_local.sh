@@ -8,7 +8,7 @@ echo "🚀 Launching Zyrabit API in Local Dev Mode (Hot-Reload)..."
 # 1. Environment Overrides
 export PROJECT_NAME="Zyrabit-Dev"
 export SLM_URL="http://localhost:11434"
-export DB_HOST="localhost"
+export DB_HOST="127.0.0.1"
 export DB_PORT=8000
 export RAG_COLLECTION="zyrabit_knowledge"
 export MODEL_NAME="qwen2.5:7b"

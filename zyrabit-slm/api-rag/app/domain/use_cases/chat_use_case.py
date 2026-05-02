@@ -48,16 +48,19 @@ class ChatUseCase:
             context = ""
             sources = []
             if decision == "rag":
-                RAG_HITS_TOTAL.labels(collection="zyrabit_knowledge").inc()
-                try:
-                    results = self.vector_store.similarity_search(sanitized_text, k=3)
-                    if results:
-                        context = "\n".join([r.page_content for r in results])
-                        sources = list(set([r.metadata.get("source", "unknown") for r in results]))
-                except Exception as e:
-                    logger.error(f"⚠️ RAG Retrieval failed: {e}")
-                    # Fallback to direct inference if RAG fails
-                    decision = "direct (fallback)"
+                if not self.vector_store:
+                    logger.warning("⚠️ RAG requested but Vector Store is not initialized. Falling back to direct.")
+                    decision = "direct (no-vector-store)"
+                else:
+                    RAG_HITS_TOTAL.labels(collection="zyrabit_knowledge").inc()
+                    try:
+                        results = self.vector_store.similarity_search(sanitized_text, k=3)
+                        if results:
+                            context = "\n".join([r.page_content for r in results])
+                            sources = list(set([r.metadata.get("source", "unknown") for r in results]))
+                    except Exception as e:
+                        logger.error(f"⚠️ RAG Retrieval failed: {e}")
+                        decision = "direct (fallback)"
 
             # 4. Prompt Engineering
             prompt = sanitized_text

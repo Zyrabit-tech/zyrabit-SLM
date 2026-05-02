@@ -14,6 +14,9 @@ def get_chat_use_case(request: Request) -> ChatUseCase:
     """
     Factory dependency for ChatUseCase with Cache.
     """
+    if not request.app.state.inference_provider:
+        raise HTTPException(status_code=503, detail="Inference Provider not initialized")
+    
     return ChatUseCase(
         inference_provider=request.app.state.inference_provider,
         vector_store=request.app.state.vector_store,
