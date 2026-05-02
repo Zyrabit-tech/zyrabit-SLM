@@ -31,6 +31,12 @@ class ChatUseCase:
             # 1. Security Check (PII Masking)
             sanitized_text, entities = self.gatekeeper.mask_pii(text)
             
+            if any(entities.values()):
+                found = [k for k, v in entities.items() if v]
+                logger.info(f"🛡️ PII Detected! Masked entities: {found}")
+                logger.debug(f"Original: {text}")
+                logger.info(f"Sanitized: {sanitized_text}")
+            
             # 2. Routing Decision
             decision = self.gatekeeper.get_routing_decision(sanitized_text)
             
