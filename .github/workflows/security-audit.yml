@@ -36,7 +36,7 @@ jobs:
         run: uv python install 3.12
 
       - name: Audit root dependencies
-        run: uv run pip-audit -r requirements.txt
+        run: uv run --with pip-audit pip-audit -r requirements.txt
 
       - name: Audit API dependencies
-        run: uv run pip-audit -r zyrabit-slm/api-rag/requirements.txt
+        run: uv run --with pip-audit pip-audit -r zyrabit-slm/api-rag/requirements.txt

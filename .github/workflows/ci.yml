@@ -62,8 +62,8 @@ jobs:
 
       - name: Install dependencies
         run: |
-          uv pip install -r requirements.txt
-          uv pip install -r zyrabit-slm/api-rag/requirements.txt
+          uv pip install --system -r requirements.txt
+          uv pip install --system -r zyrabit-slm/api-rag/requirements.txt
 
       - name: Validate Python imports/compilation
         run: |
@@ -72,7 +72,7 @@ jobs:
       - name: Run API tests
         run: |
             cd zyrabit-slm/api-rag
-            uv run pytest -q
+            python -m pytest -q
 
   production-build-gate:
     name: Production Build Gate
