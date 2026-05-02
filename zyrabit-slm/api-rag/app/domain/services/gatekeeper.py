@@ -53,17 +53,12 @@ class Gatekeeper:
     @classmethod
     def get_routing_decision(cls, text: str) -> str:
         """
-        Determines the routing path: 'rag', 'direct', or 'reject'.
+        Determines the routing path: 'rag' (with docs) or 'direct' (general knowledge).
+        We no longer 'reject' unless it's a security violation.
         """
-        if not cls.is_in_scope(text):
-            return "reject"
-            
-        # Simple heuristic: if query is about documents or retrieval, use RAG
-        rag_keywords = [
-            "document", "source", "context", "search", "know about", 
-            "purpose", "what is", "how does", "tell me about", "info"
-        ]
-        if any(kw in text.lower() for kw in rag_keywords):
+        # If it has scope keywords, we definitely want RAG
+        if cls.is_in_scope(text):
             return "rag"
             
+        # For everything else, let the SLM handle it directly
         return "direct"

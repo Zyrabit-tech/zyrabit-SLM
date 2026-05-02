@@ -5,15 +5,15 @@ from app.infrastructure.shared.config import MODEL_NAME
 from app.infrastructure.shared.metrics import TOKEN_USAGE_TOTAL, TOKEN_LATENCY_MS, SECURITY_HITS_TOTAL, RAG_HITS_TOTAL
 from app.ports.inference_port import InferenceRequest
 
-logger = logging.getLogger("uvicorn.error")
+logger = logging.getLogger("zyrabit.api")
 
 class ChatUseCase:
     """
-    The brain of the conversation. Orchestrates security, RAG, and Inference.
+    V5.0 Brain: Orchestrates Security, Hybrid RAG, and Inference.
     """
-    def __init__(self, inference_provider, vector_store, gatekeeper, cache):
+    def __init__(self, inference_provider, retriever_service, gatekeeper, cache):
         self.inference_provider = inference_provider
-        self.vector_store = vector_store
+        self.retriever_service = retriever_service
         self.gatekeeper = gatekeeper
         self.cache = cache
 
@@ -23,67 +23,63 @@ class ChatUseCase:
             if client_msg_id:
                 cached_res = self.cache.get(client_msg_id)
                 if cached_res:
+                    cached_res["metadata"]["cached"] = True
                     return cached_res
 
             start_time = time.time()
             
-            # 1. PII Masking
+            # 1. Security Check (PII Masking)
             sanitized_text, entities = self.gatekeeper.mask_pii(text)
-            if any(entities.values()):
-                for entity_type, found in entities.items():
-                    if found:
-                        SECURITY_HITS_TOTAL.labels(entity_type=entity_type, action="masked").inc(len(found))
             
             # 2. Routing Decision
             decision = self.gatekeeper.get_routing_decision(sanitized_text)
             
             if decision == "reject":
-                SECURITY_HITS_TOTAL.labels(entity_type="scope", action="rejected").inc()
                 return {
-                    "response": "I'm sorry, that query is out of scope. I focus on Zyrabit SLM and infrastructure.",
+                    "response": "I'm sorry, that query is out of scope.",
                     "metadata": {"decision": "rejected", "cached": False}
                 }
 
-            # 3. Context Retrieval (RAG)
+            # 3. Hybrid Context Retrieval (RAG)
             context = ""
             sources = []
             if decision == "rag":
-                if not self.vector_store:
-                    logger.warning("⚠️ RAG requested but Vector Store is not initialized. Falling back to direct.")
-                    decision = "direct (no-vector-store)"
+                if not self.retriever_service:
+                    logger.warning("⚠️ Hybrid Retriever not initialized. Falling back to direct.")
+                    decision = "direct (no-retriever)"
                 else:
-                    RAG_HITS_TOTAL.labels(collection="zyrabit_knowledge").inc()
                     try:
-                        results = self.vector_store.similarity_search(sanitized_text, k=3)
+                        results = await self.retriever_service.search(sanitized_text)
                         if results:
                             context = "\n".join([r.page_content for r in results])
                             sources = list(set([r.metadata.get("source", "unknown") for r in results]))
                     except Exception as e:
-                        logger.error(f"⚠️ RAG Retrieval failed: {e}")
+                        logger.error(f"⚠️ Hybrid Search failed: {e}")
                         decision = "direct (fallback)"
 
-            # 4. Prompt Engineering
+            # 4. Inference
+            system_prompt_path = "app/infrastructure/shared/prompts/zyra_system.md"
+            try:
+                with open(system_prompt_path, "r", encoding="utf-8") as f:
+                    system_prompt = f.read()
+            except Exception as e:
+                logger.warning(f"⚠️ Could not load system prompt from {system_prompt_path}: {e}")
+                system_prompt = "You are Zyra, a helpful assistant."
+            
             prompt = sanitized_text
             if context:
-                prompt = f"Context: {context}\n\nQuestion: {sanitized_text}\n\nAnswer based ONLY on context:"
+                prompt = f"Context:\n{context}\n\nQuestion: {sanitized_text}\n\nAnswer based ONLY on the context provided:"
 
-            # 5. Inference
             request = InferenceRequest(
-                model=MODEL_NAME,
-                prompt=prompt
+                model=MODEL_NAME, 
+                prompt=prompt,
+                system_prompt=system_prompt
             )
-            
             response_obj = self.inference_provider.generate(request)
-            response_text = response_obj.text
-            latency_ms = response_obj.latency_seconds * 1000
             
-            # Metrics
-            TOKEN_LATENCY_MS.labels(model=MODEL_NAME).observe(latency_ms)
-            tokens_generated = response_obj.raw_payload.get("eval_count", 0)
-            TOKEN_USAGE_TOTAL.labels(model=MODEL_NAME, direction="output").inc(tokens_generated)
-
+            latency_ms = response_obj.latency_seconds * 1000
             final_response = {
-                "response": response_text,
+                "response": response_obj.text,
                 "metadata": {
                     "decision": decision,
                     "latency_ms": round(latency_ms, 2),
@@ -93,18 +89,12 @@ class ChatUseCase:
                 }
             }
             
-            # 6. Store in Cache
+            # 5. Cache
             if client_msg_id:
-                cache_entry = final_response.copy()
-                cache_entry["metadata"] = final_response["metadata"].copy()
-                cache_entry["metadata"]["cached"] = True
-                self.cache.set(client_msg_id, cache_entry)
+                self.cache.set(client_msg_id, final_response)
 
             return final_response
 
         except Exception as e:
             logger.exception(f"❌ Critical error in ChatUseCase: {e}")
-            return {
-                "response": f"I encountered a critical error: {str(e)}",
-                "metadata": {"decision": "error", "cached": False}
-            }
+            return {"response": "Critical Error", "metadata": {"decision": "error"}}

@@ -19,7 +19,7 @@ def get_chat_use_case(request: Request) -> ChatUseCase:
     
     return ChatUseCase(
         inference_provider=request.app.state.inference_provider,
-        vector_store=request.app.state.vector_store,
+        retriever_service=request.app.state.retriever_service,
         gatekeeper=Gatekeeper,
         cache=global_cache
     )

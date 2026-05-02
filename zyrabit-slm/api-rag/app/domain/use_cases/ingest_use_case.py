@@ -1,77 +1,57 @@
 import os
 import uuid
 import logging
-from typing import List, Dict, Any
-from app.infrastructure.shared.config import SLM_URL, RAG_COLLECTION
+from typing import List, Dict, Any, Optional
 from app.infrastructure.shared.state_tracker import IngestionTracker
+from app.infrastructure.shared.validators.ingestion_validator import IngestionValidator
+from app.infrastructure.persistence.pdf_processor import PDFProcessor
+from app.domain.services.document_chunker import DocumentChunker
 
-logger = logging.getLogger("uvicorn.error")
+logger = logging.getLogger("zyrabit.api")
 
 class IngestUseCase:
     """
-    Handles end-to-end document ingestion: Loading -> Chunking -> Vectorizing.
+    V5.0 High Precision Ingestion Pipeline.
     """
-    def __init__(self, vector_store):
+    def __init__(self, vector_store, retriever_service=None):
         self.vector_store = vector_store
+        self.retriever_service = retriever_service
+        self.chunker = DocumentChunker()
 
-    async def execute(self, file_path: str):
+    async def execute(self, file_path: str, domain: str = "general"):
         """
-        Executes the full ingestion pipeline for a file.
+        Executes the high-precision ingestion pipeline.
         """
-        doc_id = str(uuid.uuid4())
         filename = os.path.basename(file_path)
         
-        # 1. Register PENDING state
+        # 1. Validation (Fail-Fast)
+        error = IngestionValidator.validate(file_path)
+        if error:
+            logger.error(f"❌ Validation failed for {filename}: {error}")
+            return {"status": "error", "message": error}
+            
+        doc_id = str(uuid.uuid4())
         IngestionTracker.register_ingest(doc_id, filename)
         
         try:
-            # 2. Load and Split
-            chunks, metadatas = self._load_and_split(file_path)
+            # 2. Extract (Markdown Paradigm)
+            documents = PDFProcessor.to_markdown_documents(file_path)
             
-            # 3. Ingest into Vector Store
-            for m in metadatas:
-                m["doc_id"] = doc_id
-                m["source"] = filename
-                
-            ids = [f"{doc_id}_{i}" for i in range(len(chunks))]
-            self.vector_store.add_texts(chunks, metadatas=metadatas, ids=ids)
+            # 3. Structural Chunking
+            chunks = self.chunker.split(documents, domain=domain)
             
-            # 4. Mark as COMPLETED
+            # 4. Ingest into Vector Store
+            # In V5.0 we use the LangChain vector store directly
+            self.vector_store.add_documents(chunks)
+            
+            # 5. Update BM25 Index (for Hybrid Search)
+            if self.retriever_service:
+                self.retriever_service.update_bm25_index(chunks)
+            
             IngestionTracker.complete_ingest(doc_id)
-            logger.info(f"✅ Ingestion successful: {filename} ({len(chunks)} chunks)")
+            logger.info(f"✅ High-Precision Ingestion successful: {filename}")
             return {"status": "success", "doc_id": doc_id, "chunks": len(chunks)}
             
         except Exception as e:
             logger.error(f"❌ Ingestion failed for {filename}: {e}")
-            # The Garbage Collector will clean this up on next startup
             return {"status": "error", "message": str(e), "doc_id": doc_id}
-
-    def _load_and_split(self, file_path: str):
-        """
-        Internal logic for parsing files and creating chunks.
-        Uses LangChain loaders and splitters.
-        """
-        from langchain_text_splitters import RecursiveCharacterTextSplitter
-        
-        if file_path.lower().endswith(".pdf"):
-            from langchain_community.document_loaders import PyMuPDFLoader
-            loader = PyMuPDFLoader(file_path)
-        elif file_path.lower().endswith(".md"):
-            from langchain_community.document_loaders import TextLoader
-            loader = TextLoader(file_path)
-        else:
-            from langchain_community.document_loaders import TextLoader
-            loader = TextLoader(file_path)
-            
-        docs = loader.load()
-        
-        text_splitter = RecursiveCharacterTextSplitter(
-            chunk_size=1000,
-            chunk_overlap=200
-        )
-        split_docs = text_splitter.split_documents(docs)
-        
-        chunks = [d.page_content for d in split_docs]
-        metadatas = [d.metadata for d in split_docs]
-        
-        return chunks, metadatas

@@ -1,20 +1,33 @@
 #!/bin/bash
 
-# Zyrabit SLM: Local Development Launcher
-# This script runs the API natively on your Mac for instant feedback.
+# Zyrabit SLM - Local Dev Launcher (UV Optimized)
+# -----------------------------------------------
 
-echo "🚀 Launching Zyrabit API in Local Dev Mode (Hot-Reload)..."
+# 1. Check for 'uv' (The pnpm of Python)
+if ! command -v uv &> /dev/null; then
+    echo "❌ 'uv' is not installed."
+    echo "💡 Install it with: curl -LsSf https://astral.sh/uv/install.sh | sh"
+    exit 1
+fi
 
-# 1. Environment Overrides
-export PROJECT_NAME="Zyrabit-Dev"
-export SLM_URL="http://localhost:11434"
+echo "🚀 Initializing Zyrabit Environment (Python 3.12 via uv)..."
+
+# 2. Ensure Virtual Environment with Python 3.12
+if [ ! -d ".venv" ]; then
+    uv venv --python 3.12
+fi
+source .venv/bin/activate
+
+# 3. Fast Sync Dependencies
+echo "📦 Syncing dependencies..."
+uv pip install -r api-rag/requirements.txt
+
+# 4. Set Dev Environment Variables
 export DB_HOST="127.0.0.1"
-export DB_PORT=8000
-export RAG_COLLECTION="zyrabit_knowledge"
-export MODEL_NAME="qwen2.5:7b"
+export DB_PORT="8000"
+export SLM_URL="http://localhost:11434"
+export APP_ENV="local"
 
-# 2. Path Setup
-export PYTHONPATH=$PYTHONPATH:$(pwd)/api-rag
-
-# 3. Execution
-cd api-rag && uvicorn app.main:app --reload --port 8081 --host 0.0.0.0
+# 5. Launch API with Hot-Reload
+echo "🔥 Launching Zyrabit API in Local Dev Mode..."
+cd api-rag && uvicorn app.main:app --host 0.0.0.0 --port 8081 --reload
