@@ -59,7 +59,11 @@ class Gatekeeper:
             return "reject"
             
         # Simple heuristic: if query is about documents or retrieval, use RAG
-        if any(kw in text.lower() for kw in ["document", "source", "context", "search", "know about"]):
+        rag_keywords = [
+            "document", "source", "context", "search", "know about", 
+            "purpose", "what is", "how does", "tell me about", "info"
+        ]
+        if any(kw in text.lower() for kw in rag_keywords):
             return "rag"
             
         return "direct"

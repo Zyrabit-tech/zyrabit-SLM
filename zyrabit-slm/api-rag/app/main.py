@@ -15,7 +15,10 @@ from app.infrastructure.persistence.chroma_adapter import ChromaAdapter
 from app.infrastructure.inference.ollama_inference_adapter import OllamaInferenceAdapter
 from app.infrastructure.shared.config import SLM_URL, DB_URL, RAG_COLLECTION
 
-logger = logging.getLogger("uvicorn.error")
+# Industrial Logging Standard
+from app.infrastructure.shared.logger import setup_logging
+setup_logging()
+logger = logging.getLogger("zyrabit.api")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -23,10 +26,6 @@ async def lifespan(app: FastAPI):
     KISS Lifespan: Manages adapter initialization and graceful shutdown.
     """
     logger.info("🚀 Zyrabit SLM API Starting...")
-    
-    # 1. Initialize Adapters
-    # In a real production app, we'd use factories here. 
-    # For MVP V3.0, we instantiate directly and inject into app.state.
     
     try:
         # 0. Initialize State Tracker
@@ -40,9 +39,10 @@ async def lifespan(app: FastAPI):
         )
 
         # Persistence
+        from app.infrastructure.shared.config import DB_HOST, DB_PORT
         app.state.vector_store = ChromaAdapter(
-            host="zyrabit-db",
-            port=8000,
+            host=DB_HOST,
+            port=DB_PORT,
             collection_name=RAG_COLLECTION,
             embedding_function=embeddings
         )
@@ -63,20 +63,15 @@ async def lifespan(app: FastAPI):
         
         # 2. Startup Phase (Auto-Ingest)
         from app.auto_ingest import run_auto_ingest
-        run_auto_ingest(app.state.vector_store)
+        await run_auto_ingest(app.state.vector_store)
         
         logger.info("✅ Adapters and Auto-Ingest initialized.")
     except Exception as e:
         logger.error(f"❌ Failed to initialize adapters: {e}")
-        # In strict mode, we might want to prevent startup, 
-        # but for now we'll log and continue.
 
     yield
     
-    # 2. Graceful Shutdown
     logger.info("🛑 Zyrabit SLM API Shutting down...")
-    # Clean up connections if necessary
-    # Example: await app.state.vector_store.close()
 
 # --- FastAPI Setup ---
 app = FastAPI(
@@ -105,15 +100,14 @@ from app.api.v1.endpoints import chat, health
 app.include_router(chat.router, prefix=API_V1_STR, tags=["Chat"])
 app.include_router(health.router, prefix=API_V1_STR, tags=["Monitoring"])
 
-# --- Socket.io Events (Bridge to Use Cases) ---
+# --- Socket.io Events ---
 @sio.event
 async def connect(sid, environ):
     logger.info(f"Socket connected: {sid}")
 
 @sio.event
 async def chat_message(sid, data):
-    # This will be refactored in Phase 3 to use the ChatUseCase
-    # from the container/app.state
+    # Bridge to the logic via Use Case
     pass
 
 @app.get("/", include_in_schema=False)

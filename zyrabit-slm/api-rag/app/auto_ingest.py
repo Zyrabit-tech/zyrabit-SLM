@@ -4,7 +4,7 @@ from app.domain.use_cases.ingest_use_case import IngestUseCase
 
 logger = logging.getLogger("uvicorn.error")
 
-def run_auto_ingest(vector_store):
+async def run_auto_ingest(vector_store):
     """
     Scans the repository for documentation files (README, docs) and ingests them.
     Receives the vector_store from the lifespan manager.
@@ -18,10 +18,12 @@ def run_auto_ingest(vector_store):
     if os.path.exists(readme_path):
         try:
             logger.info("📄 Auto-Ingesting root README.md...")
-            # Note: execute is async, we wrap in a simple way for the bootstrap
-            import asyncio
-            asyncio.run(ingest_use_case.execute(readme_path))
+            # We await directly as we are inside an async context (lifespan)
+            await ingest_use_case.execute(readme_path)
+            logger.info("✅ README.md auto-ingested successfully.")
         except Exception as e:
             logger.error(f"❌ Failed to auto-ingest README.md: {e}")
+    else:
+        logger.warning(f"⚠️ README.md not found at {readme_path}")
     
-    logger.info("✅ Auto-Ingest Protocol Completed.")
+    logger.info("🏁 Auto-Ingest Protocol Completed.")

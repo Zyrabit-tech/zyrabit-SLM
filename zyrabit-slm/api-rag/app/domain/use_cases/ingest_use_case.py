@@ -57,8 +57,8 @@ class IngestUseCase:
             from langchain_community.document_loaders import PyMuPDFLoader
             loader = PyMuPDFLoader(file_path)
         elif file_path.lower().endswith(".md"):
-            from langchain_community.document_loaders import UnstructuredMarkdownLoader
-            loader = UnstructuredMarkdownLoader(file_path)
+            from langchain_community.document_loaders import TextLoader
+            loader = TextLoader(file_path)
         else:
             from langchain_community.document_loaders import TextLoader
             loader = TextLoader(file_path)
