@@ -1,6 +1,9 @@
+name: zyrabit-slm
+
 services:
   # 1. THE BRAIN: API RAG
   zyrabit-api:
+    image: zyrabit-slm/api-rag
     build:
       context: ./api-rag
     container_name: zyrabit-api
@@ -31,6 +34,7 @@ services:
 
   # 1.5 THE FACE: Web UI
   zyrabit-web:
+    image: zyrabit-slm/web-ui
     build:
       context: ./web-ui
     container_name: zyrabit-web

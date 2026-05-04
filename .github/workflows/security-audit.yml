@@ -35,8 +35,8 @@ jobs:
       - name: Setup Python
         run: uv python install 3.12
 
-      - name: Audit root dependencies
-        run: uv run --with pip-audit pip-audit -r requirements.txt
+      - name: Install dependencies
+        run: uv sync --only-group dev
 
-      - name: Audit API dependencies
-        run: uv run --with pip-audit pip-audit -r zyrabit-slm/api-rag/requirements.txt
+      - name: Run Security Audit
+        run: uv run pip-audit -r pyproject.toml

@@ -1,3 +1,5 @@
+name: zyrabit-slm
+
 services:
   traefik:
     image: traefik:latest
@@ -26,6 +28,7 @@ services:
 
   # 1. THE BRAIN: API RAG
   zyrabit-api:
+    image: zyrabit-slm/api-rag
     build:
       context: ./api-rag
     container_name: zyrabit-api
@@ -65,6 +68,7 @@ services:
 
   # 1.5 THE FACE: Web UI
   zyrabit-web:
+    image: zyrabit-slm/web-ui
     build:
       context: ./web-ui
     container_name: zyrabit-web
@@ -175,21 +179,6 @@ services:
     networks:
       - backend-network
 
-  zyrabit-docs:
-    build:
-      context: ../docs-portal
-    container_name: zyrabit-docs
-    profiles: [ "docs" ]
-    labels:
-      - traefik.enable=true
-      - traefik.http.routers.zyrabit-docs.rule=PathPrefix(`/docs-portal`)
-      - traefik.http.routers.zyrabit-docs.entrypoints=websecure
-      - traefik.http.routers.zyrabit-docs.tls=true
-      - traefik.http.services.zyrabit-docs.loadbalancer.server.port=3001
-      - traefik.http.middlewares.docs-stripprefix.stripprefix.prefixes=/docs-portal
-      - traefik.http.routers.zyrabit-docs.middlewares=docs-stripprefix@docker,secureHeaders@file
-    networks:
-      - frontend-network
 
   zyrabit-n8n:
     image: n8nio/n8n:latest
@@ -217,6 +206,7 @@ services:
 
   # 6. SYSTEM ASSISTANT: MCP Installer Server
   zyrabit-mcp:
+    image: zyrabit-slm/mcp
     build:
       context: ../mcp
     container_name: zyrabit-mcp

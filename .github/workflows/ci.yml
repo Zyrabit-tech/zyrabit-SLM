@@ -61,18 +61,14 @@ jobs:
         run: uv python install 3.12
 
       - name: Install dependencies
-        run: |
-          uv pip install --system -r requirements.txt
-          uv pip install --system -r zyrabit-slm/api-rag/requirements.txt
+        run: uv sync --all-groups
 
       - name: Validate Python imports/compilation
         run: |
-          python -m compileall slm_console.py secure_agent.py zyrabit-slm/api-rag/app
+          uv run python -m compileall slm_console.py secure_agent.py zyrabit-slm/api-rag/app
 
       - name: Run API tests
-        run: |
-            cd zyrabit-slm/api-rag
-            python -m pytest -q
+        run: uv run pytest
 
   production-build-gate:
     name: Production Build Gate
