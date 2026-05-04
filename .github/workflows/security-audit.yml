@@ -36,9 +36,7 @@ jobs:
         run: uv python install 3.12
 
       - name: Install dependencies
-        run: |
-          uv venv
-          uv pip install -r requirements.txt -r zyrabit-slm/api-rag/requirements.txt
+        run: uv sync --all-groups
 
       - name: Run Security Audit
-        run: uv run --no-sync pip-audit --ignore-vuln GHSA-fv5p-p927-qmxr
+        run: uv run pip-audit

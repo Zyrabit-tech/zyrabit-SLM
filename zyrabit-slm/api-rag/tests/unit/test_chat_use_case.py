@@ -12,12 +12,18 @@ async def test_chat_use_case_direct_answer():
     # Mock return object for inference
     mock_response = MagicMock()
     mock_response.text = "Mocked Zyrabit answer"
+    mock_response.latency_seconds = 0.1
     mock_inference.generate.return_value = mock_response
     
+    mock_gatekeeper = MagicMock()
+    mock_gatekeeper.mask_pii.return_value = ("What is Zyrabit SLM?", {})
+    mock_gatekeeper.get_routing_decision.return_value = "direct"
+    
     use_case = ChatUseCase(
-        inference_provider=mock_inference,
-        vector_store=mock_vector_store,
-        gatekeeper=Gatekeeper
+        mock_inference,
+        mock_vector_store,
+        mock_gatekeeper,
+        MagicMock()
     )
     
     # 2. Execute
@@ -36,20 +42,26 @@ async def test_chat_use_case_pii_masking():
     
     mock_response = MagicMock()
     mock_response.text = "Answer sent to masked email"
+    mock_response.latency_seconds = 0.1
     mock_inference.generate.return_value = mock_response
     
+    mock_gatekeeper = MagicMock()
+    mock_gatekeeper.mask_pii.return_value = ("My email is [EMAIL_MASKED]", {"email": ["test@example.com"]})
+    mock_gatekeeper.get_routing_decision.return_value = "direct"
+
     use_case = ChatUseCase(
-        inference_provider=mock_inference,
-        vector_store=mock_vector_store,
-        gatekeeper=Gatekeeper
+        mock_inference,
+        mock_vector_store,
+        mock_gatekeeper,
+        MagicMock()
     )
     
     # Text with PII
     result = await use_case.execute(text="My email is test@example.com")
     
     # Verify that the text sent to inference was masked
-    # The first argument of the first call to generate
-    called_prompt = mock_inference.generate.call_args[0][0]
-    assert "[EMAIL_MASKED]" in called_prompt
-    assert "test@example.com" not in called_prompt
+    # The first argument of the first call to generate is an InferenceRequest
+    called_request = mock_inference.generate.call_args[0][0]
+    assert "[EMAIL_MASKED]" in called_request.prompt
+    assert "test@example.com" not in called_request.prompt
     assert result["metadata"]["pii_detected"] is True

@@ -49,10 +49,7 @@ def mock_infrastructure():
     ), patch(
         "app.auto_ingest.run_auto_ingest",
         new=AsyncMock(return_value=None),
-    ), patch(
-        "app.domain.use_cases.chat_use_case.ChatUseCase.execute",
-        new=AsyncMock(return_value=mock_execute_result),
-    ) as mock_execute:
+    ):
         from app.main import app
         app.state.vector_store = mock_chroma
         app.state.inference_provider = mock_inference
@@ -62,7 +59,6 @@ def mock_infrastructure():
             "vector_store": mock_chroma,
             "inference": mock_inference,
             "retriever": mock_retriever,
-            "execute": mock_execute,
         }
 
 

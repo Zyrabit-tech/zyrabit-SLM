@@ -120,7 +120,7 @@ Before adding a new dependency:
    - Number of transitive dependencies it adds
    - `pip-audit` result (clean)
 
-**Langchain ecosystem note:** All `langchain-*` packages must stay within the same version era (currently `0.3.x`). Do not mix packages from different eras — they have incompatible sub-dependency ranges.
+**Langchain ecosystem note:** All `langchain-*` packages must stay within the same version era (currently `LangChain Core 1.x`). Do not mix packages from different eras — they have incompatible sub-dependency ranges.
 
 ---
 
