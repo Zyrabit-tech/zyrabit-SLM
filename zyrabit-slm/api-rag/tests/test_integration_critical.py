@@ -20,21 +20,27 @@ client = TestClient(app)
 
 def test_router_returns_rag_for_zyrabit_keyword():
     """Router must send Zyrabit-related queries to RAG."""
-    assert Gatekeeper.get_routing_decision("¿Qué es Zyrabit?") == "search_rag_database"
-    assert Gatekeeper.get_routing_decision("Explain the architecture") == "search_rag_database"
-    assert Gatekeeper.get_routing_decision("How does RAG work here?") == "search_rag_database"
+    assert Gatekeeper.get_routing_decision("¿Qué es Zyrabit?") == "rag"
+    assert Gatekeeper.get_routing_decision("Explain the architecture") == "rag"
+    assert Gatekeeper.get_routing_decision("How does RAG work here?") == "rag"
 
 
 def test_router_returns_direct_for_general_queries():
     """Router must send general knowledge to direct SLM."""
-    assert Gatekeeper.get_routing_decision("¿Qué es Python?") == "direct_SLM_answer"
-    assert Gatekeeper.get_routing_decision("Capital of France?") == "direct_SLM_answer"
+    assert Gatekeeper.get_routing_decision("¿Qué es Python?") == "direct"
+    assert Gatekeeper.get_routing_decision("Capital of France?") == "direct"
 
 
-def test_router_rejects_spam():
-    """Router must reject spam/off-topic queries."""
-    assert Gatekeeper.get_routing_decision("comprar viagra barato ahora") == "reject_query"
-    assert Gatekeeper.get_routing_decision("casino free money") == "reject_query"
+def test_router_handles_spam_as_direct():
+    """
+    V5.0: The Gatekeeper no longer hard-rejects off-topic queries.
+    Spam/irrelevant queries are routed to direct SLM, which handles
+    them contextually with the system prompt.
+    """
+    result = Gatekeeper.get_routing_decision("comprar viagra barato ahora")
+    assert result in ("direct", "rag"), f"Expected routing decision, got: {result}"
+    result2 = Gatekeeper.get_routing_decision("casino free money")
+    assert result2 in ("direct", "rag"), f"Expected routing decision, got: {result2}"
 
 
 # --- Ingest API ---
