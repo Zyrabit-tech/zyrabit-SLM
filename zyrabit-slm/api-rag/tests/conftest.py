@@ -53,6 +53,11 @@ def mock_infrastructure():
         "app.domain.use_cases.chat_use_case.ChatUseCase.execute",
         new=AsyncMock(return_value=mock_execute_result),
     ) as mock_execute:
+        from app.main import app
+        app.state.vector_store = mock_chroma
+        app.state.inference_provider = mock_inference
+        app.state.retriever_service = mock_retriever
+
         yield {
             "vector_store": mock_chroma,
             "inference": mock_inference,

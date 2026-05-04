@@ -20,3 +20,4 @@ EMBEDDING_MODEL: str = os.getenv("EMBEDDING_MODEL", "mxbai-embed-large")
 
 # Security
 N8N_SERVICE_TOKEN: str = os.getenv("N8N_SERVICE_TOKEN", "zyrabit-local-token")
+DOCS_DIR: str = os.getenv("DOCS_DIR", "./docs")

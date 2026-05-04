@@ -62,9 +62,12 @@ app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, 
 Instrumentator().instrument(app).expose(app)
 
 # Register Routers
-from app.api.v1.endpoints import chat, health
+from app.api.v1.endpoints import chat, health, mcp, documents, integrations
 app.include_router(chat.router, prefix=API_V1_STR, tags=["Chat"])
 app.include_router(health.router, prefix=API_V1_STR, tags=["Monitoring"])
+app.include_router(mcp.router, prefix="/mcp", tags=["MCP"])
+app.include_router(documents.router, prefix=API_V1_STR, tags=["Documents"])
+app.include_router(integrations.router, prefix=API_V1_STR, tags=["Integrations"])
 
 @app.get("/", include_in_schema=False)
 async def root():
