@@ -36,7 +36,7 @@ jobs:
         run: uv python install 3.12
 
       - name: Install dependencies
-        run: uv sync --only-group dev
+        run: uv sync --all-groups
 
       - name: Run Security Audit
-        run: uv run pip-audit -r pyproject.toml
+        run: uv run pip-audit
