@@ -2,8 +2,6 @@ import urllib.request
 import json
 import uuid
 import time
-import ssl
-
 # Configuration
 SOCKET_URL = "http://127.0.0.1:8080"
 API_URL = f"{SOCKET_URL}/v1/chat"

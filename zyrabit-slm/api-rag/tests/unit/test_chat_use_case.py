@@ -1,7 +1,6 @@
 import pytest
 from unittest.mock import MagicMock
 from app.domain.use_cases.chat_use_case import ChatUseCase
-from app.domain.services.gatekeeper import Gatekeeper
 
 @pytest.mark.asyncio
 async def test_chat_use_case_direct_answer():

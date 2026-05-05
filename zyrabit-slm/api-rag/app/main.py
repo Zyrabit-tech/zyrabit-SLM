@@ -6,7 +6,7 @@ from contextlib import asynccontextmanager
 from prometheus_fastapi_instrumentator import Instrumentator
 
 # Infrastructure / Shared
-from app.infrastructure.shared.config import PROJECT_NAME, API_V1_STR, SLM_URL, DB_HOST, DB_PORT, RAG_COLLECTION, EMBEDDING_MODEL
+from app.infrastructure.shared.config import PROJECT_NAME, API_V1_STR, SLM_URL, RAG_COLLECTION, EMBEDDING_MODEL
 from app.infrastructure.shared.logger import setup_logging
 setup_logging()
 logger = logging.getLogger("zyrabit.api")

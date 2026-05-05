@@ -1,7 +1,6 @@
 from fastapi.testclient import TestClient
 from unittest.mock import patch, MagicMock
 from io import BytesIO
-import pytest
 
 from app.main import app
 
