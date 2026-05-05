@@ -105,6 +105,23 @@ Once configured, you can disable the `zyrabit-engine` service in `docker-compose
 
 ---
 
+## Hardware Support & Experimental Features
+
+Zyrabit's initialization script (`zyra-up.sh`) features bare-metal hardware detection to automatically optimize your Docker Compose topology.
+
+- **Apple Silicon (Mac M1/M2/M3)**: Our current test baseline. Auto-configures the `metal` profile.
+- **NVIDIA GPU**: Supported natively via CUDA runtime.
+- **Tenstorrent (Grayskull / Wormhole)**: **[EXPERIMENTAL/BETA]** Native simulation and bare-metal support via `tt-forge` and PyTorch XLA. The bridge is isolated in its own Docker Compose profile.
+
+> [!IMPORTANT]
+> **We need your benchmarks!**
+> Currently, our primary testing ground is a Mac M1 Pro. We lack robust stress-tests and benchmarking baselines for Linux rigs and Windows workstations.
+> If you have an exotic GPU, a high-end AMD Radeon, or just a 64-core Threadripper, please run Zyrabit and share your metrics in the **[Leaderboard Issues](https://github.com/Zyrabit-tech/zyrabit-SLM/issues)**.
+
+**Upcoming Roadmap**: We are actively planning native bindings for accessible NPU chips, starting with **Huawei Ascend**. PRs adding support for specific silicon architectures are highly encouraged.
+
+---
+
 ## Optional Profiles
 
 Extend the stack with Docker Compose profiles:
