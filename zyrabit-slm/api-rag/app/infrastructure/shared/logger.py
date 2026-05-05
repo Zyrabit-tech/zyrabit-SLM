@@ -1,7 +1,6 @@
 import logging
 import json
-import time
-from datetime import datetime
+from datetime import datetime, timezone
 
 class JsonFormatter(logging.Formatter):
     """
@@ -9,7 +8,7 @@ class JsonFormatter(logging.Formatter):
     """
     def format(self, record):
         log_record = {
-            "timestamp": datetime.utcfromtimestamp(record.created).isoformat() + "Z",
+            "timestamp": datetime.fromtimestamp(record.created, tz=timezone.utc).isoformat(),
             "level": record.levelname,
             "component": record.name,
             "message": record.getMessage(),

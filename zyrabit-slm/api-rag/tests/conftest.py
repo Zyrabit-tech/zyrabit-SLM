@@ -29,11 +29,6 @@ def mock_infrastructure():
     mock_retriever = MagicMock()
     mock_retriever.retrieve.return_value = []
 
-    mock_execute_result = {
-        "response": "Mocked response",
-        "metadata": {"decision": "rag", "latency_ms": 50.0, "sources": [], "pii_detected": False, "cached": False},
-    }
-
     with patch(
         "app.infrastructure.persistence.chroma_adapter.ChromaAdapter",
         return_value=mock_chroma,

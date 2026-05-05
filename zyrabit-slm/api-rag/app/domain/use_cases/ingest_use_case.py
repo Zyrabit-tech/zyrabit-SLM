@@ -1,7 +1,7 @@
 import os
 import uuid
 import logging
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any
 from app.infrastructure.shared.state_tracker import IngestionTracker
 from app.infrastructure.shared.validators.ingestion_validator import IngestionValidator
 from app.infrastructure.persistence.pdf_processor import PDFProcessor

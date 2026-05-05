@@ -39,6 +39,7 @@ def test_idempotency():
             duration2 = time.time() - start_time
             
             print(f"✅ Response 2 received in {duration2:.2f}s")
+            print(f"📄 Answer: {res2.get('response', '')[:50]}...")
             
             if duration2 < duration1 * 0.2: # Expecting at least 5x faster
                 print("\n🔥 SUCCESS: Idempotency cache hit! The second response was instant.")

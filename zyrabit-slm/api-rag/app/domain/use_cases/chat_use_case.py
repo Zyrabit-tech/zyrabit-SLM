@@ -1,4 +1,3 @@
-import time
 import logging
 from typing import Optional, Dict, Any
 from app.infrastructure.shared.config import MODEL_NAME
@@ -26,8 +25,6 @@ class ChatUseCase:
                     cached_res["metadata"]["cached"] = True
                     return cached_res
 
-            start_time = time.time()
-            
             # 1. Security Check (PII Masking)
             sanitized_text, entities = self.gatekeeper.mask_pii(text)
             

@@ -47,3 +47,6 @@ pythonpath = ["zyrabit-slm/api-rag"]
 testpaths = ["zyrabit-slm/api-rag/tests"]
 asyncio_mode = "auto"
 addopts = "-ra -q"
+filterwarnings = [
+    "ignore::DeprecationWarning:importlib._bootstrap",
+]

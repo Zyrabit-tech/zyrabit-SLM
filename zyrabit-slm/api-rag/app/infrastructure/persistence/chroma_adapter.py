@@ -1,6 +1,6 @@
 import logging
 import requests
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any
 from langchain_core.embeddings import Embeddings
 from langchain_chroma import Chroma
 from app.ports.vector_store_port import VectorStorePort

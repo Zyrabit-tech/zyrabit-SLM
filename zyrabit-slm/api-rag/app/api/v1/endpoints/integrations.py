@@ -1,5 +1,4 @@
 from fastapi import APIRouter, Depends, HTTPException, Request, Header
-from pydantic import BaseModel
 from typing import Optional
 from app.api.v1.dependencies import get_chat_use_case
 from app.domain.use_cases.chat_use_case import ChatUseCase
@@ -7,14 +6,10 @@ from app.infrastructure.integrations.n8n_adapter import N8nAdapter, N8nIntegrati
 
 router = APIRouter()
 
-def get_n8n_adapter() -> N8nAdapter:
-    # A real implementation would get this from app.state or a dependency provider
-    # For now we create it on the fly or it gets patched in tests
-    from app.domain.use_cases.chat_use_case import ChatUseCase
-    # This is a bit of a hack for the dependency, since the real chat use case needs its own deps
-    # But in test it is patched.
-    # Actually, we can use the injected ChatUseCase below and just pass its execute method.
-    pass
+def get_n8n_adapter() -> N8nAdapter | None:
+    # Dependency stub: returns None so the endpoint builds its own adapter.
+    # Patched with a real N8nAdapter mock in integration tests.
+    return None
 
 
 @router.post("/integrations/n8n/webhook")
@@ -37,7 +32,7 @@ async def handle_n8n_webhook(
                 import asyncio
                 # This is a simplification; in a real async environment we'd await
                 try:
-                    loop = asyncio.get_running_loop()
+                    asyncio.get_running_loop()
                     # We can't block the loop, but n8n adapter is sync
                     # For V5.0 we should probably make n8n_adapter async, but for tests it's mocked
                     return "sync_execute_placeholder"

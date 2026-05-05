@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import time
 import logging
 from typing import Tuple
 
@@ -23,7 +22,6 @@ def query_secure_slm(prompt: str) -> Tuple[str, float]:
     # 2. Inference
     provider = create_inference_provider()
     
-    start_time = time.time()
     try:
         request = InferenceRequest(
             model=MODEL_NAME,

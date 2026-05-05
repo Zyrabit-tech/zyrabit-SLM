@@ -1,5 +1,5 @@
 import logging
-from typing import List, Dict, Any
+from typing import List
 from langchain_text_splitters import MarkdownHeaderTextSplitter, RecursiveCharacterTextSplitter
 from langchain_core.documents import Document
 
