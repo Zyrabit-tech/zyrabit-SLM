@@ -2,127 +2,116 @@
 
 > This document is maintained in English only, by project policy.
 
-## 🔒 Reporting Security Vulnerabilities
+## Reporting a Vulnerability
 
-If you discover a security vulnerability in Zyrabit SLM, please **do not** open a public issue. Instead:
+If you discover a security vulnerability in Zyrabit SLM, **do not open a public issue.**
 
-1. **Email**: Send details to `security@zyrabit.com` (or create a private security advisory on GitHub)
-2. **Include**: 
-   - Description of the vulnerability
-   - Steps to reproduce
-   - Potential impact
-   - Suggested fix (if any)
+Report privately through one of these channels:
+- **GitHub Security Advisory:** [Create a private advisory](https://github.com/Zyrabit-tech/zyrabit-SLM/security/advisories/new)
+- **Email:** `security@zyrabit.com`
 
-We will respond within 48 hours and work with you to address the issue.
+Please include:
+- Description of the vulnerability
+- Steps to reproduce
+- Potential impact
+- Suggested fix (if any)
 
-## 🛡️ Dependency Security
+We will acknowledge within **48 hours** and provide a resolution timeline within **7 days** for critical issues.
+
+---
+
+## Dependency Security
 
 ### Automated Scanning
 
-This project uses the following tools to monitor dependency security:
+| Tool | Scope | Cadence |
+|---|---|---|
+| `pip-audit` | Python dependency CVEs | Every PR + weekly |
+| GitHub Dependabot | Dependency version updates | Continuous |
 
-- **pip-audit**: Scans Python dependencies for known vulnerabilities
-- **safety**: Checks against the Safety DB of known security issues
-- **Dependabot** (GitHub): Automatically creates PRs for dependency updates
-
-### Manual Security Checks
-
-Before adding or updating dependencies, run:
+### Manual Check Before Adding a Dependency
 
 ```bash
-# Install security tools
-pip install pip-audit safety
-
-# Scan all dependencies
-pip-audit
-safety check --json
-
-# Check a specific package
-pip install <package-name>
-pip-audit
+uv run --with pip-audit pip-audit -r pyproject.toml
 ```
 
-### Security Best Practices
+**Best practices:**
+- Pin exact versions (`==`) in `requirements.txt` and `pyproject.toml`.
+- Only add dependencies that are strictly necessary.
+- Review the package's maintainers, release cadence, and open issues before adopting.
+- For the Langchain ecosystem: all `langchain-*` packages must stay within the same version era to avoid dependency conflicts.
 
-1. **Pin Versions**: Always specify exact versions in `requirements.txt`
-2. **Review Dependencies**: Check the package's GitHub repo, maintainers, and recent activity
-3. **Minimize Dependencies**: Only add dependencies that are absolutely necessary
-4. **Regular Updates**: Keep dependencies up-to-date with security patches
+---
 
-## 🔐 PII Sanitization Guidelines
+## PII Sanitization
 
-This project implements Privacy by Design. When handling user data:
+This project implements **Privacy by Design**. The following rules are enforced:
 
-1. **Never Log PII**: Emails, phone numbers, credit cards, SSNs must never appear in logs.
-2. **Sanitize Before SLM**: All inference paths must pass through the centralized interceptor pipeline in `zyrabit-slm/api-rag/app/core/security/pii_pipeline.py`.
-3. **De-anonymize Only on Exit**: The SLM works with tokens only; raw values are restored after model response.
-4. **Test Sanitization**: Add tests for new PII patterns in `zyrabit-slm/api-rag/tests/test_security.py`.
+1. **Never log PII.** Emails, phone numbers, credit cards, and SSNs must never appear in application logs.
+2. **Sanitize before inference.** Every inference path passes through `zyrabit-slm/api-rag/app/core/security/pii_pipeline.py`.
+3. **De-anonymize only on exit.** The model receives tokens (`<USER_EMAIL_1>`, `<SSN_1>`, etc.). Raw values are restored only in the final response layer.
+4. **Test every new pattern.** Add tests in `zyrabit-slm/api-rag/tests/test_security.py` and `test_pii_pipeline.py`.
 
 ### Supported PII Patterns
 
-Currently sanitized patterns:
-- Email addresses
-- Phone numbers (US style)
-- Credit card numbers
-- Social Security numbers (SSN)
-- Monetary amounts
-- Person names from contextual expressions (e.g. "my name is ...")
+| Pattern | Token example |
+|---|---|
+| Email address | `<USER_EMAIL_1>` |
+| Phone number (US) | `<PHONE_1>` |
+| Credit card (Luhn-validated) | `<CARD_1>` |
+| Social Security Number | `<SSN_1>` |
+| Monetary amount | `<AMOUNT_1>` |
+| Person name | `<USER_NAME_1>` |
 
-To add new patterns, extend interceptors/detectors in `zyrabit-slm/api-rag/app/core/security/pii_pipeline.py` and keep `test_security.py` updated.
+To add a new pattern: extend the detectors in `pii_pipeline.py` and update `test_security.py`.
 
-## 🚨 Known Security Considerations
+---
 
-### Local Execution
+## Network Isolation
 
-This project is designed for **local or on-premise deployment**. Key security features:
+Services are split into three Docker networks:
 
-- **No External APIs**: All SLM inference happens locally via Ollama
-- **Air-Gapped Mode**: Can run completely offline after initial model download
-- **Data Sovereignty**: Your data never leaves your infrastructure
+| Network | Services | External access |
+|---|---|---|
+| `frontend-network` | Traefik | Yes — ports 80/443 |
+| `backend-network` | API, ChromaDB, Prometheus, Grafana, MCP | No |
+| `model-network` | Ollama (`internal: true`) | No — no egress |
 
-### Docker Network Isolation
+The inference engine (`zyrabit-engine`) is intentionally isolated with no external network egress.
 
-Services are split into three networks:
+---
 
-- `frontend-network`: proxy and UI surface
-- `backend-network`: API, vector DB, observability
-- `model-network`: model inference path (`internal: true`)
-
-Only proxy entrypoints are exposed to host by default.
-
-## 📊 Security Audit History
+## Security Audit Log
 
 | Date | Tool | Vulnerabilities Found | Status |
-|------|------|----------------------|--------|
+|---|---|---|---|
+| 2026-05-04 | pip-audit | 0 | ✅ Clean |
 | 2026-03-12 | pip-audit | 0 | ✅ Clean |
-| 2026-03-12 | safety | 0 | ✅ Clean |
 
-*Last updated: 2026-03-12*
+---
 
-## 🔄 Security Update Process
+## Security Validation Checklist
 
-1. **Detection**: Dependabot or manual scan identifies vulnerability
-2. **Assessment**: Evaluate severity and impact
-3. **Patch**: Update dependency to patched version
-4. **Test**: Run full test suite
-5. **Deploy**: Merge to `beta`, then `main`
-6. **Notify**: Update this document and notify users if critical
+Before merging any PR:
 
-## ✅ Security Validation Checklist
+```bash
+# 1. Run the full test suite
+uv run pytest
 
-Before merge:
+# 2. Run dependency audit
+uv run --with pip-audit pip-audit -r pyproject.toml
 
-1. Run unit/integration tests:
-   ```bash
-   cd zyrabit-slm/api-rag
-   python3 -m pytest -q
-   ```
-2. Verify no PII reaches model payload (`test_services_security.py`).
-3. Verify `/metrics` includes custom security and usage counters.
-4. Verify MCP `resources/read` sanitizes by default.
+# 3. Verify PII never reaches the model payload
+uv run pytest tests/test_services_security.py -v
 
-## 📚 Additional Resources
+# 4. Verify MCP resources are sanitized by default
+uv run pytest tests/test_mcp.py -v
+```
+
+---
+
+## Additional Resources
 
 - [OWASP Top 10](https://owasp.org/www-project-top-ten/)
-- [Python Security Best Practices](https://python.readthedocs.io/en/stable/library/security_warnings.html)
-- [Docker Security](https://docs.docker.com/engine/security/)
+- [Docker Security Best Practices](https://docs.docker.com/engine/security/)
+- [pip-audit documentation](https://pypi.org/project/pip-audit/)

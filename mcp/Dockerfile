@@ -7,16 +7,19 @@ ENV PYTHONUNBUFFERED=1
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
+    curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Create virtual environment
-RUN python -m venv /opt/venv
-ENV PATH="/opt/venv/bin:$PATH"
+# Install uv
+RUN curl -LsSf https://astral.sh/uv/install.sh | sh
+ENV PATH="/root/.local/bin:$PATH"
 
 COPY requirements.txt .
-
-RUN pip install --upgrade pip && \
-    pip install --no-cache-dir -r requirements.txt
+# Install dependencies using uv
+RUN uv venv /opt/venv
+ENV VIRTUAL_ENV=/opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+RUN uv pip install --no-cache -r requirements.txt
 
 # STAGE 2: Runtime
 FROM python:3.12-slim-bookworm
@@ -27,8 +30,10 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PATH="/opt/venv/bin:$PATH"
 
+# Hardening: Update system, cleanup and REMOVE pip
 RUN apt-get update && apt-get upgrade -y && \
     apt-get install -y --no-install-recommends docker.io && \
+    apt-get purge -y --auto-remove python3-pip && \
     rm -rf /var/lib/apt/lists/*
 
 # Copiamos el virtual environment

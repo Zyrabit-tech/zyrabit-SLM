@@ -1,12 +1,18 @@
-FROM node:latest-slim
+FROM node:20-alpine AS builder
 
 WORKDIR /site
-COPY package.json ./
-RUN corepack enable \
-    && if ! command -v pnpm >/dev/null 2>&1; then corepack prepare pnpm@latest --activate; fi \
-    && if ! command -v pnpm >/dev/null 2>&1; then echo "ERROR: no se encontro el paquete pnpm" >&2; exit 1; fi \
-    && pnpm install --no-frozen-lockfile
+COPY package.json pnpm-lock.yaml* ./
+RUN corepack enable && pnpm install --frozen-lockfile
 
 COPY . .
+RUN pnpm run build
+
+# Stage 2: Runtime
+FROM node:20-alpine
+
+WORKDIR /site
+COPY --from=builder /site ./
+
 EXPOSE 3001
+USER node
 CMD ["pnpm", "start"]

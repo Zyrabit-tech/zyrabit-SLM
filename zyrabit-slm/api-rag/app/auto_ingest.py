@@ -1,40 +1,33 @@
 import os
 import logging
-from . import services
+from app.domain.use_cases.ingest_use_case import IngestUseCase
 
-logger = logging.getLogger("uvicorn.error")
+logger = logging.getLogger("zyrabit.api")
 
-def run_auto_ingest():
+async def run_auto_ingest(vector_store, retriever_service=None):
     """
-    Scans the repository for documentation files (README, docs) and ingests them.
+    V5.0 Auto-Ingest: Ingests core documentation using the High-Precision pipeline.
     """
-    logger.info("Starting Zyrabit Auto-Ingest Protocol...")
+    logger.info("🚀 Starting Zyrabit Auto-Ingest Protocol V5.0...")
     
-    # 1. Path to README in the root (mounted in Docker)
+    ingest_use_case = IngestUseCase(vector_store, retriever_service)
+    
+    # Locate README (Docker vs Local)
     readme_path = "/app/README.md"
+    if not os.path.exists(readme_path):
+        readme_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../README.md"))
+        
     if os.path.exists(readme_path):
         try:
-            logger.info("Ingesting root README.md...")
-            services.process_and_ingest_file(readme_path)
-            logger.info("README.md ingested successfully.")
+            logger.info(f"📄 Auto-Ingesting: {readme_path}")
+            res = await ingest_use_case.execute(readme_path, domain="zyrabit-docs")
+            if res.get("status") == "success":
+                logger.info("✅ README.md auto-ingested successfully.")
+            else:
+                logger.error(f"⚠️ README.md ingestion failed: {res.get('message')}")
         except Exception as e:
-            logger.error(f"Failed to ingest README.md: {e}")
+            logger.error(f"❌ Failed to auto-ingest README.md: {e}")
     else:
-        logger.warning(f"README.md not found at {readme_path}")
-
-    # 2. Path to other docs if any
-    docs_dir = "/app/docs"
-    if os.path.isdir(docs_dir):
-        for entry in os.listdir(docs_dir):
-            if entry.endswith((".md", ".txt")):
-                full_path = os.path.join(docs_dir, entry)
-                try:
-                    logger.info(f"Ingesting documentation: {entry}")
-                    services.process_and_ingest_file(full_path)
-                except Exception as e:
-                    logger.error(f"Failed to ingest {entry}: {e}")
-
-    logger.info("Auto-Ingest Protocol Completed.")
-
-if __name__ == "__main__":
-    run_auto_ingest()
+        logger.warning(f"⚠️ README.md not found. Skipping auto-ingest.")
+    
+    logger.info("🏁 Auto-Ingest Protocol Completed.")

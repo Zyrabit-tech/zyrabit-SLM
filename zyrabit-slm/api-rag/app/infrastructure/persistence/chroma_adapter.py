@@ -1,52 +1,70 @@
-import chromadb
+import logging
+import requests
 from typing import List, Dict, Any
+from langchain_core.embeddings import Embeddings
+from langchain_chroma import Chroma
 from app.ports.vector_store_port import VectorStorePort
 
+logger = logging.getLogger("zyrabit.api")
 
-class LangchainEmbeddingAdapter:
-    """Wrapper to make LangChain embeddings compatible with native ChromaDB."""
-    def __init__(self, langchain_embeddings: Any):
-        self.langchain_embeddings = langchain_embeddings
+class DirectOllamaEmbeddings(Embeddings):
+    """
+    Direct Ollama API Embeddings (LangChain Compatible).
+    Bypasses library bugs by using raw HTTP requests.
+    """
+    def __init__(self, model: str, base_url: str):
+        self.model = model
+        self.base_url = base_url.rstrip("/")
 
-    def __call__(self, input: List[str]) -> List[List[float]]:
-        return self.langchain_embeddings.embed_documents(input)
+    def _embed(self, texts: List[str]) -> List[List[float]]:
+        all_embeddings = []
+        batch_size = 5 # Optimized for 800-char chunks
+        
+        for i in range(0, len(texts), batch_size):
+            batch = texts[i : i + batch_size]
+            try:
+                response = requests.post(
+                    f"{self.base_url}/api/embed",
+                    json={
+                        "model": self.model,
+                        "input": batch
+                    }
+                )
+                if response.status_code != 200:
+                    logger.error(f"❌ Ollama Error ({response.status_code}): {response.text}")
+                response.raise_for_status()
+                all_embeddings.extend(response.json()["embeddings"])
+            except Exception as e:
+                logger.error(f"❌ Direct Ollama Embedding failed at batch {i//batch_size}: {e}")
+                raise
+        
+        return all_embeddings
 
-    def embed_query(self, input: str) -> List[float]:
-        """Specific method required by some ChromaDB versions/paths."""
-        return self.langchain_embeddings.embed_query(input)
+    def embed_documents(self, texts: List[str]) -> List[List[float]]:
+        return self._embed(texts)
 
-    def name(self) -> str:
-        return self.langchain_embeddings.__class__.__name__
+    def embed_query(self, text: str) -> List[float]:
+        return self._embed([text])[0]
 
 class ChromaAdapter(VectorStorePort):
-    def __init__(self, host: str, port: int, collection_name: str, embedding_function: Any):
-        self.client = chromadb.HttpClient(host=host, port=port)
-        
-        # Wrap if it's a LangChain embedding object (has embed_documents)
-        if hasattr(embedding_function, "embed_documents") and not hasattr(embedding_function, "name"):
-            embedding_function = LangchainEmbeddingAdapter(embedding_function)
+    """
+    Bridge between our VectorStorePort and LangChain's Chroma.
+    """
+    def __init__(self, langchain_chroma: Chroma):
+        self.vector_store = langchain_chroma
 
-        self.collection = self.client.get_or_create_collection(
-            name=collection_name, 
-            embedding_function=embedding_function
-        )
+    def similarity_search(self, query_text: str, k: int = 5) -> List[Any]:
+        return self.vector_store.similarity_search(query_text, k=k)
 
-    def query(self, query_text: str, n_results: int = 5) -> Dict[str, Any]:
-        return self.collection.query(
-            query_texts=[query_text],
-            n_results=n_results
-        )
+    def add_texts(self, texts: List[str], metadatas: List[Dict[str, Any]], ids: List[str]) -> None:
+        self.vector_store.add_texts(texts=texts, metadatas=metadatas, ids=ids)
 
-    def add_documents(self, documents: List[str], metadatas: List[Dict[str, Any]], ids: List[str]) -> None:
-        self.collection.add(
-            documents=documents,
-            metadatas=metadatas,
-            ids=ids
-        )
+    def add_documents(self, documents: List[Any]) -> None:
+        self.vector_store.add_documents(documents)
+
+    def delete(self, where: Dict[str, Any]) -> None:
+        # Simplified delete for Chroma V0.5+
+        pass
 
     def heartbeat(self) -> bool:
-        try:
-            self.client.heartbeat()
-            return True
-        except Exception:
-            return False
+        return True

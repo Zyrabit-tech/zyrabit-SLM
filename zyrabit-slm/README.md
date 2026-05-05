@@ -1,322 +1,276 @@
-# Zyrabit SLM
+# Zyrabit SLM — Backend Stack
 
-[English version](README_EN.md)
+Backend stack for secure local RAG, MCP bridge, and full-stack observability.
 
-Stack backend para RAG local seguro, puente MCP y observabilidad.
+> **Recommended Python runtime: 3.12.** Avoid 3.13+ until all dependencies declare support.
 
-> Runtime recomendado local: **Python 3.12** para evitar incompatibilidades con dependencias legacy en Python 3.14+.
+---
 
-## Contenido de esta carpeta
+## What this folder contains
 
-- `api-rag/`: API en FastAPI y flujo de seguridad.
-- `docker-compose.yml`: orquestacion local del stack.
-- `config/`: provisionamiento de Prometheus y Grafana.
-- `traefik/`: configuracion de reverse proxy y reglas de seguridad.
+| Path | Purpose |
+|---|---|
+| `api-rag/` | FastAPI service, security pipeline, RAG engine |
+| `docker-compose.yml` | Production stack with Traefik, segmented networks |
+| `docker-compose.local.yml` | Local override — direct HTTP port 8080, no TLS |
+| `config/` | Prometheus & Grafana provisioning files |
+| `traefik/` | Reverse proxy dynamic config, TLS rules, rate-limiting |
+| `scripts/` | Dev, build, and verification scripts |
+| `prompts/` | Editable system prompts for the SLM |
+| `secrets/` | Docker secrets (never commit real values) |
 
-## Capacidades principales
+---
 
-- Anonimizacion de PII basada en interceptores antes de inferencia.
-- Desanonimizacion reversible de tokens al responder al usuario.
-- Metricas Prometheus en `/metrics`:
-  - `zyrabit_token_latency_ms_per_token`
-  - `zyrabit_token_usage_total`
-  - `zyrabit_security_hits_total`
-- Endpoints MCP:
-  - `GET /mcp/config.json`
-  - `POST /mcp`
-- Endpoint de integración n8n (adapter + políticas):
-  - `POST /v1/integrations/n8n/webhook`
+## Core capabilities
 
-## Inicio rapido
+- **PII scrubbing:** Interceptor pipeline anonymizes sensitive entities (email, phone, SSN, credit cards, names, amounts) before every inference call using heuristic regex + Luhn validation.
+- **Reversible de-anonymization:** Tokens (`<USER_EMAIL_1>`, `<SSN_1>`, etc.) are restored in the final response. Raw data never touches the model.
+- **Hybrid RAG retrieval:** BM25 keyword matching + ChromaDB vector search for deterministic, high-recall retrieval.
+- **Pluggable inference:** Swap between `ollama`, `ollama_host`, `ollama_docker`, or any `openai_compatible` endpoint via a single env variable.
+- **MCP bridge:** Exposes Zyrabit tools (`secure_chat`, `sanitize_text`) through the Model Context Protocol for AI agent integration.
+- **Observability:** Prometheus metrics + Grafana dashboards included. Zero public ports — everything served through Traefik.
 
-Desde la raiz del repositorio:
+---
 
-```bash
-chmod +x zyra-up.sh
-./zyra-up.sh install
-```
+## Environment Setup
 
-Scripts principales de instalacion:
+### Required variables
 
-- `install.sh`: bootstrap remoto/local para primera ejecucion.
-- `zyra-up.sh`: entrada principal para validar entorno y levantar stack.
-
-## Validacion de variables de entorno
-
-El script `zyra-up.sh` valida el valor efectivo de variables requeridas antes de arrancar:
-
-- Prioriza variables del entorno del servidor (por ejemplo CI/CD o systemd).
-- Si no existen en runtime, usa `zyrabit-slm/.env` como fallback.
-- Deben existir y tener valor valido:
-  - `SLM_URL`
-  - `DB_URL`
-  - `MODEL_NAME`
-- Se rechazan valores vacios o invalidos como `undefined`, `null`, `none`.
-
-Plantilla completa: copia `example.env` a `.env` y ajusta valores:
+Copy the template and fill in your values:
 
 ```bash
 cp example.env .env
 ```
 
-Ejemplo minimo para `.env` (opcional si ya exportas variables en servidor):
+| Variable | Description |
+|---|---|
+| `SLM_URL` | Ollama inference endpoint |
+| `DB_URL` | ChromaDB endpoint |
+| `MODEL_NAME` | SLM model to use (e.g. `qwen2.5:7b`) |
+| `INFERENCE_PROVIDER` | Adapter name: `ollama`, `ollama_host`, `openai_compatible` |
+| `INFERENCE_TIMEOUT_SECONDS` | Max seconds to wait for a model response |
+| `PROMETHEUS_BASIC_AUTH` | `user:htpasswd_hash` for Prometheus basic auth |
+| `GRAFANA_BASIC_AUTH` | `user:htpasswd_hash` for Grafana basic auth |
+
+Generate a bcrypt hash for basic auth:
 
 ```bash
-INFERENCE_PROVIDER=ollama
-SLM_URL=http://slm-engine:11434/api/generate
-DB_URL=http://vector-db:8000
-MODEL_NAME=qwen2.5:7b
-INFERENCE_TIMEOUT_SECONDS=120
-PROMETHEUS_BASIC_AUTH=admin:$2y$05$...   # htpasswd -nbB admin 'password'
-GRAFANA_BASIC_AUTH=admin:$2y$05$...      # idem
+htpasswd -nbB admin 'your-password'
 ```
 
-### Proveedores de inferencia intercambiables (factory + adapters)
+### Inference providers
 
-La capa de inferencia usa contrato por puerto (`app/ports/inference_port.py`) con factory (`app/inference_factory.py`) y adapters:
+```env
+# Ollama running inside Docker (default)
+INFERENCE_PROVIDER=ollama
+SLM_URL=http://zyrabit-engine:11434/api/generate
 
-- `ollama` / `ollama_host` / `ollama_docker` -> `SLM_URL=/api/generate`
-- `openai_compatible` -> `INFERENCE_BASE_URL=/v1/chat/completions`
-
-Ejemplo modo hibrido (Ollama nativo host + resto en Docker):
-
-```bash
+# Native Ollama on the host (Mac/Windows — best performance)
 INFERENCE_PROVIDER=ollama_host
 SLM_URL=http://host.docker.internal:11434/api/generate
-MODEL_NAME=qwen2.5:7b
+
+# OpenAI-compatible endpoint (e.g. LiteLLM, vLLM, BitNet)
+INFERENCE_PROVIDER=openai_compatible
+INFERENCE_BASE_URL=http://your-endpoint/v1/chat/completions
 ```
 
-Variables para integracion n8n (adapter webhook):
+### n8n integration variables
 
-```bash
+```env
 N8N_SERVICE_TOKEN=replace-with-strong-token
 N8N_WEBHOOK_SIGNING_SECRET=replace-with-hmac-secret
 N8N_REQUIRE_SIGNATURE=true
-```
 
-En produccion, usa secretos por archivo o Vault (no hardcode):
-
-```bash
+# Production: use file-based secrets, never plain values in compose files
 N8N_SERVICE_TOKEN_FILE=/run/secrets/n8n_service_token
 N8N_WEBHOOK_SIGNING_SECRET_FILE=/run/secrets/n8n_webhook_signing_secret
 ```
 
-Credenciales de autenticacion basica para observabilidad en Traefik:
+---
+
+## Starting the Stack
 
 ```bash
-PROMETHEUS_BASIC_AUTH=<usuario:hash_htpasswd>
-GRAFANA_BASIC_AUTH=<usuario:hash_htpasswd>
-```
+# From the repository root — preferred
+./zyra-up.sh install          # Start + pull models
+./zyra-up.sh start            # Start only
+./zyra-up.sh doctor           # Validate environment
 
-Ejemplo para generar hash:
-
-```bash
-htpasswd -nbB admin 'cambia-esto'
-```
-
-## Ejemplos de uso
-
-Verificar entorno y configuracion:
-
-```bash
-./zyra-up.sh doctor
-```
-
-Levantar infraestructura:
-
-```bash
-./zyra-up.sh start
-```
-
-Levantar stack manualmente con Docker Compose:
-
-```bash
-cd zyrabit-slm
+# Manually from this directory
 docker compose up -d
+
+# Local HTTP mode (no TLS, port 8080)
+docker compose -f docker-compose.local.yml up -d
 ```
 
-Levantar e instalar modelos base:
+### Adding optional profiles
 
 ```bash
-./zyra-up.sh install
+# n8n automation engine
+./zyra-up.sh install --profile n8n
+
+# Extended observability (Loki log aggregation)
+docker compose --profile observability-extra up -d
 ```
 
-Descargar modelos manualmente (sin flujo automático):
+---
 
-```bash
-docker compose exec -T slm-engine ollama pull qwen2.5:7b
-docker compose exec -T slm-engine ollama pull mxbai-embed-large
+## Service Topology
+
+```
+                     ┌─────────────────────────────────────────┐
+                     │         frontend-network (bridge)        │
+                     └──────────────┬──────────────────────────┘
+                            Traefik │ (TLS, rate-limit, auth)
+                     ┌─────────────▼──────────────────────────┐
+                     │          backend-network (bridge)       │
+                     │  api-rag   chroma-db   prometheus       │
+                     │  grafana   mcp         n8n (optional)   │
+                     └──────────────┬─────────────────────────┘
+                                    │
+                     ┌──────────────▼─────────────────────────┐
+                     │   model-network (internal: true)        │
+                     │   zyrabit-engine (Ollama)               │
+                     └────────────────────────────────────────┘
 ```
 
-Consultar salud de la API:
+| Service | Published path |
+|---|---|
+| `api-rag` | `https://localhost/v1/*`, `https://localhost/socket.io` |
+| `grafana` | `https://localhost/grafana` |
+| `prometheus` | `https://localhost/prometheus` |
+| `n8n` *(optional)* | `https://localhost/n8n` |
+
+---
+
+## API Reference
+
+### Health
 
 ```bash
-curl -k https://localhost/health
+curl -k https://localhost/v1/health
+# → {"status":"ok","slm":"online","db":"online"}
 ```
 
-Enviar una consulta al router:
+### Chat
 
 ```bash
-curl -k https://localhost/v1/chat \
+curl -k -X POST https://localhost/v1/chat \
   -H "Content-Type: application/json" \
-  -d '{"text":"Explica la arquitectura de Zyrabit"}'
+  -d '{"text": "Explain the Zyrabit architecture"}'
 ```
-
-Respuesta de `POST /v1/chat`:
 
 ```json
 {
   "response": "...",
   "metadata": {
-    "route_decision": "search_rag_database",
+    "decision": "search_rag_database",
     "rag_hits": 2,
     "latency_ms": 305.44
   }
 }
 ```
 
-Ingestar documento:
+### Ingest a document
 
 ```bash
 curl -k -X POST https://localhost/v1/ingest \
   -F "file=@api-rag/sample_docs/zyrabit_project_overview.txt"
 ```
 
-Respuesta de `POST /v1/ingest`:
-
 ```json
 {
   "status": "success",
   "filename": "zyrabit_project_overview.txt",
   "chunks_processed": 4,
-  "message": "Documento ingestado correctamente en la base de conocimiento.",
-  "ingest_id": "..."
+  "ingest_id": "abc123"
 }
 ```
 
-Ver ejemplos completos: `docs/CURL_EXAMPLES.md` y workflow n8n en `docs/n8n_zyrabit_webhook_workflow.json`.
-
-Enviar evento desde n8n al adapter:
+### n8n webhook
 
 ```bash
 curl -k https://localhost/v1/integrations/n8n/webhook \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer ${N8N_SERVICE_TOKEN}" \
-  -H "X-Zyrabit-Signature: sha256=<hmac_sha256_del_body>" \
-  -d '{"text":"Resume estado de observabilidad","workflow_id":"wf-001","execution_id":"exec-001"}'
+  -H "X-Zyrabit-Signature: sha256=<hmac_sha256_of_body>" \
+  -d '{"text":"Summarize observability status","workflow_id":"wf-001","execution_id":"exec-001"}'
 ```
 
-## Capas de abstraccion
+See [`docs/CURL_EXAMPLES.md`](docs/CURL_EXAMPLES.md) for the full reference.
 
-La solucion esta organizada por capas para separar responsabilidades:
+---
 
-1. **Capa de entrada (Edge/Ingress)**
-   - `traefik` recibe trafico y aplica TLS, redirecciones y rate limiting.
-2. **Capa de aplicacion**
-   - `api-rag` expone endpoints HTTP y coordina la logica.
-3. **Capa de seguridad**
-   - Pipeline de anonymizacion/desanonimizacion de datos sensibles.
-4. **Capa de inferencia**
-   - `slm-engine` (Ollama) ejecuta el modelo local.
-5. **Capa de conocimiento**
-   - `vector-db` almacena y recupera embeddings/contexto.
-6. **Capa de observabilidad**
-   - `prometheus`, `grafana` y opcionalmente `loki`.
+## Architecture
 
-## Patrones aplicados
+Zyrabit follows a **Hexagonal (Ports & Adapters)** architecture inside `api-rag/`:
 
-- **Interceptor Pipeline**: cadena de transformaciones para sanitizar input/output.
-- **Router Pattern**: el endpoint `/v1/chat` decide entre flujo RAG o respuesta directa.
-- **Facade/API Gateway**: FastAPI y Traefik simplifican acceso al sistema distribuido.
-- **Defense in Depth**: redes segmentadas + sanitizacion + reverse proxy.
+| Layer | Responsibility |
+|---|---|
+| **Edge / Ingress** | Traefik — TLS, rate-limiting, auth middleware |
+| **Transport** | FastAPI routers — HTTP endpoints, request parsing |
+| **Security Pipeline** | PII anonymization interceptors — runs before domain logic |
+| **Domain** | Use cases, Gatekeeper router, RAG orchestration |
+| **Ports** | Contracts for inference, vector store, automation |
+| **Adapters** | Ollama, ChromaDB, n8n, MCP implementations |
+| **Observability** | Prometheus, Grafana, optional Loki |
 
-## Arquitectura utilizada
+See [`api-rag/app/HEXAGONAL_ARCHITECTURE.md`](api-rag/app/HEXAGONAL_ARCHITECTURE.md) for the full guide.
 
-- **Arquitectura por servicios (micro-servicios locales)** orquestada con Docker Compose.
-- **Estilo Clean / Layered** dentro de `api-rag` para aislar transporte, servicios y seguridad.
-- **Topologia Zero-Trust local**: nada de datos sensibles sale fuera de la infraestructura.
+---
 
-## Topologia de servicios
-
-- `traefik`: ingress, HTTPS y politicas de entrada.
-- `api-rag`: nucleo FastAPI.
-- `slm-engine`: motor de inferencia local.
-- `vector-db`: capa de persistencia semantica.
-- `prometheus` + `grafana`: monitoreo.
-- `loki` (perfil opcional): logs centralizados.
-- `docs-portal` (perfil opcional): portal de documentacion.
-- `n8n` (perfil opcional `automation`): automatizacion por webhook, publicado via Traefik (`/n8n`).
-
-Redes:
-
-- `frontend-network`
-- `backend-network`
-- `model-network` (`internal: true`)
-
-## Manejo de Entorno (Managed Environment)
-
-> [!TIP]
-> Para evitar errores de "module not found" (como `pytest`), se recomienda encarecidamente trabajar dentro de un entorno virtual.
-
-1. **Crear el entorno virtual:**
-   ```bash
-   python3 -m venv .venv
-   ```
-
-2. **Activarlos:**
-   - macOS / Linux: `source .venv/bin/activate`
-   - Windows: `.\.venv\Scripts\activate`
-
-3. **Instalar dependencias:**
-   ```bash
-   pip install -r requirements.txt
-   pip install -r api-rag/requirements.txt
-   ```
-
-## Testing
-
-Asegúrate de tener el entorno activado antes de correr los tests.
+## Development
 
 ```bash
-cd api-rag
-python3 -m pytest -q
+# Install all Python dependencies
+uv sync
+
+# Run the test suite
+uv run pytest
+
+# Build and verify all containers locally
+cd scripts
+./build_and_verify.sh          # local mode (HTTP, port 8080)
+./build_and_verify.sh --prod   # production mode (Traefik + HTTPS)
 ```
 
-Suites clave:
+### Test suites
 
-- `tests/test_security.py`: comportamiento de sanitizacion PII.
-- `tests/test_services_security.py`: evita fuga de PII al payload del modelo.
-- `tests/test_integration.py`: integracion API.
-- `tests/test_mcp.py`: contrato MCP y sanitizacion.
+| Suite | What it covers |
+|---|---|
+| `tests/test_security.py` | PII sanitization, anonymize/de-anonymize roundtrip |
+| `tests/test_pii_pipeline.py` | Luhn validation, shard building, entity deduplication |
+| `tests/test_services_security.py` | PII must never reach the model payload |
+| `tests/test_integration.py` | Full API flow with mocked infrastructure |
+| `tests/test_integration_critical.py` | Gatekeeper routing logic (no mocks) |
+| `tests/test_mcp.py` | MCP protocol contract and sanitization |
 
-## Referencias de seguridad
+---
 
-- Politica global: `../SECURITY.md`
-- Config MCP estatico: `../mcp/config.json`
+## Adding a new inference adapter
 
-## Politicas de integracion (n8n y futuros adapters)
+1. Implement the `InferencePort` interface in `api-rag/app/adapters/`.
+2. Register it in `api-rag/app/inference_factory.py`.
+3. Set `INFERENCE_PROVIDER=your_adapter_name` in `.env`.
 
-- **Single entrypoint**: todo acceso externo por Traefik (`https://localhost`), sin puertos publicos adicionales por servicio.
-- **Token de servicio**: `Authorization: Bearer <token>` obligatorio para adapters de automatizacion.
-- **Integridad de webhook**: firma HMAC SHA-256 en `X-Zyrabit-Signature` cuando `N8N_REQUIRE_SIGNATURE=true`.
-- **Contrato estable**: payload minimo `{ "text": "..." }`; metadatos opcionales `workflow_id`, `execution_id`.
-- **Arquitectura hexagonal**: nuevas integraciones (Make, Strapi, DB connectors) deben implementar su propio adapter sobre un port, sin acoplar el dominio a proveedores externos.
-- **Secrets en produccion**: usar `_FILE` con Docker Secrets o un Vault on-prem, nunca secretos en claro en `docker-compose.yml`.
+A blueprint is available at [`api-rag/app/adapters/make_adapter_blueprint.py`](api-rag/app/adapters/make_adapter_blueprint.py).
 
-## Observabilidad sin puertos publicos
+---
 
-- `grafana` se publica por `https://localhost/grafana`.
-- `prometheus` se publica por `https://localhost/prometheus`.
-- Ambos quedan detras de Traefik con middleware `basicauth` configurable por variables de entorno.
+## Security
 
-## Plantilla para nuevos adapters (Make)
+- `model-network` is declared `internal: true` — the inference engine has no egress.
+- PII tokens are resolved only in the final response layer, never persisted.
+- Production secrets must use `_FILE` variables with Docker Secrets or an on-prem Vault.
+- All external adapters require `Authorization: Bearer` + optional HMAC signature validation.
 
-Se incluye plantilla base en:
+Full policy: [`../SECURITY.md`](../SECURITY.md)
 
-- `api-rag/app/adapters/make_adapter_blueprint.py`
+---
 
-La plantilla implementa el mismo contrato del `AutomationPort` y sirve como referencia para:
+## Documentation
 
-- validacion de token
-- validacion de firma HMAC
-- normalizacion de payload externo a contrato interno estable
+- 📖 Full docs: [https://Zyrabit-tech.github.io/zyrabit-SLM/](https://Zyrabit-tech.github.io/zyrabit-SLM/)
+- 🏗️ Architecture: [`api-rag/app/HEXAGONAL_ARCHITECTURE.md`](api-rag/app/HEXAGONAL_ARCHITECTURE.md)
+- 🤝 Contributing: [`../CONTRIBUTING_EN.md`](../CONTRIBUTING_EN.md)
+- 🔒 Security: [`../SECURITY.md`](../SECURITY.md)

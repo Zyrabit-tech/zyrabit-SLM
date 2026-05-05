@@ -2,8 +2,8 @@ const config = {
   title: "Zyrabit Docs",
   tagline: "Local sovereign AI, production-ready",
   favicon: "img/favicon.ico",
-  url: "https://localhost",
-  baseUrl: "/",
+  url: "https://Zyrabit-tech.github.io",
+  baseUrl: "/zyrabit-SLM/",
   onBrokenLinks: "throw",
   onBrokenMarkdownLinks: "warn",
   i18n: {

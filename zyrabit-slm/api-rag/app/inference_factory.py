@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import os
 
-from .infrastructure.inference.ollama_inference_adapter import OllamaInferenceAdapter
-from .infrastructure.inference.gemini_inference_adapter import GeminiInferenceAdapter
-from .ports.inference_port import InferenceProviderError, InferenceProviderPort
+from app.infrastructure.inference.ollama_inference_adapter import OllamaInferenceAdapter
+from app.infrastructure.inference.gemini_inference_adapter import GeminiInferenceAdapter
+from app.ports.inference_port import InferenceProviderError, InferenceProviderPort
 
 
 def _read_timeout_seconds() -> float:

@@ -1,0 +1,45 @@
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches:
+      - main
+      - fix/cve-remediation-hardening # Added for testing
+    paths:
+      - 'docs-portal/**'
+
+permissions:
+  contents: write
+
+jobs:
+  deploy:
+    name: Deploy to GitHub Pages
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          # cache: 'pnpm' # Temporarily disabled: docs-portal/pnpm-lock.yaml is missing
+          # cache-dependency-path: docs-portal/pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install
+        working-directory: docs-portal
+
+      - name: Build website
+        run: pnpm run build
+        working-directory: docs-portal
+
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./docs-portal/build
