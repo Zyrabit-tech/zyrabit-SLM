@@ -1,0 +1,18 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer components {
+    .scrollbar-hide::-webkit-scrollbar {
+        display: none;
+    }
+
+    .glass {
+        @apply bg-opacity-80 backdrop-blur-md;
+        background: rgba(226, 236, 244, 0.8);
+    }
+
+    #gdpr-panel {
+        transition: transform 0.3s ease;
+    }
+}

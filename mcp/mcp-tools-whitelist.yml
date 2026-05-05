@@ -1,0 +1,16 @@
+# MCP Tools Whitelist
+# Restricted tools for Zyrabit Installer Agent
+
+allowed_commands:
+  - name: "check_disk_usage"
+    command: "df -h /app"
+    description: "Verify available disk space for documents."
+  
+  - name: "check_memory"
+    command: "free -m"
+    description: "Verify available RAM for SLM inference."
+
+allowed_files:
+  - "/app/README.md"
+  - "/app/CONTRIBUTING.md"
+  - "/app/config.json"

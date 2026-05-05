@@ -6,43 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="icon" type="image/png" href="/img/favicon.png">
     <title>Zyrabit SLM Console</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-        tailwind.config = {
-            darkMode: 'class',
-            theme: {
-                extend: {
-                    colors: {
-                        zyrabit: {
-                            primary: '#3f5a6d',
-                            secondary: '#6090b4',
-                            bg: '#fdfdfd',
-                            surface: '#e2ecf4',
-                            muted: '#a9c4d9',
-                            ring: '#6090b4',
-                            border: '#a9c4d9',
-                            text: '#323439',
-                            subtext: '#3f5a6d',
-                        }
-                    }
-                }
-            }
-        }
-    </script>
-    <style>
-        .scrollbar-hide::-webkit-scrollbar {
-            display: none;
-        }
-
-        .glass {
-            background: rgba(226, 236, 244, 0.8);
-            backdrop-filter: blur(8px);
-        }
-
-        #gdpr-panel {
-            transition: transform 0.3s ease;
-        }
-    </style>
+    <link rel="stylesheet" href="/src/input.css">
 </head>
 
 <body class="bg-zyrabit-bg text-zyrabit-text h-screen overflow-hidden flex font-sans">

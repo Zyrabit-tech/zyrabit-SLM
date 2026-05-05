@@ -1,109 +1,161 @@
-# Contributing to Zyrabit SLM (EN)
+# Contributing to Zyrabit SLM
 
-[Versión en español](CONTRIBUTING.md)
+Thank you for your interest in contributing. This document explains the branching model, commit conventions, and review process for this project.
 
-## Ground rules
+---
 
-- All contributions go through Pull Requests.
-- PR base branch must be `beta`.
-- Direct PRs to `main` are not accepted.
-- Only `beta` can open a PR into `main`.
-- **Python Version**: Strictly **Python 3.12**. (3.14+ is currently incompatible with RAG dependencies).
-- **KISS Principle**: Favor simple, readable solutions over complex abstractions.
-- **Clean Git Tree**: Maintain linear history; feature branches must sync with `beta` before merging.
-- Code, variables, and commits must be in English.
-- One PR = one clear purpose.
+## Branching Model
 
-## Recommended workflow
+```
+main        ← production-only, protected
+  └── beta  ← staging integration branch
+        └── feat/*, fix/*, docs/*, chore/*  ← all work branches
+```
 
-1. Fork and clone.
-2. Add upstream.
-3. Sync `beta`.
-4. Create branch from `beta`.
-5. Implement changes + tests.
-6. Open PR targeting `beta`.
+**Rules:**
+- All PRs must target `beta`. Direct PRs to `main` are rejected by CI.
+- Only `beta` merges into `main` (enforced by the contribution-policy workflow).
+- Keep your branch in sync with `beta` before opening a PR.
 
-Commands:
+---
+
+## Workflow
 
 ```bash
+# 1. Fork and clone
 git clone https://github.com/YOUR_USER/zyrabit-SLM.git
 cd zyrabit-SLM
+
+# 2. Add upstream
 git remote add upstream https://github.com/Zyrabit-tech/zyrabit-SLM.git
+
+# 3. Sync beta
 git fetch upstream
 git checkout beta
 git pull upstream beta
+
+# 4. Create your branch
 git checkout -b feat/my-change
+
+# 5. Make changes, add tests, commit
+git commit -m "feat(api): add streaming response support"
+
+# 6. Open a PR targeting beta
 ```
 
-## Commit convention
+---
 
-Required format:
+## Commit Convention
 
-```text
-type(scope): short description
+This project uses [Conventional Commits](https://www.conventionalcommits.org/):
+
+```
+<type>(<scope>): <short description>
 ```
 
-Allowed types: `feat`, `fix`, `docs`, `refactor`, `test`, `chore`.
+| Type | When to use |
+|---|---|
+| `feat` | New feature or capability |
+| `fix` | Bug fix |
+| `docs` | Documentation only |
+| `refactor` | Code restructuring without behavior change |
+| `test` | Adding or fixing tests |
+| `chore` | Tooling, CI, dependencies, config |
 
-Examples:
+**Examples:**
+```
+feat(security): add credit card PII pattern to pipeline
+fix(api): handle empty ingest response from ChromaDB
+docs(readme): update quick start with uv sync instructions
+chore(ci): pin ubuntu-latest to ubuntu-24.04
+```
 
-- `feat(api): add chat metadata for route decision`
-- `fix(security): prevent pii leak in model payload`
-- `docs(readme): add ui verification guide`
+---
 
-## PR checklist
+## PR Checklist
 
-- [ ] PR targets `beta`.
-- [ ] Tests pass locally.
-- [ ] Documentation updated (ES/EN when applicable).
-- [ ] No secrets committed.
-- [ ] Commit messages follow Conventional Commits.
+Before requesting review, verify:
 
-## Minimum local verification
+- [ ] PR targets `beta` (not `main`)
+- [ ] Tests pass locally: `uv run pytest`
+- [ ] No secrets, credentials, or PII in code or commits
+- [ ] Documentation updated if behavior changed
+- [ ] Commit messages follow Conventional Commits
+- [ ] New dependencies include a rationale and `pip-audit` scan result
+
+---
+
+## Local Verification
 
 ```bash
-./.venv/bin/python -m pytest -q -c zyrabit-slm/api-rag/pytest.ini
-python secure_agent.py "Test query"
-./zyrabit-slm/scripts/build_and_verify.sh
+# Install dependencies
+uv sync
+
+# Run the full test suite
+uv run pytest
+
+# Verify the PII pipeline end-to-end
+python secure_agent.py "My email is test@example.com and SSN is 123-45-6789"
+
+# Build and verify all containers
+cd zyrabit-slm/scripts
+./build_and_verify.sh
 ```
 
-Extended checklist: `validation/pr-checklist.md`
+Extended checklist: [`validation/pr-checklist.md`](validation/pr-checklist.md)
+
+---
+
+## Dependency Policy
+
+Before adding a new dependency:
+
+1. Check if the functionality can be implemented without it.
+2. Run a security scan:
+   ```bash
+   uv run --with pip-audit pip-audit -r pyproject.toml
+   ```
+3. Include in your PR description:
+   - Why this dependency is needed
+   - Number of transitive dependencies it adds
+   - `pip-audit` result (clean)
+
+**Langchain ecosystem note:** All `langchain-*` packages must stay within the same version era (currently `LangChain Core 1.x`). Do not mix packages from different eras — they have incompatible sub-dependency ranges.
+
+---
 
 ## Infrastructure Standards
 
-To maintain consistency and readability across the Zyrabit ecosystem, all new containers or services must follow the naming pattern:
+All services must follow the container naming pattern: `zyrabit-<function>`.
 
-`zyrabit-<descriptive-function>`
+| Service | Container name |
+|---|---|
+| API backend | `zyrabit-api` |
+| Web UI | `zyrabit-web` |
+| Inference engine | `zyrabit-engine` |
+| Vector database | `zyrabit-db` |
+| MCP tool server | `zyrabit-mcp` |
 
-**Operational Examples:**
-- Main API: `zyrabit-api`
-- Web Interface: `zyrabit-web`
-- Inference Engine: `zyrabit-engine`
-- Database: `zyrabit-db`
+Environment variable references (`SLM_URL`, `DB_URL`) must use these official hostnames.
 
-Any internal reference (DNS) or environment variable (`SLM_URL`, `DB_URL`) must point to these official hostnames.
+---
 
-## Dependency security
+## Code Standards
 
-Before adding dependencies:
+- **Python version:** 3.12 strictly. Avoid 3.13+ until all dependencies declare support.
+- **Language:** Code, variable names, comments, and commit messages must be in English.
+- **Architecture:** New integrations must implement an adapter over an existing port — do not couple domain logic to external providers directly.
+- **KISS principle:** Prefer simple, readable solutions over clever abstractions.
+- **One PR = one purpose.** Split unrelated changes into separate PRs.
 
-```bash
-pip install pip-audit
-pip-audit
-```
+---
 
-If you add dependencies, include in your PR:
+## CI / GitHub Actions
 
-- technical rationale,
-- expected impact,
-- scan result.
+| Workflow | Trigger | What it checks |
+|---|---|---|
+| `ci.yml` | PR to `beta`/`main` | Contribution policy, tests, production build gate |
+| `security-audit.yml` | Weekly + every PR | Dependency vulnerability scan (`pip-audit`) |
+| `deploy-docs.yml` | Push to `main` | Publishes docs to GitHub Pages |
 
-## GitHub Actions
-
-Workflows automatically validate:
-
-- contribution policy (PR base branch `beta`),
-- `api-rag` tests,
-- dependency security audit.
-
-If CI fails, fix before requesting review.
+If CI fails, fix the issue before requesting a review. Do not merge with failing checks.

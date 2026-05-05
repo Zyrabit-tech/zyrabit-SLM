@@ -35,6 +35,8 @@ class OllamaInferenceAdapter(InferenceProviderPort):
             "prompt": request.prompt,
             "stream": request.stream,
         }
+        if request.system_prompt:
+            payload["system"] = request.system_prompt
         if request.options:
             payload.update(request.options)
 

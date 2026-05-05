@@ -1,6 +1,9 @@
+name: zyrabit-slm
+
 services:
   # 1. THE BRAIN: API RAG
   zyrabit-api:
+    image: zyrabit-slm/api-rag
     build:
       context: ./api-rag
     container_name: zyrabit-api
@@ -9,13 +12,13 @@ services:
     environment:
       - N8N_SERVICE_TOKEN_FILE=/run/secrets/n8n_service_token
       - N8N_WEBHOOK_SIGNING_SECRET_FILE=/run/secrets/n8n_webhook_signing_secret
-      - SLM_URL=http://zyrabit-engine:11434
+      - SLM_URL=http://host.docker.internal:11434
       - DB_URL=http://zyrabit-db:8000
-    depends_on:
-      zyrabit-db:
-        condition: service_started
-      zyrabit-engine:
-        condition: service_started
+    # depends_on:
+    #   zyrabit-db:
+    #     condition: service_started
+    #   zyrabit-engine:
+    #     condition: service_started
     ports:
       - "8080:8080" # Direct HTTP access
     networks:
@@ -26,9 +29,12 @@ services:
       - ./prompts:/app/prompts:ro
       - ./document_source:/app/document_source
       - ../README.md:/app/README.md:ro # For auto-ingest
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
 
   # 1.5 THE FACE: Web UI
   zyrabit-web:
+    image: zyrabit-slm/web-ui
     build:
       context: ./web-ui
     container_name: zyrabit-web
@@ -46,18 +52,18 @@ services:
       timeout: 10s
       retries: 3
 
-  # 2. THE MUSCLE: SLM Server
-  zyrabit-engine:
-    image: ollama/ollama:latest
-    container_name: zyrabit-engine
-    environment:
-      - OLLAMA_NUM_PARALLEL=${OLLAMA_NUM_PARALLEL:-1}
-    ports:
-      - "11434:11434"
-    volumes:
-      - ./ollama-models:/root/.ollama
-    networks:
-      - model-network
+  # 2. THE MUSCLE: SLM Server (DISABLED - Using Native Metal)
+  # zyrabit-engine:
+  #   image: ollama/ollama:latest
+  #   container_name: zyrabit-engine
+  #   environment:
+  #     - OLLAMA_NUM_PARALLEL=${OLLAMA_NUM_PARALLEL:-1}
+  #   ports:
+  #     - "11434:11434"
+  #   volumes:
+  #     - ./ollama-models:/root/.ollama
+  #   networks:
+  #     - model-network
 
   # 3. THE MEMORY: Vector DB
   zyrabit-db:

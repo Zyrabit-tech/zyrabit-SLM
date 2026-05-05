@@ -49,29 +49,26 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Python
-        uses: actions/setup-python@v5
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v5
         with:
-          python-version: "3.12"
-          cache: pip
+          enable-cache: true
           cache-dependency-path: |
             requirements.txt
             zyrabit-slm/api-rag/requirements.txt
 
+      - name: Setup Python
+        run: uv python install 3.12
+
       - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install -r zyrabit-slm/api-rag/requirements.txt
+        run: uv sync --all-groups
 
       - name: Validate Python imports/compilation
         run: |
-          python -m compileall slm_console.py secure_agent.py zyrabit-slm/api-rag/app
+          uv run python -m compileall slm_console.py secure_agent.py zyrabit-slm/api-rag/app
 
       - name: Run API tests
-        run: |
-            cd zyrabit-slm/api-rag
-            python -m pytest -q
+        run: uv run pytest
 
   production-build-gate:
     name: Production Build Gate

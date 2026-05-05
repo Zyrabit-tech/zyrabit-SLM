@@ -107,3 +107,8 @@ postman/private/
 
 # Private local ops toolkit
 ops-private/
+zyrabit-slm/api-rag/chroma_data/chroma.sqlite3
+zyrabit-slm/api-rag/chroma_data/c10090a8-3723-40c8-a7e1-b3231f515815/data_level0.bin
+zyrabit-slm/api-rag/chroma_data/c10090a8-3723-40c8-a7e1-b3231f515815/header.bin
+zyrabit-slm/api-rag/chroma_data/c10090a8-3723-40c8-a7e1-b3231f515815/length.bin
+zyrabit-slm/api-rag/chroma_data/c10090a8-3723-40c8-a7e1-b3231f515815/link_lists.bin

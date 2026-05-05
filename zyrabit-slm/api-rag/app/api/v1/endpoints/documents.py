@@ -1,13 +1,12 @@
-from fastapi import APIRouter, UploadFile, File, HTTPException
+from fastapi import APIRouter, UploadFile, File, HTTPException, Depends, BackgroundTasks
 import os
 import logging
-from .... import services
+from app.infrastructure.shared.config import DOCS_DIR
+from app.api.v1.dependencies import get_ingest_use_case
+from app.domain.use_cases.ingest_use_case import IngestUseCase
 
 logger = logging.getLogger("uvicorn.error")
-
 router = APIRouter()
-
-DOCS_DIR = os.getenv("DOCS_DIR", "./document_source")
 
 @router.get("/documents")
 async def list_documents():
@@ -26,20 +25,32 @@ async def list_documents():
     return {"documents": files}
 
 @router.post("/ingest")
-async def ingest_document(file: UploadFile = File(...)):
-    """Uploads and ingests a single document."""
+async def ingest_document(
+    background_tasks: BackgroundTasks,
+    file: UploadFile = File(...),
+    ingest_use_case: IngestUseCase = Depends(get_ingest_use_case)
+):
+    """
+    Uploads and schedules ingestion in the background.
+    Returns 202 Accepted immediately.
+    """
     os.makedirs(DOCS_DIR, exist_ok=True)
     file_path = os.path.join(DOCS_DIR, file.filename)
     
     try:
+        # 1. Save file locally
         with open(file_path, "wb") as f:
             f.write(await file.read())
         
-        result = services.process_and_ingest_file(file_path)
-        if result["status"] == "error":
-            raise HTTPException(status_code=500, detail="Failed to ingest document.")
-            
-        return result
+        # 2. Schedule background processing
+        # We don't await here, we return immediately
+        background_tasks.add_task(ingest_use_case.execute, file_path)
+        
+        return {
+            "status": "accepted", 
+            "message": f"File {file.filename} uploaded and scheduled for ingestion.",
+            "filename": file.filename
+        }
     except Exception as e:
-        logger.error(f"Failed to ingest {file.filename}: {e}")
-        raise HTTPException(status_code=500, detail="Internal server error during ingestion.")
+        logger.error(f"Failed to initiate ingestion for {file.filename}: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error.")
