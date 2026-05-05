@@ -88,10 +88,10 @@ class InferenceResult:
 
 class InferenceBackend(Protocol):
     def generate(self, prompt: str, max_new_tokens: int) -> InferenceResult:
-        ...
+        pass
 
     def health(self) -> Dict[str, Any]:
-        ...
+        pass
 
 
 def _physical_ram_gb() -> float:
