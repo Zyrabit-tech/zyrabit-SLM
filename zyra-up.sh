@@ -134,6 +134,18 @@ detect_accelerator() {
     echo "nvidia"
     return
   fi
+  if ls -d /dev/tenstorrent >/dev/null 2>&1; then
+    echo "tenstorrent"
+    return
+  fi
+  if command -v tt-smi >/dev/null 2>&1; then
+    echo "tenstorrent"
+    return
+  fi
+  if command -v lspci >/dev/null 2>&1 && lspci | grep -qi "tenstorrent"; then
+    echo "tenstorrent"
+    return
+  fi
   if [[ "$(uname -s)" == "Darwin" && "$(uname -m)" == "arm64" ]]; then
     echo "metal"
     return
@@ -185,6 +197,12 @@ apply_accelerator_profile() {
       log_ok "NVIDIA GPU detected. Using CUDA-capable container runtime if configured."
       export OLLAMA_NUM_GPU=999
       ;;
+    tenstorrent)
+      log_ok "Hardware Tenstorrent detectado. (Experimental/Beta support)"
+      log_warn "Asegúrate de tener los drivers del host instalados o Docker fallará al montar /dev/tenstorrent."
+      export TT_DETECTED="true"
+      export OLLAMA_NUM_GPU=1
+      ;;
     metal)
       log_ok "Apple Silicon detected. Optimizing for Metal backend. Cores: ${cores} (Parallel: ${OLLAMA_NUM_PARALLEL})"
       export OLLAMA_NUM_GPU=1
@@ -217,6 +235,11 @@ run_start() {
     log_info "Starting secure stack via Docker Compose with profile: ${PROFILE}..."
   else
     log_info "Starting secure stack via Docker Compose..."
+  fi
+  
+  if [[ "${TT_DETECTED:-}" == "true" ]]; then
+    compose_args+=("--profile" "tenstorrent")
+    log_info "Auto-inyectando perfil de hardware: tenstorrent"
   fi
   
   compose_args+=("up" "-d")
