@@ -1,0 +1,76 @@
+name: 🚀 Hardware Benchmark Leaderboard
+description: Share your Zyrabit SLM hardware inference performance metrics!
+title: '[Benchmark] <Hardware Name> - <Tokens/sec>'
+labels: ["benchmark", "leaderboard", "community"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping us build the ultimate local SLM! Your metrics will be added to our public Leaderboard.
+
+  - type: input
+    id: os_kernel
+    attributes:
+      label: OS & Kernel
+      description: e.g., Ubuntu 24.04, Windows 11 WSL2, macOS 14.5
+      placeholder: "Ubuntu 24.04.1 LTS (Kernel 6.8.0-31-generic)"
+    validations:
+      required: true
+
+  - type: input
+    id: cpu_ram
+    attributes:
+      label: CPU & RAM
+      description: Your Host machine specs
+      placeholder: "AMD Ryzen 9 7950X, 64GB DDR5"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: accelerator_type
+    attributes:
+      label: Accelerator Type
+      description: What bare-metal accelerator did Zyrabit detect?
+      options:
+        - Apple Silicon (Metal)
+        - NVIDIA CUDA (GPU)
+        - Tenstorrent (Metal / Sim)
+        - AMD ROCm
+        - Huawei Ascend NPU
+        - Pure CPU (No Accelerator)
+    validations:
+      required: true
+
+  - type: input
+    id: accelerator_model
+    attributes:
+      label: Accelerator Model & VRAM
+      description: e.g., RTX 4090 24GB, Mac M1 Pro 16GB, Tenstorrent Grayskull
+      placeholder: "NVIDIA RTX 4090 24GB"
+    validations:
+      required: true
+
+  - type: input
+    id: model_used
+    attributes:
+      label: Model Used
+      description: The SLM model tested
+      placeholder: "qwen2.5:7b"
+    validations:
+      required: true
+
+  - type: input
+    id: metrics
+    attributes:
+      label: Inference Metrics
+      description: Throughput in Tokens/sec or Cycle Counts (for TT-MLIR)
+      placeholder: "45.2 tokens/sec"
+    validations:
+      required: true
+
+  - type: textarea
+    id: notes
+    attributes:
+      label: Extra Notes / Logs
+      description: Paste any interesting log outputs or configuration overrides.
+      render: shell
