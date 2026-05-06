@@ -5,6 +5,10 @@ on:
     branches:
       - main
       - beta
+  push:
+    branches:
+      - main
+      - beta
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
@@ -25,9 +29,45 @@ jobs:
             exit 1
           fi
 
+      - name: Enforce Odd/Even versioning policy
+        run: |
+          CURRENT_VERSION=$(cat VERSION | tr -d '\n' | xargs)
+          # Extract the minor version (the Y in X.Y.Z)
+          MINOR_VERSION=$(echo $CURRENT_VERSION | cut -d. -f2)
+          
+          # Check if minor is odd or even
+          if [ $((MINOR_VERSION % 2)) -ne 0 ]; then
+            TYPE="BETA (ODD)"
+            ALLOWED_BRANCH="beta"
+          else
+            TYPE="PRODUCTION (EVEN)"
+            ALLOWED_BRANCH="main"
+          fi
+          
+          echo "🔍 Version detected: $CURRENT_VERSION (Minor: $MINOR_VERSION -> $TYPE)"
+          
+          TARGET_BRANCH="${{ github.base_ref }}"
+          # If it's a push to a branch (not a PR), github.base_ref is empty.
+          # We use github.ref_name for push events.
+          CURRENT_BRANCH="${{ github.head_ref || github.ref_name }}"
+          
+          if [ "$CURRENT_BRANCH" != "$ALLOWED_BRANCH" ]; then
+            echo "❌ ERROR: Versioning Policy Violation!"
+            echo "   Version $CURRENT_VERSION ($TYPE) is NOT allowed on branch '$CURRENT_BRANCH'."
+            echo "   Please use the '$ALLOWED_BRANCH' branch for this version series."
+            exit 1
+          fi
+          
+          echo "✅ Version $CURRENT_VERSION aligns with branch '$CURRENT_BRANCH'."
+
       - name: Compare VERSION with target branch
         run: |
           TARGET_BRANCH="${{ github.base_ref }}"
+          if [ -z "$TARGET_BRANCH" ]; then
+            echo "Skipping comparison (not a PR event)."
+            exit 0
+          fi
+          
           git fetch origin $TARGET_BRANCH || echo "Base branch '$TARGET_BRANCH' might not exist locally"
           
           CURRENT_VERSION=$(cat VERSION | tr -d '\n' | xargs)

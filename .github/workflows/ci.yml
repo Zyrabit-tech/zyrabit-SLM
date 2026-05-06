@@ -65,7 +65,7 @@ jobs:
 
       - name: Validate Python imports/compilation
         run: |
-          uv run python -m compileall slm_console.py secure_agent.py zyrabit-slm/api-rag/app
+          uv run python -m compileall secure_agent.py zyrabit-slm/api-rag/app
 
       - name: Run API tests
         run: uv run pytest
