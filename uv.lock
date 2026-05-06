@@ -1071,22 +1071,8 @@ wheels = [
 ]
 
 [[package]]
-name = "langchain-chroma"
-version = "1.1.0"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "chromadb" },
-    { name = "langchain-core" },
-    { name = "numpy" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/fa/0e/54896830b7331c90788cf96b2c37858977c199da9ecdaf85cf11eb6e6bc1/langchain_chroma-1.1.0.tar.gz", hash = "sha256:8069685e7848041e998d16c8a4964256b031fd20551bf59429173415bc2adc12", size = 220382, upload-time = "2025-12-12T16:23:01.399Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/ae/35/2a6d1191acaad043647e28313b0ecd161d61f09d8be37d1996a90d752c13/langchain_chroma-1.1.0-py3-none-any.whl", hash = "sha256:ff65e4a2ccefb0fb9fde2ff38705022ace402f979d557f018f6e623f7288f0fc", size = 12981, upload-time = "2025-12-12T16:23:00.196Z" },
-]
-
-[[package]]
-name = "langchain-classic"
-version = "1.0.5"
+name = "langchain"
+version = "0.3.29"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "langchain-core" },
@@ -1097,20 +1083,34 @@ dependencies = [
     { name = "requests" },
     { name = "sqlalchemy" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/5a/46/2b7dff9566a7c3985a05e11b43ca28801ff02b9f2fe3b0eff745f70ebd77/langchain_classic-1.0.5.tar.gz", hash = "sha256:33c2c0d8483ce7523e81b7e9107459a666497b39ad1018d7e635999b790e52c6", size = 10553125, upload-time = "2026-05-03T17:32:07.406Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/89/b8/b07646e1d0caa372dcd2a9bb9c0eaa94ba5cc3517107b97f4f4f348b04ec/langchain-0.3.29.tar.gz", hash = "sha256:4c7da1879c4138de4721ce4e9dfbda97fa0a1a4afb24f61bcfe6643a031e99fe", size = 10244120, upload-time = "2026-05-05T21:01:45.027Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/10/b7/f370c946d10c1c7161c6c9eba6a2df1a87a35d0400803472a0efa99ba53c/langchain_classic-1.0.5-py3-none-any.whl", hash = "sha256:824755c79c029a1c1ad389a6e2a75fd8eecdb87d427197d8777570ec55512022", size = 1040496, upload-time = "2026-05-03T17:32:05.329Z" },
+    { url = "https://files.pythonhosted.org/packages/6c/c8/36c31c6b50715e04b5a3bfd0491fb49ce9bb2c098724c042c9a9450f1c6c/langchain-0.3.29-py3-none-any.whl", hash = "sha256:4af0c6056f2ace34813b77412cceb885b419e2c43d225742ae01f4a32171ccc9", size = 1026012, upload-time = "2026-05-05T21:01:42.187Z" },
+]
+
+[[package]]
+name = "langchain-chroma"
+version = "0.2.6"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "chromadb" },
+    { name = "langchain-core" },
+    { name = "numpy" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/dd/94/93ab8f6e96429a60da50eea2d3f3ac988852f6b8da4e817d73ec026a0bd3/langchain_chroma-0.2.6.tar.gz", hash = "sha256:ec5ca0f6f7692ac053741e076ea086c4be0cfcb5846c8693b1bcc3089c88b65e", size = 17296, upload-time = "2025-09-11T19:54:47.991Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/08/bc/591e416a134f9fb766579d1ca9739f32b9d79c607a5053d34ad2b8fa7246/langchain_chroma-0.2.6-py3-none-any.whl", hash = "sha256:d7e10101b0942cd990eedb798c3d85ed3e8415a992c8a388843196f6ab97b41b", size = 12512, upload-time = "2025-09-11T19:54:46.72Z" },
 ]
 
 [[package]]
 name = "langchain-community"
-version = "0.4.1"
+version = "0.3.31"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "aiohttp" },
     { name = "dataclasses-json" },
     { name = "httpx-sse" },
-    { name = "langchain-classic" },
+    { name = "langchain" },
     { name = "langchain-core" },
     { name = "langsmith" },
     { name = "numpy" },
@@ -1120,18 +1120,17 @@ dependencies = [
     { name = "sqlalchemy" },
     { name = "tenacity" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/53/97/a03585d42b9bdb6fbd935282d6e3348b10322a24e6ce12d0c99eb461d9af/langchain_community-0.4.1.tar.gz", hash = "sha256:f3b211832728ee89f169ddce8579b80a085222ddb4f4ed445a46e977d17b1e85", size = 33241144, upload-time = "2025-10-27T15:20:32.504Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/83/49/2ff5354273809e9811392bc24bcffda545a196070666aef27bc6aacf1c21/langchain_community-0.3.31.tar.gz", hash = "sha256:250e4c1041539130f6d6ac6f9386cb018354eafccd917b01a4cff1950b80fd81", size = 33241237, upload-time = "2025-10-07T20:17:57.857Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/f0/a4/c4fde67f193401512337456cabc2148f2c43316e445f5decd9f8806e2992/langchain_community-0.4.1-py3-none-any.whl", hash = "sha256:2135abb2c7748a35c84613108f7ebf30f8505b18c3c18305ffaecfc7651f6c6a", size = 2533285, upload-time = "2025-10-27T15:20:30.767Z" },
+    { url = "https://files.pythonhosted.org/packages/e6/0a/b8848db67ad7c8d4652cb6f4cb78d49b5b5e6e8e51d695d62025aa3f7dbc/langchain_community-0.3.31-py3-none-any.whl", hash = "sha256:1c727e3ebbacd4d891b07bd440647668001cea3e39cbe732499ad655ec5cb569", size = 2532920, upload-time = "2025-10-07T20:17:54.91Z" },
 ]
 
 [[package]]
 name = "langchain-core"
-version = "1.3.2"
+version = "0.3.85"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "jsonpatch" },
-    { name = "langchain-protocol" },
     { name = "langsmith" },
     { name = "packaging" },
     { name = "pydantic" },
@@ -1140,46 +1139,34 @@ dependencies = [
     { name = "typing-extensions" },
     { name = "uuid-utils" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/a8/03/7219502e8ca728d65eb44d7a3eb60239230742a70dbfc9241b9bfd61c4ab/langchain_core-1.3.2.tar.gz", hash = "sha256:fd7a50b2f28ba561fd9d7f5d2760bc9e06cf00cdf820a3ccafe88a94ffa8d5b7", size = 911813, upload-time = "2026-04-24T15:49:23.699Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/24/48/fd8dee0e2bf19f94d9c04d62131b9dbf51f7d08e645dd00daa5d6c9eb60e/langchain_core-0.3.85.tar.gz", hash = "sha256:9321142eb8f754045c02b914bc9a18b07a589e76423c3ac0e69c35e130826f0c", size = 601850, upload-time = "2026-05-05T20:43:20.865Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/7d/d5/8fa4431007cbb7cfed7590f4d6a5dea3ad724f4174d248f6642ef5ce7d05/langchain_core-1.3.2-py3-none-any.whl", hash = "sha256:d44a66127f9f8db735bdfd0ab9661bccb47a97113cfd3f2d89c74864422b7274", size = 542390, upload-time = "2026-04-24T15:49:21.991Z" },
+    { url = "https://files.pythonhosted.org/packages/b1/71/cadea475bda84fd4cc6fe46b347fd643be8b323fc8c413f4ccbbe2717db6/langchain_core-0.3.85-py3-none-any.whl", hash = "sha256:3ff7d8da9645cc8ff221d3db7fcccb9794ea4b84834b3714071459c254ed9061", size = 460237, upload-time = "2026-05-05T20:43:19.294Z" },
 ]
 
 [[package]]
 name = "langchain-ollama"
-version = "1.1.0"
+version = "0.3.10"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "langchain-core" },
     { name = "ollama" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/d4/9b/6641afe8a5bf807e454fd464eddfc7eb2f2df53cb0b29744381171f9c609/langchain_ollama-1.1.0.tar.gz", hash = "sha256:f776f56f6782ae4da7692579b94a6575906118318d1023b455d7207f9d059811", size = 133075, upload-time = "2026-04-07T02:48:00.873Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/73/c9/ff996fc5fa2d8d23136f07c56e88a1013fe1e03a35ef3e65899baa73c49e/langchain_ollama-0.3.10.tar.gz", hash = "sha256:5d942d331c44351bae5c5c5965603ceb20b0ee4d70082290f4b15bc638559756", size = 35771, upload-time = "2025-10-02T15:53:20.974Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/2c/b2/c2acb076590a98bee2816ed5f285e00df162a34238f9e276e175e14ebc35/langchain_ollama-1.1.0-py3-none-any.whl", hash = "sha256:43ac83a6eacb0f43855810739794dd55019e0d9b17bdcf3ecb3b1991ac3b59dd", size = 31413, upload-time = "2026-04-07T02:47:59.642Z" },
-]
-
-[[package]]
-name = "langchain-protocol"
-version = "0.0.15"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "typing-extensions" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/4f/24/9777489d6fbbee64af0c8f96d4f840239c408cf694f3394672807dafc490/langchain_protocol-0.0.15.tar.gz", hash = "sha256:9ab2d11ee73944754f10e037e717098d3a6796f0e58afa9cadda6154e7655ade", size = 5862, upload-time = "2026-05-01T22:30:04.748Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/1d/7a/9c97a7b9cbe4c5dc6a44cdb1545450c28f0c8ce89b9c1f0ee7fbad896263/langchain_protocol-0.0.15-py3-none-any.whl", hash = "sha256:461eb794358f83d5e42635a5797799ffec7b4702314e34edf73ac21e75d3ef79", size = 6982, upload-time = "2026-05-01T22:30:03.877Z" },
+    { url = "https://files.pythonhosted.org/packages/4b/f2/d87767a106021206fb53faf7ae4517d365d353dc29a1649b9f3e47eef940/langchain_ollama-0.3.10-py3-none-any.whl", hash = "sha256:7550792872e8f86d362568e9ceb0f8085428bc59946c7b44e726358ba4b280f9", size = 27646, upload-time = "2025-10-02T15:53:19.89Z" },
 ]
 
 [[package]]
 name = "langchain-text-splitters"
-version = "1.1.2"
+version = "0.3.11"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "langchain-core" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/26/9f/6c545900fefb7b00ddfa3f16b80d61338a0ec68c31c5451eeeab99082760/langchain_text_splitters-1.1.2.tar.gz", hash = "sha256:782a723db0a4746ac91e251c7c1d57fd23636e4f38ed733074e28d7a86f41627", size = 293580, upload-time = "2026-04-16T14:20:39.162Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/11/43/dcda8fd25f0b19cb2835f2f6bb67f26ad58634f04ac2d8eae00526b0fa55/langchain_text_splitters-0.3.11.tar.gz", hash = "sha256:7a50a04ada9a133bbabb80731df7f6ddac51bc9f1b9cab7fa09304d71d38a6cc", size = 46458, upload-time = "2025-08-31T23:02:58.316Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/d3/26/1ef06f56198d631296d646a6223de35bcc6cf9795ceb2442816bc963b84c/langchain_text_splitters-1.1.2-py3-none-any.whl", hash = "sha256:a2de0d799ff31886429fd6e2e0032df275b60ec817c19059a7b46181cc1c2f10", size = 35903, upload-time = "2026-04-16T14:20:38.243Z" },
+    { url = "https://files.pythonhosted.org/packages/58/0d/41a51b40d24ff0384ec4f7ab8dd3dcea8353c05c973836b5e289f1465d4f/langchain_text_splitters-0.3.11-py3-none-any.whl", hash = "sha256:cf079131166a487f1372c8ab5d0bfaa6c0a4291733d9c43a34a16ac9bcd6a393", size = 33845, upload-time = "2025-08-31T23:02:57.195Z" },
 ]
 
 [[package]]
@@ -1607,11 +1594,11 @@ wheels = [
 
 [[package]]
 name = "packaging"
-version = "26.2"
+version = "25.0"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/d7/f1/e7a6dd94a8d4a5626c03e4e99c87f241ba9e350cd9e6d75123f992427270/packaging-26.2.tar.gz", hash = "sha256:ff452ff5a3e828ce110190feff1178bb1f2ea2281fa2075aadb987c2fb221661", size = 228134, upload-time = "2026-04-24T20:15:23.917Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/a1/d4/1fc4078c65507b51b96ca8f8c3ba19e6a61c8253c72794544580a7b6c24d/packaging-25.0.tar.gz", hash = "sha256:d443872c98d677bf60f6a1f2f8c1cb748e8fe762d2bf9d3148b5599295b0fc4f", size = 165727, upload-time = "2025-04-19T11:48:59.673Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/df/b2/87e62e8c3e2f4b32e5fe99e0b86d576da1312593b39f47d8ceef365e95ed/packaging-26.2-py3-none-any.whl", hash = "sha256:5fc45236b9446107ff2415ce77c807cee2862cb6fac22b8a73826d0693b0980e", size = 100195, upload-time = "2026-04-24T20:15:22.081Z" },
+    { url = "https://files.pythonhosted.org/packages/20/12/38679034af332785aac8774540895e234f4d07f7545804097de4b666afd8/packaging-25.0-py3-none-any.whl", hash = "sha256:29572ef2b1f17581046b3a2227d5c611fb25ec70ca1ba8554b24b0e69331a484", size = 66469, upload-time = "2025-04-19T11:48:57.875Z" },
 ]
 
 [[package]]
@@ -2117,6 +2104,11 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/59/81/cf8284f45e32efa18d3848ed82cdd4dcc1b657b082458fbe01ad3e1f2f8d/python_socketio-5.16.1.tar.gz", hash = "sha256:f863f98eacce81ceea2e742f6388e10ca3cdd0764be21d30d5196470edf5ea89", size = 128508, upload-time = "2026-02-06T23:42:07Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/07/c7/deb8c5e604404dbf10a3808a858946ca3547692ff6316b698945bb72177e/python_socketio-5.16.1-py3-none-any.whl", hash = "sha256:a3eb1702e92aa2f2b5d3ba00261b61f062cce51f1cfb6900bf3ab4d1934d2d35", size = 82054, upload-time = "2026-02-06T23:42:05.772Z" },
+]
+
+[package.optional-dependencies]
+asyncio-client = [
+    { name = "aiohttp" },
 ]
 
 [[package]]
@@ -2922,8 +2914,8 @@ dependencies = [
     { name = "fastapi" },
     { name = "fastmcp" },
     { name = "httpx" },
+    { name = "langchain" },
     { name = "langchain-chroma" },
-    { name = "langchain-classic" },
     { name = "langchain-community" },
     { name = "langchain-core" },
     { name = "langchain-ollama" },
@@ -2935,7 +2927,7 @@ dependencies = [
     { name = "python-dotenv" },
     { name = "python-engineio" },
     { name = "python-multipart" },
-    { name = "python-socketio" },
+    { name = "python-socketio", extra = ["asyncio-client"] },
     { name = "rank-bm25" },
     { name = "requests" },
     { name = "spacy" },
@@ -2952,28 +2944,28 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "chromadb", specifier = ">=0.5.0" },
+    { name = "chromadb", specifier = ">=0.6.3" },
     { name = "docker", specifier = ">=7.1.0" },
     { name = "fastapi", specifier = ">=0.115.4" },
     { name = "fastmcp", specifier = ">=3.2.0" },
     { name = "httpx", specifier = ">=0.27.2" },
-    { name = "langchain-chroma", specifier = ">=0.1.4" },
-    { name = "langchain-classic", specifier = ">=0.1.0" },
-    { name = "langchain-community", specifier = ">=0.3.25" },
-    { name = "langchain-core", specifier = ">=1.3.2" },
-    { name = "langchain-ollama", specifier = ">=0.3.3" },
-    { name = "langchain-text-splitters", specifier = ">=1.1.2" },
+    { name = "langchain", specifier = ">=0.3.0,<1.0.0" },
+    { name = "langchain-chroma", specifier = ">=0.2.2,<0.3.0" },
+    { name = "langchain-community", specifier = ">=0.3.27,<0.4.0" },
+    { name = "langchain-core", specifier = ">=0.3.66,<0.4.0" },
+    { name = "langchain-ollama", specifier = ">=0.3.3,<0.4.0" },
+    { name = "langchain-text-splitters", specifier = ">=0.3.6,<0.4.0" },
     { name = "markdown", specifier = ">=3.8.1" },
     { name = "prometheus-fastapi-instrumentator", specifier = ">=7.0.0" },
-    { name = "pymupdf", specifier = ">=1.24.10" },
-    { name = "pymupdf4llm", specifier = ">=0.0.17" },
+    { name = "pymupdf", specifier = ">=1.25.5" },
+    { name = "pymupdf4llm", specifier = ">=0.0.22" },
     { name = "python-dotenv", specifier = ">=1.2.2" },
-    { name = "python-engineio", specifier = ">=4.10.1" },
+    { name = "python-engineio", specifier = ">=4.11.0" },
     { name = "python-multipart", specifier = ">=0.0.26" },
-    { name = "python-socketio", extras = ["asyncio"], specifier = ">=5.14.0" },
+    { name = "python-socketio", extras = ["asyncio-client"], specifier = ">=5.14.0" },
     { name = "rank-bm25", specifier = ">=0.2.2" },
     { name = "requests", specifier = ">=2.33.1" },
-    { name = "spacy", specifier = ">=3.7.0" },
+    { name = "spacy", specifier = ">=3.8.7" },
     { name = "uvicorn", specifier = ">=0.35.0" },
 ]
 
@@ -2981,6 +2973,6 @@ requires-dist = [
 dev = [
     { name = "autopep8", specifier = ">=2.3.2" },
     { name = "pip-audit", specifier = ">=2.8.0" },
-    { name = "pytest", specifier = ">=9.0.3" },
+    { name = "pytest", specifier = ">=8.3.4" },
     { name = "pytest-asyncio", specifier = ">=0.24.0" },
 ]
