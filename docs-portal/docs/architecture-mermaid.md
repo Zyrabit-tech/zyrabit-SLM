@@ -1,4 +1,4 @@
-# Architecture Diagram (Mermaid)
+# Architecture Overview
 
 ```mermaid
 flowchart TB

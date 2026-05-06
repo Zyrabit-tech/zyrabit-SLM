@@ -1,19 +1,25 @@
-# Welcome to Zyrabit SLM
+# Zyrabit SLM
 
-**Zyrabit SLM** is a private, sovereign, and production-ready Small Language Model (SLM) stack. It allows you to deploy advanced AI capabilities on your own infrastructure without relying on external APIs.
+Zyrabit SLM is a production-grade Small Language Model (SLM) orchestration stack designed for on-premise and private cloud environments. It provides a containerized architecture to deploy, manage, and scale local AI capabilities while maintaining strict data privacy and network isolation.
 
-## Key Capabilities
+## Architecture & Design Principles
 
-- **Private RAG:** Chat with your local documents using a high-performance vector database.
-- **Multi-Model Support:** Easily switch between Qwen, Llama, Mistral, and more via Ollama.
-- **Observability:** Built-in Prometheus and Grafana dashboards for monitoring performance and usage.
-- **Automation Ready:** Integrated with n8n for complex AI workflows.
-- **Secure by Design:** Hardened containers and local-first data processing.
+Zyrabit is built on a zero-trust architecture, ensuring that data processing remains entirely within the host network perimeter. It integrates vector databases, local inference engines, and workflow automation into a unified, reproducible deployment model.
 
-## Why Zyrabit?
+### Core Capabilities
 
-In a world of cloud-only AI, Zyrabit provides the tools to maintain data sovereignty while benefiting from the latest advancements in language modeling. Whether you are building an internal knowledge base or an automated agent, Zyrabit provides the foundation.
+- **Private RAG Engine:** A high-performance vector retrieval system coupled with local language models for deterministic, context-aware querying of proprietary datasets.
+- **Hardware-Aware Inference:** Dynamic compute routing that automatically maps execution to the optimal available backend (Apple Metal, NVIDIA CUDA, or CPU/AVX2) without manual configuration overhead.
+- **Native Observability:** Integrated telemetry stack utilizing Prometheus and Grafana to expose critical metrics, including inference latency, VRAM allocation, and query throughput.
+- **Workflow Orchestration:** Native integration with n8n to enable the design and execution of complex, API-driven AI pipelines.
 
-## Getting Started
+## Target Environments
 
-Check out the [Installation Guide](./installation.md) to get the stack running on your machine in minutes.
+Zyrabit is engineered for deployments that require stringent data governance and low-latency local execution:
+- Air-gapped enterprise networks.
+- Compliance-regulated industries (Healthcare, Finance, Public Sector).
+- Edge computing nodes and localized data centers.
+
+## Next Steps
+
+To begin deploying the Zyrabit stack, proceed to the [Quickstart Fundamentals](./getting-started/fundamentals.md) guide.
