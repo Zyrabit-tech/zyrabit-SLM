@@ -1,18 +1,20 @@
 const config = {
   title: "Zyrabit Docs",
   tagline: "Local sovereign AI, production-ready",
-  favicon: "img/favicon.ico",
+  favicon: "https://assets.zyrabit.com/logos/favicon.png",
   url: "https://Zyrabit-tech.github.io",
-  baseUrl: "/zyrabit-SLM/",
+  baseUrl: "/",
   onBrokenLinks: "throw",
-  onBrokenMarkdownLinks: "warn",
   i18n: {
     defaultLocale: "en",
     locales: ["en"]
   },
   themes: ["@docusaurus/theme-mermaid"],
   markdown: {
-    mermaid: true
+    mermaid: true,
+    hooks: {
+      onBrokenMarkdownLinks: "warn"
+    }
   },
   presets: [
     [
@@ -30,7 +32,12 @@ const config = {
   ],
   themeConfig: {
     navbar: {
-      title: "Zyrabit Docs",
+      title: "Docs",
+      logo: {
+        alt: "Zyrabit Logo",
+        src: "https://assets.zyrabit.com/logos/zyrabit_black.png",
+        srcDark: "https://assets.zyrabit.com/logos/zyrabit_white.png",
+      },
       items: [
         {
           to: "/docs/intro",

@@ -1,21 +1,23 @@
 # Model Configuration
 
-Zyrabit SLM uses **Ollama** as its core inference engine. This allows you to run state-of-the-art small language models (SLMs) locally with high performance.
+Zyrabit SLM utilizes **Ollama** as the core inference engine, enabling the local execution of Small Language Models (SLMs) with high performance and low latency.
 
-## Default Model
-By default, Zyrabit uses **Qwen 2.5 (7B or 1.5B)** depending on your detected system RAM:
-- **< 12GB RAM:** Qwen 2.5 (1.5B) - Optimized for low resources.
-- **>= 12GB RAM:** Qwen 2.5 (7B) - Balanced performance and quality.
+## Default Model Configuration
 
-## Changing Models
+The stack selects a default model based on detected system resources during initialization:
 
-You can override the default model using the `--model` flag in the setup script:
+- **< 12GB RAM:** Qwen 2.5 (1.5B) - Optimized for resource-constrained environments.
+- **>= 12GB RAM:** Qwen 2.5 (7B) - Balanced for accuracy and throughput.
+
+## Overriding Defaults
+
+Users can specify an alternative model during installation using the `--model` flag:
 
 ```bash
 ./zyra-up.sh install --model mistral
 ```
 
-Or by setting the `MODEL_NAME` environment variable in `zyrabit-slm/.env`:
+Alternatively, the `MODEL_NAME` environment variable can be set in the `.env` file:
 
 ```env
 MODEL_NAME="llama3"
@@ -25,13 +27,14 @@ MODEL_NAME="llama3"
 
 ## Supported Models
 
-Since Zyrabit uses Ollama, you can use any model from the [Ollama Library](https://ollama.com/library). Popular choices include:
-- `llama3`: Meta's latest general-purpose model.
-- `mistral`: High-efficiency 7B model.
-- `codellama`: Specialized for programming tasks.
-- `phi3`: Microsoft's ultra-small but capable model.
+Zyrabit is compatible with models available in the [Ollama Library](https://ollama.com/library). Common choices include:
 
-To pull a new model manually:
+- `llama3`: Meta's general-purpose model.
+- `mistral`: High-efficiency 7B model.
+- `codellama`: Optimized for programming and logic tasks.
+- `phi3`: Lightweight, capable model from Microsoft.
+
+To manually pull a specific model:
 ```bash
 docker exec -it zyrabit-engine ollama pull <model_name>
 ```
@@ -40,22 +43,23 @@ docker exec -it zyrabit-engine ollama pull <model_name>
 
 ## Hardware Acceleration
 
-Zyrabit automatically detects and configures the best acceleration backend:
+Zyrabit automatically configures the optimal acceleration backend based on host hardware:
 
-### 🚀 NVIDIA GPU (CUDA)
-If an NVIDIA GPU is detected, the `zyrabit-engine` will use the GPU for all inference tasks. Ensure the **NVIDIA Container Toolkit** is installed on the host.
+### NVIDIA GPU (CUDA)
+Utilizes NVIDIA GPUs for inference. Requires the **NVIDIA Container Toolkit** on the host.
 
-### 🍎 Apple Silicon (Metal)
-On Mac, Zyrabit utilizes the unified memory architecture and Metal API for high-speed inference.
+### Apple Silicon (Metal)
+Utilizes the unified memory and Metal API on macOS for accelerated performance.
 
-### ⚙️ CPU Only
-If no GPU is found, the engine falls back to CPU inference. We recommend using smaller quantized models (e.g., 1.5B or 3B) for a smooth experience.
+### CPU Fallback
+If no GPU is detected, the engine utilizes optimized CPU instructions. It is recommended to use smaller quantized models (1.5B - 3B) for CPU-only deployments.
 
 ---
 
 ## Embedding Models
 
-For RAG (Retrieval-Augmented Generation), Zyrabit uses a separate embedding model to vectorize documents. By default, it uses:
-- `mxbai-embed-large`: A high-performance embedding model.
+For Retrieval-Augmented Generation (RAG), Zyrabit utilizes a dedicated embedding model for document vectorization. 
 
-You can change this in the API configuration if needed, but the default is recommended for most use cases.
+- **Default:** `mxbai-embed-large`
+
+This model is selected for its high performance in semantic retrieval tasks. It can be modified in the API configuration if a custom embedding space is required.
