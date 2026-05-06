@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - beta
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
@@ -69,12 +70,14 @@ jobs:
           push: true
           platforms: linux/amd64,linux/arm64
           tags: |
-            zyrabitcore/zyrabit-slm:${{ steps.version.outputs.version }}
-            zyrabitcore/zyrabit-slm:latest
-            ghcr.io/${{ steps.repo_owner.outputs.val }}/zyrabit-slm:${{ steps.version.outputs.version }}
-            ghcr.io/${{ steps.repo_owner.outputs.val }}/zyrabit-slm:latest
+            ${{ github.ref == 'refs/heads/main' && format('zyrabitcore/zyrabit-slm:{0}', steps.version.outputs.version) || '' }}
+            ${{ github.ref == 'refs/heads/main' && 'zyrabitcore/zyrabit-slm:latest' || '' }}
+            ${{ github.ref == 'refs/heads/beta' && 'zyrabitcore/zyrabit-slm:beta' || '' }}
+            ghcr.io/${{ steps.repo_owner.outputs.val }}/zyrabit-slm:${{ github.ref == 'refs/heads/main' && steps.version.outputs.version || 'beta' }}
+            ${{ github.ref == 'refs/heads/main' && format('ghcr.io/{0}/zyrabit-slm:latest', steps.repo_owner.outputs.val) || '' }}
 
       - name: Create GitHub Release
+        if: github.ref == 'refs/heads/main'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.version.outputs.tag }}
