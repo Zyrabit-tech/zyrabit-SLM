@@ -4,7 +4,7 @@ on:
   push:
     branches:
       - main
-      - fix/cve-remediation-hardening # Added for testing
+      - fix/docusaurus-errorsq
     paths:
       - 'docs-portal/**'
 
@@ -27,8 +27,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-          # cache: 'pnpm' # Temporarily disabled: docs-portal/pnpm-lock.yaml is missing
-          # cache-dependency-path: docs-portal/pnpm-lock.yaml
+          cache: 'pnpm'
+          cache-dependency-path: docs-portal/pnpm-lock.yaml
 
       - name: Install dependencies
         run: pnpm install
@@ -43,3 +43,4 @@ jobs:
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./docs-portal/build
+          cname: docs.zyrabit.com

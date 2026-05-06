@@ -2,7 +2,7 @@ const config = {
   title: "Zyrabit Docs",
   tagline: "Local sovereign AI, production-ready",
   favicon: "https://assets.zyrabit.com/logos/favicon.png",
-  url: "https://Zyrabit-tech.github.io",
+  url: "https://docs.zyrabit.com",
   baseUrl: "/",
   onBrokenLinks: "throw",
   i18n: {
