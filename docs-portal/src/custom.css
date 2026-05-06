@@ -1,3 +1,48 @@
+@import url('https://fonts.googleapis.com/css2?family=Funnel+Display:wght@300..800&display=swap');
+
 :root {
-  --ifm-color-primary: #2456d8;
+  /* Brand Colors */
+  --zyrabit-primary: #3f5a6d;
+  --zyrabit-secondary: #6090b4;
+  --zyrabit-bg: #fdfdfd;
+  --zyrabit-surface: #e2ecf4;
+  --zyrabit-muted: #a9c4d9;
+  --zyrabit-text: #323439;
+  --zyrabit-subtext: #3f5a6d;
+
+  /* Infima Overrides */
+  --ifm-color-primary: var(--zyrabit-primary);
+  --ifm-color-primary-dark: #354c5c;
+  --ifm-color-primary-darker: #324757;
+  --ifm-color-primary-darkest: #2a3b48;
+  --ifm-color-primary-light: #49687e;
+  --ifm-color-primary-lighter: #4d6e85;
+  --ifm-color-primary-lightest: #5c839f;
+
+  --ifm-background-color: var(--zyrabit-bg);
+  --ifm-font-color-base: var(--zyrabit-text);
+  --ifm-heading-color: var(--zyrabit-primary);
+  
+  --ifm-font-family-base: 'Funnel Display', sans-serif;
+  --ifm-heading-font-family: 'Funnel Display', sans-serif;
+
+  /* Navbar */
+  --ifm-navbar-background-color: var(--zyrabit-bg);
+  --ifm-navbar-link-color: var(--zyrabit-subtext);
+  
+  /* Sidebar */
+  --ifm-menu-color: var(--zyrabit-subtext);
+  --ifm-menu-color-active: var(--zyrabit-primary);
+}
+
+[data-theme='dark'] {
+  --ifm-color-primary: #6090b4;
+  --ifm-background-color: #1a1b1e;
+  --ifm-font-color-base: #e2ecf4;
+}
+
+.navbar__title {
+  font-weight: 800;
+  color: var(--zyrabit-primary);
+  font-family: 'Funnel Display', sans-serif;
 }

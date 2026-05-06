@@ -63,6 +63,9 @@ crash.journal
 # Node / frontend
 node_modules/
 docs-portal/node_modules/
+docs-portal/.docusaurus/
+docs-portal/build/
+.pnpm-store/
 
 # Python build
 *.egg-info/

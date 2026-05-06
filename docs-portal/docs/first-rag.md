@@ -1,11 +1,16 @@
 # Your First RAG Query
 
-1. Start the stack with `./zyra-up.sh`.
-2. Ingest your files via `/v1/ingest`.
-3. Query the API via `/v1/chat`.
+To execute your first Retrieval-Augmented Generation (RAG) query, follow these steps:
+
+1. **Start the stack:** Run `./zyra-up.sh`.
+2. **Ingest documents:** Upload files via the `/v1/ingest` endpoint.
+3. **Submit a query:** Send a POST request to the `/v1/chat` endpoint.
+
+### Example Request
 
 ```bash
 curl -k -X POST https://localhost/v1/chat \
   -H "Content-Type: application/json" \
-  -d '{"text":"What did we ingest about our policy?"}'
+  -H "Authorization: Bearer <YOUR_TOKEN>" \
+  -d '{"text":"What is the summary of the policy we just ingested?"}'
 ```
