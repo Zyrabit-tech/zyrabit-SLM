@@ -18,7 +18,7 @@ ENV PATH="/root/.local/bin:$PATH"
 
 COPY requirements.txt .
 # Install dependencies using uv into a virtualenv
-RUN uv venv /opt/venv
+RUN uv venv --seed /opt/venv
 ENV VIRTUAL_ENV=/opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
