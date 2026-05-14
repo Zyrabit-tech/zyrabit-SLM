@@ -79,14 +79,24 @@ class ZyrabitApp {
     }
 
     async startHealthChecks() {
+        let isOffline = false;
         const updateHealth = async () => {
             try {
                 const res = await fetch('/v1/health');
                 if (!res.ok) throw new Error(`HTTP_${res.status}`);
                 const data = await res.json();
                 this.updateUIStatus(data);
+                
+                if (isOffline) {
+                    this.showNotification("Connection Restored", "success");
+                    isOffline = false;
+                }
             } catch (e) {
                 this.addGdprLog("SYSTEM", `HEALTH_CHECK_FAILED`);
+                if (!isOffline) {
+                    this.showNotification("Connection Lost: API Offline", "error");
+                    isOffline = true;
+                }
             }
         };
         updateHealth();
@@ -177,15 +187,67 @@ class ZyrabitApp {
             const formData = new FormData();
             formData.append('file', file);
             this.addGdprLog("INGEST", `PROCESSING_${file.name.toUpperCase()}`);
+            
+            // UI Feedback: Loading
+            const dropZone = document.getElementById('drop-zone-content');
+            const loader = document.getElementById('drop-zone-loader');
+            if (dropZone && loader) {
+                dropZone.classList.add('hidden');
+                loader.classList.remove('hidden');
+            }
+
             try {
                 const res = await fetch('/v1/ingest', { method: 'POST', body: formData });
                 if (!res.ok) throw new Error(`HTTP_${res.status}`);
                 await this.loadVault();
                 this.addGdprLog("INGEST", `SUCCESS_${file.name.toUpperCase()}`);
+                this.showNotification(`File uploaded: ${file.name}`, "success");
             } catch (e) {
                 this.addGdprLog("INGEST", `FAILED_${file.name.toUpperCase()}`);
+                this.showNotification(`Upload failed: ${file.name}`, "error");
+            } finally {
+                const dropZone = document.getElementById('drop-zone-content');
+                const loader = document.getElementById('drop-zone-loader');
+                if (dropZone && loader) {
+                    dropZone.classList.remove('hidden');
+                    loader.classList.add('hidden');
+                }
             }
         }
+    }
+
+    showNotification(message, type = 'info') {
+        const container = document.getElementById('snackbar-container');
+        if (!container) return;
+
+        const el = document.createElement('div');
+        const icons = {
+            success: '✅',
+            error: '❌',
+            info: 'ℹ️'
+        };
+
+        el.className = `snackbar snackbar-${type} snackbar-enter`;
+        el.innerHTML = `
+            <span class="text-lg">${icons[type]}</span>
+            <div class="flex-1">
+                <div class="text-[10px] font-bold uppercase tracking-wider">${type}</div>
+                <div class="text-xs opacity-90">${message}</div>
+            </div>
+        `;
+
+        container.appendChild(el);
+
+        // Animation: Enter
+        requestAnimationFrame(() => {
+            el.classList.remove('snackbar-enter');
+        });
+
+        // Auto-remove
+        setTimeout(() => {
+            el.classList.add('snackbar-exit');
+            el.addEventListener('transitionend', () => el.remove());
+        }, 5000);
     }
 }
 

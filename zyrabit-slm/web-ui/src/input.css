@@ -15,4 +15,36 @@
     #gdpr-panel {
         transition: transform 0.3s ease;
     }
+
+    .snackbar {
+        @apply flex items-center gap-3 p-4 rounded-xl border shadow-lg transition-all duration-300 transform translate-y-0 opacity-100;
+        min-width: 300px;
+        backdrop-filter: blur(8px);
+    }
+
+    .snackbar-enter {
+        @apply translate-y-12 opacity-0;
+    }
+
+    .snackbar-exit {
+        @apply translate-y-4 opacity-0;
+    }
+
+    .snackbar-success {
+        @apply bg-green-50 border-green-200 text-green-800;
+    }
+
+    .snackbar-error {
+        @apply bg-red-50 border-red-200 text-red-800;
+    }
+
+    .snackbar-info {
+        @apply bg-zyrabit-surface border-zyrabit-border text-zyrabit-text;
+    }
+
+    .loader-spin {
+        @apply animate-spin rounded-full border-2 border-current border-t-transparent;
+        width: 1rem;
+        height: 1rem;
+    }
 }

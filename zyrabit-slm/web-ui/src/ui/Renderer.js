@@ -72,12 +72,18 @@ export class Renderer {
     }
 
     toggleThinking(state) {
-        const button = document.querySelector('#chat-form button');
+        const button = document.getElementById('chat-submit');
         const loader = document.getElementById('thinking-bubble');
+        if (!button) return;
+
+        const btnText = button.querySelector('.button-text');
+        const btnSpinner = button.querySelector('.loader-spin');
 
         if (state) {
             button.disabled = true;
-            button.classList.add('opacity-50', 'cursor-not-allowed');
+            button.classList.add('opacity-80', 'cursor-not-allowed');
+            if (btnText) btnText.classList.add('hidden');
+            if (btnSpinner) btnSpinner.classList.remove('hidden');
             
             if (loader) return;
 
@@ -89,8 +95,8 @@ export class Renderer {
                     <div class="w-8 h-8 rounded-full bg-zyrabit-surface border border-zyrabit-border flex items-center justify-center flex-shrink-0">
                         <img src="/img/logo.png" class="w-5 h-5 object-contain animate-pulse">
                     </div>
-                    <div class="bg-zyrabit-surface p-4 rounded-2xl rounded-tl-none text-sm text-zyrabit-primary italic flex items-center gap-2">
-                        <span class="animate-pulse">Thinking...</span>
+                    <div class="bg-zyrabit-surface p-4 rounded-2xl rounded-tl-none text-sm text-zyrabit-primary italic flex items-center gap-2 border border-zyrabit-border/30">
+                        <span class="animate-pulse">Zyra is thinking...</span>
                     </div>
                 </div>
             `;
@@ -98,7 +104,9 @@ export class Renderer {
             this.container.scrollTop = this.container.scrollHeight;
         } else {
             button.disabled = false;
-            button.classList.remove('opacity-50', 'cursor-not-allowed');
+            button.classList.remove('opacity-80', 'cursor-not-allowed');
+            if (btnText) btnText.classList.remove('hidden');
+            if (btnSpinner) btnSpinner.classList.add('hidden');
             if (loader) loader.remove();
         }
     }

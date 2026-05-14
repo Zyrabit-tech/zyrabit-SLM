@@ -112,9 +112,10 @@
                 <textarea id="chat-input" rows="1"
                     class="flex-1 bg-white border border-zyrabit-border rounded-xl py-3 px-4 focus:ring-2 focus:ring-zyrabit-primary/20 focus:border-zyrabit-primary outline-none transition resize-none placeholder-gray-400 text-sm shadow-sm"
                     placeholder="Ask about architecture, code or your docs..."></textarea>
-                <button type="submit"
-                    class="px-8 bg-zyrabit-primary hover:bg-zyrabit-secondary text-white rounded-xl flex items-center justify-center transition shadow-lg shadow-zyrabit-primary/20 flex-shrink-0 text-xs font-bold tracking-widest px-8">
-                    SEND
+                <button type="submit" id="chat-submit"
+                    class="px-8 bg-zyrabit-primary hover:bg-zyrabit-secondary text-white rounded-xl flex items-center justify-center transition shadow-lg shadow-zyrabit-primary/20 flex-shrink-0 text-xs font-bold tracking-widest px-8 min-w-[120px]">
+                    <span class="button-text">SEND</span>
+                    <div class="loader-spin hidden ml-2"></div>
                 </button>
             </form>
         </div>

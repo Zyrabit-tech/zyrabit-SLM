@@ -265,6 +265,7 @@ See [`SECURITY.md`](SECURITY.md) for the full security policy and vulnerability 
 - 🤝 **Contributing:** [`CONTRIBUTING_EN.md`](CONTRIBUTING_EN.md)
 - 🔒 **Security policy:** [`SECURITY.md`](SECURITY.md)
 - 🗂️ **Backend deep-dive:** [`zyrabit-slm/README.md`](zyrabit-slm/README.md)
+- 🐳 **Docker & Debugging:** [`DOCKER_DEBUG_GUIDE.md`](DOCKER_DEBUG_GUIDE.md)
 
 ---
 
