@@ -1,19 +1,31 @@
 import logging
+# pyrefly: ignore [missing-import]
 import socketio
+# pyrefly: ignore [missing-import]
 from fastapi import FastAPI
+# pyrefly: ignore [missing-import]
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
+# pyrefly: ignore [missing-import]
 from prometheus_fastapi_instrumentator import Instrumentator
 
 # Infrastructure / Shared
 from app.infrastructure.shared.config import PROJECT_NAME, API_V1_STR, SLM_URL, RAG_COLLECTION, EMBEDDING_MODEL
 from app.infrastructure.shared.logger import setup_logging
 from app.infrastructure.shared.state_tracker import IngestionTracker
+from app.infrastructure.shared.cache import global_cache
+
+# Domain Layer
+from app.domain.services.gatekeeper import Gatekeeper
+from app.domain.use_cases.chat_use_case import ChatUseCase
+from app.domain.use_cases.ingest_use_case import IngestUseCase
+from app.domain.services.mcp_service import set_mcp_app_state
 
 # Infrastructure Adapters
 from app.infrastructure.persistence.chroma_adapter import ChromaAdapter, DirectOllamaEmbeddings
 from app.infrastructure.inference.ollama_inference_adapter import OllamaInferenceAdapter
 from app.domain.services.retriever_service import HybridRetrieverService
+# pyrefly: ignore [missing-import]
 from langchain_chroma import Chroma
 
 # Setup Socket.io
@@ -24,12 +36,18 @@ socket_app = socketio.ASGIApp(sio)
 setup_logging()
 logger = logging.getLogger("zyrabit.api")
 
+# Global App State Reference for Sockets
+_global_app = None
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """
-    Orchestrates Infrastructure Startup and Shutdown.
+    V5.0 Lifespan: Orchestrates the Sovereign AI Infrastructure.
     """
-    # 0. Initialize State Tracker (SQLite for ingest tracking)
+    global _global_app
+    _global_app = app
+    
+    # 0. Initialize State Tracker
     try:
         IngestionTracker.init_db()
         logger.info("✅ State Tracker initialized.")
@@ -38,15 +56,11 @@ async def lifespan(app: FastAPI):
 
     logger.info("🚀 Zyrabit SLM API Starting...")
     
-    app.state.vector_store = None
-    app.state.retriever_service = None
-    app.state.inference_provider = None
-    
     try:
         # 1. Direct Embeddings
         embeddings = DirectOllamaEmbeddings(model=EMBEDDING_MODEL, base_url=SLM_URL)
         
-        # 2. Vector Store (LangChain Chroma)
+        # 2. Vector Store
         lc_chroma = Chroma(
             collection_name=RAG_COLLECTION,
             embedding_function=embeddings,
@@ -54,13 +68,25 @@ async def lifespan(app: FastAPI):
         )
         app.state.vector_store = ChromaAdapter(lc_chroma)
         
-        # 3. Hybrid Retriever Service
+        # 3. Hybrid Retriever
         app.state.retriever_service = HybridRetrieverService(lc_chroma)
         
-        # 4. Inference
+        # 4. Inference Provider
         app.state.inference_provider = OllamaInferenceAdapter(endpoint=f"{SLM_URL}/api/generate")
         
-        # 5. Auto-Ingest
+        # 5. Use Cases (Singletons for the session)
+        app.state.chat_use_case = ChatUseCase(
+            inference_provider=app.state.inference_provider,
+            retriever_service=app.state.retriever_service,
+            gatekeeper=Gatekeeper,
+            cache=global_cache
+        )
+        app.state.ingest_use_case = IngestUseCase(vector_store=app.state.vector_store)
+        
+        # 6. Set MCP State
+        set_mcp_app_state(app.state)
+        
+        # 7. Auto-Ingest
         from app.auto_ingest import run_auto_ingest
         await run_auto_ingest(app.state.vector_store, app.state.retriever_service)
         
@@ -72,6 +98,39 @@ async def lifespan(app: FastAPI):
     logger.info("🛑 Zyrabit SLM API Shutting down...")
 
 app = FastAPI(title=PROJECT_NAME, lifespan=lifespan)
+
+# Mount Socket.io
+app.mount("/socket.io", socket_app)
+
+@sio.event
+async def connect(sid, environ):
+    logger.info(f"🔗 Socket Connected: {sid}")
+
+@sio.event
+async def disconnect(sid):
+    logger.info(f"❌ Socket Disconnected: {sid}")
+
+@sio.event
+async def chat_message(sid, data):
+    """
+    Real-Time Chat Bridge: Directly calls the RAG Brain.
+    """
+    if not _global_app or not hasattr(_global_app.state, 'chat_use_case'):
+        await sio.emit("chat_response", {"response": "System initializing..."}, to=sid)
+        return
+
+    text = data.get("text", "")
+    msg_id = data.get("client_msg_id")
+    
+    logger.info(f"💬 Socket RAG Query from {sid}: {text[:30]}...")
+    
+    try:
+        # Execute the EXACT SAME use case as the REST API
+        result = await _global_app.state.chat_use_case.execute(text=text, client_msg_id=msg_id)
+        await sio.emit("chat_response", result, to=sid)
+    except Exception as e:
+        logger.error(f"❌ Socket RAG Error: {e}")
+        await sio.emit("chat_response", {"response": "I encountered an error processing your request."}, to=sid)
 
 # Middleware
 app.add_middleware(

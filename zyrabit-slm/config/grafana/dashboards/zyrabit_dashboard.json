@@ -21,6 +21,19 @@
       "targets": [
         { "expr": "rate(slm_request_duration_seconds_sum[1m]) / rate(slm_request_duration_seconds_count[1m])", "legendFormat": "Avg Latency" }
       ]
+    },
+    {
+      "title": "Security Interceptions (PII Masking)",
+      "type": "stat",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 8 },
+      "targets": [
+        { "expr": "sum(zyrabit_security_hits_total) by (entity_type)", "legendFormat": "{{entity_type}}" }
+      ],
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "auto"
+      }
     }
   ],
   "schemaVersion": 36,

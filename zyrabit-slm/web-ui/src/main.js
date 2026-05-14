@@ -35,6 +35,14 @@ class ZyrabitApp {
             input.value = '';
         };
 
+        // Keyboard Shortcuts (Cmd+Enter or Ctrl+Enter)
+        input.onkeydown = (e) => {
+            if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+                e.preventDefault();
+                form.requestSubmit(); // Triggers form.onsubmit
+            }
+        };
+
         // UI Interaction
         document.getElementById('toggle-gdpr').onclick = () => this.togglePanel('gdpr-panel');
         document.getElementById('close-gdpr').onclick = () => this.togglePanel('gdpr-panel');

@@ -1,5 +1,6 @@
 import re
 from typing import Tuple, Dict, List
+from app.infrastructure.shared.metrics import SECURITY_HITS_TOTAL
 
 class Gatekeeper:
     """
@@ -27,18 +28,21 @@ class Gatekeeper:
         if emails:
             entities["email"].extend(emails)
             text = cls.EMAIL_PATTERN.sub("[EMAIL_MASKED]", text)
+            SECURITY_HITS_TOTAL.labels(entity_type="email", action="masked").inc(len(emails))
             
         # Mask IPs
         ips = cls.IP_PATTERN.findall(text)
         if ips:
             entities["ip"].extend(ips)
             text = cls.IP_PATTERN.sub("[IP_MASKED]", text)
+            SECURITY_HITS_TOTAL.labels(entity_type="ip", action="masked").inc(len(ips))
             
         # Mask Credit Cards
         cards = cls.CREDIT_CARD_PATTERN.findall(text)
         if cards:
             entities["credit_card"].extend(cards)
             text = cls.CREDIT_CARD_PATTERN.sub("[CARD_MASKED]", text)
+            SECURITY_HITS_TOTAL.labels(entity_type="credit_card", action="masked").inc(len(cards))
             
         return text, entities
 
