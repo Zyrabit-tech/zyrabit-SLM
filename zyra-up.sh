@@ -264,23 +264,33 @@ run_install() {
   run_start
 
   log_info "Waiting for SLM endpoint..."
-  for _ in {1..30}; do
-    if docker compose -f "${COMPOSE_FILE}" exec -T zyrabit-engine ollama list >/dev/null 2>&1; then
-      break
-    fi
-    sleep 2
-  done
+  if docker compose -f "${COMPOSE_FILE}" ps zyrabit-engine >/dev/null 2>&1; then
+    for _ in {1..30}; do
+      if docker compose -f "${COMPOSE_FILE}" exec -T zyrabit-engine ollama list >/dev/null 2>&1; then
+        break
+      fi
+      sleep 2
+    done
 
-  log_info "Ensuring base models are present..."
-  docker network connect zyrabit-slm_backend-network zyrabit-engine || true
-  docker compose -f "${COMPOSE_FILE}" exec -T zyrabit-engine ollama pull "${model_name}"
-  docker compose -f "${COMPOSE_FILE}" exec -T zyrabit-engine ollama pull "mxbai-embed-large"
-  docker network disconnect zyrabit-slm_backend-network zyrabit-engine || true
+    log_info "Ensuring base models are present (Docker Container)..."
+    docker network connect zyrabit-slm_backend-network zyrabit-engine || true
+    docker compose -f "${COMPOSE_FILE}" exec -T zyrabit-engine ollama pull "${model_name}"
+    docker compose -f "${COMPOSE_FILE}" exec -T zyrabit-engine ollama pull "mxbai-embed-large"
+    docker network disconnect zyrabit-slm_backend-network zyrabit-engine || true
+  elif command -v ollama >/dev/null 2>&1; then
+    log_info "Ensuring base models are present (Local Host)..."
+    ollama pull "${model_name}"
+    ollama pull "mxbai-embed-large"
+  else
+    log_warn "SLM Engine (Ollama) not detected in Docker or Host. Model pull skipped."
+  fi
 
   log_ok "Zyrabit is ready."
   echo "URL (Selected): ${COMPOSE_FILE}"
   if [[ "${COMPOSE_FILE}" == *"local"* ]]; then
-    echo "API (Direct HTTP): http://localhost:8080/health"
+    echo "API (Direct HTTP): http://localhost:8080/v1/health"
+    echo "API (Traefik HTTPS): https://localhost/v1/health"
+    echo "Web UI: http://localhost:3000"
   else
     echo "API (Traefik HTTPS): https://localhost/health"
     echo "Prometheus (Traefik): https://localhost/prometheus"

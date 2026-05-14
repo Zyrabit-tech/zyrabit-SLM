@@ -96,9 +96,12 @@ class ZyrabitApp {
     updateUIStatus(data) {
         const setStatus = (id, status) => {
             const el = document.getElementById(id);
+            if (!el) return;
             const dot = el.querySelector('.status-dot');
             const label = el.querySelector('.label');
-            if (status === 'online') {
+            const isOnline = status.toUpperCase() === 'ONLINE';
+
+            if (isOnline) {
                 dot.className = 'w-2 h-2 rounded-full bg-green-500 shadow-sm';
                 label.innerText = 'ONLINE';
                 label.className = 'text-[10px] font-bold text-green-600 label';
@@ -109,12 +112,45 @@ class ZyrabitApp {
             }
         };
 
-        setStatus('health-api', 'online');
-        setStatus('health-slm', data.slm);
-        setStatus('health-db', data.db);
+        // Parse infrastructure array
+        const infra = data.infrastructure || [];
+        const db = infra.find(i => i.id === 'vector-db') || { status: 'OFFLINE' };
+        const slm = infra.find(i => i.id === 'slm-engine') || { status: 'OFFLINE' };
+        const api = infra.find(i => i.id === 'core-api') || { status: 'ONLINE' };
 
+        setStatus('health-api', api.status);
+        setStatus('health-slm', slm.status);
+        setStatus('health-db', db.status);
+
+        // Update SLM Mode Label
+        const modeLabel = document.getElementById('slm-mode-label');
+        if (modeLabel) {
+            modeLabel.innerText = slm.mode || '';
+        }
+
+        // Update Model Badge
         const modelBadge = document.getElementById('model-badge');
-        modelBadge.innerText = `MODEL: ${data.model || '...'}`;
+        if (modelBadge) {
+            const modelName = slm.name ? slm.name.split('(')[1]?.replace(')', '') : '...';
+            modelBadge.innerText = `MODEL: ${modelName || '...'}`;
+        }
+        
+        // Detailed log if DB or SLM are offline (only log once per state change ideally, but here simple is fine)
+        if (db.status === 'OFFLINE') {
+            this.addGdprLog("SYSTEM", "VECTOR_DB_DISCONNECTED - Check zyrabit-db container");
+        }
+        if (slm.status === 'OFFLINE' && slm.mode === 'Local Host (Mac)') {
+            this.addGdprLog("SYSTEM", "LOCAL_OLLAMA_OFFLINE - Make sure Ollama app is open on your Mac");
+        }
+
+        // Show document count in log if it changes (simple check)
+        if (db.metrics?.documents > 0) {
+            const count = db.metrics.documents;
+            if (this._lastDocCount !== count) {
+                this.addGdprLog("VAULT", `SYNCED_${count}_DOCUMENTS`);
+                this._lastDocCount = count;
+            }
+        }
     }
 
     async loadVault() {

@@ -67,4 +67,15 @@ class ChromaAdapter(VectorStorePort):
         pass
 
     def heartbeat(self) -> bool:
-        return True
+        """
+        Real connectivity check for ChromaDB.
+        """
+        try:
+            # We try to access the underlying chroma client heartbeat
+            if hasattr(self.vector_store, "_client"):
+                self.vector_store._client.heartbeat()
+                return True
+            return False
+        except Exception as e:
+            logger.error(f"❌ ChromaDB Heartbeat failed: {e}")
+            return False

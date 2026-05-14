@@ -29,6 +29,7 @@ dependencies = [
     "markdown>=3.8.1",
     "fastmcp>=3.2.0",
     "docker>=7.1.0",
+    "psutil>=6.1.1",
 ]
 
 [dependency-groups]
