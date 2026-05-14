@@ -8,8 +8,7 @@ from prometheus_fastapi_instrumentator import Instrumentator
 # Infrastructure / Shared
 from app.infrastructure.shared.config import PROJECT_NAME, API_V1_STR, SLM_URL, RAG_COLLECTION, EMBEDDING_MODEL
 from app.infrastructure.shared.logger import setup_logging
-setup_logging()
-logger = logging.getLogger("zyrabit.api")
+from app.infrastructure.shared.state_tracker import IngestionTracker
 
 # Infrastructure Adapters
 from app.infrastructure.persistence.chroma_adapter import ChromaAdapter, DirectOllamaEmbeddings
@@ -17,12 +16,27 @@ from app.infrastructure.inference.ollama_inference_adapter import OllamaInferenc
 from app.domain.services.retriever_service import HybridRetrieverService
 from langchain_chroma import Chroma
 
+# Setup Socket.io
+sio = socketio.AsyncServer(async_mode='asgi', cors_allowed_origins='*')
+socket_app = socketio.ASGIApp(sio)
+
+# Setup logging
+setup_logging()
+logger = logging.getLogger("zyrabit.api")
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """
-    V5.0 Lifespan: Orchestrates High-Precision RAG Infrastructure.
+    Orchestrates Infrastructure Startup and Shutdown.
     """
-    logger.info("🚀 Zyrabit SLM API V5.0 (High Precision) Starting...")
+    # 0. Initialize State Tracker (SQLite for ingest tracking)
+    try:
+        IngestionTracker.init_db()
+        logger.info("✅ State Tracker initialized.")
+    except Exception as e:
+        logger.error(f"❌ Failed to initialize State Tracker: {e}")
+
+    logger.info("🚀 Zyrabit SLM API Starting...")
     
     app.state.vector_store = None
     app.state.retriever_service = None
@@ -40,7 +54,7 @@ async def lifespan(app: FastAPI):
         )
         app.state.vector_store = ChromaAdapter(lc_chroma)
         
-        # 3. Hybrid Retriever Service (Uses the underlying LC Chroma)
+        # 3. Hybrid Retriever Service
         app.state.retriever_service = HybridRetrieverService(lc_chroma)
         
         # 4. Inference
@@ -50,15 +64,25 @@ async def lifespan(app: FastAPI):
         from app.auto_ingest import run_auto_ingest
         await run_auto_ingest(app.state.vector_store, app.state.retriever_service)
         
-        logger.info("✅ Infrastructure V5.0 initialized successfully.")
+        logger.info("✅ Infrastructure initialized successfully.")
     except Exception as e:
-        logger.error(f"❌ Failed to initialize V5.0 infrastructure: {e}")
+        logger.error(f"❌ Failed to initialize infrastructure: {e}")
 
     yield
     logger.info("🛑 Zyrabit SLM API Shutting down...")
 
 app = FastAPI(title=PROJECT_NAME, lifespan=lifespan)
-app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
+
+# Middleware
+app.add_middleware(
+    CORSMiddleware, 
+    allow_origins=["*"], 
+    allow_credentials=True, 
+    allow_methods=["*"], 
+    allow_headers=["*"]
+)
+
+# Metrics
 Instrumentator().instrument(app).expose(app)
 
 # Register Routers
@@ -71,4 +95,4 @@ app.include_router(integrations.router, prefix=API_V1_STR, tags=["Integrations"]
 
 @app.get("/", include_in_schema=False)
 async def root():
-    return {"status": "Zyrabit SLM API V5.0 is running."}
+    return {"status": "Zyrabit SLM API is running."}

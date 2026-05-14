@@ -1,8 +1,0 @@
-requests==2.33.1
-python-dotenv==1.2.2
-autopep8==2.3.2
-pytest==9.0.3
-fastmcp==3.2.0
-docker==7.1.0
-pip-audit==2.8.0
-psutil==6.1.1
