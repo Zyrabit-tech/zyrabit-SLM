@@ -51,9 +51,11 @@ export class ChatManager {
     }
 
     onResponse(data) {
-        // Remove the processed message from queue
-        this.queue.shift();
-        this.persist();
+        // Only shift if we were expecting a response
+        if (this.queue.length > 0) {
+            this.queue.shift();
+            this.persist();
+        }
         
         bus.emit('UI:MSG_ADDED', { 
             role: 'assistant', 
@@ -61,7 +63,13 @@ export class ChatManager {
             metadata: data.metadata 
         });
         
-        this.processNext();
+        // If there's more in the queue, keep going
+        if (this.queue.length > 0) {
+            this.processNext();
+        } else {
+            this.isProcessing = false;
+            bus.emit('UI:THINKING', false);
+        }
     }
 
     persist() {

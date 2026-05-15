@@ -46,6 +46,7 @@ async def lifespan(app: FastAPI):
     """
     global _global_app
     _global_app = app
+    app.state.sio = sio # Store for other endpoints
     
     # 0. Initialize State Tracker
     try:

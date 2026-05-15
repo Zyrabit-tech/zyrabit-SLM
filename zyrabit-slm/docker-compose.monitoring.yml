@@ -1,0 +1,34 @@
+name: zyrabit-monitoring
+
+services:
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: zyrabit-prometheus-local
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+    volumes:
+      - ./config/prometheus.yml:/etc/prometheus/prometheus.yml
+    ports:
+      - "9500:9090"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: zyrabit-grafana-local
+    environment:
+      - GF_AUTH_ANONYMOUS_ENABLED=true
+      - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
+      - GF_AUTH_BASIC_ENABLED=false
+    volumes:
+      - grafana-storage:/var/lib/grafana
+      - ./config/grafana/datasources:/etc/grafana/provisioning/datasources
+      - ./config/grafana/dashboards:/etc/grafana/provisioning/dashboards
+    ports:
+      - "3500:3000"
+    depends_on:
+      - prometheus
+
+volumes:
+  grafana-storage:

@@ -1,3 +1,4 @@
+import os
 import logging
 from typing import Optional, Dict, Any
 from app.infrastructure.shared.config import MODEL_NAME
@@ -61,17 +62,34 @@ class ChatUseCase:
                         decision = "direct (fallback)"
 
             # 4. Inference
-            system_prompt_path = "app/infrastructure/shared/prompts/zyra_system.md"
-            try:
-                with open(system_prompt_path, "r", encoding="utf-8") as f:
-                    system_prompt = f.read()
-            except Exception as e:
-                logger.warning(f"⚠️ Could not load system prompt from {system_prompt_path}: {e}")
-                system_prompt = "You are Zyra, a helpful assistant."
-            
-            prompt = sanitized_text
+            # Attempt to find system prompt in multiple locations (Local vs Docker)
+            possible_paths = [
+                "app/infrastructure/shared/prompts/zyra_system.md",
+                "zyrabit-slm/api-rag/app/infrastructure/shared/prompts/zyra_system.md",
+                "/app/app/infrastructure/shared/prompts/zyra_system.md"
+            ]
+            system_prompt = "You are Zyra, a helpful sovereign assistant."
+            for p in possible_paths:
+                if os.path.exists(p):
+                    try:
+                        with open(p, "r", encoding="utf-8") as f:
+                            system_prompt = f.read()
+                        break
+                    except: continue
+
+            # Construct High-Precision Prompt
             if context:
-                prompt = f"Context:\n{context}\n\nQuestion: {sanitized_text}\n\nAnswer based ONLY on the context provided:"
+                prompt = f"""### CONOCIMIENTO DEL VAULT (FRAGMENTOS):
+{context}
+
+### CONSULTA DEL USUARIO:
+{sanitized_text}
+
+### INSTRUCCIÓN DE RESPUESTA:
+Utiliza exclusivamente el conocimiento del Vault arriba proporcionado. Si la información no es suficiente, indícalo basándote en tu identidad como Zyra."""
+            else:
+                # Reinforce identity in DIRECT mode
+                prompt = f"### IDENTIDAD: Eres Zyra de Zyrabit. Responde de forma inteligente y soberana.\n\n### CONSULTA:\n{sanitized_text}"
 
             request = InferenceRequest(
                 model=MODEL_NAME, 
@@ -87,6 +105,7 @@ class ChatUseCase:
                     "decision": decision,
                     "latency_ms": round(latency_ms, 2),
                     "sources": sources,
+                    "rag_hits": len(sources) if context else 0,
                     "pii_detected": any(entities.values()),
                     "cached": False
                 }

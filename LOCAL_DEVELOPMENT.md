@@ -76,6 +76,21 @@ The UI will be available at `http://localhost:5173` (or the port Vite provides).
 ### ❌ `sqlite3.OperationalError: no such table: ingests`
 **Cause:** The state tracking database was not initialized.
 **Fix:** This is now handled automatically in `main.py`. Ensure you have the latest code where `IngestionTracker.init_db()` is called inside the `lifespan` function.
+---
+
+## 8. Monitoring & Observability
+
+To see real-time metrics (latency, security hits, token usage), you can lift a simplified monitoring stack:
+
+```bash
+# From zyrabit-slm directory
+docker compose -f docker-compose.monitoring.yml up -d
+```
+
+- **Grafana:** [http://localhost:3500](http://localhost:3500) (Auto-login as Admin)
+- **Prometheus:** [http://localhost:9500](http://localhost:9500)
+
+The pre-built dashboard **"Zyrabit SLM Command Center"** is automatically provisioned and connected to your local API.
 
 ### ❌ Frontend cannot connect to API (`404` or `CORS` error)
 **Cause:** Vite is running on port 5173 and doesn't know where the API (port 8080) is.
