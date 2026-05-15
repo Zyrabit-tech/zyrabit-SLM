@@ -38,7 +38,11 @@ def _is_allowed_path(candidate: Path) -> bool:
         return False
     return False
 
-def _resolve_file_uri(uri: str, allowed_roots: List[Path]) -> Path:
+def _resolve_file_uri(uri: str) -> Path:
+    """
+    Parses a file:// URI and returns a Path object.
+    Does NOT perform resolution or validation.
+    """
     if not isinstance(uri, str) or not uri.strip():
         raise ValueError("Invalid URI: expected non-empty string.")
         
@@ -46,7 +50,7 @@ def _resolve_file_uri(uri: str, allowed_roots: List[Path]) -> Path:
     if parsed.scheme != "file":
         raise ValueError("Only file:// URIs are supported.")
     
-    # Reject host-based URIs (security requirement)
+    # Reject host-based URIs
     if parsed.netloc not in ("", "localhost"):
         raise ValueError("Only local file:// URIs are supported.")
         
@@ -54,22 +58,7 @@ def _resolve_file_uri(uri: str, allowed_roots: List[Path]) -> Path:
     if not path_str:
         raise ValueError("Invalid file URI: empty path.")
         
-    # Resolve strictly: expands symlinks and ensures the path exists.
-    # This is critical for preventing '..' injection and symlink bypass.
-    try:
-        candidate = Path(path_str).resolve(strict=True)
-    except (FileNotFoundError, RuntimeError):
-        raise FileNotFoundError(f"Resource not found: {path_str}")
-
-    for root in allowed_roots:
-        try:
-            # Check containment via relative_to
-            candidate.relative_to(root)
-            return candidate
-        except ValueError:
-            continue
-            
-    raise ValueError("Access denied: Path not allowed.")
+    return Path(path_str)
 
 def _resource_index() -> Dict[str, str]:
     index: Dict[str, str] = {}
@@ -203,25 +192,31 @@ async def handle_jsonrpc(payload: Dict[str, Any]) -> Tuple[Dict[str, Any], int]:
 def _validated_allowed_path(uri: str) -> Path:
     """
     Strictly validates that the URI resolves to a file within the allowed roots.
-    Canonicalizes all paths to prevent traversal attacks using CodeQL recognized patterns.
+    Uses os.path.commonpath, a pattern recognized by CodeQL for path traversal mitigation.
     """
+    # 1. Parse URI
+    raw_path = _resolve_file_uri(uri)
+    
+    # 2. Canonicalize (resolve symlinks and ..)
+    # Using realpath to ensure we have the absolute, canonical path
+    resolved_path_str = os.path.realpath(str(raw_path))
+    
     roots = _allowed_roots()
-    # Initial resolution and containment check
-    candidate = _resolve_file_uri(uri, roots)
-
     for root in roots:
+        # 3. Canonicalize root
+        resolved_root_str = os.path.realpath(str(root))
+        
+        # 4. Check containment using CodeQL-recognized pattern
         try:
-            # CodeQL recognized pattern: commonpath validation for path traversal mitigation
-            if os.path.commonpath([str(candidate), str(root)]) == str(root):
-                return candidate
-            
-            # Secondary check for extra safety
-            candidate.relative_to(root)
-            return candidate
+            if os.path.commonpath([resolved_path_str, resolved_root_str]) == resolved_root_str:
+                safe_path = Path(resolved_path_str)
+                # Final check: Must exist and be under the root
+                if safe_path.exists():
+                    return safe_path
         except (ValueError, RuntimeError):
             continue
 
-    raise ValueError("Access denied: Path not allowed.")
+    raise ValueError("Access denied: Path not allowed or outside sandbox.")
 
 async def _read_resource(uri: str) -> Dict[str, Any]:
     # Preventive check

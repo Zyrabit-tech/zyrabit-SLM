@@ -10,7 +10,10 @@ from contextlib import asynccontextmanager
 from prometheus_fastapi_instrumentator import Instrumentator
 
 # Infrastructure / Shared
-from app.infrastructure.shared.config import PROJECT_NAME, API_V1_STR, SLM_URL, RAG_COLLECTION, EMBEDDING_MODEL
+from app.infrastructure.shared.config import (
+    PROJECT_NAME, API_V1_STR, SLM_URL, 
+    RAG_COLLECTION, EMBEDDING_MODEL, DB_HOST, DB_PORT
+)
 from app.infrastructure.shared.logger import setup_logging
 from app.infrastructure.shared.state_tracker import IngestionTracker
 from app.infrastructure.shared.cache import global_cache
@@ -50,7 +53,9 @@ async def lifespan(app: FastAPI):
     
     # 0. Initialize State Tracker
     try:
-        IngestionTracker.init_db()
+        # Use an absolute path in the container to ensure persistence and visibility
+        DB_PATH = "/app/ingestion_state.db"
+        IngestionTracker.init_db(db_path=DB_PATH)
         logger.info("✅ State Tracker initialized.")
     except Exception as e:
         logger.error(f"❌ Failed to initialize State Tracker: {e}")
@@ -61,11 +66,15 @@ async def lifespan(app: FastAPI):
         # 1. Direct Embeddings
         embeddings = DirectOllamaEmbeddings(model=EMBEDDING_MODEL, base_url=SLM_URL)
         
-        # 2. Vector Store
+        # 2. Vector Store (Connecting to remote Chroma Server)
+        import chromadb
+        # Use HttpClient to connect to the zyrabit-db container
+        chroma_client = chromadb.HttpClient(host=DB_HOST, port=DB_PORT)
+        
         lc_chroma = Chroma(
+            client=chroma_client,
             collection_name=RAG_COLLECTION,
-            embedding_function=embeddings,
-            persist_directory="./chroma_data"
+            embedding_function=embeddings
         )
         app.state.vector_store = ChromaAdapter(lc_chroma)
         

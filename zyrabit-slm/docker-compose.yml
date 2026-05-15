@@ -147,11 +147,11 @@ services:
       - CHROMA_OTEL_COLLECTION_ENDPOINT=http://localhost:4317
       - CHROMA_OTEL_SERVICE_NAME=zyrabit-vector-db
     volumes:
-      - ./chroma-data:/chroma/chroma
+      - ./chroma-data:/data
     networks:
       - backend-network
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:8000/api/v1/heartbeat || exit 1"]
+      test: ["CMD-SHELL", "python3 -c 'import urllib.request; urllib.request.urlopen(\"http://localhost:8000/api/v2/heartbeat\")' || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3

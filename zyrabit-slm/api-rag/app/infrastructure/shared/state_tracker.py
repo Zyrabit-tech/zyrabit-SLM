@@ -8,10 +8,14 @@ class IngestionTracker:
     """
     KISS State Tracker: Tracks document ingestion to ensure self-healing.
     """
-    DB_PATH = "ingestion_state.db"
+    DB_PATH = "/app/ingestion_state.db"
+    _initialized = False
 
     @classmethod
-    def init_db(cls):
+    def init_db(cls, db_path: str = None):
+        if db_path:
+            cls.DB_PATH = db_path
+        
         with sqlite3.connect(cls.DB_PATH) as conn:
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS ingests (

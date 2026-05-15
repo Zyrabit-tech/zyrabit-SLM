@@ -104,7 +104,13 @@ services:
     ports:
       - "8000:8000"
     volumes:
-      - ./chroma-data:/chroma/chroma
+      - ./chroma-data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "python3 -c 'import urllib.request; urllib.request.urlopen(\"http://localhost:8000/api/v2/heartbeat\")' || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
     networks:
       - backend-network
 

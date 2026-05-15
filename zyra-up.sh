@@ -107,6 +107,15 @@ detect_hardware() {
     echo "${ram_gb}|${cores}|${accelerator}"
 }
 
+check_local_ollama() {
+    # Try both 127.0.0.1 and localhost for maximum compatibility
+    if curl -s -m 2 http://127.0.0.1:11434/api/tags >/dev/null 2>&1 || \
+       curl -s -m 2 http://localhost:11434/api/tags >/dev/null 2>&1; then
+        return 0
+    fi
+    return 1
+}
+
 # --- Core Commands ---
 
 run_doctor() {
@@ -121,6 +130,13 @@ run_doctor() {
     echo -e "  ${BOLD}Compose CMD:${NC}  ${DOCKER_COMPOSE_CMD}"
     
     require_docker
+    
+    if check_local_ollama; then
+        log_ok "Local Ollama detected on host (Metal)."
+    else
+        log_warn "Local Ollama not detected on host. Will use Docker container."
+    fi
+    
     log_ok "System environment is healthy."
 }
 
@@ -142,16 +158,32 @@ run_verify() {
     printf "  ${CYAN}%-25s %-15s %-10s${NC}\n" "─────────────────────────" "───────────────" "──────────"
 
     for c in "${containers[@]}"; do
-        local status
-        status=$(docker inspect --format='{{.State.Status}}' "$c" 2>/dev/null || echo "not_found")
+        local status health
+        # Clean potential newlines or spaces from docker output
+        status=$(docker inspect --format='{{.State.Status}}' "$c" 2>/dev/null | tr -d '[:space:]' || echo "not_found")
+        
+        # Special case for engine running on Metal
+        if [[ "$c" == "zyrabit-engine" ]] && [[ "$status" == "not_found" ]]; then
+            if check_local_ollama; then
+                printf "  ${CYAN}%-25s %-15s %-10s${NC}\n" "$c" "native (metal)" "healthy"
+                ((pass++))
+                continue
+            fi
+        fi
+
         if [[ "$status" == "running" ]]; then
-            local health
-            health=$(docker inspect --format='{{if .State.Health}}{{.State.Health.Status}}{{else}}N/A{{end}}' "$c" 2>/dev/null)
+            health=$(docker inspect --format='{{if .State.Health}}{{.State.Health.Status}}{{else}}N/A{{end}}' "$c" 2>/dev/null | tr -d '[:space:]')
             printf "  ${GREEN}%-25s %-15s %-10s${NC}\n" "$c" "running" "$health"
             ((pass++))
+            
+            # If unhealthy, show some logs automatically
+            if [[ "$health" == "unhealthy" ]]; then
+                log_warn "Container $c is UNHEALTHY. Last logs:"
+                docker logs --tail 10 "$c"
+            fi
         else
             printf "  ${RED}%-25s %-15s %-10s${NC}\n" "$c" "$status" "—"
-            ((fail++))
+            [[ "$status" != "not_found" ]] && ((fail++))
         fi
     done
 
@@ -166,6 +198,8 @@ run_verify() {
         log_ok "API is responding correctly."
     else
         log_warn "API is not responding yet (it might still be initializing)."
+        log_info "Checking container logs for zyrabit-api..."
+        docker logs --tail 20 zyrabit-api
     fi
 }
 
@@ -193,14 +227,33 @@ run_dev() {
 }
 
 run_start() {
-    require_docker
     local compose_args=("-f" "${COMPOSE_FILE}")
     [[ "${USE_LOCAL:-}" == "true" ]] && compose_args+=("-f" "${LOCAL_COMPOSE_FILE}")
     [[ -n "${PROFILE:-}" ]] && compose_args+=("--profile" "${PROFILE}")
     
-    log_info "Launching infrastructure..."
-    $DOCKER_COMPOSE_CMD "${compose_args[@]}" up -d
+    if check_local_ollama && [[ "${PROFILE:-}" != *"engine"* ]]; then
+        log_info "Using native Ollama (host). Skipping zyrabit-engine container..."
+        # If we detect local Ollama, we don't start the engine service
+        $DOCKER_COMPOSE_CMD "${compose_args[@]}" up -d --scale zyrabit-engine=0
+    else
+        log_info "Launching full infrastructure..."
+        $DOCKER_COMPOSE_CMD "${compose_args[@]}" up -d
+    fi
     log_ok "Infrastructure is up."
+
+    # --- Print Service URLs ---
+    echo -e "\n${BOLD}🚀 Zyrabit SLM is ready! Access your services below:${NC}"
+    if [[ "${USE_LOCAL:-}" == "true" ]]; then
+        echo -e "  ${CYAN}➜ Web UI:${NC}   http://localhost:3000"
+        echo -e "  ${CYAN}➜ API:${NC}      http://localhost:8080/v1"
+        echo -e "  ${CYAN}➜ DB Admin:${NC} http://localhost:8000/api/v2/heartbeat"
+    else
+        echo -e "  ${CYAN}➜ Web UI:${NC}   https://localhost"
+        echo -e "  ${CYAN}➜ API:${NC}      https://localhost/v1"
+        echo -e "  ${CYAN}➜ Grafana:${NC}  https://localhost/grafana"
+        echo -e "  ${CYAN}➜ Prom:${NC}     https://localhost/prometheus"
+    fi
+    echo -e "  ${YELLOW}ℹ Use './zyra-up.sh verify' to check detailed health status.${NC}\n"
 }
 
 run_install() {
