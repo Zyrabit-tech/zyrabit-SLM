@@ -7,32 +7,74 @@
   "links": [],
   "panels": [
     {
-      "title": "Total Requests (Traffic)",
+      "title": "Total API Traffic (Req/sec)",
       "type": "stat",
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "gridPos": { "h": 6, "w": 6, "x": 0, "y": 0 },
       "targets": [
-        { "expr": "sum(rate(slm_requests_total[1m]))", "legendFormat": "Requests/sec" }
-      ]
+        { "expr": "sum(rate(http_requests_total[1m]))", "legendFormat": "Requests/sec" }
+      ],
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area"
+      }
     },
     {
-      "title": "slm Latency (Seconds)",
-      "type": "timeseries",
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "title": "Avg Latency",
+      "type": "stat",
+      "gridPos": { "h": 6, "w": 6, "x": 6, "y": 0 },
       "targets": [
-        { "expr": "rate(slm_request_duration_seconds_sum[1m]) / rate(slm_request_duration_seconds_count[1m])", "legendFormat": "Avg Latency" }
-      ]
+        { "expr": "rate(http_request_duration_seconds_sum[1m]) / rate(http_request_duration_seconds_count[1m])", "legendFormat": "Avg Latency" }
+      ],
+      "options": {
+        "fieldConfig": {
+          "defaults": { "unit": "s" }
+        },
+        "colorMode": "value"
+      }
     },
     {
-      "title": "Security Interceptions (PII Masking)",
+      "title": "Token Velocity (Tokens/sec)",
       "type": "stat",
-      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 8 },
+      "gridPos": { "h": 6, "w": 6, "x": 12, "y": 0 },
+      "targets": [
+        { "expr": "sum(rate(zyrabit_token_usage_total[1m]))", "legendFormat": "Tokens/sec" }
+      ],
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area"
+      }
+    },
+    {
+      "title": "Security Masking Hits",
+      "type": "stat",
+      "gridPos": { "h": 6, "w": 6, "x": 18, "y": 0 },
       "targets": [
         { "expr": "sum(zyrabit_security_hits_total) by (entity_type)", "legendFormat": "{{entity_type}}" }
       ],
       "options": {
-        "colorMode": "background",
-        "graphMode": "area",
-        "justifyMode": "auto"
+        "colorMode": "background"
+      }
+    },
+    {
+      "title": "RAG Vault Activity (Hits Over Time)",
+      "type": "timeseries",
+      "gridPos": { "h": 10, "w": 12, "x": 0, "y": 6 },
+      "targets": [
+        { "expr": "sum(rate(zyrabit_rag_hits_total[5m]))", "legendFormat": "RAG Hits" }
+      ],
+      "options": {
+        "legend": { "displayMode": "table", "placement": "right" }
+      }
+    },
+    {
+      "title": "Model Performance (Latency ms)",
+      "type": "timeseries",
+      "gridPos": { "h": 10, "w": 12, "x": 12, "y": 6 },
+      "targets": [
+        { "expr": "rate(zyrabit_token_latency_ms_sum[5m]) / rate(zyrabit_token_latency_ms_count[5m])", "legendFormat": "Latency (ms)" }
+      ],
+      "options": {
+        "legend": { "displayMode": "table", "placement": "right" }
       }
     }
   ],
@@ -45,6 +87,6 @@
   "timezone": "",
   "title": "Zyrabit SLM Command Center",
   "uid": "zyrabit-main",
-  "version": 1,
+  "version": 3,
   "weekStart": ""
 }

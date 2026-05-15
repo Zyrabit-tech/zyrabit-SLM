@@ -111,7 +111,15 @@ Utiliza exclusivamente el conocimiento del Vault arriba proporcionado. Si la inf
                 }
             }
             
-            # 5. Cache
+            # 5. Metrics Recording
+            TOKEN_LATENCY_MS.labels(model=MODEL_NAME).observe(latency_ms)
+            # Estimate tokens as words (approximate for SLM visibility)
+            token_count = len(response_obj.text.split())
+            TOKEN_USAGE_TOTAL.labels(model=MODEL_NAME, direction="output").inc(token_count)
+            if decision == "rag" and sources:
+                RAG_HITS_TOTAL.labels(collection="default").inc()
+
+            # 6. Cache
             if client_msg_id:
                 self.cache.set(client_msg_id, final_response)
 
