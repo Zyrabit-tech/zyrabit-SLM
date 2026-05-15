@@ -1,382 +1,257 @@
 #!/usr/bin/env bash
 
+# ──────────────────────────────────────────────────────────────────────────────
+#   ZYRABIT SLM — Unified Orchestration Script
+#   Version: 2.0.0
+#   Description: Unified entry point for installation, development, and maintenance.
+#   Usage: ./zyra-up.sh [command] [options]
+# ──────────────────────────────────────────────────────────────────────────────
+
 set -euo pipefail
 
+# --- Colors & UI ---
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 RED='\033[0;31m'
+CYAN='\033[0;36m'
+BOLD='\033[1m'
 NC='\033[0m'
 
+# --- Logging Helpers ---
 log_info() { echo -e "${BLUE}ℹ${NC} $1"; }
 log_ok() { echo -e "${GREEN}✔${NC} $1"; }
 log_warn() { echo -e "${YELLOW}⚠${NC} $1"; }
 log_err() { echo -e "${RED}✖${NC} $1"; }
+log_header() {
+    echo -e "\n${BOLD}${BLUE}══════════════════════════════════════════════════${NC}"
+    echo -e "${BOLD}${CYAN}   $1 ${NC}"
+    echo -e "${BOLD}${BLUE}══════════════════════════════════════════════════${NC}\n"
+}
 
+# --- Paths & Constants ---
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 COMPOSE_FILE="${SCRIPT_DIR}/zyrabit-slm/docker-compose.yml"
+LOCAL_COMPOSE_FILE="${SCRIPT_DIR}/zyrabit-slm/docker-compose.local.yml"
 ENV_FILE="${SCRIPT_DIR}/zyrabit-slm/.env"
 
-usage() {
-  cat <<'EOF'
-Usage: ./zyra-up.sh [command] [options]
+# --- Dynamic Command Detection ---
+DOCKER_COMPOSE_CMD="docker compose"
+if ! docker compose version >/dev/null 2>&1; then
+    if command -v docker-compose >/dev/null 2>&1; then
+        DOCKER_COMPOSE_CMD="docker-compose"
+    else
+        log_err "Neither 'docker compose' nor 'docker-compose' found."
+        exit 1
+    fi
+fi
 
-Commands:
-  install   Start stack and pull required models (default)
-  start     Start stack only
-  doctor    Validate environment and print detected runtime profile
+# --- Helper Functions ---
+
+usage() {
+    cat <<EOF
+${BOLD}Usage:${NC} ./zyra-up.sh [command] [options]
+
+${BOLD}Commands:${NC}
+  install   Full setup: build images, start stack, and pull AI models (default)
+  start     Bring up the infrastructure only (no model pulling)
+  stop      Tear down the infrastructure
+  build     Build Docker images without starting containers
+  verify    Health check: validate all containers and API status
+  dev       Native local development (starts API via 'uv' with hot-reload)
+  doctor    Diagnostic: validate environment, RAM, and hardware acceleration
   help      Show this help message
 
-Options:
-  --profile <name>  Start Docker Compose with a specific profile (e.g., n8n, docs, observability-extra)
-  --local           Use the local composition (No SSL, port 8080)
-  --model <name>    Override the SLM model to use (e.g., llama3, mistral)
+${BOLD}Options:${NC}
+  --profile <name>  Add Docker Compose profile (automation, observability-extra)
+  --local           Use local configuration (port 8080, no SSL/Traefik)
+  --model <name>    Override the default SLM model (e.g., llama3, mistral)
+  --no-cache        Force build without using Docker cache
 EOF
 }
 
-require_compose_file() {
-  if [[ ! -f "${COMPOSE_FILE}" ]]; then
-    log_err "docker-compose file not found at ${COMPOSE_FILE}"
-    exit 1
-  fi
+require_docker() {
+    if ! command -v docker >/dev/null 2>&1; then
+        log_err "Docker is not installed."
+        exit 1
+    fi
+    if ! docker info >/dev/null 2>&1; then
+        log_err "Docker daemon is not running."
+        exit 1
+    fi
 }
 
-read_env_value() {
-  local key="$1"
-  if [[ ! -f "${ENV_FILE}" ]]; then
-    return 0
-  fi
-  awk -F= -v key="${key}" '
-    /^[[:space:]]*#/ {next}
-    $1 ~ "^[[:space:]]*" key "[[:space:]]*$" {
-      sub(/^[^=]*=/, "", $0)
-      gsub(/^[[:space:]]+|[[:space:]]+$/, "", $0)
-      print $0
-      exit
-    }
-  ' "${ENV_FILE}"
-}
-
-resolve_required_var_value() {
-  local var_name="$1"
-  local runtime_value file_value
-
-  if [[ "${!var_name+x}" == "x" ]]; then
-    runtime_value="${!var_name}"
-    printf '%s' "${runtime_value}"
-    return 0
-  fi
-
-  file_value="$(read_env_value "${var_name}")"
-  printf '%s' "${file_value}"
-}
-
-validate_required_env_vars() {
-  local required_vars=(
-    "SLM_URL"
-    "DB_URL"
-    "MODEL_NAME"
-  )
-
-  for var_name in "${required_vars[@]}"; do
-    local value value_lower
-    value="$(resolve_required_var_value "${var_name}")"
-    value="${value%\"}"
-    value="${value#\"}"
-    value="${value%\'}"
-    value="${value#\'}"
-
-    if [[ -z "${value}" ]]; then
-      log_err "Required variable '${var_name}' is missing or empty (runtime env or ${ENV_FILE})"
-      exit 1
+detect_hardware() {
+    local ram_gb cores accelerator
+    
+    # RAM Detection
+    if [[ "$(uname -s)" == "Darwin" ]]; then
+        ram_gb="$(( $(sysctl -n hw.memsize 2>/dev/null || echo 0) / 1024 / 1024 / 1024 ))"
+        cores="$(sysctl -n hw.logicalcpu 2>/dev/null || echo 4)"
+    else
+        ram_gb="$(( $(awk '/MemTotal/ {print $2}' /proc/meminfo 2>/dev/null || echo 0) / 1024 / 1024 ))"
+        cores="$(nproc 2>/dev/null || echo 4)"
     fi
 
-    value_lower="$(printf '%s' "${value}" | tr '[:upper:]' '[:lower:]')"
-    case "${value_lower}" in
-      undefined|null|none)
-        log_err "Variable '${var_name}' has invalid value '${value}' (runtime env or ${ENV_FILE})"
+    # Accelerator Detection
+    if command -v nvidia-smi >/dev/null 2>&1; then
+        accelerator="nvidia"
+    elif [[ -e /dev/tenstorrent ]] || command -v tt-smi >/dev/null 2>&1; then
+        accelerator="tenstorrent"
+    elif [[ "$(uname -s)" == "Darwin" && "$(uname -m)" == "arm64" ]]; then
+        accelerator="metal"
+    else
+        accelerator="cpu"
+    fi
+
+    echo "${ram_gb}|${cores}|${accelerator}"
+}
+
+# --- Core Commands ---
+
+run_doctor() {
+    log_header "ZYRABIT DOCTOR — System Diagnostics"
+    local hw_info
+    hw_info=$(detect_hardware)
+    IFS='|' read -r ram cores accel <<< "$hw_info"
+
+    echo -e "  ${BOLD}RAM:${NC}          ${ram} GB"
+    echo -e "  ${BOLD}Cores:${NC}        ${cores} logical"
+    echo -e "  ${BOLD}Accelerator:${NC}  ${accel}"
+    echo -e "  ${BOLD}Compose CMD:${NC}  ${DOCKER_COMPOSE_CMD}"
+    
+    require_docker
+    log_ok "System environment is healthy."
+}
+
+run_build() {
+    log_header "BUILDING ZYRABIT IMAGES"
+    local build_args=("")
+    [[ "${NO_CACHE:-}" == "true" ]] && build_args+=("--no-cache")
+    
+    $DOCKER_COMPOSE_CMD -f "${COMPOSE_FILE}" build "${build_args[@]}"
+    log_ok "Build completed successfully."
+}
+
+run_verify() {
+    log_header "ZYRABIT VERIFICATION — Health Check"
+    local containers=("zyrabit-api" "zyrabit-web" "zyrabit-engine" "zyrabit-db")
+    local pass=0 fail=0
+    
+    printf "  ${BOLD}%-25s %-15s %-10s${NC}\n" "CONTAINER" "STATUS" "HEALTH"
+    printf "  ${CYAN}%-25s %-15s %-10s${NC}\n" "─────────────────────────" "───────────────" "──────────"
+
+    for c in "${containers[@]}"; do
+        local status
+        status=$(docker inspect --format='{{.State.Status}}' "$c" 2>/dev/null || echo "not_found")
+        if [[ "$status" == "running" ]]; then
+            local health
+            health=$(docker inspect --format='{{if .State.Health}}{{.State.Health.Status}}{{else}}N/A{{end}}' "$c" 2>/dev/null)
+            printf "  ${GREEN}%-25s %-15s %-10s${NC}\n" "$c" "running" "$health"
+            ((pass++))
+        else
+            printf "  ${RED}%-25s %-15s %-10s${NC}\n" "$c" "$status" "—"
+            ((fail++))
+        fi
+    done
+
+    echo -e "\n  ${BOLD}Status:${NC} ${GREEN}${pass} active${NC}, ${RED}${fail} inactive${NC}"
+    
+    # API Probe
+    local api_url="https://localhost/v1/health"
+    [[ "${USE_LOCAL:-}" == "true" ]] && api_url="http://localhost:8080/v1/health"
+    
+    log_info "Probing API at ${api_url}..."
+    if curl -sk -f "${api_url}" >/dev/null 2>&1; then
+        log_ok "API is responding correctly."
+    else
+        log_warn "API is not responding yet (it might still be initializing)."
+    fi
+}
+
+run_dev() {
+    log_header "ZYRABIT NATIVE DEV — (uv + hot-reload)"
+    
+    if ! command -v uv >/dev/null 2>&1; then
+        log_err "'uv' is required for native development. Install: curl -LsSf https://astral.sh/uv/install.sh | sh"
         exit 1
-        ;;
-    esac
-  done
-}
+    fi
 
-require_docker() {
-  if ! command -v docker >/dev/null 2>&1; then
-    log_err "Docker is required."
-    exit 1
-  fi
-
-  if ! docker info >/dev/null 2>&1; then
-    log_err "Docker daemon is not running."
-    exit 1
-  fi
-}
-
-detect_ram_gb() {
-  if [[ "$(uname -s)" == "Darwin" ]]; then
-    echo "$(( $(sysctl -n hw.memsize 2>/dev/null || echo 0) / 1024 / 1024 / 1024 ))"
-    return
-  fi
-
-  if [[ -f "/proc/meminfo" ]]; then
-    local mem_kb
-    mem_kb="$(awk '/MemTotal/ {print $2}' /proc/meminfo)"
-    echo "$(( mem_kb / 1024 / 1024 ))"
-    return
-  fi
-
-  echo "0"
-}
-
-detect_accelerator() {
-  if command -v nvidia-smi >/dev/null 2>&1; then
-    echo "nvidia"
-    return
-  fi
-  if ls -d /dev/tenstorrent >/dev/null 2>&1; then
-    echo "tenstorrent"
-    return
-  fi
-  if command -v tt-smi >/dev/null 2>&1; then
-    echo "tenstorrent"
-    return
-  fi
-  if command -v lspci >/dev/null 2>&1 && lspci | grep -qi "tenstorrent"; then
-    echo "tenstorrent"
-    return
-  fi
-  if [[ "$(uname -s)" == "Darwin" && "$(uname -m)" == "arm64" ]]; then
-    echo "metal"
-    return
-  fi
-  echo "cpu"
-}
-
-detect_cores() {
-  if [[ "$(uname -s)" == "Darwin" ]]; then
-    sysctl -n hw.logicalcpu 2>/dev/null || echo 4
-    return
-  fi
-  nproc 2>/dev/null || echo 4
-}
-
-resolve_model_name() {
-  local model_default model_low_ram ram_gb
-  model_default="${ZYRABIT_MODEL_DEFAULT:-qwen2.5:7b}"
-  model_low_ram="${ZYRABIT_MODEL_LOW_RAM:-qwen2.5:1.5b}"
-  ram_gb="$(detect_ram_gb)"
-
-  if [[ "${ram_gb}" -gt 0 && "${ram_gb}" -lt 12 ]]; then
-    model_default="${model_low_ram}"
-  fi
-
-  if [[ -n "${OVERRIDE_MODEL:-}" ]]; then
-    echo "${OVERRIDE_MODEL}"
-  elif [[ -n "${ZYRABIT_MODEL:-}" ]]; then
-    echo "${ZYRABIT_MODEL}"
-  else
-    echo "${model_default}"
-  fi
-}
-
-apply_accelerator_profile() {
-  local accelerator="$1"
-  local cores
-  cores="$(detect_cores)"
-
-  # Adjust parallelism dynamically. CPU handles ~4 threads well per parallel request.
-  if [[ "${cores}" -ge 8 ]]; then
-    export OLLAMA_NUM_PARALLEL=2
-  else
-    export OLLAMA_NUM_PARALLEL=1
-  fi
-  
-  case "${accelerator}" in
-    nvidia)
-      log_ok "NVIDIA GPU detected. Using CUDA-capable container runtime if configured."
-      export OLLAMA_NUM_GPU=999
-      ;;
-    tenstorrent)
-      log_ok "Hardware Tenstorrent detectado. (Experimental/Beta support)"
-      log_warn "Asegúrate de tener los drivers del host instalados o Docker fallará al montar /dev/tenstorrent."
-      export TT_DETECTED="true"
-      export OLLAMA_NUM_GPU=1
-      ;;
-    metal)
-      log_ok "Apple Silicon detected. Optimizing for Metal backend. Cores: ${cores} (Parallel: ${OLLAMA_NUM_PARALLEL})"
-      export OLLAMA_NUM_GPU=1
-      ;;
-    *)
-      log_warn "CPU-only mode detected. Quantized model is recommended. Cores: ${cores} (Parallel: ${OLLAMA_NUM_PARALLEL})"
-      ;;
-  esac
-}
-
-run_cleanup() {
-  log_info "Cleaning up old images and dangling containers..."
-  docker image prune -f
-  # Optional: docker system prune -f --volumes (Too aggressive?)
-  log_ok "Cleanup completed."
+    log_info "Synchronizing Python environment..."
+    cd "${SCRIPT_DIR}/zyrabit-slm"
+    if [[ ! -d ".venv" ]]; then uv venv --python 3.12; fi
+    
+    # Source venv and install
+    export VIRTUAL_ENV=".venv"
+    export PATH="$PWD/.venv/bin:$PATH"
+    uv pip install -r api-rag/requirements.txt
+    
+    log_info "Launching API with hot-reload..."
+    export APP_ENV="local"
+    export DB_HOST="127.0.0.1"
+    cd api-rag && uvicorn app.main:app --host 0.0.0.0 --port 8081 --reload
 }
 
 run_start() {
-  require_compose_file
-  validate_required_env_vars
-  require_docker
-  
-  local compose_args=("-f" "${COMPOSE_FILE}")
-  
-  if [[ -n "${PROFILE}" ]]; then
-    if [[ "${PROFILE}" == "n8n" ]]; then
-       PROFILE="automation"
-    fi
-    compose_args+=("--profile" "${PROFILE}")
-    log_info "Starting secure stack via Docker Compose with profile: ${PROFILE}..."
-  else
-    log_info "Starting secure stack via Docker Compose..."
-  fi
-  
-  if [[ "${TT_DETECTED:-}" == "true" ]]; then
-    compose_args+=("--profile" "tenstorrent")
-    log_info "Auto-inyectando perfil de hardware: tenstorrent"
-  fi
-  
-  compose_args+=("up" "-d")
-  
-  if [[ "${COMPOSE_FILE}" != *"local"* ]]; then
-     # Production-like path: cleanup first
-     run_cleanup
-  fi
-
-  docker compose "${compose_args[@]}"
-  log_ok "Infrastructure started."
+    require_docker
+    local compose_args=("-f" "${COMPOSE_FILE}")
+    [[ "${USE_LOCAL:-}" == "true" ]] && compose_args+=("-f" "${LOCAL_COMPOSE_FILE}")
+    [[ -n "${PROFILE:-}" ]] && compose_args+=("--profile" "${PROFILE}")
+    
+    log_info "Launching infrastructure..."
+    $DOCKER_COMPOSE_CMD "${compose_args[@]}" up -d
+    log_ok "Infrastructure is up."
 }
 
 run_install() {
-  local accelerator model_name
-  accelerator="$(detect_accelerator)"
-  model_name="$(resolve_model_name)"
+    local hw_info ram cores accel model_name
+    hw_info=$(detect_hardware)
+    IFS='|' read -r ram cores accel <<< "$hw_info"
+    
+    # Intelligence: select model based on RAM
+    model_name="${OVERRIDE_MODEL:-qwen2.5:7b}"
+    if [[ "${ram}" -lt 12 ]]; then model_name="qwen2.5:1.5b"; fi
+    
+    log_info "System Detection: ${ram}GB RAM / ${accel} Accelerator"
+    log_info "Target Model: ${model_name}"
 
-  log_info "Selected model: ${model_name}"
-  log_info "Detected accelerator: ${accelerator}"
-  apply_accelerator_profile "${accelerator}"
-  run_start
-
-  log_info "Waiting for SLM endpoint..."
-  if docker compose -f "${COMPOSE_FILE}" ps zyrabit-engine >/dev/null 2>&1; then
-    for _ in {1..30}; do
-      if docker compose -f "${COMPOSE_FILE}" exec -T zyrabit-engine ollama list >/dev/null 2>&1; then
-        break
-      fi
-      sleep 2
-    done
-
-    log_info "Ensuring base models are present (Docker Container)..."
-    docker network connect zyrabit-slm_backend-network zyrabit-engine || true
-    docker compose -f "${COMPOSE_FILE}" exec -T zyrabit-engine ollama pull "${model_name}"
-    docker compose -f "${COMPOSE_FILE}" exec -T zyrabit-engine ollama pull "mxbai-embed-large"
-    docker network disconnect zyrabit-slm_backend-network zyrabit-engine || true
-  elif command -v ollama >/dev/null 2>&1; then
-    log_info "Ensuring base models are present (Local Host)..."
-    ollama pull "${model_name}"
-    ollama pull "mxbai-embed-large"
-  else
-    log_warn "SLM Engine (Ollama) not detected in Docker or Host. Model pull skipped."
-  fi
-
-  log_ok "Zyrabit is ready."
-  echo "URL (Selected): ${COMPOSE_FILE}"
-  if [[ "${COMPOSE_FILE}" == *"local"* ]]; then
-    echo "API (Direct HTTP): http://localhost:8080/v1/health"
-    echo "API (Traefik HTTPS): https://localhost/v1/health"
-    echo "Web UI: http://localhost:3000"
-  else
-    echo "API (Traefik HTTPS): https://localhost/health"
-    echo "Prometheus (Traefik): https://localhost/prometheus"
-    echo "Grafana (Traefik): https://localhost/grafana"
-  fi
+    run_build
+    run_start
+    
+    log_info "Pulling models into engine..."
+    $DOCKER_COMPOSE_CMD -f "${COMPOSE_FILE}" exec -T zyrabit-engine ollama pull "${model_name}"
+    $DOCKER_COMPOSE_CMD -f "${COMPOSE_FILE}" exec -T zyrabit-engine ollama pull "mxbai-embed-large"
+    
+    log_ok "Installation complete."
+    run_verify
 }
 
-run_doctor() {
-  local accelerator model_name ram_gb cores
-  require_compose_file
-  validate_required_env_vars
-  ram_gb="$(detect_ram_gb)"
-  cores="$(detect_cores)"
-  accelerator="$(detect_accelerator)"
-  model_name="$(resolve_model_name)"
-
-  echo "Zyrabit Doctor"
-  echo "--------------"
-  echo "compose_file: ${COMPOSE_FILE}"
-  echo "ram_gb: ${ram_gb}"
-  echo "logical_cores: ${cores}"
-  echo "accelerator: ${accelerator}"
-  echo "selected_model: ${model_name}"
-
-  if command -v docker >/dev/null 2>&1; then
-    echo "docker: installed"
-    if docker info >/dev/null 2>&1; then
-      echo "docker_daemon: running"
-    else
-      echo "docker_daemon: not_running"
-    fi
-  else
-    echo "docker: missing"
-  fi
-}
-
+# --- Argument Parsing ---
+COMMAND="${1:-install}"
+shift || true
 PROFILE=""
+USE_LOCAL="false"
 OVERRIDE_MODEL=""
-COMMAND="install"
+NO_CACHE="false"
 
 while [[ "$#" -gt 0 ]]; do
-  case "$1" in
-    --profile)
-      PROFILE="$2"
-      shift 2
-      ;;
-    --local)
-      COMPOSE_FILE="${SCRIPT_DIR}/zyrabit-slm/docker-compose.local.yml"
-      shift
-      ;;
-    --model)
-      OVERRIDE_MODEL="$2"
-      shift 2
-      ;;
-    --model=*)
-      OVERRIDE_MODEL="${1#*=}"
-      shift
-      ;;
-    install|start|doctor|help|-h|--help)
-      COMMAND="$1"
-      shift
-      ;;
-    *)
-      log_err "Unknown argument: $1"
-      usage
-      exit 1
-      ;;
-  esac
+    case "$1" in
+        --profile) PROFILE="$2"; shift 2 ;;
+        --local) USE_LOCAL="true"; shift ;;
+        --model) OVERRIDE_MODEL="$2"; shift 2 ;;
+        --no-cache) NO_CACHE="true"; shift ;;
+        *) log_err "Unknown option: $1"; usage; exit 1 ;;
+    esac
 done
 
 case "${COMMAND}" in
-  install)
-    run_install
-    ;;
-  start)
-    run_start
-    ;;
-  doctor)
-    run_doctor
-    ;;
-  help|-h|--help)
-    usage
-    ;;
-  *)
-    log_err "Unknown command: ${COMMAND}"
-    usage
-    exit 1
-    ;;
+    install) run_install ;;
+    start)   run_start ;;
+    stop)    $DOCKER_COMPOSE_CMD -f "${COMPOSE_FILE}" down ;;
+    build)   run_build ;;
+    verify)  run_verify ;;
+    dev)     run_dev ;;
+    doctor)  run_doctor ;;
+    help|--help|-h) usage ;;
+    *) log_err "Unknown command: ${COMMAND}"; usage; exit 1 ;;
 esac
