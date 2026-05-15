@@ -98,7 +98,7 @@ async def lifespan(app: FastAPI):
     yield
     logger.info("🛑 Zyrabit SLM API Shutting down...")
 
-app = FastAPI(title=PROJECT_NAME, version="1.8.0", lifespan=lifespan)
+app = FastAPI(title=PROJECT_NAME, version="1.7.3", lifespan=lifespan)
 
 # Mount Socket.io
 app.mount("/socket.io", socket_app)
