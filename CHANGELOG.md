@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.7.5] - 2026-05-15
+
+### Security
+- Hardened MCP file reading by strictly validating paths against allowed roots, preventing directory traversal attacks.
+- Updated `_resolve_file_uri` to canonicalize paths and use `os.path.commonpath` for robust path containment checks.
+
+### Changed
+- Updated `zyra-up.sh verify` to use `uv run pytest -q` for running MCP security tests.
+    
 ## [1.5.0] - 2026-04-08
 
 ### Added

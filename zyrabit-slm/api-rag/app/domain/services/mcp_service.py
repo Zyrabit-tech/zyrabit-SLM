@@ -38,7 +38,7 @@ def _is_allowed_path(candidate: Path) -> bool:
         return False
     return False
 
-def _resolve_file_uri(uri: str) -> Path:
+def _resolve_file_uri(uri: str, allowed_roots: List[Path]) -> Path:
     if not isinstance(uri, str) or not uri.strip():
         raise ValueError("Invalid URI: expected non-empty string.")
         
@@ -54,7 +54,22 @@ def _resolve_file_uri(uri: str) -> Path:
     if not path_str:
         raise ValueError("Invalid file URI: empty path.")
         
-    return Path(path_str).resolve()
+    # Resolve strictly: expands symlinks and ensures the path exists.
+    # This is critical for preventing '..' injection and symlink bypass.
+    try:
+        candidate = Path(path_str).resolve(strict=True)
+    except (FileNotFoundError, RuntimeError):
+        raise FileNotFoundError(f"Resource not found: {path_str}")
+
+    for root in allowed_roots:
+        try:
+            # Check containment via relative_to
+            candidate.relative_to(root)
+            return candidate
+        except ValueError:
+            continue
+            
+    raise ValueError("Access denied: Path not allowed.")
 
 def _resource_index() -> Dict[str, str]:
     index: Dict[str, str] = {}
@@ -186,14 +201,26 @@ async def handle_jsonrpc(payload: Dict[str, Any]) -> Tuple[Dict[str, Any], int]:
         return error(-32000, "Internal MCP bridge error.", status=500)
 
 def _validated_allowed_path(uri: str) -> Path:
-    candidate = _resolve_file_uri(uri)
-    for root in _allowed_roots():
+    """
+    Strictly validates that the URI resolves to a file within the allowed roots.
+    Canonicalizes all paths to prevent traversal attacks using CodeQL recognized patterns.
+    """
+    roots = _allowed_roots()
+    # Initial resolution and containment check
+    candidate = _resolve_file_uri(uri, roots)
+
+    for root in roots:
         try:
-            # CodeQL recognized pattern: commonpath validation
+            # CodeQL recognized pattern: commonpath validation for path traversal mitigation
             if os.path.commonpath([str(candidate), str(root)]) == str(root):
                 return candidate
-        except ValueError:
+            
+            # Secondary check for extra safety
+            candidate.relative_to(root)
+            return candidate
+        except (ValueError, RuntimeError):
             continue
+
     raise ValueError("Access denied: Path not allowed.")
 
 async def _read_resource(uri: str) -> Dict[str, Any]:
