@@ -31,9 +31,11 @@ from app.domain.services.retriever_service import HybridRetrieverService
 # pyrefly: ignore [missing-import]
 from langchain_chroma import Chroma
 
-# Setup Socket.io
+# Setup Socket.io (V5.2 Fix: Correct path mapping)
 sio = socketio.AsyncServer(async_mode='asgi', cors_allowed_origins='*')
-socket_app = socketio.ASGIApp(sio)
+# By setting socketio_path to empty string, we tell the ASGI app to handle
+# the requests directly at the mount point.
+socket_app = socketio.ASGIApp(sio, socketio_path='')
 
 # Setup logging
 setup_logging()
@@ -53,10 +55,10 @@ async def lifespan(app: FastAPI):
     
     # 0. Initialize State Tracker
     try:
-        # Use an absolute path in the container to ensure persistence and visibility
-        DB_PATH = "/app/ingestion_state.db"
-        IngestionTracker.init_db(db_path=DB_PATH)
-        logger.info("✅ State Tracker initialized.")
+        # Use an absolute path in the container to ensure persistence
+        ABS_DB_PATH = "/app/ingestion_state.db"
+        IngestionTracker.init_db(db_path=ABS_DB_PATH)
+        logger.info(f"✅ State Tracker initialized at {ABS_DB_PATH}")
     except Exception as e:
         logger.error(f"❌ Failed to initialize State Tracker: {e}")
 

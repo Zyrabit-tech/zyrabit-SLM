@@ -62,9 +62,9 @@ ${BOLD}Commands:${NC}
   doctor    Diagnostic: validate environment, RAM, and hardware acceleration
   help      Show this help message
 
-${BOLD}Options:${NC}
   --profile <name>  Add Docker Compose profile (automation, observability-extra)
   --local           Use local configuration (port 8080, no SSL/Traefik)
+  --domain <name>   Set the target domain for production (default: localhost)
   --model <name>    Override the default SLM model (e.g., llama3, mistral)
   --no-cache        Force build without using Docker cache
 EOF
@@ -142,10 +142,10 @@ run_doctor() {
 
 run_build() {
     log_header "BUILDING ZYRABIT IMAGES"
-    local build_args=("")
+    local build_args=()
     [[ "${NO_CACHE:-}" == "true" ]] && build_args+=("--no-cache")
     
-    $DOCKER_COMPOSE_CMD -f "${COMPOSE_FILE}" build "${build_args[@]}"
+    $DOCKER_COMPOSE_CMD -f "${COMPOSE_FILE}" build ${build_args[@]+"${build_args[@]}"}
     log_ok "Build completed successfully."
 }
 
@@ -291,6 +291,7 @@ while [[ "$#" -gt 0 ]]; do
     case "$1" in
         --profile) PROFILE="$2"; shift 2 ;;
         --local) USE_LOCAL="true"; shift ;;
+        --domain) export DOMAIN="$2"; shift 2 ;;
         --model) OVERRIDE_MODEL="$2"; shift 2 ;;
         --no-cache) NO_CACHE="true"; shift ;;
         *) log_err "Unknown option: $1"; usage; exit 1 ;;

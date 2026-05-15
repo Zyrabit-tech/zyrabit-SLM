@@ -12,11 +12,14 @@ services:
       - --entryPoints.websecure.address=:443
       - --entryPoints.websecure.http.tls=true
       - --api.insecure=true
+      - --log.level=${TRAEFIK_LOG_LEVEL:-INFO}
+      - --providers.file.directory=/etc/traefik/dynamic
     ports:
       - "80:80"
       - "443:443"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
+      - ./traefik:/etc/traefik/dynamic:ro
     networks:
       - backend-network
 
@@ -36,13 +39,13 @@ services:
       - DB_URL=http://zyrabit-db:8000
     labels:
       - traefik.enable=true
-      - traefik.http.routers.zyrabit-api.rule=PathPrefix(`/v1`) || PathPrefix(`/socket.io`)
+      - traefik.http.routers.zyrabit-api.rule=Host(`${DOMAIN}`) && (PathPrefix(`/v1`) || PathPrefix(`/socket.io`))
       - traefik.http.routers.zyrabit-api.entrypoints=websecure
       - traefik.http.routers.zyrabit-api.tls=true
       - traefik.http.services.zyrabit-api.loadbalancer.server.port=8080
       - traefik.docker.network=zyrabit-slm_backend-network
     ports:
-      - "8080:8080" # Direct HTTP access
+      - "8082:8080" # Moved from 8080 to avoid Mac system conflicts
     networks:
       - backend-network
       - model-network
@@ -63,7 +66,7 @@ services:
     container_name: zyrabit-web
     labels:
       - traefik.enable=true
-      - traefik.http.routers.zyrabit-web.rule=PathPrefix(`/`)
+      - traefik.http.routers.zyrabit-web.rule=Host(`${DOMAIN}`) && PathPrefix(`/`)
       - traefik.http.routers.zyrabit-web.entrypoints=websecure
       - traefik.http.routers.zyrabit-web.tls=true
       - traefik.http.services.zyrabit-web.loadbalancer.server.port=80
@@ -77,7 +80,7 @@ services:
     depends_on:
       - zyrabit-api
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost"]
+      test: [ "CMD", "curl", "-f", "http://localhost" ]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -106,7 +109,7 @@ services:
     volumes:
       - ./chroma-data:/data
     healthcheck:
-      test: ["CMD-SHELL", "python3 -c 'import urllib.request; urllib.request.urlopen(\"http://localhost:8000/api/v2/heartbeat\")' || exit 1"]
+      test: [ "CMD-SHELL", "python3 -c 'import urllib.request; urllib.request.urlopen(\"http://localhost:8000/api/v2/heartbeat\")' || exit 1" ]
       interval: 30s
       timeout: 10s
       retries: 5

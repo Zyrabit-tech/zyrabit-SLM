@@ -8,20 +8,23 @@ services:
       - --api.dashboard=true
       - --providers.docker=true
       - --providers.docker.exposedbydefault=false
-      - --providers.file.filename=/etc/traefik/dynamic.yml
+      - --providers.file.directory=/etc/traefik/dynamic
+      - --metrics.prometheus=true
+      - --metrics.prometheus.buckets=0.1,0.3,1.2,5.0
       - --entryPoints.web.address=:80
       - --entryPoints.web.http.redirections.entryPoint.to=websecure
       - --entryPoints.web.http.redirections.entryPoint.scheme=https
       - --entryPoints.websecure.address=:443
       - --entryPoints.websecure.http.tls=true
       - --api.insecure=true
+      - --log.level=${TRAEFIK_LOG_LEVEL:-INFO}
     ports:
       - "80:80"
       - "443:443"
       - "8081:8080" # Dashboard access
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-      - ./traefik/dynamic.yml:/etc/traefik/dynamic.yml:ro
+      - ./traefik:/etc/traefik/dynamic:ro
     networks:
       - frontend-network
       - backend-network
@@ -45,7 +48,7 @@ services:
         condition: service_started
     labels:
       - traefik.enable=true
-      - traefik.http.routers.zyrabit-api.rule=PathPrefix(`/v1`) || PathPrefix(`/socket.io`)
+      - traefik.http.routers.zyrabit-api.rule=Host(`${DOMAIN}`) && (PathPrefix(`/v1`) || PathPrefix(`/socket.io`))
       - traefik.http.routers.zyrabit-api.entrypoints=websecure
       - traefik.http.routers.zyrabit-api.tls=true
       - traefik.http.routers.zyrabit-api.middlewares=api-ratelimit@docker,secureHeaders@file
@@ -76,7 +79,7 @@ services:
     container_name: zyrabit-web
     labels:
       - traefik.enable=true
-      - traefik.http.routers.zyrabit-web.rule=PathPrefix(`/`)
+      - traefik.http.routers.zyrabit-web.rule=Host(`${DOMAIN}`) && PathPrefix(`/`)
       - traefik.http.routers.zyrabit-web.entrypoints=websecure
       - traefik.http.routers.zyrabit-web.tls=true
       - traefik.http.routers.zyrabit-web.middlewares=secureHeaders@file

@@ -15,8 +15,23 @@ TEMP_*.py
 *test_interno*.py
 *draft*.py
 
+# Build artifacts and dependencies
+node_modules/
+dist/
+build/
+.next/
+.uv_cache/
+.pytest_cache/
+
+# Specific web-ui paths
+zyrabit-slm/web-ui/node_modules/
+zyrabit-slm/web-ui/dist/
+pnpm-debug.log*
+.pnpm-store/
+
 # Credentials
 *.env*
+!zyrabit-slm/.env
 *.key
 *.pem
 

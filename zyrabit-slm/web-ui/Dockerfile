@@ -3,14 +3,15 @@ FROM node:20-alpine AS build
 
 WORKDIR /app
 
-# Install dependencies
-COPY zyrabit-slm/web-ui/package.json ./
-# Using npm as no pnpm is guaranteed in container unless installed
-RUN npm install
+# Install pnpm and dependencies
+RUN apk add --no-cache libc6-compat
+RUN npm install -g pnpm && npm cache clean --force
+COPY zyrabit-slm/web-ui/package.json zyrabit-slm/web-ui/pnpm-lock.yaml* ./
+RUN pnpm install
 
 # Copy source and build
 COPY zyrabit-slm/web-ui .
-RUN npm run build
+RUN pnpm run build
 
 # Production stage
 FROM nginx:stable-alpine

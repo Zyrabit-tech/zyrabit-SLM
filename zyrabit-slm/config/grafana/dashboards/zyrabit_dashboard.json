@@ -1,92 +1,63 @@
 {
   "annotations": { "list": [] },
   "editable": true,
-  "gnetId": null,
+  "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": null,
+  "id": 1,
   "links": [],
+  "liveNow": false,
   "panels": [
     {
-      "title": "Total API Traffic (Req/sec)",
-      "type": "stat",
-      "gridPos": { "h": 6, "w": 6, "x": 0, "y": 0 },
-      "targets": [
-        { "expr": "sum(rate(http_requests_total[1m]))", "legendFormat": "Requests/sec" }
-      ],
-      "options": {
-        "colorMode": "value",
-        "graphMode": "area"
-      }
-    },
-    {
-      "title": "Avg Latency",
-      "type": "stat",
-      "gridPos": { "h": 6, "w": 6, "x": 6, "y": 0 },
-      "targets": [
-        { "expr": "rate(http_request_duration_seconds_sum[1m]) / rate(http_request_duration_seconds_count[1m])", "legendFormat": "Avg Latency" }
-      ],
-      "options": {
-        "fieldConfig": {
-          "defaults": { "unit": "s" }
-        },
-        "colorMode": "value"
-      }
-    },
-    {
-      "title": "Token Velocity (Tokens/sec)",
-      "type": "stat",
-      "gridPos": { "h": 6, "w": 6, "x": 12, "y": 0 },
-      "targets": [
-        { "expr": "sum(rate(zyrabit_token_usage_total[1m]))", "legendFormat": "Tokens/sec" }
-      ],
-      "options": {
-        "colorMode": "value",
-        "graphMode": "area"
-      }
-    },
-    {
-      "title": "Security Masking Hits",
-      "type": "stat",
-      "gridPos": { "h": 6, "w": 6, "x": 18, "y": 0 },
-      "targets": [
-        { "expr": "sum(zyrabit_security_hits_total) by (entity_type)", "legendFormat": "{{entity_type}}" }
-      ],
-      "options": {
-        "colorMode": "background"
-      }
-    },
-    {
-      "title": "RAG Vault Activity (Hits Over Time)",
+      "title": "🚀 Zyrabit API Latency (p95)",
       "type": "timeseries",
-      "gridPos": { "h": 10, "w": 12, "x": 0, "y": 6 },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
       "targets": [
-        { "expr": "sum(rate(zyrabit_rag_hits_total[5m]))", "legendFormat": "RAG Hits" }
+        {
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(http_request_duration_seconds_bucket[5m])))",
+          "legendFormat": "p95 Latency",
+          "refId": "A"
+        }
       ],
-      "options": {
-        "legend": { "displayMode": "table", "placement": "right" }
+      "fieldConfig": {
+        "defaults": { "unit": "s", "color": { "mode": "palette-classic" } }
       }
     },
     {
-      "title": "Model Performance (Latency ms)",
+      "title": "📊 Request Rate (Requests/sec)",
       "type": "timeseries",
-      "gridPos": { "h": 10, "w": 12, "x": 12, "y": 6 },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
       "targets": [
-        { "expr": "rate(zyrabit_token_latency_ms_sum[5m]) / rate(zyrabit_token_latency_ms_count[5m])", "legendFormat": "Latency (ms)" }
+        {
+          "expr": "sum(rate(http_requests_total[5m]))",
+          "legendFormat": "Total Requests",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "title": "⚠️ Error Rate (5xx Errors)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 8 },
+      "targets": [
+        {
+          "expr": "sum(rate(http_requests_total{status=~\"5..\"}[5m]))",
+          "legendFormat": "5xx Errors",
+          "refId": "A"
+        }
       ],
-      "options": {
-        "legend": { "displayMode": "table", "placement": "right" }
+      "fieldConfig": {
+        "defaults": { "color": { "fixedColor": "red", "mode": "fixed" } }
       }
     }
   ],
-  "schemaVersion": 36,
+  "refresh": "5s",
+  "schemaVersion": 38,
   "style": "dark",
   "tags": ["zyrabit", "slm"],
   "templating": { "list": [] },
   "time": { "from": "now-15m", "to": "now" },
   "timepicker": {},
   "timezone": "",
-  "title": "Zyrabit SLM Command Center",
-  "uid": "zyrabit-main",
-  "version": 3,
-  "weekStart": ""
+  "title": "Zyrabit SLM Performance",
+  "version": 1
 }
