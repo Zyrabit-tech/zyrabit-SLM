@@ -13,20 +13,21 @@ export class ChatManager {
     }
 
     setupListeners() {
-        bus.on('CHAT:SEND', (text) => this.enqueue(text));
+        bus.on('CHAT:SEND', (data) => this.enqueue(data));
         bus.on('CHAT:RESPONSE_RECEIVED', (data) => this.onResponse(data));
     }
 
-    enqueue(text) {
+    enqueue(data) {
         const message = {
             id: crypto.randomUUID(),
-            text,
+            text: data.text,
+            history: data.history || [],
             timestamp: Date.now()
         };
         this.queue.push(message);
         this.persist();
         
-        bus.emit('UI:MSG_ADDED', { role: 'user', text });
+        bus.emit('UI:MSG_ADDED', { role: 'user', text: data.text });
         
         if (!this.isProcessing) {
             this.processNext();
@@ -46,6 +47,7 @@ export class ChatManager {
         const message = this.queue[0];
         bus.emit('SOCKET:EMIT', { 
             text: message.text, 
+            history: message.history,
             client_msg_id: message.id 
         });
     }

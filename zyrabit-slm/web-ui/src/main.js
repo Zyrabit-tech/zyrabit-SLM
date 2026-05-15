@@ -12,6 +12,7 @@ class ZyrabitApp {
         this.renderer = new Renderer();
         this.socket = new SocketAdapter();
         this.chat = new ChatManager();
+        this.history = []; // Conversation memory
         
         this.init();
     }
@@ -22,6 +23,7 @@ class ZyrabitApp {
         this.startHealthChecks();
         this.chat.recover(); // Recover Shadow State
         this.loadVault();
+        this.loadTools();
     }
 
     setupUIListeners() {
@@ -31,7 +33,9 @@ class ZyrabitApp {
         form.onsubmit = (e) => {
             e.preventDefault();
             if (!input.value.trim()) return;
-            bus.emit('CHAT:SEND', input.value);
+            const text = input.value;
+            bus.emit('CHAT:SEND', { text, history: this.history });
+            this.history.push({ role: 'user', content: text });
             input.value = '';
         };
 
@@ -188,6 +192,36 @@ class ZyrabitApp {
                 </div>
             `).join('');
         } catch (e) {}
+    }
+
+    async loadTools() {
+        try {
+            const res = await fetch('/v1/rpc', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    jsonrpc: '2.0',
+                    method: 'tools/list',
+                    id: 'ui-init'
+                })
+            });
+            const data = await res.json();
+            const tools = data.result?.tools || [];
+            const list = document.getElementById('tools-list');
+            if (list) {
+                list.innerHTML = tools.map(tool => `
+                    <div class="p-3 bg-white rounded-lg border border-zyrabit-border group hover:border-zyrabit-primary transition">
+                        <div class="flex items-center justify-between mb-1">
+                            <span class="text-[10px] font-bold text-zyrabit-primary uppercase">${tool.name}</span>
+                            <span class="text-[8px] px-1 bg-blue-50 text-blue-500 rounded">TOOL</span>
+                        </div>
+                        <p class="text-[9px] text-zyrabit-muted leading-tight">${tool.description}</p>
+                    </div>
+                `).join('');
+            }
+        } catch (e) {
+            console.error("Failed to load tools", e);
+        }
     }
 
     async handleFileUpload(files) {

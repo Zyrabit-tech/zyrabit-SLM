@@ -17,7 +17,7 @@ class ChatUseCase:
         self.gatekeeper = gatekeeper
         self.cache = cache
 
-    async def execute(self, text: str, client_msg_id: Optional[str] = None) -> Dict[str, Any]:
+    async def execute(self, text: str, client_msg_id: Optional[str] = None, history: Optional[list] = None) -> Dict[str, Any]:
         try:
             # 0. Idempotency Check
             if client_msg_id:
@@ -77,19 +77,34 @@ class ChatUseCase:
                         break
                     except: continue
 
+            # 4. Memory Integration (Last 5 turns)
+            memory_context = ""
+            if history:
+                # Take last 10 messages (5 turns)
+                recent = history[-10:]
+                memory_context = "\n".join([f"{m.get('role', 'user')}: {m.get('content', '')}" for m in recent])
+
             # Construct High-Precision Prompt
             if context:
                 prompt = f"""### CONOCIMIENTO DEL VAULT (FRAGMENTOS):
 {context}
 
+### HISTORIAL RECIENTE:
+{memory_context if memory_context else "No hay historial previo."}
+
 ### CONSULTA DEL USUARIO:
 {sanitized_text}
 
 ### INSTRUCCIÓN DE RESPUESTA:
-Utiliza exclusivamente el conocimiento del Vault arriba proporcionado. Si la información no es suficiente, indícalo basándote en tu identidad como Zyra."""
+Utiliza el conocimiento del Vault y el historial para responder. Si es un resumen, básate en el Vault."""
             else:
-                # Reinforce identity in DIRECT mode
-                prompt = f"### IDENTIDAD: Eres Zyra de Zyrabit. Responde de forma inteligente y soberana.\n\n### CONSULTA:\n{sanitized_text}"
+                prompt = f"""### HISTORIAL RECIENTE:
+{memory_context if memory_context else "No hay historial previo."}
+
+### CONSULTA:
+{sanitized_text}
+
+### IDENTIDAD: Eres Zyra de Zyrabit. Responde de forma inteligente y soberana."""
 
             request = InferenceRequest(
                 model=MODEL_NAME, 
