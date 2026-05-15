@@ -1,3 +1,4 @@
+import json
 from fastapi import APIRouter, Response
 from typing import Dict, Any
 from app.domain.services.mcp_service import handle_jsonrpc, get_config
@@ -12,6 +13,22 @@ async def mcp_config():
 @router.post("/rpc")
 async def mcp_rpc(payload: Dict[str, Any]):
     """JSON-RPC endpoint for MCP tools and resources."""
-    result, status_code = await handle_jsonrpc(payload)
-    import json
-    return Response(content=json.dumps(result), media_type="application/json", status_code=status_code)
+    try:
+        result, status_code = await handle_jsonrpc(payload)
+        return Response(
+            content=json.dumps(result), 
+            media_type="application/json", 
+            status_code=status_code
+        )
+    except Exception:
+        # Fallback for unexpected failures to prevent info exposure
+        error_res = {
+            "jsonrpc": "2.0",
+            "id": payload.get("id"),
+            "error": {"code": -32000, "message": "Internal server error"}
+        }
+        return Response(
+            content=json.dumps(error_res), 
+            media_type="application/json", 
+            status_code=500
+        )

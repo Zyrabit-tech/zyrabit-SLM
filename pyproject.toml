@@ -1,6 +1,6 @@
 [project]
 name = "zyrabit-slm"
-version = "1.7.3"
+version = "1.7.5"
 description = "Sovereign SLM with RAG and secure bridge"
 readme = "README.md"
 requires-python = ">=3.12,<3.13"
