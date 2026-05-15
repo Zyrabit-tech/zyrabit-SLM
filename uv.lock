@@ -3022,7 +3022,7 @@ wheels = [
 
 [[package]]
 name = "zyrabit-slm"
-version = "0.1.0"
+version = "1.7.5"
 source = { virtual = "." }
 dependencies = [
     { name = "chromadb" },

@@ -76,8 +76,8 @@ jobs:
           tags: |
             ${{ github.ref == 'refs/heads/main' && format('zyrabitcore/zyrabit-slm:{0}', steps.version.outputs.version) || '' }}
             ${{ github.ref == 'refs/heads/main' && 'zyrabitcore/zyrabit-slm:latest' || '' }}
-            ${{ github.ref == 'refs/heads/beta' && format('zyrabitcore/zyrabit-slm:beta-{0}-{1}', steps.version.outputs.version, steps.vars.outputs.sha_short) || '' }}
-            ghcr.io/${{ steps.repo_owner.outputs.val }}/zyrabit-slm:${{ github.ref == 'refs/heads/main' && steps.version.outputs.version || format('beta-{0}-{1}', steps.version.outputs.version, steps.vars.outputs.sha_short) }}
+            ${{ github.ref == 'refs/heads/beta' && format('zyrabitcore/zyrabit-slm:beta-{0}', steps.version.outputs.version) || '' }}
+            ghcr.io/${{ steps.repo_owner.outputs.val }}/zyrabit-slm:${{ github.ref == 'refs/heads/main' && steps.version.outputs.version || format('beta-{0}', steps.version.outputs.version) }}
             ${{ github.ref == 'refs/heads/main' && format('ghcr.io/{0}/zyrabit-slm:latest', steps.repo_owner.outputs.val) || '' }}
 
       - name: Create GitHub Release

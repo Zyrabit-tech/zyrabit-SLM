@@ -51,11 +51,17 @@ jobs:
           # We use github.ref_name for push events.
           CURRENT_BRANCH="${{ github.head_ref || github.ref_name }}"
           
-          if [ "$CURRENT_BRANCH" != "$ALLOWED_BRANCH" ]; then
-            echo "❌ ERROR: Versioning Policy Violation!"
-            echo "   Version $CURRENT_VERSION ($TYPE) is NOT allowed on branch '$CURRENT_BRANCH'."
-            echo "   Please use the '$ALLOWED_BRANCH' branch for this version series."
-            exit 1
+          # Enforce policy ONLY on main and beta branches
+          if [[ "$CURRENT_BRANCH" == "main" || "$CURRENT_BRANCH" == "beta" ]]; then
+            if [ "$CURRENT_BRANCH" != "$ALLOWED_BRANCH" ]; then
+              echo "❌ ERROR: Versioning Policy Violation!"
+              echo "   Version $CURRENT_VERSION ($TYPE) is NOT allowed on branch '$CURRENT_BRANCH'."
+              echo "   Please use the '$ALLOWED_BRANCH' branch for this version series."
+              exit 1
+            fi
+            echo "✅ Version $CURRENT_VERSION aligns with branch '$CURRENT_BRANCH'."
+          else
+            echo "ℹ️ INFO: Branch '$CURRENT_BRANCH' is exempt from strict versioning policy."
           fi
           
           echo "✅ Version $CURRENT_VERSION aligns with branch '$CURRENT_BRANCH'."

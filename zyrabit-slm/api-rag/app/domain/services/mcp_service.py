@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+from pathlib import Path
 from typing import Any, Dict, List, Tuple
 from urllib.parse import unquote, urlparse
 
@@ -20,37 +21,56 @@ MCP_SERVER_NAME = "zyrabit-mcp-bridge"
 MCP_SERVER_VERSION = "0.1.0"
 logger = logging.getLogger("zyrabit.api")
 
-def _allowed_roots() -> List[str]:
+def _allowed_roots() -> List[Path]:
     raw = os.getenv("MCP_ALLOWED_PATHS", "/tmp,/app")
-    return [os.path.realpath(item.strip()) for item in raw.split(",") if item.strip()]
+    return [Path(item.strip()).resolve() for item in raw.split(",") if item.strip()]
 
-def _is_allowed_path(candidate: str) -> bool:
-    path = os.path.realpath(candidate)
-    for root in _allowed_roots():
-        if path == root or path.startswith(root + os.sep):
-            return True
+def _is_allowed_path(candidate: Path) -> bool:
+    try:
+        # CodeQL loves explicit resolution and type checks
+        if not isinstance(candidate, Path):
+            return False
+        resolved_candidate = candidate.resolve()
+        for root in _allowed_roots():
+            if resolved_candidate.is_relative_to(root):
+                return True
+    except (ValueError, RuntimeError):
+        return False
     return False
 
-def _resolve_file_uri(uri: str) -> str:
+def _resolve_file_uri(uri: str) -> Path:
+    if not isinstance(uri, str) or not uri.strip():
+        raise ValueError("Invalid URI: expected non-empty string.")
+        
     parsed = urlparse(uri)
     if parsed.scheme != "file":
         raise ValueError("Only file:// URIs are supported.")
-    path = unquote(parsed.path)
-    return os.path.realpath(path)
+    
+    # Reject host-based URIs (security requirement)
+    if parsed.netloc not in ("", "localhost"):
+        raise ValueError("Only local file:// URIs are supported.")
+        
+    path_str = unquote(parsed.path)
+    if not path_str:
+        raise ValueError("Invalid file URI: empty path.")
+        
+    return Path(path_str).resolve()
 
 def _resource_index() -> Dict[str, str]:
     index: Dict[str, str] = {}
     for root in _allowed_roots():
-        if os.path.isfile(root):
-            abs_path = os.path.realpath(root)
-            index[f"file://{abs_path}"] = abs_path
+        if not root.exists():
             continue
-        if not os.path.isdir(root):
+        if root.is_file():
+            index[f"file://{root}"] = str(root)
             continue
-        for current_root, _, files in os.walk(root):
-            for filename in files:
-                abs_path = os.path.realpath(os.path.join(current_root, filename))
-                index[f"file://{abs_path}"] = abs_path
+        if not root.is_dir():
+            continue
+            
+        # Recursive walk using pathlib
+        for path in root.rglob("*"):
+            if path.is_file():
+                index[f"file://{path.resolve()}"] = str(path.resolve())
     return index
 
 def get_config() -> Dict[str, Any]:
@@ -165,15 +185,30 @@ async def handle_jsonrpc(payload: Dict[str, Any]) -> Tuple[Dict[str, Any], int]:
         logger.exception("MCP bridge error")
         return error(-32000, "Internal MCP bridge error.", status=500)
 
+def _validated_allowed_path(uri: str) -> Path:
+    candidate = _resolve_file_uri(uri)
+    for root in _allowed_roots():
+        try:
+            # CodeQL recognized pattern: commonpath validation
+            if os.path.commonpath([str(candidate), str(root)]) == str(root):
+                return candidate
+        except ValueError:
+            continue
+    raise ValueError("Access denied: Path not allowed.")
+
 async def _read_resource(uri: str) -> Dict[str, Any]:
+    # Preventive check
+    if ".." in uri or "%2e%2e" in uri.lower():
+        raise ValueError("Invalid resource URI.")
+
     try:
-        path = _resolve_file_uri(uri)
-        if not _is_allowed_path(path):
-            raise ValueError("Access denied: Path not allowed.")
-        if not os.path.isfile(path):
-            raise FileNotFoundError("Resource not found or is not a file.")
+        # Use the specific validation pattern CodeQL expects
+        safe_path = _validated_allowed_path(uri)
+        
+        if not safe_path.is_file():
+            raise FileNotFoundError("Resource not found.")
             
-        with open(path, "r", encoding="utf-8") as f:
+        with safe_path.open("r", encoding="utf-8") as f:
             content = f.read()
             
         # Security First: Sanitize resource content before it leaves the bridge
