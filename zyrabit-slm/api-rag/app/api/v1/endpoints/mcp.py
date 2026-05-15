@@ -9,9 +9,9 @@ async def mcp_config():
     """Dynamic MCP configuration discovery."""
     return get_config()
 
-@router.post("")
+@router.post("/rpc")
 async def mcp_rpc(payload: Dict[str, Any]):
     """JSON-RPC endpoint for MCP tools and resources."""
-    result, status_code = handle_jsonrpc(payload)
+    result, status_code = await handle_jsonrpc(payload)
     import json
     return Response(content=json.dumps(result), media_type="application/json", status_code=status_code)

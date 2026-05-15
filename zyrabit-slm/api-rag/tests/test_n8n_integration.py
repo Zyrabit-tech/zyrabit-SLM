@@ -1,22 +1,14 @@
 import hashlib
 import hmac
 import pathlib
-
-from fastapi.testclient import TestClient
-
-from app.main import app
-from app.infrastructure.integrations.n8n_adapter import N8nAdapter, N8nIntegrationPolicy
-
-
-client = TestClient(app)
-
+import pytest
 
 def _signature(secret: str, body: bytes) -> str:
     digest = hmac.new(secret.encode("utf-8"), body, hashlib.sha256).hexdigest()
     return f"sha256={digest}"
 
-
-def _build_adapter() -> N8nAdapter:
+def _build_adapter():
+    from app.infrastructure.integrations.n8n_adapter import N8nAdapter, N8nIntegrationPolicy
     policy = N8nIntegrationPolicy(
         service_token="test-token",
         signing_secret="test-secret",
@@ -24,8 +16,8 @@ def _build_adapter() -> N8nAdapter:
     )
     return N8nAdapter(policy=policy, execute_automation=lambda text: f"ok:{text}")
 
-
-def test_n8n_webhook_accepts_valid_token_and_signature(monkeypatch):
+def test_n8n_webhook_accepts_valid_token_and_signature(client, monkeypatch):
+    from app.main import app
     from app.api.v1.endpoints.integrations import get_n8n_adapter
     app.dependency_overrides[get_n8n_adapter] = _build_adapter
     raw_body = b'{"text":"run report","workflow_id":"wf-1","execution_id":"ex-1"}'
@@ -47,8 +39,8 @@ def test_n8n_webhook_accepts_valid_token_and_signature(monkeypatch):
     assert data["provider"] == "n8n"
     assert data["response"] == "ok:run report"
 
-
-def test_n8n_webhook_rejects_invalid_token(monkeypatch):
+def test_n8n_webhook_rejects_invalid_token(client, monkeypatch):
+    from app.main import app
     from app.api.v1.endpoints.integrations import get_n8n_adapter
     app.dependency_overrides[get_n8n_adapter] = _build_adapter
     raw_body = b'{"text":"run report"}'
@@ -66,8 +58,8 @@ def test_n8n_webhook_rejects_invalid_token(monkeypatch):
     assert response.status_code == 401
     assert "invalid n8n bearer token" in response.json()["detail"].lower()
 
-
-def test_n8n_webhook_requires_text_field(monkeypatch):
+def test_n8n_webhook_requires_text_field(client, monkeypatch):
+    from app.main import app
     from app.api.v1.endpoints.integrations import get_n8n_adapter
     app.dependency_overrides[get_n8n_adapter] = _build_adapter
     raw_body = b'{"workflow_id":"wf-1"}'
@@ -85,8 +77,8 @@ def test_n8n_webhook_requires_text_field(monkeypatch):
     assert response.status_code == 400
     assert "text" in response.json()["detail"].lower()
 
-
 def test_n8n_policy_reads_secrets_from_file(monkeypatch, tmp_path):
+    from app.infrastructure.integrations.n8n_adapter import N8nIntegrationPolicy
     token_path = tmp_path / "n8n_service_token"
     signing_path = tmp_path / "n8n_webhook_signing_secret"
     token_path.write_text("file-token", encoding="utf-8")

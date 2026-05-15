@@ -157,7 +157,38 @@ async def handle_jsonrpc(payload: Dict[str, Any]) -> Tuple[Dict[str, Any], int]:
             name = params.get("name", "")
             arguments = params.get("arguments", {})
             return ok(await call_tool(name=name, arguments=arguments))
+        if method == "resources/read":
+            uri = params.get("uri", "")
+            return ok(await _read_resource(uri))
         return error(-32601, f"Method not found: {method}", status=404)
     except Exception as exc:
         logger.exception("MCP bridge error")
-        return error(-32000, "Internal MCP bridge error.", status=500)
+        return error(-32000, f"Internal error: {str(exc)}", status=500)
+
+async def _read_resource(uri: str) -> Dict[str, Any]:
+    try:
+        path = _resolve_file_uri(uri)
+        if not _is_allowed_path(path):
+            raise ValueError(f"Path not allowed: {path}")
+        if not os.path.exists(path):
+            raise FileNotFoundError(f"Resource not found: {path}")
+            
+        with open(path, "r", encoding="utf-8") as f:
+            content = f.read()
+            
+        # Security First: Sanitize resource content before it leaves the bridge
+        from app.domain.services.gatekeeper import Gatekeeper
+        sanitized, _ = Gatekeeper.mask_pii(content)
+        
+        return {
+            "contents": [
+                {
+                    "uri": uri,
+                    "mimeType": "text/plain",
+                    "text": sanitized
+                }
+            ]
+        }
+    except Exception as e:
+        logger.error(f"Failed to read resource {uri}: {e}")
+        raise

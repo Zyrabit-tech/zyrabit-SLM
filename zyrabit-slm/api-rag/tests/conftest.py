@@ -1,16 +1,22 @@
 import pytest
 from unittest.mock import MagicMock, AsyncMock, patch
+from fastapi.testclient import TestClient
 
+@pytest.fixture
+def client():
+    """
+    Returns a TestClient for the FastAPI app. 
+    The app is imported inside the fixture to ensure it is 
+    initialized AFTER infrastructure mocks are applied.
+    """
+    from app.main import app
+    with TestClient(app) as c:
+        yield c
 
 @pytest.fixture(autouse=True)
 def mock_infrastructure():
     """
     Global fixture that prevents tests from connecting to real infrastructure.
-
-    V5.0 architecture: ChatUseCase has a single execute() method. Infrastructure
-    adapters are initialized in the lifespan and stored on app.state. We patch
-    at the class/constructor level to return mock instances without a real
-    Ollama or ChromaDB endpoint.
     """
     mock_chroma = MagicMock()
     mock_chroma.heartbeat.return_value = True
@@ -46,6 +52,7 @@ def mock_infrastructure():
         new=AsyncMock(return_value=None),
     ):
         from app.main import app
+        # Ensure state is set before each test
         app.state.vector_store = mock_chroma
         app.state.inference_provider = mock_inference
         app.state.retriever_service = mock_retriever
@@ -55,7 +62,6 @@ def mock_infrastructure():
             "inference": mock_inference,
             "retriever": mock_retriever,
         }
-
 
 @pytest.fixture(autouse=True)
 def mock_settings(monkeypatch):
