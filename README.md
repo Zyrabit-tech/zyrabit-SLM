@@ -1,12 +1,12 @@
 # 🤖 Zyrabit SLM
 
-[![Version](https://img.shields.io/badge/version-1.7.5-orange.svg)](VERSION)
+[![Version](https://img.shields.io/badge/version-2.0.0-orange.svg)](VERSION)
 [![CI](https://github.com/Zyrabit-tech/zyrabit-SLM/actions/workflows/ci.yml/badge.svg)](https://github.com/Zyrabit-tech/zyrabit-SLM/actions/workflows/ci.yml)
-[![Security Audit](https://github.com/Zyrabit-tech/zyrabit-SLM/actions/workflows/security-audit.yml/badge.svg)](https://github.com/Zyrabit-tech/zyrabit-SLM/actions/workflows/security-audit.yml)
+[![Security Audit](https://github.com/Zyrabit-tech/zyrabit-SLM/actions/workflows/security.yml/badge.svg)](https://github.com/Zyrabit-tech/zyrabit-SLM/actions/workflows/security.yml)
 [![Docker Hub](https://img.shields.io/badge/docker-zyrabitcore-blue.svg)](https://hub.docker.com/r/zyrabitcore/zyrabit-slm)
 [![License](https://img.shields.io/badge/license-MIT-yellow.svg)](LICENSE)
 
-**Sovereign, privacy-first AI assistant with RAG, PII scrubbing, and local inference — fully self-hosted, no cloud required.**
+**Sovereign Operating System for Local AI: Persistent memory, hardware-aware orchestration, and native MCP v1.0.**
 
 ---
 

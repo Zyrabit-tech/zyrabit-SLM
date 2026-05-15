@@ -7,6 +7,15 @@ module.exports = {
     },
     {
       type: "category",
+      label: "Sovereign Core v2.0",
+      items: [
+        "core-v2",
+        "telegram-bridge",
+        "zds-manifesto",
+      ],
+    },
+    {
+      type: "category",
       label: "Getting Started",
       items: [
         "getting-started/fundamentals",

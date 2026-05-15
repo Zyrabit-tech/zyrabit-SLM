@@ -67,6 +67,38 @@ async def list_vault_stats() -> dict:
     except Exception as e:
         return {"error": str(e)}
 
+@mcp.tool()
+async def send_telegram_notification(message: str) -> str:
+    """
+    Sends a secure notification to the user's Telegram.
+    Intercepts and masks PII via Gatekeeper before transmission.
+    """
+    import httpx
+    from app.domain.services.gatekeeper import Gatekeeper
+    
+    token = os.getenv("TELEGRAM_BOT_TOKEN")
+    chat_id = os.getenv("TELEGRAM_CHAT_ID")
+    
+    if not token or not chat_id:
+        return "Error: Telegram integration not configured. Missing TOKEN or CHAT_ID."
+    
+    # SECURITY SHIELD: Mask PII before it leaves the sovereign environment
+    safe_message, _ = Gatekeeper.mask_pii(message)
+    
+    url = f"https://api.telegram.org/bot{token}/sendMessage"
+    try:
+        async with httpx.AsyncClient() as client:
+            res = await client.post(url, json={
+                "chat_id": chat_id,
+                "text": f"🛡️ Zyrabit Sovereign Alert:\n\n{safe_message}"
+            })
+            if res.status_code == 200:
+                logger.info("📤 Telegram: Notification sent securely (PII Masked).")
+                return "Success: Telegram notification sent (Secure Mode)."
+            return f"Error: Telegram API responded with {res.status_code}"
+    except Exception as e:
+        return f"Error connecting to Telegram: {e}"
+
 # Note: The actual Chat logic is still handled by ChatUseCase, 
 # but we can expose it as a tool if needed for external clients.
 @mcp.tool()
