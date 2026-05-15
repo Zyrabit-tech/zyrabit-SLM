@@ -1,34 +1,42 @@
 import json
-from fastapi import APIRouter, Response
+from fastapi import APIRouter, Response, Request
 from typing import Dict, Any
-from app.domain.services.mcp_service import handle_jsonrpc, get_config
+from app.domain.services.mcp_service import mcp
 
 router = APIRouter()
 
 @router.get("/config.json")
 async def mcp_config():
     """Dynamic MCP configuration discovery."""
-    return get_config()
+    return {
+        "mcp_server": "Zyrabit Sovereign Core",
+        "version": "1.0.0",
+        "capabilities": ["tools"]
+    }
 
 @router.post("/rpc")
-async def mcp_rpc(payload: Dict[str, Any]):
-    """JSON-RPC endpoint for MCP tools and resources."""
-    try:
-        result, status_code = await handle_jsonrpc(payload)
-        return Response(
-            content=json.dumps(result), 
-            media_type="application/json", 
-            status_code=status_code
-        )
-    except Exception:
-        # Fallback for unexpected failures to prevent info exposure
-        error_res = {
+async def mcp_rpc(request: Request):
+    """JSON-RPC bridge to the Native FastMCP instance."""
+    # FastMCP uses its own ASGI handler, but we can call it manually
+    # or just let the app mount handle it. For now, we bridge the post.
+    payload = await request.json()
+    
+    # Simple bridge for the UI which expects /v1/rpc
+    # We can use the mcp instance to handle the JSON-RPC call
+    # Note: FastMCP usually handles this via its ASGI app at a mount point.
+    # To keep it simple for the UI, we'll keep this endpoint for now.
+    
+    # We'll return the tool list if requested, which is what the UI does.
+    if payload.get("method") == "tools/list":
+        tools = [{"name": t.name, "description": t.description} for t in mcp._tools.values()]
+        return {
             "jsonrpc": "2.0",
             "id": payload.get("id"),
-            "error": {"code": -32000, "message": "Internal server error"}
+            "result": {"tools": tools}
         }
-        return Response(
-            content=json.dumps(error_res), 
-            media_type="application/json", 
-            status_code=500
-        )
+    
+    return {
+        "jsonrpc": "2.0",
+        "id": payload.get("id"),
+        "error": {"code": -32601, "message": "Method not found in bridge"}
+    }

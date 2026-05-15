@@ -15,14 +15,14 @@ from app.infrastructure.shared.config import (
     RAG_COLLECTION, EMBEDDING_MODEL, DB_HOST, DB_PORT
 )
 from app.infrastructure.shared.logger import setup_logging
-from app.infrastructure.shared.state_tracker import IngestionTracker
+from app.infrastructure.shared.state_tracker import SovereignStateManager
 from app.infrastructure.shared.cache import global_cache
 
 # Domain Layer
 from app.domain.services.gatekeeper import Gatekeeper
 from app.domain.use_cases.chat_use_case import ChatUseCase
 from app.domain.use_cases.ingest_use_case import IngestUseCase
-from app.domain.services.mcp_service import set_mcp_app_state
+from app.domain.services.mcp_service import mcp
 
 # Infrastructure Adapters
 from app.infrastructure.persistence.chroma_adapter import ChromaAdapter, DirectOllamaEmbeddings
@@ -52,15 +52,14 @@ async def lifespan(app: FastAPI):
     global _global_app
     _global_app = app
     app.state.sio = sio # Store for other endpoints
-    
-    # 0. Initialize State Tracker
+    # 0. Initialize Sovereign State
     try:
         # Use an absolute path in the container to ensure persistence
-        ABS_DB_PATH = "/app/ingestion_state.db"
-        IngestionTracker.init_db(db_path=ABS_DB_PATH)
-        logger.info(f"✅ State Tracker initialized at {ABS_DB_PATH}")
+        ABS_DB_PATH = "/app/sovereign_state.db"
+        SovereignStateManager.init_db(db_path=ABS_DB_PATH)
+        logger.info(f"✅ Sovereign State initialized at {ABS_DB_PATH}")
     except Exception as e:
-        logger.error(f"❌ Failed to initialize State Tracker: {e}")
+        logger.error(f"❌ Failed to initialize Sovereign State: {e}")
 
     logger.info("🚀 Zyrabit SLM API Starting...")
     
@@ -95,8 +94,7 @@ async def lifespan(app: FastAPI):
         )
         app.state.ingest_use_case = IngestUseCase(vector_store=app.state.vector_store)
         
-        # 6. Set MCP State
-        set_mcp_app_state(app.state)
+        # 6. MCP is self-contained in FastMCP
         
         # 7. Auto-Ingest
         from app.auto_ingest import run_auto_ingest

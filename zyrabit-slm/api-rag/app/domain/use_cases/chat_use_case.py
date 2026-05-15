@@ -3,6 +3,8 @@ import logging
 from typing import Optional, Dict, Any
 from app.infrastructure.shared.config import MODEL_NAME
 from app.infrastructure.shared.metrics import TOKEN_USAGE_TOTAL, TOKEN_LATENCY_MS, SECURITY_HITS_TOTAL, RAG_HITS_TOTAL
+from app.infrastructure.shared.state_tracker import SovereignStateManager
+from app.domain.services.context_manager import ContextManager
 from app.ports.inference_port import InferenceRequest
 
 logger = logging.getLogger("zyrabit.api")
@@ -16,6 +18,7 @@ class ChatUseCase:
         self.retriever_service = retriever_service
         self.gatekeeper = gatekeeper
         self.cache = cache
+        self.context_manager = ContextManager()
 
     async def execute(self, text: str, client_msg_id: Optional[str] = None, history: Optional[list] = None) -> Dict[str, Any]:
         try:
@@ -77,34 +80,21 @@ class ChatUseCase:
                         break
                     except: continue
 
-            # 4. Memory Integration (Last 5 turns)
-            memory_context = ""
-            if history:
-                # Take last 10 messages (5 turns)
-                recent = history[-10:]
-                memory_context = "\n".join([f"{m.get('role', 'user')}: {m.get('content', '')}" for m in recent])
+            # 4. Memory Recovery (Optional override if history not sent from frontend)
+            if history is None:
+                history = SovereignStateManager.get_history(client_msg_id or "default")
+            
+            # 4b. Fetch User Profile for Personalization
+            user_profile = SovereignStateManager.get_user_profile()
 
-            # Construct High-Precision Prompt
-            if context:
-                prompt = f"""### CONOCIMIENTO DEL VAULT (FRAGMENTOS):
-{context}
-
-### HISTORIAL RECIENTE:
-{memory_context if memory_context else "No hay historial previo."}
-
-### CONSULTA DEL USUARIO:
-{sanitized_text}
-
-### INSTRUCCIÓN DE RESPUESTA:
-Utiliza el conocimiento del Vault y el historial para responder. Si es un resumen, básate en el Vault."""
-            else:
-                prompt = f"""### HISTORIAL RECIENTE:
-{memory_context if memory_context else "No hay historial previo."}
-
-### CONSULTA:
-{sanitized_text}
-
-### IDENTIDAD: Eres Zyra de Zyrabit. Responde de forma inteligente y soberana."""
+            # 5. Build Final Prompt via ContextManager
+            prompt = self.context_manager.build_final_prompt(
+                system_prompt=system_prompt,
+                history=history,
+                rag_docs=results if decision == "rag" else [],
+                user_query=sanitized_text,
+                user_profile=user_profile
+            )
 
             request = InferenceRequest(
                 model=MODEL_NAME, 
@@ -113,6 +103,10 @@ Utiliza el conocimiento del Vault y el historial para responder. Si es un resume
             )
             response_obj = self.inference_provider.generate(request)
             
+            # 6. Persist interaction to Sovereign State
+            SovereignStateManager.store_message(client_msg_id or "default", "user", sanitized_text)
+            SovereignStateManager.store_message(client_msg_id or "default", "assistant", response_obj.text)
+
             latency_ms = response_obj.latency_seconds * 1000
             final_response = {
                 "response": response_obj.text,
@@ -120,7 +114,7 @@ Utiliza el conocimiento del Vault y el historial para responder. Si es un resume
                     "decision": decision,
                     "latency_ms": round(latency_ms, 2),
                     "sources": sources,
-                    "rag_hits": len(sources) if context else 0,
+                    "rag_hits": len(sources) if (decision == "rag" and sources) else 0,
                     "pii_detected": any(entities.values()),
                     "cached": False
                 }

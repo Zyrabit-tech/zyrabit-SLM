@@ -98,12 +98,15 @@ detect_hardware() {
         accelerator="nvidia"
     elif [[ -e /dev/tenstorrent ]] || command -v tt-smi >/dev/null 2>&1; then
         accelerator="tenstorrent"
+        export SLM_URL="http://zyrabit-tt-bridge:8000"
     elif [[ "$(uname -s)" == "Darwin" && "$(uname -m)" == "arm64" ]]; then
         accelerator="metal"
+        export SLM_URL="http://host.docker.internal:11434"
     else
         accelerator="cpu"
     fi
 
+    echo -e "${GREEN}✅ Hardware Profile: ${BOLD}${accelerator^^}${NC} (RAM: ${ram_gb}GB, Cores: ${cores})"
     echo "${ram_gb}|${cores}|${accelerator}"
 }
 

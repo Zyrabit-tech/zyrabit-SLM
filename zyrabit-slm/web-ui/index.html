@@ -192,6 +192,37 @@
         <!-- SNACKBAR CONTAINER -->
         <div id="snackbar-container" class="fixed bottom-6 right-6 z-50 flex flex-col gap-3 pointer-events-none"></div>
 
+        <!-- ONBOARDING MODAL (NEW) -->
+        <div id="onboarding-modal" class="fixed inset-0 bg-zyrabit-bg/90 backdrop-blur-sm z-[100] flex items-center justify-center hidden p-4">
+            <div class="bg-white border border-zyrabit-border shadow-2xl rounded-2xl w-full max-w-lg p-8 animate-in zoom-in duration-300">
+                <div class="text-center mb-8">
+                    <div class="text-4xl mb-4">👋</div>
+                    <h2 class="text-2xl font-bold text-zyrabit-primary">¡Bienvenido a Zyrabit!</h2>
+                    <p class="text-xs text-zyrabit-muted mt-2">Para darte una experiencia soberana y personalizada, cuéntame un poco sobre ti.</p>
+                </div>
+                
+                <form id="onboarding-form" class="space-y-4">
+                    <div>
+                        <label class="text-[10px] font-bold text-zyrabit-muted uppercase mb-1 block">¿Cómo te llamas?</label>
+                        <input type="text" id="ob-name" required class="w-full bg-gray-50 border border-zyrabit-border rounded-lg py-2 px-3 text-sm focus:ring-2 focus:ring-zyrabit-primary/20 outline-none" placeholder="Tu nombre...">
+                    </div>
+                    <div>
+                        <label class="text-[10px] font-bold text-zyrabit-muted uppercase mb-1 block">¿A qué te dedicas? (Rol)</label>
+                        <input type="text" id="ob-role" required class="w-full bg-gray-50 border border-zyrabit-border rounded-lg py-2 px-3 text-sm focus:ring-2 focus:ring-zyrabit-primary/20 outline-none" placeholder="Ej: Desarrollador, Investigador, CTO...">
+                    </div>
+                    <div>
+                        <label class="text-[10px] font-bold text-zyrabit-muted uppercase mb-1 block">¿Qué te gustaría aprender o descubrir?</label>
+                        <textarea id="ob-interests" rows="3" required class="w-full bg-gray-50 border border-zyrabit-border rounded-lg py-2 px-3 text-sm focus:ring-2 focus:ring-zyrabit-primary/20 outline-none resize-none" placeholder="Ej: Quiero optimizar mis flujos de RAG locales..."></textarea>
+                    </div>
+                    
+                    <div class="flex gap-3 pt-4">
+                        <button type="button" id="ob-skip" class="flex-1 py-3 text-xs font-bold text-zyrabit-muted hover:bg-gray-50 rounded-xl transition">SALTAR POR AHORA</button>
+                        <button type="submit" class="flex-1 py-3 bg-zyrabit-primary text-white text-xs font-bold rounded-xl shadow-lg shadow-zyrabit-primary/20 hover:bg-zyrabit-secondary transition">GUARDAR PERFIL</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
     </main>
 
     <script type="module" src="/src/main.js"></script>

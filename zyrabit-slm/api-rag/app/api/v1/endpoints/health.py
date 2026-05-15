@@ -111,3 +111,24 @@ async def detailed_status(
         "vector_store": "connected" if db_ok else "offline",
         "inference": "ready" if slm_ok else "offline"
     }
+
+from pydantic import BaseModel
+from app.infrastructure.shared.state_tracker import SovereignStateManager
+
+class UserProfileUpdate(BaseModel):
+    name: str
+    role: str
+    interests: str
+
+@router.get("/profile")
+async def get_profile():
+    return SovereignStateManager.get_user_profile()
+
+@router.post("/profile")
+async def update_profile(profile: UserProfileUpdate):
+    SovereignStateManager.update_user_profile(
+        name=profile.name,
+        role=profile.role,
+        interests=profile.interests
+    )
+    return {"status": "success"}

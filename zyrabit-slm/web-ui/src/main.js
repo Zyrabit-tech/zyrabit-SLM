@@ -21,12 +21,56 @@ class ZyrabitApp {
         this.setupUIListeners();
         this.socket.connect();
         this.startHealthChecks();
+        this.checkOnboarding();
         this.chat.recover(); // Recover Shadow State
         this.loadVault();
         this.loadTools();
     }
 
+    async checkOnboarding() {
+        try {
+            const res = await fetch('/v1/profile');
+            const profile = await res.json();
+            
+            if (!profile || !profile.onboarding_completed) {
+                document.getElementById('onboarding-modal').classList.remove('hidden');
+            }
+        } catch (e) {
+            console.error("Profile check failed", e);
+        }
+    }
+
     setupUIListeners() {
+        // Onboarding Form
+        const obForm = document.getElementById('onboarding-form');
+        if (obForm) {
+            obForm.onsubmit = async (e) => {
+                e.preventDefault();
+                const profile = {
+                    name: document.getElementById('ob-name').value,
+                    role: document.getElementById('ob-role').value,
+                    interests: document.getElementById('ob-interests').value
+                };
+                
+                try {
+                    await fetch('/v1/profile', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(profile)
+                    });
+                    document.getElementById('onboarding-modal').classList.add('hidden');
+                    this.showNotification(`¡Bienvenido, ${profile.name}!`, "success");
+                    // Send a welcoming message from Zyra
+                    bus.emit('CHAT:SEND', { text: `Hola Zyra, soy ${profile.name}, trabajo como ${profile.role} y me interesa ${profile.interests}. Preséntate.`, history: [] });
+                } catch (e) {
+                    this.showNotification("Error guardando perfil", "error");
+                }
+            };
+            
+            document.getElementById('ob-skip').onclick = () => {
+                document.getElementById('onboarding-modal').classList.add('hidden');
+            };
+        }
         // Chat Form
         const form = document.getElementById('chat-form');
         const input = document.getElementById('chat-input');
