@@ -78,6 +78,14 @@ class ContextManager:
             
         return "\n\n".join(selected_fragments)
 
+    PERSONA_PROMPTS = {
+        "marketing": "Eres un experto en Marketing Estratégico y Crecimiento. Tu objetivo es ayudar a Abraham Gomez a escalar Zyrabit. Tu tono es creativo, orientado a datos, persuasivo y disruptivo. Enfócate en el ROI y el Brand Equity.",
+        "sales": "Eres un cerrador de ventas de alto nivel. Te enfocas en la conversión, el manejo de objeciones y la propuesta de valor clara. Tu tono es directo, motivador e influyente. No aceptes un no por respuesta.",
+        "admin": "Eres un asistente administrativo y de operaciones impecable. Te enfocas en la eficiencia, el orden y la gestión de procesos. Tu tono es formal, organizado y altamente pragmático.",
+        "aviation": "Eres un copiloto virtual y experto en aviación avanzada. Te enfocas en la seguridad, los procedimientos estándar (SOPs), la navegación y la precisión técnica. Tu tono es calmado, profesional y ultra-preciso.",
+        "general": "Eres Kai, el cerebro soberano de Zyrabit. Un asistente de IA de alto nivel diseñado para Abraham Gomez. Tu objetivo es ser eficiente, seguro y discreto."
+    }
+
     def build_final_prompt(self, system_prompt: str, history: List[Dict[str, str]], rag_docs: List[Any], user_query: str, user_profile: Dict[str, Any] = None) -> str:
         # 1. System Prompt (Highest Priority)
         # 2. History (Contextual continuity)
@@ -87,14 +95,22 @@ class ContextManager:
         trimmed_history = self.trim_history(history)
         trimmed_rag = self.trim_rag_context(rag_docs)
         
+        persona_key = user_profile.get("persona", "general") if user_profile else "general"
+        persona_desc = self.PERSONA_PROMPTS.get(persona_key, self.PERSONA_PROMPTS["general"])
+        tone = user_profile.get("tone", "professional") if user_profile else "professional"
+
         profile_str = ""
         if user_profile and user_profile.get("onboarding_completed"):
-            profile_str = f"USUARIO: {user_profile.get('name')} | ROL: {user_profile.get('role')} | INTERESES: {user_profile.get('interests')}\n"
+            profile_str = f"USUARIO: {user_profile.get('name')} | ROL: {user_profile.get('role')} | EXPERTISE: {user_profile.get('interests')}\n"
 
-        final_prompt = f"""### PERFIL DEL USUARIO:
+        final_prompt = f"""### INSTRUCCIONES DE IDENTIDAD (PERSONA):
+{persona_desc}
+TONO REQUERIDO: {tone.upper()}
+
+### PERFIL DEL USUARIO:
 {profile_str if profile_str else "Usuario nuevo (sin perfil)."}
 
-### CONOCIMIENTO RELEVANTE:
+### CONOCIMIENTO RELEVANTE (RAG):
 {trimmed_rag if trimmed_rag else "No se encontraron documentos relevantes."}
 
 ### HISTORIAL DE CONVERSACIÓN:
@@ -104,3 +120,4 @@ class ContextManager:
 {user_query}
 """
         return final_prompt
+

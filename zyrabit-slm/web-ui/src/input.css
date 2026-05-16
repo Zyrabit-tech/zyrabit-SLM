@@ -24,7 +24,7 @@
 
 @layer components {
     .glass-premium {
-        @apply backdrop-blur-2xl bg-[#e2ecf4]/60 border border-[#a9c4d9]/30 shadow-[0_8px_32px_rgba(63,90,109,0.08)];
+        @apply backdrop-blur-2xl bg-[#e2ecf4]/40 border border-black/[0.03] shadow-[0_4px_24px_rgba(63,90,109,0.05)];
     }
 
     .btn-apple {

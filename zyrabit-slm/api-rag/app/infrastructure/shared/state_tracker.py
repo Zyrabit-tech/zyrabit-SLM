@@ -1,3 +1,4 @@
+import os
 import sqlite3
 import logging
 import hashlib
@@ -11,10 +12,10 @@ class SovereignStateManager:
     V2.0 Sovereign State: Manages Vault Indexing (Hashing) and Conversation Memory.
     Uses SQLite WAL mode for high-concurrency async environments.
     """
-    DB_PATH = "/app/sovereign_state.db"
+    DB_PATH = os.getenv("DB_PATH", "/app/db_data/sovereign_state.db")
 
     @classmethod
-    def init_db(cls, db_path: str = None):
+    def init_db(cls, db_path: str | None = None):
         if db_path:
             cls.DB_PATH = db_path
         
@@ -46,13 +47,17 @@ class SovereignStateManager:
                 )
             """)
 
-            # 3. User Profile (Onboarding)
+            # 3. User Profile (Onboarding & Persona)
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS user_profile (
                     id INTEGER PRIMARY KEY,
                     name TEXT,
+                    email TEXT,
                     role TEXT,
                     interests TEXT,
+                    persona TEXT DEFAULT 'general',
+                    preferred_model TEXT DEFAULT 'qwen2.5:7b',
+                    tone TEXT DEFAULT 'professional',
                     onboarding_completed INTEGER DEFAULT 0
                 )
             """)
@@ -60,6 +65,7 @@ class SovereignStateManager:
 
     @classmethod
     def get_user_profile(cls) -> dict:
+
         with sqlite3.connect(cls.DB_PATH) as conn:
             conn.row_factory = sqlite3.Row
             cursor = conn.execute("SELECT * FROM user_profile WHERE id = 1")
@@ -69,12 +75,14 @@ class SovereignStateManager:
             return {}
 
     @classmethod
-    def update_user_profile(cls, name: str, role: str, interests: str):
+    def update_user_profile(cls, name: str, role: str, interests: str, email: str = "contact@zyrabit.com", persona: str = 'general', preferred_model: str = 'qwen2.5:7b', tone: str = 'professional'):
         with sqlite3.connect(cls.DB_PATH) as conn:
             conn.execute("""
-                INSERT OR REPLACE INTO user_profile (id, name, role, interests, onboarding_completed)
-                VALUES (1, ?, ?, ?, 1)
-            """, (name, role, interests))
+                INSERT OR REPLACE INTO user_profile (id, name, email, role, interests, persona, preferred_model, tone, onboarding_completed)
+                VALUES (1, ?, ?, ?, ?, ?, ?, ?, 1)
+            """, (name, email, role, interests, persona, preferred_model, tone))
+
+
 
     @classmethod
     def get_file_hash(cls, file_path: str) -> str:

@@ -117,8 +117,12 @@ from app.infrastructure.shared.state_tracker import SovereignStateManager
 
 class UserProfileUpdate(BaseModel):
     name: str
+    email: str
     role: str
     interests: str
+    persona: str = 'general'
+    preferred_model: str = 'qwen2.5:7b'
+    tone: str = 'professional'
 
 @router.get("/profile")
 async def get_profile():
@@ -128,10 +132,15 @@ async def get_profile():
 async def update_profile(profile: UserProfileUpdate):
     SovereignStateManager.update_user_profile(
         name=profile.name,
+        email=profile.email,
         role=profile.role,
-        interests=profile.interests
+        interests=profile.interests,
+        persona=profile.persona,
+        preferred_model=profile.preferred_model,
+        tone=profile.tone
     )
     return {"status": "success"}
+
 
 @router.get("/tools")
 async def list_mcp_tools():

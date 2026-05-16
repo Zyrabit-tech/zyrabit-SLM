@@ -19,7 +19,7 @@
         <div class="flex flex-col items-center gap-2 mb-12">
             <img src="/img/logo_zyrabit.png" alt="Zyrabit Icon" class="w-12 h-12 object-contain">
             <img src="/img/logo_zyrabit.png" alt="Zyrabit Name" class="h-4 object-contain opacity-80 hidden">
-            <span class="text-[14px] font-bold tracking-[0.3em] text-[#3f5a6d] mt-2 uppercase">ZYRABIT</span>
+            <span class="text-[14px] font-bold tracking-[0.4em] text-[#3f5a6d] mt-2 uppercase">ZYRABIT</span>
         </div>
 
         <nav class="flex-1 space-y-10">
@@ -92,13 +92,13 @@
         </header>
 
         <!-- CHAT LIST -->
-        <div id="chat-container" class="flex-1 overflow-y-auto p-6 md:p-10 pt-28 space-y-6 scrollbar-hide pb-40">
+        <div id="chat-container" class="flex-1 overflow-y-auto p-4 md:p-8 pt-24 space-y-6 scrollbar-hide pb-32">
             <div class="flex flex-col items-center justify-center py-24 text-center max-w-lg mx-auto">
                 <div class="w-24 h-24 rounded-[2rem] bg-white shadow-2xl flex items-center justify-center mb-8 animate-bounce-subtle border border-[#a9c4d9]/30">
                     <img src="/img/logo_zyrabit.png" alt="Zyra" class="w-12 h-12 object-contain">
                 </div>
-                <h1 class="text-3xl font-bold tracking-tight text-[#3f5a6d] mb-4">How can I help you, Kai?</h1>
-                <p class="text-sm text-[#323439]/60 leading-relaxed">I'm your sovereign intelligence. Everything we discuss stays local, secure, and under your control.</p>
+                <h1 class="text-3xl font-bold tracking-tight text-[#3f5a6d] mb-4">Sovereign Architecture Ready</h1>
+                <p class="text-sm text-[#323439]/60 leading-relaxed">System initialized. Your workspace is secured and your assistant is ready to build with you.</p>
             </div>
         </div>
 
@@ -119,7 +119,7 @@
         </div>
 
         <!-- OVERLAYS (Panels) -->
-        <div id="gdpr-panel" class="fixed right-6 top-24 bottom-6 w-full md:w-96 glass-premium rounded-[2.5rem] z-50 p-6 flex flex-col translate-x-[120%] transition-transform duration-500 shadow-3xl">
+        <div id="gdpr-panel" class="fixed right-6 top-24 bottom-6 w-full md:w-96 glass-premium rounded-[2.5rem] z-50 p-5 flex flex-col translate-x-[120%] transition-transform duration-500 shadow-3xl">
             <div class="flex items-center justify-between mb-8">
                 <h2 class="text-xl font-bold tracking-tight">GateKeeper Logs</h2>
                 <button id="close-gdpr" class="w-8 h-8 rounded-full bg-black/5 flex items-center justify-center hover:bg-black/10 transition-all">×</button>
@@ -129,7 +129,7 @@
             </div>
         </div>
 
-        <div id="ingest-panel" class="fixed right-6 top-24 bottom-6 w-full md:w-96 glass-premium rounded-[2.5rem] z-50 p-6 flex flex-col translate-x-[120%] transition-transform duration-500 shadow-3xl">
+        <div id="ingest-panel" class="fixed right-6 top-24 bottom-6 w-full md:w-96 glass-premium rounded-[2.5rem] z-50 p-5 flex flex-col translate-x-[120%] transition-transform duration-500 shadow-3xl">
             <div class="flex items-center justify-between mb-8">
                 <h2 class="text-xl font-bold tracking-tight">Vault Management</h2>
                 <button id="close-ingest" class="w-8 h-8 rounded-full bg-black/5 flex items-center justify-center hover:bg-black/10 transition-all">×</button>
@@ -158,18 +158,49 @@
                 </div>
                 
                 <form id="onboarding-form" class="space-y-6">
-                    <div class="space-y-2">
-                        <label class="text-[11px] font-bold text-black/30 uppercase tracking-widest ml-4">Full Name</label>
-                        <input type="text" id="ob-name" required class="input-apple" placeholder="Steve Jobs">
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="space-y-2">
+                            <label class="text-[10px] font-bold text-black/30 uppercase tracking-widest ml-4">Full Name</label>
+                            <input type="text" id="ob-name" required class="input-apple" placeholder="Abraham Gomez">
+                        </div>
+                        <div class="space-y-2">
+                            <label class="text-[10px] font-bold text-black/30 uppercase tracking-widest ml-4">Email</label>
+                            <input type="email" id="ob-email" required class="input-apple" placeholder="contact@zyrabit.com">
+                        </div>
                     </div>
+
                     <div class="space-y-2">
-                        <label class="text-[11px] font-bold text-black/30 uppercase tracking-widest ml-4">Current Role</label>
-                        <input type="text" id="ob-role" required class="input-apple" placeholder="Lead Architect">
+                        <label class="text-[10px] font-bold text-black/30 uppercase tracking-widest ml-4">Current Role</label>
+                        <input type="text" id="ob-role" required class="input-apple" placeholder="Founder Zyrabit">
                     </div>
+
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="space-y-2">
+                            <label class="text-[10px] font-bold text-black/30 uppercase tracking-widest ml-4">Persona Profile</label>
+                            <select id="ob-persona" class="input-apple appearance-none">
+                                <option value="general">Sovereign General</option>
+                                <option value="marketing">Marketing Expert</option>
+                                <option value="sales">Sales & Growth</option>
+                                <option value="admin">Admin & Ops</option>
+                                <option value="aviation">Aviation Specialist</option>
+                            </select>
+                        </div>
+                        <div class="space-y-2">
+                            <label class="text-[10px] font-bold text-black/30 uppercase tracking-widest ml-4">Intelligence Tone</label>
+                            <select id="ob-tone" class="input-apple appearance-none">
+                                <option value="professional">Professional</option>
+                                <option value="disruptive">Disruptive</option>
+                                <option value="friendly">Friendly</option>
+                                <option value="technical">Highly Technical</option>
+                            </select>
+                        </div>
+                    </div>
+
                     <div class="space-y-2">
-                        <label class="text-[11px] font-bold text-black/30 uppercase tracking-widest ml-4">Goals</label>
-                        <textarea id="ob-interests" rows="3" required class="input-apple resize-none" placeholder="What are we building today?"></textarea>
+                        <label class="text-[10px] font-bold text-black/30 uppercase tracking-widest ml-4">Core Objectives</label>
+                        <textarea id="ob-interests" rows="2" required class="input-apple resize-none" placeholder="Scale Zyrabit and dominate the sovereign AI space."></textarea>
                     </div>
+
                     
                     <div class="flex gap-4 pt-6">
                         <button type="button" id="ob-skip" class="flex-1 py-4 text-xs font-bold text-black/40 hover:bg-black/5 rounded-3xl transition-all">SKIP</button>

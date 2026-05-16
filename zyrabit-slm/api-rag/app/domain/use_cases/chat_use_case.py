@@ -110,12 +110,16 @@ class ChatUseCase:
                 user_profile=user_profile
             )
 
+            # [NEW] Model Switching based on Persona/Profile Preference
+            target_model = user_profile.get("preferred_model", MODEL_NAME) if user_profile else MODEL_NAME
+
             request = InferenceRequest(
-                model=MODEL_NAME, 
+                model=target_model, 
                 prompt=prompt,
                 system_prompt=system_prompt
             )
             response_obj = self.inference_provider.generate(request)
+
             
             # 6. Persist interaction to Sovereign State
             SovereignStateManager.store_message(client_msg_id or "default", "user", sanitized_text)

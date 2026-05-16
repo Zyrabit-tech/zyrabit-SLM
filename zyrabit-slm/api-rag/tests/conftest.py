@@ -71,3 +71,5 @@ def mock_settings(monkeypatch):
     monkeypatch.setenv("SLM_URL", "http://localhost:11434")
     monkeypatch.setenv("DB_URL", "http://localhost:8000")
     monkeypatch.setenv("MODEL_NAME", "qwen2.5:7b")
+    monkeypatch.setenv("DB_PATH", "/tmp/test_sovereign.db")
+

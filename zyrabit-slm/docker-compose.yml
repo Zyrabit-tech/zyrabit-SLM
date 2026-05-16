@@ -62,6 +62,8 @@ services:
       - ./secrets:/run/secrets:ro
       - ./prompts:/app/prompts:ro
       - ./document_source:/app/document_source
+      - ./db_data:/app/db_data
+
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080/v1/health')"]
       interval: 30s

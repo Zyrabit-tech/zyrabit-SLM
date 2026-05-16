@@ -60,7 +60,7 @@ class ZyraChatMessage extends HTMLElement {
 
     render() {
         const isUser = this._role === 'user';
-        
+
         this.shadowRoot.innerHTML = `
             <style>
                 :host { display: block; width: 100%; margin-bottom: 1rem; animation: slideIn 0.3s ease-out; }
@@ -68,7 +68,7 @@ class ZyraChatMessage extends HTMLElement {
                 .wrapper { display: flex; gap: 12px; max-width: 85%; align-items: flex-start; ${isUser ? 'flex-direction: row-reverse; margin-left: auto;' : ''} }
                 .avatar { width: 32px; height: 32px; border-radius: 50%; background: #e2ecf4; border: 1px solid #a9c4d9; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
                 .avatar img { width: 20px; height: 20px; object-fit: contain; }
-                .bubble { padding: 16px; border-radius: 20px; font-size: 14px; line-height: 1.5; white-space: pre-wrap; word-break: break-word; }
+                .bubble { padding: 16px; border-radius: 20px; font-size: 14px; line-height: 1.5; word-break: break-word; }
                 .user { background: #3f5a6d; color: white; border-top-right-radius: 0; }
                 .assistant { background: #e2ecf4; color: #323439; border: 1px solid rgba(169, 196, 217, 0.5); border-top-left-radius: 0; }
                 .meta { font-size: 9px; margin-top: 8px; opacity: 0.6; font-family: monospace; display: flex; flex-direction: column; gap: 4px; }
@@ -90,7 +90,7 @@ class ZyraChatMessage extends HTMLElement {
         if (!this._metadata) return '';
         const m = this._metadata;
         const sources = m.sources ? [...new Set(m.sources)].map(s => `<span class="source-pill">${s}</span>`).join('') : '';
-        
+
         return `
             <div class="meta">
                 <span>${(m.decision || 'direct').toUpperCase()} | ${m.latency_ms || 0}ms | HITS: ${m.rag_hits || 0}</span>

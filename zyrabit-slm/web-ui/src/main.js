@@ -48,8 +48,12 @@ class ZyrabitApp {
                 e.preventDefault();
                 const profile = {
                     name: document.getElementById('ob-name').value,
+                    email: document.getElementById('ob-email').value,
                     role: document.getElementById('ob-role').value,
-                    interests: document.getElementById('ob-interests').value
+                    interests: document.getElementById('ob-interests').value,
+                    persona: document.getElementById('ob-persona').value,
+                    tone: document.getElementById('ob-tone').value,
+                    preferred_model: 'qwen2.5:7b' // Default for now, can be expanded
                 };
                 
                 try {
@@ -59,9 +63,13 @@ class ZyrabitApp {
                         body: JSON.stringify(profile)
                     });
                     document.getElementById('onboarding-modal').classList.add('hidden');
-                    this.showNotification(`¡Bienvenido, ${profile.name}!`, "success");
-                    // Send a welcoming message from Zyra
-                    bus.emit('CHAT:SEND', { text: `Hola Zyra, soy ${profile.name}, trabajo como ${profile.role} y me interesa ${profile.interests}. Preséntate.`, history: [] });
+                    this.showNotification(`System Initialized: Welcome, ${profile.name}`, "success");
+                    // Send a welcoming message from Zyra in the chosen persona tone
+                    bus.emit('CHAT:SEND', { 
+                        text: `System initialization complete. Identity: ${profile.name}. Role: ${profile.role}. Persona Active: ${profile.persona}. Tone: ${profile.tone}. Await commands.`, 
+                        history: [] 
+                    });
+
                 } catch (e) {
                     this.showNotification("Error guardando perfil", "error");
                 }
