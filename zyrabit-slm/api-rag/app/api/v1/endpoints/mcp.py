@@ -24,7 +24,7 @@ async def mcp_rpc(request: Request):
 
     # 1. LIST TOOLS
     if method == "tools/list":
-        tools = [{"name": t.name, "description": t.description, "inputSchema": t.parameters} for t in mcp._tools.values()]
+        tools = [{"name": t.name, "description": t.description, "inputSchema": t.parameters} for t in mcp._tool_manager._tools.values()]
         return {
             "jsonrpc": "2.0",
             "id": rpc_id,
@@ -36,7 +36,7 @@ async def mcp_rpc(request: Request):
         tool_name = params.get("name")
         arguments = params.get("arguments", {})
         
-        if tool_name not in mcp._tools:
+        if tool_name not in mcp._tool_manager._tools:
             return {
                 "jsonrpc": "2.0",
                 "id": rpc_id,
@@ -44,9 +44,8 @@ async def mcp_rpc(request: Request):
             }
         
         try:
-            # Execute the tool via FastMCP
-            tool_func = mcp._tools[tool_name].fn
-            result = await tool_func(**arguments)
+            # Execute the tool via FastMCP ToolManager
+            result = await mcp._tool_manager.call_tool(tool_name, arguments)
             
             return {
                 "jsonrpc": "2.0",
@@ -61,6 +60,7 @@ async def mcp_rpc(request: Request):
                 "id": rpc_id,
                 "error": {"code": -32000, "message": str(e)}
             }
+
     
     return {
         "jsonrpc": "2.0",

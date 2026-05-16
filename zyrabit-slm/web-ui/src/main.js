@@ -160,23 +160,13 @@ class ZyrabitApp {
     }
 
     updateUIStatus(data) {
-        const setStatus = (id, status) => {
-            const el = document.getElementById(id);
-            if (!el) return;
-            const dot = el.querySelector('.status-dot');
-            const label = el.querySelector('.label');
-            const isOnline = status.toUpperCase() === 'ONLINE';
-
-            if (isOnline) {
-                dot.className = 'w-2 h-2 rounded-full bg-green-500 shadow-sm';
-                label.innerText = 'ONLINE';
-                label.className = 'text-[10px] font-bold text-green-600 label';
-            } else {
-                dot.className = 'w-2 h-2 rounded-full bg-red-500 shadow-sm';
-                label.innerText = 'OFFLINE';
-                label.className = 'text-[10px] font-bold text-red-600 label';
+        const setStatus = (dotId, status) => {
+            const dot = document.getElementById(dotId);
+            if (dot) {
+                dot.setAttribute('status', status.toLowerCase());
             }
         };
+
 
         // Parse infrastructure array
         const infra = data.infrastructure || [];
@@ -184,9 +174,9 @@ class ZyrabitApp {
         const slm = infra.find(i => i.id === 'slm-engine') || { status: 'OFFLINE' };
         const api = infra.find(i => i.id === 'core-api') || { status: 'ONLINE' };
 
-        setStatus('health-api', api.status);
-        setStatus('health-slm', slm.status);
-        setStatus('health-db', db.status);
+        setStatus('health-api-dot', api.status);
+        setStatus('health-slm-dot', slm.status);
+        setStatus('health-db-dot', db.status);
 
         // Update SLM Mode Label
         const modeLabel = document.getElementById('slm-mode-label');

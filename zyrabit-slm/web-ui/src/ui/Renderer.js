@@ -16,21 +16,13 @@ export class Renderer {
     }
 
     renderMessage(role, text, metadata = null) {
-        const div = document.createElement('div');
-        div.className = `flex ${role === 'user' ? 'justify-end' : 'justify-start'} animate-in fade-in slide-in-from-bottom-4 duration-300`;
+        const msg = document.createElement('zyra-chat-message');
+        msg.data = { role, text, metadata };
         
-        const wrapper = this.createMessageWrapper(role);
-        const inner = this.createMessageBubble(role, text);
-
-        if (metadata && metadata.latency_ms) {
-            this.renderMetadata(inner, metadata);
-        }
-
-        wrapper.appendChild(inner);
-        div.appendChild(wrapper);
-        this.container.appendChild(div);
+        this.container.appendChild(msg);
         this.container.scrollTop = this.container.scrollHeight;
     }
+
 
     createMessageWrapper(role) {
         const wrapper = document.createElement('div');

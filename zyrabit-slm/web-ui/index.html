@@ -15,7 +15,7 @@
 <body class="h-screen overflow-hidden flex">
 
     <!-- SIDEBAR -->
-    <aside class="w-72 glass-premium border-r border-black/5 p-8 flex flex-col hidden md:flex z-20">
+    <aside class="w-72 glass-premium border-r border-black/5 p-6 flex flex-col hidden md:flex z-20">
         <div class="flex flex-col items-center gap-2 mb-12">
             <img src="/img/logo_zyrabit.png" alt="Zyrabit Icon" class="w-12 h-12 object-contain">
             <img src="/img/logo_zyrabit.png" alt="Zyrabit Name" class="h-4 object-contain opacity-80 hidden">
@@ -28,11 +28,15 @@
                 <div class="space-y-3">
                     <div id="health-api" class="flex items-center justify-between p-3 bg-black/5 rounded-2xl">
                         <span class="text-xs font-medium text-black/60">Core API</span>
-                        <div class="w-2.5 h-2.5 rounded-full bg-gray-300 status-dot shadow-sm"></div>
+                        <zyra-status-dot id="health-api-dot" status="offline"></zyra-status-dot>
                     </div>
                     <div id="health-slm" class="flex items-center justify-between p-3 bg-black/5 rounded-2xl">
                         <span class="text-xs font-medium text-black/60">SLM Engine</span>
-                        <div class="w-2.5 h-2.5 rounded-full bg-gray-300 status-dot shadow-sm"></div>
+                        <zyra-status-dot id="health-slm-dot" status="offline"></zyra-status-dot>
+                    </div>
+                    <div id="health-db" class="flex items-center justify-between p-3 bg-black/5 rounded-2xl">
+                        <span class="text-xs font-medium text-black/60">Vector DB</span>
+                        <zyra-status-dot id="health-db-dot" status="offline"></zyra-status-dot>
                     </div>
                 </div>
             </div>
@@ -70,7 +74,7 @@
     <main class="flex-1 flex flex-col relative h-screen bg-[#f5f5f7]">
 
         <!-- HEADER -->
-        <header class="h-20 flex items-center justify-between px-10 glass-premium border-b border-black/5 absolute top-0 w-full z-10">
+        <header class="h-20 flex items-center justify-between px-6 md:px-10 glass-premium border-b border-black/5 absolute top-0 w-full z-10">
             <div class="flex items-center gap-6">
                 <div id="status-pill" class="flex items-center gap-2 px-4 py-2 bg-green-500/10 border border-green-500/20 rounded-full">
                     <div class="w-2 h-2 rounded-full bg-green-500 shadow-sm"></div>
@@ -88,7 +92,7 @@
         </header>
 
         <!-- CHAT LIST -->
-        <div id="chat-container" class="flex-1 overflow-y-auto p-10 pt-32 space-y-8 scrollbar-hide pb-40">
+        <div id="chat-container" class="flex-1 overflow-y-auto p-6 md:p-10 pt-28 space-y-6 scrollbar-hide pb-40">
             <div class="flex flex-col items-center justify-center py-24 text-center max-w-lg mx-auto">
                 <div class="w-24 h-24 rounded-[2rem] bg-white shadow-2xl flex items-center justify-center mb-8 animate-bounce-subtle border border-[#a9c4d9]/30">
                     <img src="/img/logo_zyrabit.png" alt="Zyra" class="w-12 h-12 object-contain">
@@ -115,7 +119,7 @@
         </div>
 
         <!-- OVERLAYS (Panels) -->
-        <div id="gdpr-panel" class="fixed right-6 top-24 bottom-6 w-96 glass-premium rounded-[2.5rem] z-50 p-8 flex flex-col translate-x-[120%] transition-transform duration-500 shadow-3xl">
+        <div id="gdpr-panel" class="fixed right-6 top-24 bottom-6 w-full md:w-96 glass-premium rounded-[2.5rem] z-50 p-6 flex flex-col translate-x-[120%] transition-transform duration-500 shadow-3xl">
             <div class="flex items-center justify-between mb-8">
                 <h2 class="text-xl font-bold tracking-tight">GateKeeper Logs</h2>
                 <button id="close-gdpr" class="w-8 h-8 rounded-full bg-black/5 flex items-center justify-center hover:bg-black/10 transition-all">×</button>
@@ -125,7 +129,7 @@
             </div>
         </div>
 
-        <div id="ingest-panel" class="fixed right-6 top-24 bottom-6 w-96 glass-premium rounded-[2.5rem] z-50 p-8 flex flex-col translate-x-[120%] transition-transform duration-500 shadow-3xl">
+        <div id="ingest-panel" class="fixed right-6 top-24 bottom-6 w-full md:w-96 glass-premium rounded-[2.5rem] z-50 p-6 flex flex-col translate-x-[120%] transition-transform duration-500 shadow-3xl">
             <div class="flex items-center justify-between mb-8">
                 <h2 class="text-xl font-bold tracking-tight">Vault Management</h2>
                 <button id="close-ingest" class="w-8 h-8 rounded-full bg-black/5 flex items-center justify-center hover:bg-black/10 transition-all">×</button>
@@ -180,4 +184,7 @@
 
     </main>
 
-    <script type="module" src="/src/main.js"></script>\n</body>\n\n</html>
+    <script type="module" src="/src/ui/components.js"></script>
+    <script type="module" src="/src/main.js"></script>
+</body>
+</html>
