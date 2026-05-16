@@ -151,13 +151,16 @@ async def chat_message(sid, data):
         await sio.emit("chat_response", {"response": "I encountered an error processing your request."}, to=sid)
 
 # Middleware
+from app.infrastructure.shared.config import ALLOWED_ORIGINS
+
 app.add_middleware(
     CORSMiddleware, 
-    allow_origins=["*"], 
+    allow_origins=ALLOWED_ORIGINS, 
     allow_credentials=True, 
     allow_methods=["*"], 
     allow_headers=["*"]
 )
+
 
 # Metrics
 Instrumentator().instrument(app).expose(app)

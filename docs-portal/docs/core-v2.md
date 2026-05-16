@@ -35,3 +35,13 @@ Zyrabit v2.0 includes automated security audits:
 - **Trivy**: Scans for high/critical CVEs in dependencies.
 - **CodeQL**: Semantic analysis of data flows to prevent PII leaks.
 - **Dependabot**: Automated "Auto-Heal" agent for keeping the stack updated.
+
+## 🏗️ Hexagonal Architecture & BYOF
+
+The core is decoupled from any specific interface. It exposes stable **Ports** for the community to build upon:
+- **REST Port (8080/v1)**: Standard HTTP endpoints for document management and status.
+- **Streaming Port (8080/socket.io)**: Real-time RAG inference.
+- **MCP Port (8080/mcp/rpc)**: System tools and cross-platform extensions.
+
+**Bring Your Own Front (BYOF)**: Zyrabit is designed to be "quid-pro-quo". You can use our lightweight Vanilla JS UI or connect your own Angular/Next.js/React dashboard without touching the core.
+

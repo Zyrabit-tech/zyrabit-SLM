@@ -19,19 +19,8 @@ export class Renderer {
         const div = document.createElement('div');
         div.className = `flex ${role === 'user' ? 'justify-end' : 'justify-start'} animate-in fade-in slide-in-from-bottom-4 duration-300`;
         
-        const wrapper = document.createElement('div');
-        wrapper.className = `flex items-start gap-3 max-w-[85%] ${role === 'user' ? 'flex-row-reverse' : ''}`;
-
-        if (role === 'assistant') {
-            const avatar = document.createElement('div');
-            avatar.className = 'w-8 h-8 rounded-full bg-zyrabit-surface border border-zyrabit-border flex items-center justify-center flex-shrink-0 mt-1 shadow-sm';
-            avatar.innerHTML = `<img src="/img/logo.png" class="w-5 h-5 object-contain">`;
-            wrapper.appendChild(avatar);
-        }
-
-        const inner = document.createElement('div');
-        inner.className = `p-4 rounded-2xl text-sm ${role === 'user' ? 'bg-zyrabit-primary text-white rounded-tr-none' : 'bg-zyrabit-surface text-zyrabit-text border border-zyrabit-border/50 rounded-tl-none'}`;
-        inner.textContent = text; // XSS SAFE!
+        const wrapper = this.createMessageWrapper(role);
+        const inner = this.createMessageBubble(role, text);
 
         if (metadata && metadata.latency_ms) {
             this.renderMetadata(inner, metadata);
@@ -42,6 +31,27 @@ export class Renderer {
         this.container.appendChild(div);
         this.container.scrollTop = this.container.scrollHeight;
     }
+
+    createMessageWrapper(role) {
+        const wrapper = document.createElement('div');
+        wrapper.className = `flex items-start gap-3 max-w-[85%] ${role === 'user' ? 'flex-row-reverse' : ''}`;
+
+        if (role === 'assistant') {
+            const avatar = document.createElement('div');
+            avatar.className = 'w-8 h-8 rounded-full bg-zyrabit-surface border border-zyrabit-border flex items-center justify-center flex-shrink-0 mt-1 shadow-sm';
+            avatar.innerHTML = `<img src="/img/logo.png" class="w-5 h-5 object-contain">`;
+            wrapper.appendChild(avatar);
+        }
+        return wrapper;
+    }
+
+    createMessageBubble(role, text) {
+        const bubble = document.createElement('div');
+        bubble.className = `p-4 rounded-2xl text-sm ${role === 'user' ? 'bg-zyrabit-primary text-white rounded-tr-none' : 'bg-zyrabit-surface text-zyrabit-text border border-zyrabit-border/50 rounded-tl-none'}`;
+        bubble.textContent = text; // XSS SAFE!
+        return bubble;
+    }
+
 
     renderMetadata(parent, metadata) {
         const meta = document.createElement('div');

@@ -17,26 +17,53 @@ async def mcp_config():
 @router.post("/rpc")
 async def mcp_rpc(request: Request):
     """JSON-RPC bridge to the Native FastMCP instance."""
-    # FastMCP uses its own ASGI handler, but we can call it manually
-    # or just let the app mount handle it. For now, we bridge the post.
     payload = await request.json()
-    
-    # Simple bridge for the UI which expects /v1/rpc
-    # We can use the mcp instance to handle the JSON-RPC call
-    # Note: FastMCP usually handles this via its ASGI app at a mount point.
-    # To keep it simple for the UI, we'll keep this endpoint for now.
-    
-    # We'll return the tool list if requested, which is what the UI does.
-    if payload.get("method") == "tools/list":
-        tools = [{"name": t.name, "description": t.description} for t in mcp._tools.values()]
+    method = payload.get("method")
+    params = payload.get("params", {})
+    rpc_id = payload.get("id")
+
+    # 1. LIST TOOLS
+    if method == "tools/list":
+        tools = [{"name": t.name, "description": t.description, "inputSchema": t.parameters} for t in mcp._tools.values()]
         return {
             "jsonrpc": "2.0",
-            "id": payload.get("id"),
+            "id": rpc_id,
             "result": {"tools": tools}
         }
     
+    # 2. CALL TOOL
+    if method == "tools/call":
+        tool_name = params.get("name")
+        arguments = params.get("arguments", {})
+        
+        if tool_name not in mcp._tools:
+            return {
+                "jsonrpc": "2.0",
+                "id": rpc_id,
+                "error": {"code": -32601, "message": f"Tool '{tool_name}' not found"}
+            }
+        
+        try:
+            # Execute the tool via FastMCP
+            tool_func = mcp._tools[tool_name].fn
+            result = await tool_func(**arguments)
+            
+            return {
+                "jsonrpc": "2.0",
+                "id": rpc_id,
+                "result": {
+                    "content": [{"type": "text", "text": str(result)}]
+                }
+            }
+        except Exception as e:
+            return {
+                "jsonrpc": "2.0",
+                "id": rpc_id,
+                "error": {"code": -32000, "message": str(e)}
+            }
+    
     return {
         "jsonrpc": "2.0",
-        "id": payload.get("id"),
+        "id": rpc_id,
         "error": {"code": -32601, "message": "Method not found in bridge"}
     }
