@@ -88,5 +88,8 @@ def mock_settings(monkeypatch):
     monkeypatch.setenv("MODEL_NAME", "qwen2.5:7b")
     monkeypatch.setenv("DB_PATH", "/tmp/test_sovereign.db")
     monkeypatch.setenv("TESTING", "true")
+    monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "mock_token")
+    monkeypatch.setenv("TELEGRAM_CHAT_ID", "mock_chat_id")
+
 
 

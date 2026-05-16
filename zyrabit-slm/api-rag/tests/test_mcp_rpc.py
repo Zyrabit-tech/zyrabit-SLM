@@ -53,10 +53,13 @@ def test_mcp_rpc_call_telegram_tool_mocked(mock_post):
     assert "Success" in result_text or "Telegram notification sent" in result_text
     
     # Verify the mock was called with PII masking check (if applicable)
+    from urllib.parse import urlparse
     assert mock_post.called
     args, kwargs = mock_post.call_args
-    assert "api.telegram.org" in args[0]
+    parsed_url = urlparse(args[0])
+    assert parsed_url.hostname == "api.telegram.org"
     assert "chat_id" in kwargs["json"]
+
 
 def test_mcp_rpc_call_tool_not_found():
     """Test calling a non-existent tool via MCP JSON-RPC."""

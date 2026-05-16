@@ -55,11 +55,13 @@ async def mcp_rpc(request: Request):
                 }
             }
         except Exception as e:
+            logger.exception("Error while calling MCP tool '%s'", tool_name)
             return {
                 "jsonrpc": "2.0",
                 "id": rpc_id,
-                "error": {"code": -32000, "message": str(e)}
+                "error": {"code": -32000, "message": "Internal server error"}
             }
+
 
     
     return {

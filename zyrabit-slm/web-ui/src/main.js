@@ -2,6 +2,9 @@ import { bus } from "./core/EventBus";
 import { SocketAdapter } from "./adapters/Socket";
 import { ChatManager } from "./services/ChatManager";
 import { Renderer } from "./ui/Renderer";
+import { EVENTS, IDS } from "./core/Constants";
+import { getSafeElement } from "./utils/DOM";
+
 
 /**
  * Zyrabit App Orchestrator
@@ -41,19 +44,31 @@ class ZyrabitApp {
     }
 
     setupUIListeners() {
-        // Onboarding Form
+        console.log("🛠️ Initializing UI Listeners (Strict Mode)...");
+
+        // Helper for safe binding
+        const bind = (id, event, handler) => {
+            try {
+                const el = getSafeElement(id);
+                el[event] = handler;
+            } catch (e) {
+                console.warn(`[SKIP] Optional or missing element skipped: #${id}`);
+            }
+        };
+
+        // 1. Onboarding (Safe because it's a modal)
         const obForm = document.getElementById('onboarding-form');
         if (obForm) {
             obForm.onsubmit = async (e) => {
                 e.preventDefault();
                 const profile = {
-                    name: document.getElementById('ob-name').value,
-                    email: document.getElementById('ob-email').value,
-                    role: document.getElementById('ob-role').value,
-                    interests: document.getElementById('ob-interests').value,
-                    persona: document.getElementById('ob-persona').value,
-                    tone: document.getElementById('ob-tone').value,
-                    preferred_model: 'qwen2.5:7b' // Default for now, can be expanded
+                    name: getSafeElement('ob-name').value,
+                    email: getSafeElement('ob-email').value,
+                    role: getSafeElement('ob-role').value,
+                    interests: getSafeElement('ob-interests').value,
+                    persona: getSafeElement('ob-persona').value,
+                    tone: getSafeElement('ob-tone').value,
+                    preferred_model: 'qwen2.5:7b'
                 };
                 
                 try {
@@ -62,58 +77,67 @@ class ZyrabitApp {
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify(profile)
                     });
-                    document.getElementById('onboarding-modal').classList.add('hidden');
+                    getSafeElement('onboarding-modal').classList.add('hidden');
                     this.showNotification(`System Initialized: Welcome, ${profile.name}`, "success");
-                    // Send a welcoming message from Zyra in the chosen persona tone
-                    bus.emit('CHAT:SEND', { 
+                    bus.emit(EVENTS.CHAT.SEND, { 
                         text: `System initialization complete. Identity: ${profile.name}. Role: ${profile.role}. Persona Active: ${profile.persona}. Tone: ${profile.tone}. Await commands.`, 
                         history: [] 
                     });
-
                 } catch (e) {
                     this.showNotification("Error guardando perfil", "error");
                 }
             };
             
-            document.getElementById('ob-skip').onclick = () => {
-                document.getElementById('onboarding-modal').classList.add('hidden');
-            };
+            const skipBtn = document.getElementById('ob-skip');
+            if (skipBtn) skipBtn.onclick = () => getSafeElement('onboarding-modal').classList.add('hidden');
         }
-        // Chat Form
-        const form = document.getElementById('chat-form');
-        const input = document.getElementById('chat-input');
-        form.onsubmit = (e) => {
-            e.preventDefault();
-            if (!input.value.trim()) return;
-            const text = input.value;
-            bus.emit('CHAT:SEND', { text, history: this.history });
-            this.history.push({ role: 'user', content: text });
-            input.value = '';
-        };
 
-        // Keyboard Shortcuts (Cmd+Enter or Ctrl+Enter)
-        input.onkeydown = (e) => {
-            if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+        // 2. Chat Logic (CRITICAL)
+        try {
+            const form = getSafeElement(IDS.CHAT_FORM);
+            const input = getSafeElement(IDS.CHAT_INPUT);
+
+            form.onsubmit = (e) => {
                 e.preventDefault();
-                form.requestSubmit(); // Triggers form.onsubmit
-            }
-        };
+                const text = input.value.trim();
+                if (!text) return;
+                
+                bus.emit(EVENTS.CHAT.SEND, { text, history: this.history });
+                this.history.push({ role: 'user', content: text });
+                input.value = '';
+            };
 
-        // UI Interaction
-        document.getElementById('toggle-gdpr').onclick = () => this.togglePanel('gdpr-panel');
-        document.getElementById('close-gdpr').onclick = () => this.togglePanel('gdpr-panel');
-        document.getElementById('toggle-ingest').onclick = () => this.togglePanel('ingest-panel');
-        document.getElementById('close-ingest').onclick = () => this.togglePanel('ingest-panel');
+            input.onkeydown = (e) => {
+                if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+                    e.preventDefault();
+                    form.requestSubmit();
+                }
+            };
+        } catch (e) {
+            console.error("❌ CRITICAL FAILURE: Chat form initialization failed.", e);
+        }
 
-        // File Ingest
-        const dropZone = document.getElementById('drop-zone');
-        const fileInput = document.getElementById('file-input');
-        dropZone.onclick = () => fileInput.click();
-        fileInput.onchange = (e) => this.handleFileUpload(e.target.files);
+        // 3. Navigation & Panels
+        bind(IDS.TOGGLE_GDPR, 'onclick', () => this.togglePanel(IDS.GDPR_PANEL));
+        bind(IDS.CLOSE_GDPR, 'onclick', () => this.togglePanel(IDS.GDPR_PANEL));
+        bind(IDS.TOGGLE_INGEST, 'onclick', () => this.togglePanel(IDS.INGEST_PANEL));
+        bind(IDS.VAULT_BTN, 'onclick', () => this.togglePanel(IDS.INGEST_PANEL));
+        bind(IDS.CLOSE_INGEST, 'onclick', () => this.togglePanel(IDS.INGEST_PANEL));
 
-        // System Logs
-        bus.on('SYSTEM:LOG', (data) => this.addGdprLog(data.type, data.event));
+        // 4. File Ingest
+        try {
+            const dropZone = getSafeElement(IDS.DROP_ZONE);
+            const fileInput = getSafeElement(IDS.FILE_INPUT);
+            dropZone.onclick = () => fileInput.click();
+            fileInput.onchange = (e) => this.handleFileUpload(e.target.files);
+        } catch (e) {
+            console.warn("⚠️ File ingest UI elements missing. Document upload disabled.");
+        }
+
+        // 5. System Logs
+        bus.on(EVENTS.SYSTEM.LOG, (data) => this.addGdprLog(data.type, data.event));
     }
+
 
     togglePanel(id) {
         const panels = ['gdpr-panel', 'ingest-panel'];
@@ -128,19 +152,27 @@ class ZyrabitApp {
     }
 
     addGdprLog(type, event) {
-        const logs = document.getElementById('gdpr-logs');
-        const time = new Date().toLocaleTimeString();
-        const div = document.createElement('div');
-        div.className = 'border-b border-gray-100 pb-2 mb-2 animate-in slide-in-from-right-4 duration-300';
-        div.innerHTML = `
-            <div class="flex justify-between items-center mb-1">
-                <span class="font-bold text-zyrabit-primary">[${type}]</span>
-                <span class="text-[8px] opacity-40">${time}</span>
-            </div>
-            <div class="text-gray-600">${event}</div>
-        `;
-        logs.prepend(div);
+        try {
+            const logs = getSafeElement(IDS.GDPR_LOGS);
+            const time = new Date().toLocaleTimeString();
+            const div = document.createElement('div');
+            div.className = 'border-b border-gray-100 pb-2 mb-2 animate-in slide-in-from-right-4 duration-300';
+            
+            // Using a safer approach for the inner content
+            div.innerHTML = `
+                <div class="flex justify-between items-center mb-1">
+                    <span class="font-bold text-zyrabit-primary">[${type}]</span>
+                    <span class="text-[8px] opacity-40">${time}</span>
+                </div>
+                <div class="text-gray-600 event-content"></div>
+            `;
+            div.querySelector('.event-content').textContent = event;
+            logs.prepend(div);
+        } catch (e) {
+            console.warn("Log panel not available yet.");
+        }
     }
+
 
     async startHealthChecks() {
         let isOffline = false;
@@ -171,20 +203,21 @@ class ZyrabitApp {
         const setStatus = (dotId, status) => {
             const dot = document.getElementById(dotId);
             if (dot) {
-                dot.setAttribute('status', status.toLowerCase());
+                dot.setAttribute('status', (status || 'OFFLINE').toLowerCase());
             }
         };
 
-
-        // Parse infrastructure array
         const infra = data.infrastructure || [];
         const db = infra.find(i => i.id === 'vector-db') || { status: 'OFFLINE' };
         const slm = infra.find(i => i.id === 'slm-engine') || { status: 'OFFLINE' };
         const api = infra.find(i => i.id === 'core-api') || { status: 'ONLINE' };
+        const mcp = infra.find(i => i.id === 'mcp-bridge') || { status: 'OFFLINE' };
 
         setStatus('health-api-dot', api.status);
         setStatus('health-slm-dot', slm.status);
         setStatus('health-db-dot', db.status);
+        setStatus('health-mcp-dot', mcp.status);
+
 
         // Update SLM Mode Label
         const modeLabel = document.getElementById('slm-mode-label');
@@ -304,13 +337,27 @@ class ZyrabitApp {
         };
 
         el.className = `snackbar snackbar-${type} snackbar-enter`;
-        el.innerHTML = `
-            <span class="text-lg">${icons[type]}</span>
-            <div class="flex-1">
-                <div class="text-[10px] font-bold uppercase tracking-wider">${type}</div>
-                <div class="text-xs opacity-90">${message}</div>
-            </div>
-        `;
+        
+        const iconSpan = document.createElement('span');
+        iconSpan.className = 'text-lg';
+        iconSpan.textContent = icons[type] || 'ℹ️';
+
+        const content = document.createElement('div');
+        content.className = 'flex-1';
+
+        const typeLabel = document.createElement('div');
+        typeLabel.className = 'text-[10px] font-bold uppercase tracking-wider';
+        typeLabel.textContent = type;
+
+        const messageLabel = document.createElement('div');
+        messageLabel.className = 'text-xs opacity-90';
+        messageLabel.textContent = message;
+
+        content.appendChild(typeLabel);
+        content.appendChild(messageLabel);
+        el.appendChild(iconSpan);
+        el.appendChild(content);
+
 
         container.appendChild(el);
 

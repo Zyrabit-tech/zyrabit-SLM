@@ -5,8 +5,10 @@ from datetime import datetime
 from fastapi import APIRouter, Depends, Request
 from app.infrastructure.shared.config import MODEL_NAME, PROJECT_NAME, SLM_URL
 from app.api.v1.dependencies import get_vector_store, get_inference_provider
+from app.domain.services.mcp_service import mcp
 
 router = APIRouter()
+
 
 # Global startup time
 STARTUP_TIME = datetime.now()
@@ -85,9 +87,17 @@ async def health_check(
                 "type": "Inference",
                 "mode": "Local Host (Mac)" if is_local_host else "Container",
                 "details": slm_metadata
+            },
+            {
+                "id": "mcp-bridge",
+                "name": "Sovereign Bridge (MCP)",
+                "status": "ONLINE" if mcp else "OFFLINE",
+                "type": "Connectivity"
             }
         ]
     }
+
+
 
 @router.get("/status")
 async def detailed_status(

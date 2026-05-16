@@ -51,10 +51,11 @@ class ZyraChatMessage extends HTMLElement {
         this.attachShadow({ mode: 'open' });
     }
 
-    set data({ role, text, metadata }) {
+    set data({ role, text, metadata, timestamp }) {
         this._role = role;
         this._text = text;
         this._metadata = metadata;
+        this._timestamp = timestamp || new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
         this.render();
     }
 
@@ -63,28 +64,75 @@ class ZyraChatMessage extends HTMLElement {
 
         this.shadowRoot.innerHTML = `
             <style>
-                :host { display: block; width: 100%; margin-bottom: 1rem; animation: slideIn 0.3s ease-out; }
-                @keyframes slideIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-                .wrapper { display: flex; gap: 12px; max-width: 85%; align-items: flex-start; ${isUser ? 'flex-direction: row-reverse; margin-left: auto;' : ''} }
-                .avatar { width: 32px; height: 32px; border-radius: 50%; background: #e2ecf4; border: 1px solid #a9c4d9; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-                .avatar img { width: 20px; height: 20px; object-fit: contain; }
-                .bubble { padding: 16px; border-radius: 20px; font-size: 14px; line-height: 1.5; word-break: break-word; }
-                .user { background: #3f5a6d; color: white; border-top-right-radius: 0; }
-                .assistant { background: #e2ecf4; color: #323439; border: 1px solid rgba(169, 196, 217, 0.5); border-top-left-radius: 0; }
-                .meta { font-size: 9px; margin-top: 8px; opacity: 0.6; font-family: monospace; display: flex; flex-direction: column; gap: 4px; }
+                :host { display: block; width: 100%; margin-bottom: 0.75rem; animation: slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1); }
+                @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+                
+                .wrapper { 
+                    display: flex; 
+                    flex-direction: column;
+                    max-width: 80%; 
+                    ${isUser ? 'margin-left: auto; align-items: flex-end;' : 'align-items: flex-start;'} 
+                }
+                
+                .bubble { 
+                    padding: 12px 16px; 
+                    border-radius: 1.25rem; 
+                    font-size: 14.5px; 
+                    line-height: 1.45; 
+                    word-break: break-word;
+                    box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+                    position: relative;
+                }
+
+                .user { 
+                    background: #3f5a6d; 
+                    color: white; 
+                    border-top-right-radius: 4px;
+                    box-shadow: 0 4px 15px rgba(63, 90, 109, 0.15);
+                }
+
+                .assistant { 
+                    background: white; 
+                    color: #323439; 
+                    border: 1px solid rgba(0,0,0,0.03);
+                    border-top-left-radius: 4px;
+                }
+
+                .timestamp {
+                    font-size: 9px;
+                    margin-top: 4px;
+                    opacity: 0.5;
+                    font-weight: 700;
+                    letter-spacing: 0.02em;
+                    ${isUser ? 'text-align: right; color: rgba(255,255,255,0.8);' : 'text-align: left; color: #3f5a6d;'}
+                }
+
+                .meta { 
+                    font-size: 9px; 
+                    margin-top: 8px; 
+                    padding-top: 8px;
+                    border-top: 1px solid rgba(0,0,0,0.05);
+                    opacity: 0.6; 
+                    font-family: monospace; 
+                    display: flex; 
+                    flex-direction: column; 
+                    gap: 4px; 
+                }
+                
                 .sources { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
-                .source-pill { background: rgba(63, 90, 109, 0.1); padding: 2px 4px; border-radius: 4px; font-size: 8px; border: 1px solid rgba(63, 90, 109, 0.2); }
+                .source-pill { background: rgba(63, 90, 109, 0.05); padding: 2px 4px; border-radius: 4px; font-size: 8px; border: 1px solid rgba(63, 90, 109, 0.1); }
             </style>
             <div class="wrapper">
-                ${!isUser ? `<div class="avatar"><img src="/img/logo.png"></div>` : ''}
                 <div class="bubble ${isUser ? 'user' : 'assistant'}">
                     <div id="content"></div>
                     ${this.renderMetadata()}
+                    <div class="timestamp">${this._timestamp}</div>
                 </div>
             </div>
         `;
         this.shadowRoot.getElementById('content').textContent = this._text;
     }
+
 
     renderMetadata() {
         if (!this._metadata) return '';

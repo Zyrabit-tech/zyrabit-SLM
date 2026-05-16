@@ -1,4 +1,6 @@
 import { bus } from "../core/EventBus";
+import { EVENTS, IDS } from "../core/Constants";
+import { getSafeElement } from "../utils/DOM";
 
 /**
  * Renderer (UI Component)
@@ -6,22 +8,46 @@ import { bus } from "../core/EventBus";
  */
 export class Renderer {
     constructor() {
-        this.container = document.getElementById('chat-container');
+        this.container = getSafeElement(IDS.CHAT_CONTAINER);
+        this.lastDate = null;
         this.setupListeners();
     }
 
+
     setupListeners() {
-        bus.on('UI:MSG_ADDED', (data) => this.renderMessage(data.role, data.text, data.metadata));
-        bus.on('UI:THINKING', (state) => this.toggleThinking(state));
+        bus.on(EVENTS.UI.MSG_ADDED, (data) => this.renderMessage(data.role, data.text, data.metadata));
+        bus.on(EVENTS.UI.THINKING, (state) => this.toggleThinking(state));
     }
 
+
     renderMessage(role, text, metadata = null) {
+        const now = new Date();
+        const dateStr = now.toLocaleDateString([], { weekday: 'long', day: 'numeric', month: 'long' });
+        const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+        // Add Date Separator if needed
+        if (this.lastDate !== dateStr) {
+            const separator = document.createElement('div');
+            separator.className = 'date-separator';
+            separator.innerHTML = `<span class="date-pill">${dateStr}</span>`;
+            this.container.appendChild(separator);
+            this.lastDate = dateStr;
+        }
+
         const msg = document.createElement('zyra-chat-message');
-        msg.data = { role, text, metadata };
+        msg.data = { role, text, metadata, timestamp: timeStr };
         
         this.container.appendChild(msg);
-        this.container.scrollTop = this.container.scrollHeight;
+        
+        // Auto-scroll to bottom
+        requestAnimationFrame(() => {
+            this.container.scrollTo({
+                top: this.container.scrollHeight,
+                behavior: 'smooth'
+            });
+        });
     }
+
 
 
     createMessageWrapper(role) {

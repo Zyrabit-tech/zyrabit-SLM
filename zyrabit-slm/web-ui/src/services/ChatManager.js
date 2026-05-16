@@ -1,5 +1,6 @@
 import { bus } from "../core/EventBus";
 import { Storage } from "../adapters/Storage";
+import { EVENTS } from "../core/Constants";
 
 /**
  * ChatManager (Domain Service)
@@ -13,9 +14,10 @@ export class ChatManager {
     }
 
     setupListeners() {
-        bus.on('CHAT:SEND', (data) => this.enqueue(data));
-        bus.on('CHAT:RESPONSE_RECEIVED', (data) => this.onResponse(data));
+        bus.on(EVENTS.CHAT.SEND, (data) => this.enqueue(data));
+        bus.on(EVENTS.CHAT.RESPONSE_RECEIVED, (data) => this.onResponse(data));
     }
+
 
     enqueue(data) {
         const message = {
@@ -27,7 +29,8 @@ export class ChatManager {
         this.queue.push(message);
         this.persist();
         
-        bus.emit('UI:MSG_ADDED', { role: 'user', text: data.text });
+        bus.emit(EVENTS.UI.MSG_ADDED, { role: 'user', text: data.text });
+
         
         if (!this.isProcessing) {
             this.processNext();
@@ -37,15 +40,15 @@ export class ChatManager {
     processNext() {
         if (this.queue.length === 0) {
             this.isProcessing = false;
-            bus.emit('UI:THINKING', false);
+            bus.emit(EVENTS.UI.THINKING, false);
             return;
         }
 
         this.isProcessing = true;
-        bus.emit('UI:THINKING', true);
+        bus.emit(EVENTS.UI.THINKING, true);
         
         const message = this.queue[0];
-        bus.emit('SOCKET:EMIT', { 
+        bus.emit(EVENTS.SOCKET.EMIT, { 
             text: message.text, 
             history: message.history,
             client_msg_id: message.id 
@@ -59,7 +62,7 @@ export class ChatManager {
             this.persist();
         }
         
-        bus.emit('UI:MSG_ADDED', { 
+        bus.emit(EVENTS.UI.MSG_ADDED, { 
             role: 'assistant', 
             text: data.response, 
             metadata: data.metadata 
@@ -70,8 +73,9 @@ export class ChatManager {
             this.processNext();
         } else {
             this.isProcessing = false;
-            bus.emit('UI:THINKING', false);
+            bus.emit(EVENTS.UI.THINKING, false);
         }
+
     }
 
     persist() {

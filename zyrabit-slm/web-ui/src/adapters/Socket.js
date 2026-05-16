@@ -1,8 +1,9 @@
 import { io } from "socket.io-client";
 import { bus } from "../core/EventBus";
+import { EVENTS } from "../core/Constants";
 
 /**
- * Socket Adapter V5.1
+ * Socket Adapter V5.2
  * Implements Zero-Trust connectivity with pre-flight checks and retry limits.
  */
 export class SocketAdapter {
@@ -10,10 +11,11 @@ export class SocketAdapter {
         this.socket = null;
         this.reconnectAttempts = 0;
         this.maxAttempts = 5;
-        this.timeoutMs = 60000; // 1 minute limit
+        this.timeoutMs = 60000;
         this.isConnecting = false;
         this.setupBusListeners();
     }
+
 
     async connect() {
         if (this.isConnecting || (this.socket && this.socket.connected)) return;
@@ -47,12 +49,13 @@ export class SocketAdapter {
             this.reconnectAttempts = 0;
             this.isConnecting = false;
             console.log("🚀 Secure Gateway Established");
-            bus.emit('SYSTEM:LOG', { type: 'SYSTEM', event: 'SECURE_GATEWAY_ESTABLISHED' });
+            bus.emit(EVENTS.SYSTEM.LOG, { type: 'SYSTEM', event: 'SECURE_GATEWAY_ESTABLISHED' });
         });
 
         this.socket.on("chat_response", (data) => {
-            bus.emit('CHAT:RESPONSE_RECEIVED', data);
+            bus.emit(EVENTS.CHAT.RESPONSE_RECEIVED, data);
         });
+
 
         this.socket.on("connect_error", (err) => {
             this.reconnectAttempts++;
@@ -63,8 +66,9 @@ export class SocketAdapter {
 
         this.socket.on("disconnect", (reason) => {
             console.warn(`⚠️ Gateway Disconnected: ${reason}`);
-            bus.emit('SYSTEM:LOG', { type: 'WARNING', event: 'GATEWAY_DISCONNECTED' });
+            bus.emit(EVENTS.SYSTEM.LOG, { type: 'WARNING', event: 'GATEWAY_DISCONNECTED' });
             if (reason === "io server disconnect") {
+
                 // Server-side disconnect, don't auto-reconnect
                 this.socket.close();
             }
@@ -76,20 +80,22 @@ export class SocketAdapter {
         if (permanent) {
             console.error("❌ Gateway Connection Timeout. Switching to Offline Mode.");
             if (this.socket) this.socket.close();
-            bus.emit('SYSTEM:LOG', { type: 'ERROR', event: 'GATEWAY_TIMEOUT_OFFLINE' });
+            bus.emit(EVENTS.SYSTEM.LOG, { type: 'ERROR', event: 'GATEWAY_TIMEOUT_OFFLINE' });
         } else {
+
             // Soft retry after 10s if not permanent
             setTimeout(() => this.connect(), 10000);
         }
     }
 
     setupBusListeners() {
-        bus.on('SOCKET:EMIT', (data) => {
+        bus.on(EVENTS.SOCKET.EMIT, (data) => {
             if (this.socket && this.socket.connected) {
                 this.socket.emit("chat_message", data);
             } else {
-                bus.emit('SYSTEM:LOG', { type: 'ERROR', event: 'SOCKET_NOT_CONNECTED' });
+                bus.emit(EVENTS.SYSTEM.LOG, { type: 'ERROR', event: 'SOCKET_NOT_CONNECTED' });
             }
         });
     }
+
 }

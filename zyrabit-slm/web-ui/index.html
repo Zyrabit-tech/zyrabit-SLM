@@ -38,6 +38,11 @@
                         <span class="text-xs font-medium text-black/60">Vector DB</span>
                         <zyra-status-dot id="health-db-dot" status="offline"></zyra-status-dot>
                     </div>
+                    <div id="health-mcp" class="flex items-center justify-between p-3 bg-black/5 rounded-2xl">
+                        <span class="text-xs font-medium text-black/60">MCP Bridge</span>
+                        <zyra-status-dot id="health-mcp-dot" status="offline"></zyra-status-dot>
+                    </div>
+
                 </div>
             </div>
 
@@ -106,9 +111,14 @@
         <div class="absolute bottom-10 left-1/2 -translate-x-1/2 w-full max-w-4xl px-6 z-20">
             <div class="glass-premium p-4 rounded-[2.5rem] shadow-2xl">
                 <form id="chat-form" class="flex items-center gap-4">
+                    <button type="button" id="input-vault-btn" 
+                        class="w-10 h-10 flex items-center justify-center rounded-full hover:bg-black/5 transition-all active:scale-90 text-xl text-[#3f5a6d]/60">
+                        📎
+                    </button>
                     <textarea id="chat-input" rows="1"
-                        class="flex-1 bg-transparent border-none py-2 px-4 outline-none resize-none placeholder-[#3f5a6d]/30 text-[15px] font-medium"
+                        class="flex-1 bg-transparent border-none py-2 px-2 outline-none resize-none placeholder-[#3f5a6d]/30 text-[15px] font-medium"
                         placeholder="Type your command..."></textarea>
+
                     <button type="submit" id="chat-submit"
                         class="w-12 h-12 bg-[#3f5a6d] text-white rounded-full flex items-center justify-center transition-all hover:scale-105 active:scale-95 shadow-xl shadow-[#3f5a6d]/20">
                         <span class="button-text text-xl">↑</span>

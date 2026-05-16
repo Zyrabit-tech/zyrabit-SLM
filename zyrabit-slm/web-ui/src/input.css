@@ -63,12 +63,27 @@
         height: 1.5rem;
     }
 
-    /* Message Bubbles */
+    /* Message Bubbles - WhatsApp Style */
     .bubble-user {
-        @apply bg-[#3f5a6d] text-white rounded-3xl rounded-tr-none px-5 py-3 shadow-lg shadow-[#3f5a6d]/10;
+        @apply bg-[#3f5a6d] text-white rounded-[1.5rem] rounded-tr-[0.3rem] px-6 py-4 shadow-xl shadow-[#3f5a6d]/10 max-w-[85%] relative;
+        align-self: flex-end;
     }
 
     .bubble-ai {
-        @apply glass-premium rounded-3xl rounded-tl-none px-5 py-3 text-[#323439] border border-[#a9c4d9]/20;
+        @apply bg-white text-[#323439] rounded-[1.5rem] rounded-tl-[0.3rem] px-6 py-4 shadow-lg shadow-black/5 max-w-[85%] relative border border-black/[0.03];
+        align-self: flex-start;
     }
+
+    .bubble-timestamp {
+        @apply text-[9px] opacity-40 mt-2 block text-right font-bold uppercase tracking-tighter;
+    }
+
+    .date-separator {
+        @apply flex items-center justify-center my-8 w-full;
+    }
+
+    .date-pill {
+        @apply px-4 py-1 bg-black/5 text-black/30 text-[9px] font-bold uppercase tracking-widest rounded-full;
+    }
+
 }
