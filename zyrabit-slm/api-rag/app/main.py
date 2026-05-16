@@ -1,3 +1,4 @@
+import asyncio
 import os
 import logging
 # pyrefly: ignore [missing-import]
@@ -108,7 +109,8 @@ async def lifespan(app: FastAPI):
         
         # 8. Start Telegram Bridge (Background Task)
         from app.domain.services.telegram_worker import TelegramBridgeWorker
-        app.state.tg_worker = TelegramBridgeWorker(app.state.chat_use_case)
+        app.state.tg_worker = TelegramBridgeWorker(app.state.chat_use_case, sio=sio)
+
         asyncio.create_task(app.state.tg_worker.start())
         
         logger.info("✅ Infrastructure initialized successfully.")

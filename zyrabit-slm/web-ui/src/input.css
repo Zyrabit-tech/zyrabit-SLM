@@ -3,87 +3,97 @@
 @tailwind utilities;
 
 @layer base {
-    :root {
-        --zyra-primary: #3f5a6d;
-        --zyra-secondary: #6090b4;
-        --zyra-bg: #fdfdfd;
-        --zyra-surface: #e2ecf4;
-        --zyra-muted: #a9c4d9;
-        --zyra-border: #a9c4d9;
-        --zyra-text: #323439;
-        --zyra-subtext: #3f5a6d;
-        --zyra-accent: #6090b4;
-        --zyra-gradient: linear-gradient(135deg, #3f5a6d 0%, #6090b4 100%);
-    }
-
     body {
-        @apply bg-[#fdfdfd] text-[#323439] antialiased;
+        @apply bg-[#f0f2f5] font-sans text-[#1c1e21];
         font-family: 'Funnel Display', sans-serif;
     }
 }
 
-@layer components {
-    .glass-premium {
-        @apply backdrop-blur-2xl bg-[#e2ecf4]/40 border border-black/[0.03] shadow-[0_4px_24px_rgba(63,90,109,0.05)];
-    }
+.glass-premium {
+    @apply bg-white/70 backdrop-blur-2xl;
+}
 
-    .btn-apple {
-        @apply px-5 py-2.5 rounded-2xl font-semibold transition-all duration-300 active:scale-95;
-    }
+/* Side Panels Animation */
+.side-panel {
+    position: fixed;
+    right: 1.5rem;
+    top: 6rem;
+    bottom: 1.5rem;
+    width: 100%;
+    max-width: 24rem; /* md:w-96 */
+    z-index: 50;
+    transition: transform 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+    transform: translateX(120%);
+}
 
-    .btn-apple-primary {
-        @apply btn-apple text-white shadow-xl shadow-[#3f5a6d]/20;
-        background: var(--zyra-gradient);
-    }
+.side-panel.active {
+    transform: translateX(0);
+}
 
-    .input-apple {
-        @apply w-full bg-[#e2ecf4]/30 border border-[#a9c4d9]/40 rounded-2xl px-5 py-4 outline-none transition-all duration-500 focus:bg-white focus:ring-4 focus:ring-[#6090b4]/10 focus:border-[#6090b4]/50 text-[#323439];
-    }
+.chat-bubble {
+    @apply max-w-[80%] p-4 rounded-2xl relative mb-2 text-[13px] leading-relaxed shadow-sm;
+}
 
-    .scrollbar-hide::-webkit-scrollbar {
-        display: none;
-    }
+.chat-bubble-user {
+    @apply bg-[#3f5a6d] text-white self-end rounded-tr-none;
+}
 
-    .snackbar {
-        @apply flex items-center gap-3 p-5 rounded-3xl border glass-premium shadow-2xl transition-all duration-500 transform translate-y-0 opacity-100;
-        min-width: 340px;
-    }
+.chat-bubble-ai {
+    @apply bg-white text-black self-start rounded-tl-none border border-black/5;
+}
 
-    .snackbar-enter {
-        @apply translate-y-12 opacity-0 scale-90;
-    }
+.timestamp {
+    @apply text-[9px] opacity-40 mt-1 block text-right;
+}
 
-    .snackbar-exit {
-        @apply translate-y-4 opacity-0 scale-90;
-    }
+.date-separator {
+    @apply flex items-center justify-center my-6;
+}
 
-    .loader-ios {
-        @apply animate-spin rounded-full border-[3px] border-[#3f5a6d]/20 border-t-[#3f5a6d];
-        width: 1.5rem;
-        height: 1.5rem;
-    }
+.date-text {
+    @apply bg-black/5 px-3 py-1 rounded-full text-[10px] font-bold text-black/40 uppercase tracking-widest;
+}
 
-    /* Message Bubbles - WhatsApp Style */
-    .bubble-user {
-        @apply bg-[#3f5a6d] text-white rounded-[1.5rem] rounded-tr-[0.3rem] px-6 py-4 shadow-xl shadow-[#3f5a6d]/10 max-w-[85%] relative;
-        align-self: flex-end;
-    }
+.input-apple {
+    @apply w-full bg-black/5 border-none rounded-2xl p-4 focus:ring-2 focus:ring-[#3f5a6d]/20 transition-all outline-none text-sm;
+}
 
-    .bubble-ai {
-        @apply bg-white text-[#323439] rounded-[1.5rem] rounded-tl-[0.3rem] px-6 py-4 shadow-lg shadow-black/5 max-w-[85%] relative border border-black/[0.03];
-        align-self: flex-start;
-    }
+.loader-ios {
+    @apply w-5 h-5 border-2 border-black/10 border-t-black/40 rounded-full animate-spin;
+}
 
-    .bubble-timestamp {
-        @apply text-[9px] opacity-40 mt-2 block text-right font-bold uppercase tracking-tighter;
-    }
+/* Notifications (Snackbars) */
+.snackbar {
+    @apply flex items-center gap-4 p-4 rounded-[1.5rem] shadow-2xl border border-white/40 pointer-events-auto backdrop-blur-xl transition-all duration-500;
+    background: rgba(255, 255, 255, 0.85);
+}
 
-    .date-separator {
-        @apply flex items-center justify-center my-8 w-full;
-    }
+.snackbar-success {
+    @apply border-green-500/20;
+}
+.snackbar-success .snackbar-icon { @apply text-green-500; }
+.snackbar-success .snackbar-label { @apply text-green-600; }
 
-    .date-pill {
-        @apply px-4 py-1 bg-black/5 text-black/30 text-[9px] font-bold uppercase tracking-widest rounded-full;
-    }
+.snackbar-error {
+    @apply border-red-500/20;
+}
+.snackbar-error .snackbar-icon { @apply text-red-500; }
+.snackbar-error .snackbar-label { @apply text-red-600; }
 
+.snackbar-enter {
+    animation: snackbar-in 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+}
+
+.snackbar-exit {
+    animation: snackbar-out 0.4s ease forwards;
+}
+
+@keyframes snackbar-in {
+    from { transform: translateY(-20px) scale(0.9); opacity: 0; }
+    to { transform: translateY(0) scale(1); opacity: 1; }
+}
+
+@keyframes snackbar-out {
+    from { transform: translateY(0) scale(1); opacity: 1; }
+    to { transform: translateY(-10px) scale(0.95); opacity: 0; }
 }

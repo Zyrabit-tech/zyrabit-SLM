@@ -140,16 +140,21 @@ class ZyrabitApp {
 
 
     togglePanel(id) {
-        const panels = ['gdpr-panel', 'ingest-panel'];
+        const panels = [IDS.GDPR_PANEL, IDS.INGEST_PANEL];
         panels.forEach(p => {
-            const el = document.getElementById(p);
-            if (p === id) {
-                el.classList.toggle('translate-x-full');
-            } else {
-                el.classList.add('translate-x-full');
-            }
+            try {
+                const el = getSafeElement(p);
+                if (p === id) {
+                    el.classList.toggle('active');
+                } else {
+                    el.classList.remove('active');
+                }
+            } catch (e) {}
         });
     }
+
+
+
 
     addGdprLog(type, event) {
         try {
@@ -339,18 +344,18 @@ class ZyrabitApp {
         el.className = `snackbar snackbar-${type} snackbar-enter`;
         
         const iconSpan = document.createElement('span');
-        iconSpan.className = 'text-lg';
+        iconSpan.className = 'snackbar-icon text-xl';
         iconSpan.textContent = icons[type] || 'ℹ️';
 
         const content = document.createElement('div');
         content.className = 'flex-1';
 
         const typeLabel = document.createElement('div');
-        typeLabel.className = 'text-[10px] font-bold uppercase tracking-wider';
+        typeLabel.className = 'snackbar-label text-[10px] font-bold uppercase tracking-wider';
         typeLabel.textContent = type;
 
         const messageLabel = document.createElement('div');
-        messageLabel.className = 'text-xs opacity-90';
+        messageLabel.className = 'text-xs text-black/70 font-medium';
         messageLabel.textContent = message;
 
         content.appendChild(typeLabel);
@@ -358,19 +363,14 @@ class ZyrabitApp {
         el.appendChild(iconSpan);
         el.appendChild(content);
 
-
         container.appendChild(el);
-
-        // Animation: Enter
-        requestAnimationFrame(() => {
-            el.classList.remove('snackbar-enter');
-        });
 
         // Auto-remove
         setTimeout(() => {
-            el.classList.add('snackbar-exit');
-            el.addEventListener('transitionend', () => el.remove());
+            el.classList.replace('snackbar-enter', 'snackbar-exit');
+            setTimeout(() => el.remove(), 500);
         }, 5000);
+
     }
 }
 

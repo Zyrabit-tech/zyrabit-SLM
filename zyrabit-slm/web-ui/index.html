@@ -97,7 +97,9 @@
         </header>
 
         <!-- CHAT LIST -->
-        <div id="chat-container" class="flex-1 overflow-y-auto p-4 md:p-8 pt-24 space-y-6 scrollbar-hide pb-32">
+        <div id="chat-container" class="flex-1 overflow-y-auto p-4 md:p-8 pt-24 space-y-3 scrollbar-hide pb-48">
+
+
             <div class="flex flex-col items-center justify-center py-24 text-center max-w-lg mx-auto">
                 <div class="w-24 h-24 rounded-[2rem] bg-white shadow-2xl flex items-center justify-center mb-8 animate-bounce-subtle border border-[#a9c4d9]/30">
                     <img src="/img/logo_zyrabit.png" alt="Zyra" class="w-12 h-12 object-contain">
@@ -108,8 +110,8 @@
         </div>
 
         <!-- INPUT AREA -->
-        <div class="absolute bottom-10 left-1/2 -translate-x-1/2 w-full max-w-4xl px-6 z-20">
-            <div class="glass-premium p-4 rounded-[2.5rem] shadow-2xl">
+        <div class="absolute bottom-6 left-1/2 -translate-x-1/2 w-full max-w-4xl px-6 z-20">
+            <div class="glass-premium p-4 rounded-[2.5rem] shadow-2xl mb-4">
                 <form id="chat-form" class="flex items-center gap-4">
                     <button type="button" id="input-vault-btn" 
                         class="w-10 h-10 flex items-center justify-center rounded-full hover:bg-black/5 transition-all active:scale-90 text-xl text-[#3f5a6d]/60">
@@ -126,10 +128,22 @@
                     </button>
                 </form>
             </div>
+
+            <!-- FOOTER -->
+            <footer class="flex items-center justify-between px-4 text-[10px] font-bold text-black/20 uppercase tracking-[0.2em]">
+                <div>© 2026 ZYRABIT SLM — SOVEREIGN OS</div>
+                <div class="flex gap-6">
+                    <a href="https://www.zyrabit.com" target="_blank" class="hover:text-black/40 transition-colors">WWW.ZYRABIT.COM</a>
+                    <a href="https://github.com/Zyrabit-tech/zyrabit-SLM" target="_blank" class="hover:text-black/40 transition-colors">GITHUB REPO</a>
+                </div>
+            </footer>
         </div>
 
+
         <!-- OVERLAYS (Panels) -->
-        <div id="gdpr-panel" class="fixed right-6 top-24 bottom-6 w-full md:w-96 glass-premium rounded-[2.5rem] z-50 p-5 flex flex-col translate-x-[120%] transition-transform duration-500 shadow-3xl">
+        <div id="gdpr-panel" class="side-panel glass-premium rounded-[2.5rem] p-5 flex flex-col shadow-3xl">
+
+
             <div class="flex items-center justify-between mb-8">
                 <h2 class="text-xl font-bold tracking-tight">GateKeeper Logs</h2>
                 <button id="close-gdpr" class="w-8 h-8 rounded-full bg-black/5 flex items-center justify-center hover:bg-black/10 transition-all">×</button>
@@ -139,7 +153,9 @@
             </div>
         </div>
 
-        <div id="ingest-panel" class="fixed right-6 top-24 bottom-6 w-full md:w-96 glass-premium rounded-[2.5rem] z-50 p-5 flex flex-col translate-x-[120%] transition-transform duration-500 shadow-3xl">
+        <div id="ingest-panel" class="side-panel glass-premium rounded-[2.5rem] p-5 flex flex-col shadow-3xl">
+
+
             <div class="flex items-center justify-between mb-8">
                 <h2 class="text-xl font-bold tracking-tight">Vault Management</h2>
                 <button id="close-ingest" class="w-8 h-8 rounded-full bg-black/5 flex items-center justify-center hover:bg-black/10 transition-all">×</button>
@@ -221,7 +237,8 @@
         </div>
 
         <!-- SNACKBAR CONTAINER -->
-        <div id="snackbar-container" class="fixed bottom-10 right-10 z-50 flex flex-col gap-4 pointer-events-none"></div>
+        <div id="snackbar-container" class="fixed top-24 left-1/2 -translate-x-1/2 z-[100] flex flex-col gap-3 pointer-events-none w-full max-w-sm"></div>
+
 
     </main>
 

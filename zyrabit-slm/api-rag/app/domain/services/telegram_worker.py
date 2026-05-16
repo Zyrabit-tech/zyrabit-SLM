@@ -12,12 +12,14 @@ class TelegramBridgeWorker:
     """
     Sovereign Telegram Bridge: Listens for user messages and pipes them to the RAG Brain.
     """
-    def __init__(self, chat_use_case: ChatUseCase):
+    def __init__(self, chat_use_case: ChatUseCase, sio=None):
         self.chat_use_case = chat_use_case
+        self.sio = sio
         self.token = os.getenv("TELEGRAM_BOT_TOKEN", "").strip('"').strip("'")
         self.chat_id = os.getenv("TELEGRAM_CHAT_ID", "").strip('"').strip("'")
         self.last_update_id = 0
         self.is_running = False
+
 
     async def start(self):
         if not self.token or not self.chat_id:
@@ -57,11 +59,26 @@ class TelegramBridgeWorker:
         
         # 1. Process via Sovereign RAG Brain
         try:
+            # Notify UI that a Telegram message is being processed
+            if self.sio:
+                await self.sio.emit("chat_response", {
+                    "response": f"📥 Recibido desde Telegram: {text}",
+                    "metadata": {"source": "TELEGRAM"}
+                })
+
             result = await self.chat_use_case.execute(text=text)
             response_text = result.get("response", "I'm sorry, I couldn't process that.")
             
-            # 2. Reply back to Telegram
+            # 2. Reply back to UI
+            if self.sio:
+                await self.sio.emit("chat_response", {
+                    "response": response_text,
+                    "metadata": {"source": "TELEGRAM_REPLY"}
+                })
+
+            # 3. Reply back to Telegram
             import requests
+
             reply_url = f"https://api.telegram.org/bot{self.token}/sendMessage"
             requests.post(reply_url, json={
                 "chat_id": self.chat_id,
