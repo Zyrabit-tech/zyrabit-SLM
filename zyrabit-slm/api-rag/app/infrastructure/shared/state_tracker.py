@@ -117,7 +117,7 @@ class SovereignStateManager:
             conn.execute("""
                 INSERT OR REPLACE INTO vault_index (file_path, file_hash, token_count, last_indexed)
                 VALUES (?, ?, ?, ?)
-            """, (file_path, current_hash, token_count, datetime.now()))
+            """, (file_path, current_hash, token_count, datetime.now().isoformat()))
 
     @classmethod
     def store_message(cls, session_id: str, role: str, content: str):
@@ -125,7 +125,8 @@ class SovereignStateManager:
             conn.execute("""
                 INSERT INTO conversation_memory (session_id, role, content, timestamp)
                 VALUES (?, ?, ?, ?)
-            """, (session_id, role, content, datetime.now()))
+            """, (session_id, role, content, datetime.now().isoformat()))
+
             
             # FIFO: Clean old messages (keep last 50 per session for safety)
             conn.execute("""

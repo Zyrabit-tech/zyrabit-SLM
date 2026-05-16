@@ -1,3 +1,4 @@
+import os
 import logging
 # pyrefly: ignore [missing-import]
 import socketio
@@ -54,15 +55,20 @@ async def lifespan(app: FastAPI):
     app.state.sio = sio # Store for other endpoints
     # 0. Initialize Sovereign State
     try:
-        # Use an absolute path in the container to ensure persistence
-        ABS_DB_PATH = "/app/sovereign_state.db"
-        SovereignStateManager.init_db(db_path=ABS_DB_PATH)
-        logger.info(f"✅ Sovereign State initialized at {ABS_DB_PATH}")
+        # Use the configured DB_PATH (from env or default)
+        SovereignStateManager.init_db()
+        logger.info(f"✅ Sovereign State initialized at {SovereignStateManager.DB_PATH}")
     except Exception as e:
         logger.error(f"❌ Failed to initialize Sovereign State: {e}")
 
+
     logger.info("🚀 Zyrabit SLM API Starting...")
     
+    if os.getenv("TESTING") == "true":
+        logger.info("🧪 Test Mode: Skipping heavy infrastructure initialization.")
+        yield
+        return
+
     try:
         # 1. Direct Embeddings
         embeddings = DirectOllamaEmbeddings(model=EMBEDDING_MODEL, base_url=SLM_URL)
@@ -108,6 +114,7 @@ async def lifespan(app: FastAPI):
         logger.info("✅ Infrastructure initialized successfully.")
     except Exception as e:
         logger.error(f"❌ Failed to initialize infrastructure: {e}")
+
 
     yield
     # Cleanup

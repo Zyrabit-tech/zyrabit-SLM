@@ -56,12 +56,27 @@ def mock_infrastructure():
         app.state.vector_store = mock_chroma
         app.state.inference_provider = mock_inference
         app.state.retriever_service = mock_retriever
+        
+        from app.domain.use_cases.chat_use_case import ChatUseCase
+        from app.domain.use_cases.ingest_use_case import IngestUseCase
+        from app.domain.services.gatekeeper import Gatekeeper
+        from app.infrastructure.shared.cache import global_cache
+        
+        app.state.chat_use_case = ChatUseCase(
+            inference_provider=mock_inference,
+            retriever_service=mock_retriever,
+            gatekeeper=Gatekeeper,
+            cache=global_cache
+        )
+        app.state.ingest_use_case = IngestUseCase(vector_store=mock_chroma)
 
         yield {
             "vector_store": mock_chroma,
             "inference": mock_inference,
             "retriever": mock_retriever,
+            "chat_use_case": app.state.chat_use_case
         }
+
 
 @pytest.fixture(autouse=True)
 def mock_settings(monkeypatch):
@@ -72,4 +87,6 @@ def mock_settings(monkeypatch):
     monkeypatch.setenv("DB_URL", "http://localhost:8000")
     monkeypatch.setenv("MODEL_NAME", "qwen2.5:7b")
     monkeypatch.setenv("DB_PATH", "/tmp/test_sovereign.db")
+    monkeypatch.setenv("TESTING", "true")
+
 

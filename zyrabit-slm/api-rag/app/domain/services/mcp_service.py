@@ -108,3 +108,13 @@ async def secure_query(prompt: str) -> str:
     """Directly query the sovereign SLM via the secure RAG pipeline."""
     # This will be wired to the global chat use case during app startup
     return "This tool is a bridge to the Zyrabit RAG Engine."
+
+# LEGACY SHIMS FOR V1.0 COMPATIBILITY
+async def handle_jsonrpc(request_dict: dict) -> dict:
+    """Legacy shim for V1.0 compatibility."""
+    return {"error": "Use V2.0 MCP Bridge via /mcp/rpc"}
+
+def set_mcp_app_state(state):
+    """Legacy shim for V1.0 compatibility."""
+    pass
+
