@@ -240,26 +240,18 @@ class ZyrabitApp {
 
     async loadTools() {
         try {
-            const res = await fetch('/v1/rpc', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    jsonrpc: '2.0',
-                    method: 'tools/list',
-                    id: 'ui-init'
-                })
-            });
+            const res = await fetch('/v1/tools');
             const data = await res.json();
-            const tools = data.result?.tools || [];
+            const tools = data.tools || [];
             const list = document.getElementById('tools-list');
             if (list) {
                 list.innerHTML = tools.map(tool => `
-                    <div class="p-3 bg-white rounded-lg border border-zyrabit-border group hover:border-zyrabit-primary transition">
+                    <div class="p-3 bg-white rounded-lg border border-[#a9c4d9]/30 group hover:border-[#3f5a6d] transition shadow-sm">
                         <div class="flex items-center justify-between mb-1">
-                            <span class="text-[10px] font-bold text-zyrabit-primary uppercase">${tool.name}</span>
-                            <span class="text-[8px] px-1 bg-blue-50 text-blue-500 rounded">TOOL</span>
+                            <span class="text-[10px] font-bold text-[#3f5a6d] uppercase">${tool.name}</span>
+                            <span class="text-[8px] px-1 bg-[#e2ecf4] text-[#3f5a6d] rounded">TOOL</span>
                         </div>
-                        <p class="text-[9px] text-zyrabit-muted leading-tight">${tool.description}</p>
+                        <p class="text-[9px] text-[#323439]/60 leading-tight">${tool.description}</p>
                     </div>
                 `).join('');
             }

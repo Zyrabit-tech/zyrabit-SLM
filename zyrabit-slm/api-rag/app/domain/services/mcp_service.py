@@ -76,8 +76,8 @@ async def send_telegram_notification(message: str) -> str:
     import httpx
     from app.domain.services.gatekeeper import Gatekeeper
     
-    token = os.getenv("TELEGRAM_BOT_TOKEN")
-    chat_id = os.getenv("TELEGRAM_CHAT_ID")
+    token = os.getenv("TELEGRAM_BOT_TOKEN", "").strip('"').strip("'")
+    chat_id = os.getenv("TELEGRAM_CHAT_ID", "").strip('"').strip("'")
     
     if not token or not chat_id:
         return "Error: Telegram integration not configured. Missing TOKEN or CHAT_ID."
@@ -85,18 +85,20 @@ async def send_telegram_notification(message: str) -> str:
     # SECURITY SHIELD: Mask PII before it leaves the sovereign environment
     safe_message, _ = Gatekeeper.mask_pii(message)
     
+    import requests
     url = f"https://api.telegram.org/bot{token}/sendMessage"
     try:
-        async with httpx.AsyncClient() as client:
-            res = await client.post(url, json={
-                "chat_id": chat_id,
-                "text": f"🛡️ Zyrabit Sovereign Alert:\n\n{safe_message}"
-            })
-            if res.status_code == 200:
-                logger.info("📤 Telegram: Notification sent securely (PII Masked).")
-                return "Success: Telegram notification sent (Secure Mode)."
-            return f"Error: Telegram API responded with {res.status_code}"
+        res = requests.post(url, json={
+            "chat_id": chat_id,
+            "text": f"🛡️ Zyrabit Sovereign Alert:\n\n{safe_message}"
+        }, timeout=10)
+        
+        if res.status_code == 200:
+            logger.info("📤 Telegram: Notification sent securely (PII Masked).")
+            return "Success: Telegram notification sent (Secure Mode)."
+        return f"Error: Telegram API responded with {res.status_code}: {res.text}"
     except Exception as e:
+        logger.error(f"❌ Telegram Connection Error: {e}")
         return f"Error connecting to Telegram: {e}"
 
 # Note: The actual Chat logic is still handled by ChatUseCase, 

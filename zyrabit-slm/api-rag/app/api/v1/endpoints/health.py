@@ -132,3 +132,22 @@ async def update_profile(profile: UserProfileUpdate):
         interests=profile.interests
     )
     return {"status": "success"}
+
+@router.get("/tools")
+async def list_mcp_tools():
+    """
+    Expose the native FastMCP tools to the Web UI.
+    """
+    from app.domain.services.mcp_service import mcp
+    tools = []
+    # FastMCP stores tools in a internal list or registry
+    # For now, we manually list the core sovereign tools we've defined
+    # to avoid deep inspection of FastMCP internals in this version.
+    return {
+        "tools": [
+            {"name": "import_to_vault", "description": "Securely move files into the Zyrabit Vault with security scanning."},
+            {"name": "list_vault_stats", "description": "View metadata and statistics about the sovereign vault index."},
+            {"name": "send_telegram_notification", "description": "Send secure, PII-masked notifications to your Telegram."},
+            {"name": "secure_query", "description": "Query the sovereign SLM directly via the secure RAG pipeline."}
+        ]
+    }

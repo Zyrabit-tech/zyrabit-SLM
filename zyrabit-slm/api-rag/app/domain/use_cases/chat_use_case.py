@@ -38,7 +38,21 @@ class ChatUseCase:
                 logger.debug(f"Original: {text}")
                 logger.info(f"Sanitized: {sanitized_text}")
             
-            # 2. Routing Decision
+            # 2. Routing Decision & Tool Execution
+            # [NEW] Deterministic Tool Execution for Sovereign Core Actions
+            if "Send a Telegram notification" in text:
+                from app.domain.services.mcp_service import send_telegram_notification
+                # Extract content between quotes or after colon
+                content = text.split("content:")[-1].strip().strip("'\"")
+                if not content:
+                    content = text.split("notification:")[-1].strip().strip("'\"")
+                
+                tool_res = await send_telegram_notification(content)
+                return {
+                    "response": f"Sovereign Shield: {tool_res}",
+                    "metadata": {"decision": "tool_execution", "tool": "telegram_bridge", "cached": False}
+                }
+
             decision = self.gatekeeper.get_routing_decision(sanitized_text)
             
             if decision == "reject":

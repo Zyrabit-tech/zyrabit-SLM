@@ -60,6 +60,7 @@ ${BOLD}Commands:${NC}
   verify    Health check: validate all containers and API status
   dev       Native local development (starts API via 'uv' with hot-reload)
   doctor    Diagnostic: validate environment, RAM, and hardware acceleration
+  notify    Bridge: send a secure Telegram notification via MCP
   help      Show this help message
 
   --profile <name>  Add Docker Compose profile (automation, observability-extra)
@@ -250,6 +251,7 @@ run_start() {
         echo -e "  ${CYAN}➜ Web UI:${NC}   http://localhost:3000"
         echo -e "  ${CYAN}➜ API:${NC}      http://localhost:8080/v1"
         echo -e "  ${CYAN}➜ DB Admin:${NC} http://localhost:8000/api/v2/heartbeat"
+        echo -e "  ${CYAN}➜ Grafana:${NC}  http://localhost:3001"
     else
         echo -e "  ${CYAN}➜ Web UI:${NC}   https://localhost"
         echo -e "  ${CYAN}➜ API:${NC}      https://localhost/v1"
@@ -282,14 +284,51 @@ run_install() {
     run_verify
 }
 
-# --- Argument Parsing ---
-COMMAND="${1:-install}"
-shift || true
+run_notify() {
+    local message="$1"
+    if [[ -z "$message" ]]; then
+        log_err "Please provide a message. Example: ./zyra-up.sh notify \"Hello Kai\""
+        exit 1
+    fi
+
+    log_info "Sending sovereign notification via Bridge..."
+    
+    # Determine API URL based on mode
+    local api_url="http://localhost:8080/v1/chat"
+    if [[ "${USE_LOCAL}" != "true" ]]; then
+        api_url="https://localhost/v1/chat"
+    fi
+
+    # Quick health check
+    if ! curl -s --insecure "${api_url/chat/health}" > /dev/null; then
+        log_err "Core API is not reachable at ${api_url/chat/health}. Is Zyrabit running?"
+        exit 1
+    fi
+
+    local response
+    response=$(curl -s -k -X POST "${api_url}" \
+        -H "Content-Type: application/json" \
+        -d "{\"text\": \"Send a Telegram notification with this exact content: ${message}\"}")
+
+    if [[ "${response}" == *"Error"* ]]; then
+        log_err "Failed to dispatch notification. Response: ${response}"
+        exit 1
+    elif [[ "${response}" == *"response"* ]]; then
+        log_ok "Notification dispatched successfully."
+    else
+        log_err "Unknown API response: ${response}"
+        exit 1
+    fi
+}
+
+# --- Argument & Command Parsing ---
+COMMANDS=()
 PROFILE=""
 USE_LOCAL="false"
 OVERRIDE_MODEL=""
 NO_CACHE="false"
 
+# First pass: Extract commands and flags
 while [[ "$#" -gt 0 ]]; do
     case "$1" in
         --profile) PROFILE="$2"; shift 2 ;;
@@ -297,18 +336,33 @@ while [[ "$#" -gt 0 ]]; do
         --domain) export DOMAIN="$2"; shift 2 ;;
         --model) OVERRIDE_MODEL="$2"; shift 2 ;;
         --no-cache) NO_CACHE="true"; shift ;;
-        *) log_err "Unknown option: $1"; usage; exit 1 ;;
+        -*) log_err "Unknown option: $1"; usage; exit 1 ;;
+        notify)
+            COMMANDS+=("notify")
+            shift
+            if [[ -n "$1" && "$1" != -* ]]; then
+                NOTIFY_MSG="$1"
+                shift
+            fi
+            ;;
+        *) COMMANDS+=("$1"); shift ;;
     esac
 done
 
-case "${COMMAND}" in
-    install) run_install ;;
-    start)   run_start ;;
-    stop)    $DOCKER_COMPOSE_CMD -f "${COMPOSE_FILE}" down ;;
-    build)   run_build ;;
-    verify)  run_verify ;;
-    dev)     run_dev ;;
-    doctor)  run_doctor ;;
-    help|--help|-h) usage ;;
-    *) log_err "Unknown command: ${COMMAND}"; usage; exit 1 ;;
-esac
+# Default command if none provided
+[[ ${#COMMANDS[@]} -eq 0 ]] && COMMANDS=("install")
+
+for CMD in "${COMMANDS[@]}"; do
+    case "${CMD}" in
+        install) run_install ;;
+        start)   run_start ;;
+        stop)    $DOCKER_COMPOSE_CMD -f "${COMPOSE_FILE}" down ;;
+        build)   run_build ;;
+        verify)  run_verify ;;
+        notify)  run_notify "${NOTIFY_MSG:-}" ;;
+        dev)     run_dev ;;
+        doctor)  run_doctor ;;
+        help|--help|-h) usage; exit 0 ;;
+        *) log_err "Unknown command: ${CMD}"; usage; exit 1 ;;
+    esac
+done

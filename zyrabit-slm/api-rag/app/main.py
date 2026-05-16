@@ -100,11 +100,19 @@ async def lifespan(app: FastAPI):
         from app.auto_ingest import run_auto_ingest
         await run_auto_ingest(app.state.vector_store, app.state.retriever_service)
         
+        # 8. Start Telegram Bridge (Background Task)
+        from app.domain.services.telegram_worker import TelegramBridgeWorker
+        app.state.tg_worker = TelegramBridgeWorker(app.state.chat_use_case)
+        asyncio.create_task(app.state.tg_worker.start())
+        
         logger.info("✅ Infrastructure initialized successfully.")
     except Exception as e:
         logger.error(f"❌ Failed to initialize infrastructure: {e}")
 
     yield
+    # Cleanup
+    if hasattr(app.state, 'tg_worker'):
+        app.state.tg_worker.stop()
     logger.info("🛑 Zyrabit SLM API Shutting down...")
 
 app = FastAPI(title=PROJECT_NAME, version="1.7.5", lifespan=lifespan)
