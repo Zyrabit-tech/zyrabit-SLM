@@ -133,6 +133,7 @@ class UserProfileUpdate(BaseModel):
     persona: str = 'general'
     preferred_model: str = 'qwen2.5:7b'
     tone: str = 'professional'
+    assistant_name: str = 'Zyra'
 
 @router.get("/profile")
 async def get_profile():
@@ -147,26 +148,37 @@ async def update_profile(profile: UserProfileUpdate):
         interests=profile.interests,
         persona=profile.persona,
         preferred_model=profile.preferred_model,
-        tone=profile.tone
+        tone=profile.tone,
+        assistant_name=profile.assistant_name
     )
+
     return {"status": "success"}
 
 
 @router.get("/tools")
 async def list_mcp_tools():
     """
-    Expose the native FastMCP tools to the Web UI.
+    Expose the native FastMCP tools dynamically to the Web UI.
     """
     from app.domain.services.mcp_service import mcp
-    tools = []
-    # FastMCP stores tools in a internal list or registry
-    # For now, we manually list the core sovereign tools we've defined
-    # to avoid deep inspection of FastMCP internals in this version.
-    return {
-        "tools": [
-            {"name": "import_to_vault", "description": "Securely move files into the Zyrabit Vault with security scanning."},
-            {"name": "list_vault_stats", "description": "View metadata and statistics about the sovereign vault index."},
-            {"name": "send_telegram_notification", "description": "Send secure, PII-masked notifications to your Telegram."},
-            {"name": "secure_query", "description": "Query the sovereign SLM directly via the secure RAG pipeline."}
-        ]
-    }
+    try:
+        tools = []
+        # Inspect FastMCP registered tools dynamically
+        for t in mcp._tool_manager._tools.values():
+            tools.append({
+                "name": t.name,
+                "description": t.description or "No description provided."
+            })
+        return {"tools": tools}
+    except Exception as e:
+        logger.warning(f"⚠️ Failed to dynamically inspect FastMCP: {e}")
+        # Fallback to manual list
+        return {
+            "tools": [
+                {"name": "import_to_vault", "description": "Securely move files into the Zyrabit Vault with security scanning."},
+                {"name": "list_vault_stats", "description": "View metadata and statistics about the sovereign vault index."},
+                {"name": "send_telegram_notification", "description": "Send secure, PII-masked notifications to your Telegram."},
+                {"name": "secure_query", "description": "Query the sovereign SLM directly via the secure RAG pipeline."}
+            ]
+        }
+

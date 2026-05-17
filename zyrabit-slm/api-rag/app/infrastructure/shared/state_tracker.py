@@ -61,7 +61,27 @@ class SovereignStateManager:
                     onboarding_completed INTEGER DEFAULT 0
                 )
             """)
+            
+            # Migration: Add assistant_name if missing
+            try:
+                conn.execute("ALTER TABLE user_profile ADD COLUMN assistant_name TEXT DEFAULT 'Zyra'")
+            except sqlite3.OperationalError:
+                pass # Column exists
+
+            # 4. FTS5 Virtual Table for Zero-Lag Hybrid RAG
+            try:
+                conn.execute("""
+                    CREATE VIRTUAL TABLE IF NOT EXISTS fts_vault USING fts5(
+                        file_path,
+                        content,
+                        tokenize='porter'
+                    )
+                """)
+            except sqlite3.OperationalError as e:
+                logger.warning(f"⚠️ FTS5 might not be supported on this SQLite version: {e}")
+
             logger.info(f"🏛️ Sovereign DB Initialized at {cls.DB_PATH} [WAL Mode Active]")
+
 
     @classmethod
     def get_user_profile(cls) -> dict:
@@ -75,12 +95,13 @@ class SovereignStateManager:
             return {}
 
     @classmethod
-    def update_user_profile(cls, name: str, role: str, interests: str, email: str = "contact@zyrabit.com", persona: str = 'general', preferred_model: str = 'qwen2.5:7b', tone: str = 'professional'):
+    def update_user_profile(cls, name: str, role: str, interests: str, email: str = "contact@zyrabit.com", persona: str = 'general', preferred_model: str = 'qwen2.5:7b', tone: str = 'professional', assistant_name: str = 'Zyra'):
         with sqlite3.connect(cls.DB_PATH) as conn:
             conn.execute("""
-                INSERT OR REPLACE INTO user_profile (id, name, email, role, interests, persona, preferred_model, tone, onboarding_completed)
-                VALUES (1, ?, ?, ?, ?, ?, ?, ?, 1)
-            """, (name, email, role, interests, persona, preferred_model, tone))
+                INSERT OR REPLACE INTO user_profile (id, name, email, role, interests, persona, preferred_model, tone, assistant_name, onboarding_completed)
+                VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, 1)
+            """, (name, email, role, interests, persona, preferred_model, tone, assistant_name))
+
 
 
 
@@ -111,13 +132,48 @@ class SovereignStateManager:
         return True
 
     @classmethod
-    def update_vault_index(cls, file_path: str, token_count: int):
+    def update_vault_index(cls, file_path: str, token_count: int, full_text_content: str = ""):
         current_hash = cls.get_file_hash(file_path)
         with sqlite3.connect(cls.DB_PATH) as conn:
             conn.execute("""
                 INSERT OR REPLACE INTO vault_index (file_path, file_hash, token_count, last_indexed)
                 VALUES (?, ?, ?, ?)
             """, (file_path, current_hash, token_count, datetime.now().isoformat()))
+            
+            # Sync to FTS5 for ultra-fast retrieval
+            if full_text_content:
+                conn.execute("DELETE FROM fts_vault WHERE file_path = ?", (file_path,))
+                conn.execute("""
+                    INSERT INTO fts_vault (file_path, content)
+                    VALUES (?, ?)
+                """, (file_path, full_text_content))
+
+    @classmethod
+    def search_fts(cls, query: str, limit: int = 3) -> list:
+        """Zero-Lag Keyword Search using FTS5."""
+        try:
+            with sqlite3.connect(cls.DB_PATH) as conn:
+                conn.row_factory = sqlite3.Row
+                # Escape query to prevent FTS syntax errors (basic protection)
+                safe_query = query.replace('"', '""').replace("'", "''")
+                # FTS requires exact match or wildcard, we use OR strategy
+                tokens = safe_query.split()
+                fts_query = " OR ".join(f"{t}*" for t in tokens if len(t) > 2)
+                
+                if not fts_query:
+                    return []
+                    
+                cursor = conn.execute(f"""
+                    SELECT file_path, snippet(fts_vault, 1, '<b>', '</b>', '...', 64) as snippet, rank 
+                    FROM fts_vault 
+                    WHERE fts_vault MATCH ? 
+                    ORDER BY rank LIMIT ?
+                """, (fts_query, limit))
+                return [dict(row) for row in cursor.fetchall()]
+        except sqlite3.OperationalError as e:
+            logger.warning(f"⚠️ FTS Search failed: {e}")
+            return []
+
 
     @classmethod
     def store_message(cls, session_id: str, role: str, content: str):
@@ -148,3 +204,28 @@ class SovereignStateManager:
             """, (session_id, limit))
             # Reverse to get chronological order
             return [{"role": r[0], "content": r[1]} for r in cursor.fetchall()][::-1]
+
+    @classmethod
+    def get_stats(cls) -> dict:
+        """Returns infrastructure and vault metrics."""
+        with sqlite3.connect(cls.DB_PATH) as conn:
+            cursor = conn.execute("SELECT COUNT(*), SUM(token_count) FROM vault_index")
+            vault_count, total_tokens = cursor.fetchone()
+            
+            cursor = conn.execute("SELECT COUNT(*) FROM conversation_memory")
+            msg_count = cursor.fetchone()[0]
+            
+            return {
+                "vault_files": vault_count or 0,
+                "total_tokens": total_tokens or 0,
+                "total_messages": msg_count or 0,
+                "db_path": cls.DB_PATH
+            }
+
+    @classmethod
+    def clear_session(cls, session_id: str):
+        """Resets the conversation memory for a session."""
+        with sqlite3.connect(cls.DB_PATH) as conn:
+            conn.execute("DELETE FROM conversation_memory WHERE session_id = ?", (session_id,))
+            logger.info(f"🧹 Session {session_id} cleared from Sovereign State.")
+

@@ -49,11 +49,13 @@
             <div class="space-y-4">
                 <h2 class="text-[11px] font-semibold text-black/40 uppercase tracking-[0.2em]">Connectivity</h2>
                 <div class="grid grid-cols-2 gap-3">
-                    <button id="trigger-telegram" class="flex flex-col items-center justify-center p-4 bg-blue-500/10 border border-blue-500/20 rounded-3xl hover:bg-blue-500/20 transition-all active:scale-95 group">
+                    <button id="trigger-telegram"
+                        class="flex flex-col items-center justify-center p-4 bg-blue-500/10 border border-blue-500/20 rounded-3xl hover:bg-blue-500/20 transition-all active:scale-95 group">
                         <span class="text-2xl mb-1 group-hover:scale-110 transition-transform">✈️</span>
                         <span class="text-[10px] font-bold text-blue-600">TELEGRAM</span>
                     </button>
-                    <button id="toggle-ingest" class="flex flex-col items-center justify-center p-4 bg-black/5 border border-black/5 rounded-3xl hover:bg-black/10 transition-all active:scale-95 group">
+                    <button id="toggle-ingest"
+                        class="flex flex-col items-center justify-center p-4 bg-black/5 border border-black/5 rounded-3xl hover:bg-black/10 transition-all active:scale-95 group">
                         <span class="text-2xl mb-1 group-hover:scale-110 transition-transform">📁</span>
                         <span class="text-[10px] font-bold text-black/60">VAULT</span>
                     </button>
@@ -61,12 +63,21 @@
             </div>
 
             <div class="space-y-4">
-                <h2 class="text-[11px] font-semibold text-black/40 uppercase tracking-[0.2em]">Security</h2>
-                <button id="toggle-gdpr" class="w-full flex items-center justify-between p-4 bg-black/5 rounded-3xl hover:bg-black/10 transition-all">
-                    <span class="text-xs font-semibold text-black/60">GateKeeper</span>
-                    <span class="text-sm">🛡️</span>
-                </button>
+                <h2 class="text-[11px] font-semibold text-black/40 uppercase tracking-[0.2em]">Security & Help</h2>
+                <div class="space-y-2">
+                    <button id="toggle-gdpr"
+                        class="w-full flex items-center justify-between p-4 bg-black/5 rounded-3xl hover:bg-black/10 transition-all">
+                        <span class="text-xs font-semibold text-black/60">GateKeeper</span>
+                        <span class="text-sm">🛡️</span>
+                    </button>
+                    <button id="toggle-docs"
+                        class="w-full flex items-center justify-between p-4 bg-black/5 rounded-3xl hover:bg-black/10 transition-all">
+                        <span class="text-xs font-semibold text-black/60">Documentation</span>
+                        <span class="text-sm">📚</span>
+                    </button>
+                </div>
             </div>
+
         </nav>
 
         <div class="mt-auto pt-8 border-t border-black/5 flex items-center justify-between">
@@ -79,19 +90,26 @@
     <main class="flex-1 flex flex-col relative h-screen bg-[#f5f5f7]">
 
         <!-- HEADER -->
-        <header class="h-20 flex items-center justify-between px-6 md:px-10 glass-premium border-b border-black/5 absolute top-0 w-full z-10">
+        <header
+            class="h-20 flex items-center justify-between px-6 md:px-10 glass-premium border-b border-black/5 absolute top-0 w-full z-10">
             <div class="flex items-center gap-6">
-                <div id="status-pill" class="flex items-center gap-2 px-4 py-2 bg-green-500/10 border border-green-500/20 rounded-full">
+                <div id="status-pill"
+                    class="flex items-center gap-2 px-4 py-2 bg-green-500/10 border border-green-500/20 rounded-full">
                     <div class="w-2 h-2 rounded-full bg-green-500 shadow-sm"></div>
                     <span class="text-[11px] font-bold text-green-700 tracking-wide">SYSTEM READY</span>
                 </div>
-                <span id="model-badge" class="text-[11px] font-semibold text-black/40 bg-black/5 px-4 py-2 rounded-full">QWEN 2.5:7B</span>
+                <span id="model-badge"
+                    class="text-[11px] font-semibold text-black/40 bg-black/5 px-4 py-2 rounded-full">QWEN 2.5:7B</span>
             </div>
-            
+
             <div class="flex items-center gap-4">
                 <div class="flex -space-x-2">
-                    <div class="w-8 h-8 rounded-full border-2 border-white bg-[#3f5a6d] flex items-center justify-center text-[10px] text-white font-bold">K</div>
-                    <div class="w-8 h-8 rounded-full border-2 border-white bg-[#6090b4] flex items-center justify-center text-[10px] text-white font-bold">Z</div>
+                    <div
+                        class="w-8 h-8 rounded-full border-2 border-white bg-[#3f5a6d] flex items-center justify-center text-[10px] text-white font-bold">
+                        K</div>
+                    <div
+                        class="w-8 h-8 rounded-full border-2 border-white bg-[#6090b4] flex items-center justify-center text-[10px] text-white font-bold">
+                        Z</div>
                 </div>
             </div>
         </header>
@@ -100,20 +118,33 @@
         <div id="chat-container" class="flex-1 overflow-y-auto p-4 md:p-8 pt-24 space-y-3 scrollbar-hide pb-48">
 
 
-            <div class="flex flex-col items-center justify-center py-24 text-center max-w-lg mx-auto">
+            <!-- INITIAL SUGGESTIONS (Zero-Lag) -->
+            <div id="floating-suggestions" class="flex flex-col items-center justify-center py-12 text-center max-w-lg mx-auto transition-opacity duration-500">
                 <div class="w-24 h-24 rounded-[2rem] bg-white shadow-2xl flex items-center justify-center mb-8 animate-bounce-subtle border border-[#a9c4d9]/30">
                     <img src="/img/logo_zyrabit.png" alt="Zyra" class="w-12 h-12 object-contain">
                 </div>
-                <h1 class="text-3xl font-bold tracking-tight text-[#3f5a6d] mb-4">Sovereign Architecture Ready</h1>
-                <p class="text-sm text-[#323439]/60 leading-relaxed">System initialized. Your workspace is secured and your assistant is ready to build with you.</p>
+                <h1 class="text-3xl font-bold tracking-tight text-[#3f5a6d] mb-4">Sovereign Architecture</h1>
+                <p class="text-sm text-[#323439]/60 leading-relaxed mb-6">Your personal assistant is ready to build with you.</p>
+                
+                <div class="bg-white/80 backdrop-blur-md p-6 rounded-3xl border border-black/5 shadow-sm max-w-md text-center w-full">
+                    <h3 class="text-sm font-bold text-[#3f5a6d] mb-2">⚡ Zero-Lag Sovereign Commands</h3>
+                    <p class="text-xs text-[#323439]/60 mb-4">Instant execution via SQLite, zero LLM latency.</p>
+                    <div class="grid grid-cols-2 gap-2 text-left">
+                        <div class="bg-black/5 p-2 rounded-xl text-xs"><span class="font-bold text-zyrabit-primary">/stats</span> - Metrics</div>
+                        <div class="bg-black/5 p-2 rounded-xl text-xs"><span class="font-bold text-zyrabit-primary">/vault</span> - Knowledge base</div>
+                        <div class="bg-black/5 p-2 rounded-xl text-xs"><span class="font-bold text-zyrabit-primary">/clear</span> - Reset session</div>
+                        <div class="bg-black/5 p-2 rounded-xl text-xs"><span class="font-bold text-zyrabit-primary">/tools</span> - Capabilities</div>
+                    </div>
+                </div>
             </div>
+
         </div>
 
-        <!-- INPUT AREA -->
-        <div class="absolute bottom-6 left-1/2 -translate-x-1/2 w-full max-w-4xl px-6 z-20">
-            <div class="glass-premium p-4 rounded-[2.5rem] shadow-2xl mb-4">
+        <!-- INPUT AREA (Relative to flow) -->
+        <div class="w-full max-w-4xl px-6 z-20 mx-auto pb-10">
+            <div class="glass-premium p-4 rounded-[2.5rem] shadow-2xl mb-4 border border-black/5">
                 <form id="chat-form" class="flex items-center gap-4">
-                    <button type="button" id="input-vault-btn" 
+                    <button type="button" id="input-vault-btn"
                         class="w-10 h-10 flex items-center justify-center rounded-full hover:bg-black/5 transition-all active:scale-90 text-xl text-[#3f5a6d]/60">
                         📎
                     </button>
@@ -129,12 +160,16 @@
                 </form>
             </div>
 
+
             <!-- FOOTER -->
-            <footer class="flex items-center justify-between px-4 text-[10px] font-bold text-black/20 uppercase tracking-[0.2em]">
+            <footer
+                class="flex items-center justify-between px-4 text-[10px] font-bold text-black/20 uppercase tracking-[0.2em]">
                 <div>© 2026 ZYRABIT SLM — SOVEREIGN OS</div>
                 <div class="flex gap-6">
-                    <a href="https://www.zyrabit.com" target="_blank" class="hover:text-black/40 transition-colors">WWW.ZYRABIT.COM</a>
-                    <a href="https://github.com/Zyrabit-tech/zyrabit-SLM" target="_blank" class="hover:text-black/40 transition-colors">GITHUB REPO</a>
+                    <a href="https://www.zyrabit.com" target="_blank"
+                        class="hover:text-black/40 transition-colors">WWW.ZYRABIT.COM</a>
+                    <a href="https://github.com/Zyrabit-tech/zyrabit-SLM" target="_blank"
+                        class="hover:text-black/40 transition-colors">GITHUB REPO</a>
                 </div>
             </footer>
         </div>
@@ -146,9 +181,11 @@
 
             <div class="flex items-center justify-between mb-8">
                 <h2 class="text-xl font-bold tracking-tight">GateKeeper Logs</h2>
-                <button id="close-gdpr" class="w-8 h-8 rounded-full bg-black/5 flex items-center justify-center hover:bg-black/10 transition-all">×</button>
+                <button id="close-gdpr"
+                    class="w-8 h-8 rounded-full bg-black/5 flex items-center justify-center hover:bg-black/10 transition-all">×</button>
             </div>
-            <div class="flex-1 overflow-y-auto space-y-4 font-mono text-[11px] bg-black/5 p-6 rounded-3xl border border-black/5" id="gdpr-logs">
+            <div class="flex-1 overflow-y-auto space-y-4 font-mono text-[11px] bg-black/5 p-6 rounded-3xl border border-black/5"
+                id="gdpr-logs">
                 <div class="text-black/30 italic">Monitoring sovereign stream...</div>
             </div>
         </div>
@@ -158,9 +195,11 @@
 
             <div class="flex items-center justify-between mb-8">
                 <h2 class="text-xl font-bold tracking-tight">Vault Management</h2>
-                <button id="close-ingest" class="w-8 h-8 rounded-full bg-black/5 flex items-center justify-center hover:bg-black/10 transition-all">×</button>
+                <button id="close-ingest"
+                    class="w-8 h-8 rounded-full bg-black/5 flex items-center justify-center hover:bg-black/10 transition-all">×</button>
             </div>
-            <div id="drop-zone" class="border-2 border-dashed border-black/10 rounded-[2rem] p-10 text-center hover:border-black/20 transition-all bg-black/5 mb-8 group">
+            <div id="drop-zone"
+                class="border-2 border-dashed border-black/10 rounded-[2rem] p-10 text-center hover:border-black/20 transition-all bg-black/5 mb-8 group">
                 <div id="drop-zone-content">
                     <div class="text-4xl mb-4 group-hover:scale-110 transition-transform">📁</div>
                     <p class="text-xs font-semibold text-black/60">Import to Vault</p>
@@ -175,34 +214,47 @@
         </div>
 
         <!-- ONBOARDING MODAL -->
-        <div id="onboarding-modal" class="fixed inset-0 bg-black/40 backdrop-blur-xl z-[100] flex items-center justify-center hidden p-6">
+        <div id="onboarding-modal"
+            class="fixed inset-0 bg-black/40 backdrop-blur-xl z-[100] flex items-center justify-center hidden p-6">
             <div class="bg-white rounded-[3rem] w-full max-w-xl p-12 shadow-3xl animate-in zoom-in duration-500">
                 <div class="text-center mb-10">
                     <img src="/img/logo_zyrabit.png" alt="Zyra" class="w-16 h-16 object-contain mx-auto mb-6">
                     <h2 class="text-3xl font-bold tracking-tight text-[#3f5a6d]">Welcome to Zyrabit</h2>
                     <p class="text-sm text-[#323439]/40 mt-3">Let's personalize your sovereign experience.</p>
                 </div>
-                
+
                 <form id="onboarding-form" class="space-y-6">
                     <div class="grid grid-cols-2 gap-4">
                         <div class="space-y-2">
-                            <label class="text-[10px] font-bold text-black/30 uppercase tracking-widest ml-4">Full Name</label>
+                            <label class="text-[10px] font-bold text-black/30 uppercase tracking-widest ml-4">Full
+                                Name</label>
                             <input type="text" id="ob-name" required class="input-apple" placeholder="Abraham Gomez">
                         </div>
                         <div class="space-y-2">
-                            <label class="text-[10px] font-bold text-black/30 uppercase tracking-widest ml-4">Email</label>
-                            <input type="email" id="ob-email" required class="input-apple" placeholder="contact@zyrabit.com">
+                            <label
+                                class="text-[10px] font-bold text-black/30 uppercase tracking-widest ml-4">Email</label>
+                            <input type="email" id="ob-email" required class="input-apple"
+                                placeholder="contact@zyrabit.com">
                         </div>
-                    </div>
-
-                    <div class="space-y-2">
-                        <label class="text-[10px] font-bold text-black/30 uppercase tracking-widest ml-4">Current Role</label>
-                        <input type="text" id="ob-role" required class="input-apple" placeholder="Founder Zyrabit">
                     </div>
 
                     <div class="grid grid-cols-2 gap-4">
                         <div class="space-y-2">
-                            <label class="text-[10px] font-bold text-black/30 uppercase tracking-widest ml-4">Persona Profile</label>
+                            <label class="text-[10px] font-bold text-black/30 uppercase tracking-widest ml-4">Current
+                                Role</label>
+                            <input type="text" id="ob-role" required class="input-apple" placeholder="Founder Zyrabit">
+                        </div>
+                        <div class="space-y-2">
+                            <label class="text-[10px] font-bold text-black/30 uppercase tracking-widest ml-4">Assistant Name</label>
+                            <input type="text" id="ob-assistant" class="input-apple" placeholder="Zyra (or custom name)">
+                        </div>
+                    </div>
+
+
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="space-y-2">
+                            <label class="text-[10px] font-bold text-black/30 uppercase tracking-widest ml-4">Persona
+                                Profile</label>
                             <select id="ob-persona" class="input-apple appearance-none">
                                 <option value="general">Sovereign General</option>
                                 <option value="marketing">Marketing Expert</option>
@@ -212,7 +264,9 @@
                             </select>
                         </div>
                         <div class="space-y-2">
-                            <label class="text-[10px] font-bold text-black/30 uppercase tracking-widest ml-4">Intelligence Tone</label>
+                            <label
+                                class="text-[10px] font-bold text-black/30 uppercase tracking-widest ml-4">Intelligence
+                                Tone</label>
                             <select id="ob-tone" class="input-apple appearance-none">
                                 <option value="professional">Professional</option>
                                 <option value="disruptive">Disruptive</option>
@@ -223,26 +277,56 @@
                     </div>
 
                     <div class="space-y-2">
-                        <label class="text-[10px] font-bold text-black/30 uppercase tracking-widest ml-4">Core Objectives</label>
-                        <textarea id="ob-interests" rows="2" required class="input-apple resize-none" placeholder="Scale Zyrabit and dominate the sovereign AI space."></textarea>
+                        <label class="text-[10px] font-bold text-black/30 uppercase tracking-widest ml-4">Core
+                            Objectives</label>
+                        <textarea id="ob-interests" rows="2" required class="input-apple resize-none"
+                            placeholder="Scale Zyrabit and dominate the sovereign AI space."></textarea>
                     </div>
 
-                    
+
                     <div class="flex gap-4 pt-6">
-                        <button type="button" id="ob-skip" class="flex-1 py-4 text-xs font-bold text-black/40 hover:bg-black/5 rounded-3xl transition-all">SKIP</button>
-                        <button type="submit" class="flex-1 py-4 btn-apple-primary text-xs font-bold tracking-widest">GET STARTED</button>
+                        <button type="button" id="ob-skip"
+                            class="flex-1 py-4 text-xs font-bold text-black/40 hover:bg-black/5 rounded-3xl transition-all">SKIP</button>
+                        <button type="submit"
+                            class="flex-1 py-4 btn-apple-primary text-xs font-bold tracking-widest">GET STARTED</button>
                     </div>
                 </form>
             </div>
         </div>
 
         <!-- SNACKBAR CONTAINER -->
-        <div id="snackbar-container" class="fixed top-24 left-1/2 -translate-x-1/2 z-[100] flex flex-col gap-3 pointer-events-none w-full max-w-sm"></div>
+        <div id="snackbar-container"
+            class="fixed top-24 left-1/2 -translate-x-1/2 z-[100] flex flex-col gap-3 pointer-events-none w-full max-w-sm">
+        </div>
 
 
+        <div id="docs-panel" class="side-panel glass-premium rounded-[3rem] p-8 flex flex-col shadow-3xl">
+            <div class="flex items-center justify-between mb-8">
+                <h2 class="text-2xl font-bold tracking-tight">Documentation</h2>
+                <button id="close-docs" class="w-10 h-10 rounded-full bg-black/5 flex items-center justify-center hover:bg-black/10 transition-all">×</button>
+            </div>
+            <div class="flex-1 overflow-y-auto space-y-6 pr-4">
+                <section>
+                    <h3 class="text-xs font-bold text-black/30 uppercase tracking-widest mb-3">Sovereign Commands</h3>
+                    <ul class="space-y-2 text-sm text-black/70">
+                        <li class="bg-black/5 p-3 rounded-2xl"><strong>/vault</strong> - Open knowledge management</li>
+                        <li class="bg-black/5 p-3 rounded-2xl"><strong>/clear</strong> - Reset current session</li>
+                        <li class="bg-black/5 p-3 rounded-2xl"><strong>/stats</strong> - View infrastructure latency</li>
+                    </ul>
+                </section>
+                <section>
+                    <h3 class="text-xs font-bold text-black/30 uppercase tracking-widest mb-3">Telegram Bridge</h3>
+                    <p class="text-sm leading-relaxed text-black/60">
+                        Your Zyrabit is bi-directionally linked. Messages sent from your phone appear here in real-time, allowing for sovereign remote control.
+                    </p>
+                </section>
+            </div>
+        </div>
     </main>
+
 
     <script type="module" src="/src/ui/components.js"></script>
     <script type="module" src="/src/main.js"></script>
 </body>
+
 </html>

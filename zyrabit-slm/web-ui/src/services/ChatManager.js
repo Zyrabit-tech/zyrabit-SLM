@@ -56,8 +56,10 @@ export class ChatManager {
     }
 
     onResponse(data) {
-        // Only shift if we were expecting a response
-        if (this.queue.length > 0) {
+        const isNotification = data.metadata?.source === 'TELEGRAM';
+
+        // Only shift if we were expecting a response from the web UI
+        if (!isNotification && this.queue.length > 0) {
             this.queue.shift();
             this.persist();
         }
@@ -71,12 +73,13 @@ export class ChatManager {
         // If there's more in the queue, keep going
         if (this.queue.length > 0) {
             this.processNext();
-        } else {
+        } else if (!isNotification) {
+            // Only stop thinking if this wasn't just a notification bridge message
             this.isProcessing = false;
             bus.emit(EVENTS.UI.THINKING, false);
         }
-
     }
+
 
     persist() {
         Storage.save('pending_messages', this.queue);

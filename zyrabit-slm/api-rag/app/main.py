@@ -25,6 +25,8 @@ from app.domain.services.gatekeeper import Gatekeeper
 from app.domain.use_cases.chat_use_case import ChatUseCase
 from app.domain.use_cases.ingest_use_case import IngestUseCase
 from app.domain.services.mcp_service import mcp
+from app.domain.services.command_router import CommandRouter
+
 
 # Infrastructure Adapters
 from app.infrastructure.persistence.chroma_adapter import ChromaAdapter, DirectOllamaEmbeddings
@@ -113,7 +115,12 @@ async def lifespan(app: FastAPI):
 
         asyncio.create_task(app.state.tg_worker.start())
         
+        # 9. Start Obsidian AutoLearner Background Task (Every 10 minutes)
+        from app.domain.services.obsidian_service import ObsidianService
+        asyncio.create_task(ObsidianService.start_auto_learner_loop(app.state.inference_provider, interval_seconds=600))
+        
         logger.info("✅ Infrastructure initialized successfully.")
+
     except Exception as e:
         logger.error(f"❌ Failed to initialize infrastructure: {e}")
 
@@ -152,12 +159,19 @@ async def chat_message(sid, data):
     logger.info(f"💬 Socket RAG Query from {sid}: {text[:30]}...")
     
     try:
-        # Execute the EXACT SAME use case as the REST API
+        # 1. COMMAND INTERCEPTION (Zero-Lag)
+        command_res = await CommandRouter.handle(text, source="WEB", session_id=sid)
+        if command_res:
+            await sio.emit("chat_response", command_res, to=sid)
+            return
+
+        # 2. RAG BRAIN EXECUTION
         result = await _global_app.state.chat_use_case.execute(text=text, client_msg_id=msg_id)
         await sio.emit("chat_response", result, to=sid)
     except Exception as e:
         logger.error(f"❌ Socket RAG Error: {e}")
         await sio.emit("chat_response", {"response": "I encountered an error processing your request."}, to=sid)
+
 
 # Middleware
 from app.infrastructure.shared.config import ALLOWED_ORIGINS

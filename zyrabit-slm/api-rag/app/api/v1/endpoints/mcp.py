@@ -14,6 +14,16 @@ async def mcp_config():
         "capabilities": ["tools"]
     }
 
+@router.get("/tools")
+async def list_mcp_tools_mcp():
+    """Direct discovery endpoint for FastMCP tools with JSON Schema parameters."""
+    try:
+        tools = [{"name": t.name, "description": t.description, "inputSchema": t.parameters} for t in mcp._tool_manager._tools.values()]
+        return {"tools": tools}
+    except Exception as e:
+        return {"error": f"Failed to inspect FastMCP: {e}", "tools": []}
+
+
 @router.post("/rpc")
 async def mcp_rpc(request: Request):
     """JSON-RPC bridge to the Native FastMCP instance."""

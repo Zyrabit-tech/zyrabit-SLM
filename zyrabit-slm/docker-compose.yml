@@ -40,7 +40,9 @@ services:
     environment:
       - N8N_SERVICE_TOKEN_FILE=/run/secrets/n8n_service_token
       - N8N_WEBHOOK_SIGNING_SECRET_FILE=/run/secrets/n8n_webhook_signing_secret
+      - ONNXRUNTIME_LOGGING_LEVEL=3
     depends_on:
+
       zyrabit-db:
         condition: service_started
       zyrabit-engine:
@@ -150,13 +152,16 @@ services:
       - ANONYMIZED_TELEMETRY=False
       - CHROMA_OTEL_COLLECTION_ENDPOINT=http://localhost:4317
       - CHROMA_OTEL_SERVICE_NAME=zyrabit-vector-db
+      - ORT_LOGGING_LEVEL=3
+
     volumes:
       - ./chroma-data:/data
     networks:
       - zyrabit-sovereign-net
     healthcheck:
-      test: ["CMD-SHELL", "python3 -c 'import urllib.request; urllib.request.urlopen(\"http://localhost:8000/api/v2/heartbeat\")' || exit 1"]
+      test: ["CMD-SHELL", "python -c 'import urllib.request; urllib.request.urlopen(\"http://localhost:8000/api/v2/heartbeat\")' || python3 -c 'import urllib.request; urllib.request.urlopen(\"http://localhost:8000/api/v2/heartbeat\")' || exit 1"]
       interval: 30s
+
       timeout: 10s
       retries: 3
 

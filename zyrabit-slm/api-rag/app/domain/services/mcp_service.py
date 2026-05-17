@@ -109,6 +109,39 @@ async def secure_query(prompt: str) -> str:
     # This will be wired to the global chat use case during app startup
     return "This tool is a bridge to the Zyrabit RAG Engine."
 
+@mcp.tool()
+async def sync_obsidian_vault() -> str:
+    """
+    Scans the local Obsidian vault folder and indexes new/modified markdown notes
+    dynamically into the hybrid FTS5 and Vector RAG pipeline.
+    """
+    from app.main import _global_app
+    from app.domain.services.obsidian_service import ObsidianService
+    
+    try:
+        ingest_use_case = _global_app.state.ingest_use_case
+        stats = await ObsidianService.sync_vault(ingest_use_case)
+        return f"Obsidian Sync Successful! Scanned: {stats['scanned']}, Indexed: {stats['indexed']}, Skipped: {stats['skipped']}, Errors: {stats['errors']}"
+    except Exception as e:
+        return f"Error executing Obsidian Sync: {e}"
+
+@mcp.tool()
+async def generate_reflective_note(session_id: str) -> str:
+    """
+    Saves a reflective auto-learning summary note of the active session
+    directly back into the Obsidian vault folder as a markdown file.
+    """
+    from app.main import _global_app
+    from app.domain.services.obsidian_service import ObsidianService
+    
+    try:
+        inference_provider = _global_app.state.inference_provider
+        result = await ObsidianService.generate_reflective_note(session_id, inference_provider)
+        return result
+    except Exception as e:
+        return f"Error generating reflective note: {e}"
+
+
 # LEGACY SHIMS FOR V1.0 COMPATIBILITY
 async def handle_jsonrpc(request_dict: dict) -> dict:
     """Legacy shim for V1.0 compatibility."""

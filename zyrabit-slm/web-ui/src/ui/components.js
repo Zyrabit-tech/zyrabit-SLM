@@ -61,6 +61,8 @@ class ZyraChatMessage extends HTMLElement {
 
     render() {
         const isUser = this._role === 'user';
+        const source = this._metadata?.source;
+        const isTelegram = source === 'TELEGRAM' || source === 'TELEGRAM_INCOMING';
 
         this.shadowRoot.innerHTML = `
             <style>
@@ -98,6 +100,16 @@ class ZyraChatMessage extends HTMLElement {
                     border-top-left-radius: 4px;
                 }
 
+                .source-tag {
+                    font-size: 8px;
+                    font-bold;
+                    text-transform: uppercase;
+                    letter-spacing: 0.1em;
+                    margin-bottom: 4px;
+                    opacity: 0.5;
+                    color: ${isUser ? 'white' : '#3f5a6d'};
+                }
+
                 .timestamp {
                     font-size: 9px;
                     margin-top: 4px;
@@ -123,6 +135,7 @@ class ZyraChatMessage extends HTMLElement {
                 .source-pill { background: rgba(63, 90, 109, 0.05); padding: 2px 4px; border-radius: 4px; font-size: 8px; border: 1px solid rgba(63, 90, 109, 0.1); }
             </style>
             <div class="wrapper">
+                ${isTelegram ? `<div class="source-tag">✈️ Telegram</div>` : ''}
                 <div class="bubble ${isUser ? 'user' : 'assistant'}">
                     <div id="content"></div>
                     ${this.renderMetadata()}
@@ -132,6 +145,7 @@ class ZyraChatMessage extends HTMLElement {
         `;
         this.shadowRoot.getElementById('content').textContent = this._text;
     }
+
 
 
     renderMetadata() {

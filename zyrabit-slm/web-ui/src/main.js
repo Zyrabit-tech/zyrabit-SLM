@@ -26,8 +26,16 @@ class ZyrabitApp {
         this.startHealthChecks();
         this.checkOnboarding();
         this.chat.recover(); // Recover Shadow State
+        
+        // Hide floating suggestions if history exists
+        if (this.chat.queue.length > 0) {
+            const suggestions = document.getElementById('floating-suggestions');
+            if (suggestions) suggestions.style.display = 'none';
+        }
+        
         this.loadVault();
         this.loadTools();
+
     }
 
     async checkOnboarding() {
@@ -68,8 +76,10 @@ class ZyrabitApp {
                     interests: getSafeElement('ob-interests').value,
                     persona: getSafeElement('ob-persona').value,
                     tone: getSafeElement('ob-tone').value,
+                    assistant_name: getSafeElement('ob-assistant')?.value || 'Zyra',
                     preferred_model: 'qwen2.5:7b'
                 };
+
                 
                 try {
                     await fetch('/v1/profile', {
@@ -102,10 +112,17 @@ class ZyrabitApp {
                 const text = input.value.trim();
                 if (!text) return;
                 
+                // Ocultar sugerencias flotantes al iniciar conversación
+                const suggestions = document.getElementById('floating-suggestions');
+                if (suggestions) suggestions.style.opacity = '0';
+                
+                bus.emit(EVENTS.UI.THINKING, true);
                 bus.emit(EVENTS.CHAT.SEND, { text, history: this.history });
                 this.history.push({ role: 'user', content: text });
                 input.value = '';
             };
+
+
 
             input.onkeydown = (e) => {
                 if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
@@ -119,10 +136,11 @@ class ZyrabitApp {
 
         // 3. Navigation & Panels
         bind(IDS.TOGGLE_GDPR, 'onclick', () => this.togglePanel(IDS.GDPR_PANEL));
-        bind(IDS.CLOSE_GDPR, 'onclick', () => this.togglePanel(IDS.GDPR_PANEL));
-        bind(IDS.TOGGLE_INGEST, 'onclick', () => this.togglePanel(IDS.INGEST_PANEL));
-        bind(IDS.VAULT_BTN, 'onclick', () => this.togglePanel(IDS.INGEST_PANEL));
-        bind(IDS.CLOSE_INGEST, 'onclick', () => this.togglePanel(IDS.INGEST_PANEL));
+        getSafeElement('toggle-ingest').onclick = () => this.togglePanel(IDS.INGEST_PANEL);
+        getSafeElement('toggle-docs').onclick = () => this.togglePanel(IDS.DOCS_PANEL);
+        getSafeElement('close-gdpr').onclick = () => this.togglePanel(null);
+        getSafeElement('close-ingest').onclick = () => this.togglePanel(null);
+        getSafeElement('close-docs').onclick = () => this.togglePanel(null);
 
         // 4. File Ingest
         try {
@@ -140,8 +158,9 @@ class ZyrabitApp {
 
 
     togglePanel(id) {
-        const panels = [IDS.GDPR_PANEL, IDS.INGEST_PANEL];
+        const panels = [IDS.GDPR_PANEL, IDS.INGEST_PANEL, IDS.DOCS_PANEL];
         panels.forEach(p => {
+
             try {
                 const el = getSafeElement(p);
                 if (p === id) {

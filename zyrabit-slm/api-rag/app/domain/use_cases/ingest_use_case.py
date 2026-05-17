@@ -50,8 +50,11 @@ class IngestUseCase:
             if self.retriever_service:
                 self.retriever_service.update_bm25_index(chunks)
             
-            SovereignStateManager.update_vault_index(file_path, len(chunks))
+            # Combine text for FTS5
+            full_text = "\n".join(chunk.page_content for chunk in chunks)
+            SovereignStateManager.update_vault_index(file_path, len(chunks), full_text_content=full_text)
             logger.info(f"✅ High-Precision Ingestion successful: {filename}")
+
             return {"status": "success", "doc_id": doc_id, "chunks": len(chunks)}
             
         except Exception as e:

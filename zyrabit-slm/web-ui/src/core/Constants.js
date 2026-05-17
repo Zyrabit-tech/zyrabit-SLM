@@ -32,6 +32,7 @@ export const IDS = {
     CLOSE_INGEST: 'close-ingest',
     GDPR_PANEL: 'gdpr-panel',
     INGEST_PANEL: 'ingest-panel',
+    DOCS_PANEL: 'docs-panel',
     DROP_ZONE: 'drop-zone',
     FILE_INPUT: 'file-input',
     GDPR_LOGS: 'gdpr-logs'

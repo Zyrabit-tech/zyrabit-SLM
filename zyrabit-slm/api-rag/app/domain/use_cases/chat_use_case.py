@@ -20,7 +20,7 @@ class ChatUseCase:
         self.cache = cache
         self.context_manager = ContextManager()
 
-    async def execute(self, text: str, client_msg_id: Optional[str] = None, history: Optional[list] = None) -> Dict[str, Any]:
+    async def execute(self, text: str, client_msg_id: Optional[str] = None, history: Optional[list] = None, source: str = "WEB") -> Dict[str, Any]:
         try:
             # 0. Idempotency Check
             if client_msg_id:
@@ -38,21 +38,7 @@ class ChatUseCase:
                 logger.debug(f"Original: {text}")
                 logger.info(f"Sanitized: {sanitized_text}")
             
-            # 2. Routing Decision & Tool Execution
-            # [NEW] Deterministic Tool Execution for Sovereign Core Actions
-            if "Send a Telegram notification" in text:
-                from app.domain.services.mcp_service import send_telegram_notification
-                # Extract content between quotes or after colon
-                content = text.split("content:")[-1].strip().strip("'\"")
-                if not content:
-                    content = text.split("notification:")[-1].strip().strip("'\"")
-                
-                tool_res = await send_telegram_notification(content)
-                return {
-                    "response": f"Sovereign Shield: {tool_res}",
-                    "metadata": {"decision": "tool_execution", "tool": "telegram_bridge", "cached": False}
-                }
-
+            # 2. Routing Decision
             decision = self.gatekeeper.get_routing_decision(sanitized_text)
             
             if decision == "reject":
@@ -79,22 +65,9 @@ class ChatUseCase:
                         decision = "direct (fallback)"
 
             # 4. Inference
-            # Attempt to find system prompt in multiple locations (Local vs Docker)
-            possible_paths = [
-                "app/infrastructure/shared/prompts/zyra_system.md",
-                "zyrabit-slm/api-rag/app/infrastructure/shared/prompts/zyra_system.md",
-                "/app/app/infrastructure/shared/prompts/zyra_system.md"
-            ]
             system_prompt = "You are Zyra, a helpful sovereign assistant."
-            for p in possible_paths:
-                if os.path.exists(p):
-                    try:
-                        with open(p, "r", encoding="utf-8") as f:
-                            system_prompt = f.read()
-                        break
-                    except: continue
 
-            # 4. Memory Recovery (Optional override if history not sent from frontend)
+            # 4. Memory Recovery
             if history is None:
                 history = SovereignStateManager.get_history(client_msg_id or "default")
             
@@ -107,8 +80,11 @@ class ChatUseCase:
                 history=history,
                 rag_docs=results if decision == "rag" else [],
                 user_query=sanitized_text,
-                user_profile=user_profile
+                user_profile=user_profile,
+                source=source
             )
+
+
 
             # [NEW] Model Switching based on Persona/Profile Preference
             target_model = user_profile.get("preferred_model", MODEL_NAME) if user_profile else MODEL_NAME

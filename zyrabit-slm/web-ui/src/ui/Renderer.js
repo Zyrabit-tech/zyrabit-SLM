@@ -25,17 +25,23 @@ export class Renderer {
         const dateStr = now.toLocaleDateString([], { weekday: 'long', day: 'numeric', month: 'long' });
         const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
+        // User requested Telegram incoming messages to look like user messages
+        let effectiveRole = role;
+        if (metadata && (metadata.source === 'TELEGRAM' || metadata.source === 'TELEGRAM_INCOMING')) {
+            effectiveRole = 'user';
+        }
+
         // Add Date Separator if needed
         if (this.lastDate !== dateStr) {
             const separator = document.createElement('div');
             separator.className = 'date-separator';
-            separator.innerHTML = `<span class="date-pill">${dateStr}</span>`;
+            separator.innerHTML = `<span class="date-text">${dateStr}</span>`;
             this.container.appendChild(separator);
             this.lastDate = dateStr;
         }
 
         const msg = document.createElement('zyra-chat-message');
-        msg.data = { role, text, metadata, timestamp: timeStr };
+        msg.data = { role: effectiveRole, text, metadata, timestamp: timeStr };
         
         this.container.appendChild(msg);
         
@@ -47,6 +53,7 @@ export class Renderer {
             });
         });
     }
+
 
 
 
@@ -105,7 +112,7 @@ export class Renderer {
         if (!button) return;
 
         const btnText = button.querySelector('.button-text');
-        const btnSpinner = button.querySelector('.loader-spin');
+        const btnSpinner = button.querySelector('.loader-ios');
 
         if (state) {
             button.disabled = true;
@@ -121,21 +128,59 @@ export class Renderer {
             newLoader.innerHTML = `
                 <div class="flex items-start gap-3 max-w-[85%]">
                     <div class="w-8 h-8 rounded-full bg-zyrabit-surface border border-zyrabit-border flex items-center justify-center flex-shrink-0">
-                        <img src="/img/logo.png" class="w-5 h-5 object-contain animate-pulse">
+                        <img src="/img/logo_zyrabit.png" class="w-5 h-5 object-contain animate-pulse">
                     </div>
-                    <div class="bg-zyrabit-surface p-4 rounded-2xl rounded-tl-none text-sm text-zyrabit-primary italic flex items-center gap-2 border border-zyrabit-border/30">
-                        <span class="animate-pulse">Zyra is thinking...</span>
+                    <div class="bg-white p-4 rounded-2xl rounded-tl-none text-sm text-[#3f5a6d] italic flex items-center gap-2 border border-black/5 shadow-sm">
+                        <div class="flex gap-1 flex-shrink-0">
+                            <div class="w-1.5 h-1.5 bg-[#3f5a6d] rounded-full animate-bounce"></div>
+                            <div class="w-1.5 h-1.5 bg-[#3f5a6d] rounded-full animate-bounce [animation-delay:0.2s]"></div>
+                            <div class="w-1.5 h-1.5 bg-[#3f5a6d] rounded-full animate-bounce [animation-delay:0.4s]"></div>
+                        </div>
+                        <span class="thinking-text font-medium text-xs tracking-wide">Zyra está pensando...</span>
                     </div>
                 </div>
             `;
+
             this.container.appendChild(newLoader);
             this.container.scrollTop = this.container.scrollHeight;
+
+            // Premium UX: Cycle through descriptive tasks so the user knows exactly what the sovereign engine is doing
+            const legends = [
+                "Buscando en documentos del Vault...",
+                "Consultando base de datos soberana...",
+                "Aplicando escudo de privacidad (Gatekeeper)...",
+                "Ejecutando búsqueda híbrida (FTS5 + Vectorial)...",
+                "Sintetizando respuestas con el SLM local...",
+                "Analizando contexto y dependencias...",
+                "Preparando memoria y nota reflexiva..."
+            ];
+            let legendIdx = 0;
+            const textEl = newLoader.querySelector('.thinking-text');
+            
+            // Set initial dynamic legend after 2 seconds
+            this.thinkingInterval = setInterval(() => {
+                if (textEl) {
+                    textEl.style.opacity = '0';
+                    setTimeout(() => {
+                        textEl.textContent = legends[legendIdx % legends.length];
+                        textEl.style.opacity = '1';
+                        legendIdx++;
+                    }, 200);
+                }
+            }, 3000);
+
         } else {
             button.disabled = false;
             button.classList.remove('opacity-80', 'cursor-not-allowed');
             if (btnText) btnText.classList.remove('hidden');
             if (btnSpinner) btnSpinner.classList.add('hidden');
             if (loader) loader.remove();
+            
+            if (this.thinkingInterval) {
+                clearInterval(this.thinkingInterval);
+                this.thinkingInterval = null;
+            }
         }
     }
 }
+
