@@ -2,6 +2,8 @@ import logging
 from typing import Optional, Dict, Any
 from app.infrastructure.shared.config import MODEL_NAME
 from app.infrastructure.shared.metrics import TOKEN_USAGE_TOTAL, TOKEN_LATENCY_MS, SECURITY_HITS_TOTAL, RAG_HITS_TOTAL
+from app.infrastructure.shared.state_tracker import SovereignStateManager
+from app.domain.services.context_manager import ContextManager
 from app.ports.inference_port import InferenceRequest
 
 logger = logging.getLogger("zyrabit.api")
@@ -15,8 +17,9 @@ class ChatUseCase:
         self.retriever_service = retriever_service
         self.gatekeeper = gatekeeper
         self.cache = cache
+        self.context_manager = ContextManager()
 
-    async def execute(self, text: str, client_msg_id: Optional[str] = None) -> Dict[str, Any]:
+    async def execute(self, text: str, client_msg_id: Optional[str] = None, history: Optional[list] = None, source: str = "WEB") -> Dict[str, Any]:
         try:
             # 0. Idempotency Check
             if client_msg_id:
@@ -61,25 +64,42 @@ class ChatUseCase:
                         decision = "direct (fallback)"
 
             # 4. Inference
-            system_prompt_path = "app/infrastructure/shared/prompts/zyra_system.md"
-            try:
-                with open(system_prompt_path, "r", encoding="utf-8") as f:
-                    system_prompt = f.read()
-            except Exception as e:
-                logger.warning(f"⚠️ Could not load system prompt from {system_prompt_path}: {e}")
-                system_prompt = "You are Zyra, a helpful assistant."
+            system_prompt = "You are Zyra, a helpful sovereign assistant."
+
+            # 4. Memory Recovery
+            if history is None:
+                history = SovereignStateManager.get_history(client_msg_id or "default")
             
-            prompt = sanitized_text
-            if context:
-                prompt = f"Context:\n{context}\n\nQuestion: {sanitized_text}\n\nAnswer based ONLY on the context provided:"
+            # 4b. Fetch User Profile for Personalization
+            user_profile = SovereignStateManager.get_user_profile()
+
+            # 5. Build Final Prompt via ContextManager
+            prompt = self.context_manager.build_final_prompt(
+                system_prompt=system_prompt,
+                history=history,
+                rag_docs=results if decision == "rag" else [],
+                user_query=sanitized_text,
+                user_profile=user_profile,
+                source=source
+            )
+
+
+
+            # [NEW] Model Switching based on Persona/Profile Preference
+            target_model = user_profile.get("preferred_model", MODEL_NAME) if user_profile else MODEL_NAME
 
             request = InferenceRequest(
-                model=MODEL_NAME, 
+                model=target_model, 
                 prompt=prompt,
                 system_prompt=system_prompt
             )
             response_obj = self.inference_provider.generate(request)
+
             
+            # 6. Persist interaction to Sovereign State
+            SovereignStateManager.store_message(client_msg_id or "default", "user", sanitized_text)
+            SovereignStateManager.store_message(client_msg_id or "default", "assistant", response_obj.text)
+
             latency_ms = response_obj.latency_seconds * 1000
             final_response = {
                 "response": response_obj.text,
@@ -87,12 +107,21 @@ class ChatUseCase:
                     "decision": decision,
                     "latency_ms": round(latency_ms, 2),
                     "sources": sources,
+                    "rag_hits": len(sources) if (decision == "rag" and sources) else 0,
                     "pii_detected": any(entities.values()),
                     "cached": False
                 }
             }
             
-            # 5. Cache
+            # 5. Metrics Recording
+            TOKEN_LATENCY_MS.labels(model=MODEL_NAME).observe(latency_ms)
+            # Estimate tokens as words (approximate for SLM visibility)
+            token_count = len(response_obj.text.split())
+            TOKEN_USAGE_TOTAL.labels(model=MODEL_NAME, direction="output").inc(token_count)
+            if decision == "rag" and sources:
+                RAG_HITS_TOTAL.labels(collection="default").inc()
+
+            # 6. Cache
             if client_msg_id:
                 self.cache.set(client_msg_id, final_response)
 

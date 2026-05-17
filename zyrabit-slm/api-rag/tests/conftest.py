@@ -1,16 +1,22 @@
 import pytest
 from unittest.mock import MagicMock, AsyncMock, patch
+from fastapi.testclient import TestClient
 
+@pytest.fixture
+def client():
+    """
+    Returns a TestClient for the FastAPI app. 
+    The app is imported inside the fixture to ensure it is 
+    initialized AFTER infrastructure mocks are applied.
+    """
+    from app.main import app
+    with TestClient(app) as c:
+        yield c
 
 @pytest.fixture(autouse=True)
 def mock_infrastructure():
     """
     Global fixture that prevents tests from connecting to real infrastructure.
-
-    V5.0 architecture: ChatUseCase has a single execute() method. Infrastructure
-    adapters are initialized in the lifespan and stored on app.state. We patch
-    at the class/constructor level to return mock instances without a real
-    Ollama or ChromaDB endpoint.
     """
     mock_chroma = MagicMock()
     mock_chroma.heartbeat.return_value = True
@@ -46,14 +52,29 @@ def mock_infrastructure():
         new=AsyncMock(return_value=None),
     ):
         from app.main import app
+        # Ensure state is set before each test
         app.state.vector_store = mock_chroma
         app.state.inference_provider = mock_inference
         app.state.retriever_service = mock_retriever
+        
+        from app.domain.use_cases.chat_use_case import ChatUseCase
+        from app.domain.use_cases.ingest_use_case import IngestUseCase
+        from app.domain.services.gatekeeper import Gatekeeper
+        from app.infrastructure.shared.cache import global_cache
+        
+        app.state.chat_use_case = ChatUseCase(
+            inference_provider=mock_inference,
+            retriever_service=mock_retriever,
+            gatekeeper=Gatekeeper,
+            cache=global_cache
+        )
+        app.state.ingest_use_case = IngestUseCase(vector_store=mock_chroma)
 
         yield {
             "vector_store": mock_chroma,
             "inference": mock_inference,
             "retriever": mock_retriever,
+            "chat_use_case": app.state.chat_use_case
         }
 
 
@@ -65,3 +86,10 @@ def mock_settings(monkeypatch):
     monkeypatch.setenv("SLM_URL", "http://localhost:11434")
     monkeypatch.setenv("DB_URL", "http://localhost:8000")
     monkeypatch.setenv("MODEL_NAME", "qwen2.5:7b")
+    monkeypatch.setenv("DB_PATH", "/tmp/test_sovereign.db")
+    monkeypatch.setenv("TESTING", "true")
+    monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "mock_token")
+    monkeypatch.setenv("TELEGRAM_CHAT_ID", "mock_chat_id")
+
+
+

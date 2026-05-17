@@ -7,8 +7,34 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [2.0.0] - 2026-05-15
 
+### Added
+- **Sovereign Persistence**: Migrated from memory-only state to SQLite WAL (`SovereignStateManager`) for persistent conversations and vault indexing.
+- **FastMCP SDK Integration**: Full migration to the official MCP v1.0 SDK, replacing legacy JSON-RPC handlers.
+- **Personalized Onboarding**: Added a profile management system that learns user goals and roles to tailor AI responses.
+- **Hardware-Aware Detection**: `zyra-up.sh` now supports automated profiles for Metal (Mac), CUDA (Nvidia), and Tenstorrent.
+- **Context Budgeting**: Implemented strict token management with `tiktoken` and rank-based context trimming.
+- **Security Shield**: Added executable script scanning for `import_to_vault` and automated security audits (Trivy + CodeQL).
+
+### Changed
+- Refactored `ChatUseCase` to use the new `ContextManager` and `SovereignStateManager`.
+- Updated `main.py` to initialize the sovereign database lifespan.
+- Standardized file ingestion using SHA-256 hashing to avoid redundant processing.
+
+### Fixed
+- Resolved `ImportError` on startup caused by legacy MCP RPC handlers.
+- Fixed database concurrency issues by enabling WAL mode for all SQLite operations.
+
+## [1.7.5] - 2026-05-15
+
+### Security
+- Hardened MCP file reading by strictly validating paths against allowed roots, preventing directory traversal attacks.
+- Updated `_resolve_file_uri` to canonicalize paths and use `os.path.commonpath` for robust path containment checks.
+
+### Changed
+- Updated `zyra-up.sh verify` to use `uv run pytest -q` for running MCP security tests.
+    
 ## [1.5.0] - 2026-04-08
 
 ### Added

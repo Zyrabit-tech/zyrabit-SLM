@@ -2,17 +2,98 @@
 @tailwind components;
 @tailwind utilities;
 
-@layer components {
-    .scrollbar-hide::-webkit-scrollbar {
-        display: none;
+@layer base {
+    body {
+        @apply bg-[#f0f2f5] font-sans text-[#1c1e21];
+        font-family: 'Funnel Display', sans-serif;
     }
+}
 
-    .glass {
-        @apply bg-opacity-80 backdrop-blur-md;
-        background: rgba(226, 236, 244, 0.8);
-    }
+.glass-premium {
+    @apply bg-white/70 backdrop-blur-2xl;
+}
 
-    #gdpr-panel {
-        transition: transform 0.3s ease;
-    }
+/* Side Panels Animation */
+.side-panel {
+    position: fixed;
+    right: 1.5rem;
+    top: 6rem;
+    bottom: 1.5rem;
+    width: 100%;
+    max-width: 24rem; /* md:w-96 */
+    z-index: 50;
+    transition: transform 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+    transform: translateX(120%);
+}
+
+.side-panel.active {
+    transform: translateX(0);
+}
+
+.chat-bubble {
+    @apply max-w-[80%] p-4 rounded-2xl relative mb-2 text-[13px] leading-relaxed shadow-sm;
+}
+
+.chat-bubble-user {
+    @apply bg-[#3f5a6d] text-white self-end rounded-tr-none;
+}
+
+.chat-bubble-ai {
+    @apply bg-white text-black self-start rounded-tl-none border border-black/5;
+}
+
+.timestamp {
+    @apply text-[9px] opacity-40 mt-1 block text-right;
+}
+
+.date-separator {
+    @apply flex items-center justify-center my-6;
+}
+
+.date-text {
+    @apply bg-black/5 px-3 py-1 rounded-full text-[10px] font-bold text-black/40 uppercase tracking-widest;
+}
+
+.input-apple {
+    @apply w-full bg-black/5 border-none rounded-2xl p-4 focus:ring-2 focus:ring-[#3f5a6d]/20 transition-all outline-none text-sm;
+}
+
+.loader-ios {
+    @apply w-5 h-5 border-2 border-black/10 border-t-black/40 rounded-full animate-spin;
+}
+
+/* Notifications (Snackbars) */
+.snackbar {
+    @apply flex items-center gap-4 p-4 rounded-[1.5rem] shadow-2xl border border-white/40 pointer-events-auto backdrop-blur-xl transition-all duration-500;
+    background: rgba(255, 255, 255, 0.85);
+}
+
+.snackbar-success {
+    @apply border-green-500/20;
+}
+.snackbar-success .snackbar-icon { @apply text-green-500; }
+.snackbar-success .snackbar-label { @apply text-green-600; }
+
+.snackbar-error {
+    @apply border-red-500/20;
+}
+.snackbar-error .snackbar-icon { @apply text-red-500; }
+.snackbar-error .snackbar-label { @apply text-red-600; }
+
+.snackbar-enter {
+    animation: snackbar-in 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+}
+
+.snackbar-exit {
+    animation: snackbar-out 0.4s ease forwards;
+}
+
+@keyframes snackbar-in {
+    from { transform: translateY(-20px) scale(0.9); opacity: 0; }
+    to { transform: translateY(0) scale(1); opacity: 1; }
+}
+
+@keyframes snackbar-out {
+    from { transform: translateY(0) scale(1); opacity: 1; }
+    to { transform: translateY(-10px) scale(0.95); opacity: 0; }
 }

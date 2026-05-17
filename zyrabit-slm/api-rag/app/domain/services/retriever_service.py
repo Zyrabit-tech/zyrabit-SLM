@@ -36,14 +36,22 @@ class HybridRetrieverService:
 
     async def search(self, query: str, domain: Optional[str] = None) -> List[Document]:
         """
-        Executes hybrid search with optional domain filtering.
+        Executes hybrid search with FTS5 Fast-Path and Vector Fallback.
         """
+        from app.infrastructure.shared.state_tracker import SovereignStateManager
+        
+        logger.info(f"⚡ FTS5 Fast-Path Search for: '{query}'")
+        fts_results = SovereignStateManager.search_fts(query)
+        
+        if fts_results:
+            logger.info(f"🚀 FTS5 Hit! Found {len(fts_results)} results instantly.")
+            return [Document(page_content=r["snippet"], metadata={"source": r["file_path"], "type": "fts5"}) for r in fts_results]
+
         if not self.ensemble_retriever:
             logger.warning("⚠️ Ensemble Retriever not initialized. Falling back to Vector-only.")
             return self.vector_store.similarity_search(query, k=3)
             
-        logger.info(f"🔎 Executing Hybrid Search for: '{query}' (domain: {domain})")
-        
-        # Note: In V5.1 we will add hard filtering by domain using search_kwargs
+        logger.info(f"🔎 Falling back to Hybrid Ensemble (Vector+BM25) for: '{query}'")
         results = self.ensemble_retriever.invoke(query)
         return results
+

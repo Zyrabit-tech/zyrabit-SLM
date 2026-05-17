@@ -1,11 +1,34 @@
 name: zyrabit-slm
 
 services:
+  traefik:
+    image: traefik:latest
+    container_name: zyrabit-traefik
+    command:
+      - --api.dashboard=true
+      - --providers.docker=true
+      - --providers.docker.exposedbydefault=false
+      - --entryPoints.web.address=:80
+      - --entryPoints.websecure.address=:443
+      - --entryPoints.websecure.http.tls=true
+      - --api.insecure=true
+      - --log.level=${TRAEFIK_LOG_LEVEL:-INFO}
+      - --providers.file.directory=/etc/traefik/dynamic
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./traefik:/etc/traefik/dynamic:ro
+    networks:
+      - backend-network
+
   # 1. THE BRAIN: API RAG
   zyrabit-api:
     image: zyrabit-slm/api-rag
     build:
-      context: ./api-rag
+      context: ..
+      dockerfile: zyrabit-slm/api-rag/Dockerfile
     container_name: zyrabit-api
     env_file:
       - .env
@@ -14,13 +37,15 @@ services:
       - N8N_WEBHOOK_SIGNING_SECRET_FILE=/run/secrets/n8n_webhook_signing_secret
       - SLM_URL=http://host.docker.internal:11434
       - DB_URL=http://zyrabit-db:8000
-    # depends_on:
-    #   zyrabit-db:
-    #     condition: service_started
-    #   zyrabit-engine:
-    #     condition: service_started
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.zyrabit-api.rule=Host(`${DOMAIN}`) && (PathPrefix(`/v1`) || PathPrefix(`/socket.io`))
+      - traefik.http.routers.zyrabit-api.entrypoints=websecure
+      - traefik.http.routers.zyrabit-api.tls=true
+      - traefik.http.services.zyrabit-api.loadbalancer.server.port=8080
+      - traefik.docker.network=zyrabit-slm_backend-network
     ports:
-      - "8080:8080" # Direct HTTP access
+      - "8082:8080" # Moved from 8080 to avoid Mac system conflicts
     networks:
       - backend-network
       - model-network
@@ -36,8 +61,16 @@ services:
   zyrabit-web:
     image: zyrabit-slm/web-ui
     build:
-      context: ./web-ui
+      context: ..
+      dockerfile: zyrabit-slm/web-ui/Dockerfile
     container_name: zyrabit-web
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.zyrabit-web.rule=Host(`${DOMAIN}`) && PathPrefix(`/`)
+      - traefik.http.routers.zyrabit-web.entrypoints=websecure
+      - traefik.http.routers.zyrabit-web.tls=true
+      - traefik.http.services.zyrabit-web.loadbalancer.server.port=80
+      - traefik.docker.network=zyrabit-slm_backend-network
     ports:
       - "3000:80"
     networks:
@@ -47,7 +80,7 @@ services:
     depends_on:
       - zyrabit-api
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost"]
+      test: [ "CMD", "curl", "-f", "http://localhost" ]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -74,7 +107,42 @@ services:
     ports:
       - "8000:8000"
     volumes:
-      - ./chroma-data:/chroma/chroma
+      - ./chroma-data:/data
+    healthcheck:
+      test: [ "CMD-SHELL", "python3 -c 'import urllib.request; urllib.request.urlopen(\"http://localhost:8000/api/v2/heartbeat\")' || exit 1" ]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    networks:
+      - backend-network
+
+  # 4. OBSERVABILITY: Grafana & Prometheus
+  zyrabit-prometheus:
+    image: prom/prometheus:latest
+    container_name: zyrabit-prometheus
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+    networks:
+      - backend-network
+
+  zyrabit-grafana:
+    image: grafana/grafana:latest
+    container_name: zyrabit-grafana
+    ports:
+      - "3001:3000"
+    environment:
+      - GF_AUTH_ANONYMOUS_ENABLED=true
+      - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
+      - GF_AUTH_BASIC_ENABLED=false
+      - GF_SERVER_ROOT_URL=http://localhost:3001
+      - GF_SERVER_SERVE_FROM_SUB_PATH=false
+    volumes:
+      - ./grafana/datasources:/etc/grafana/provisioning/datasources
+      - ./grafana/dashboards:/etc/grafana/provisioning/dashboards
     networks:
       - backend-network
 

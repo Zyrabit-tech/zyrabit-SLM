@@ -33,7 +33,7 @@ class ZyrabitAPI {
     async _fetch(url, options = {}) {
         const controller = new AbortController();
         const id = setTimeout(() => controller.abort(), this.timeout);
-        
+
         try {
             const res = await fetch(url, { ...options, signal: controller.signal });
             clearTimeout(id);
@@ -113,7 +113,7 @@ class ZyrabitUI {
         // Circuit Breaker triggers if API, SLM or DB is down
         const allSystemGo = state.backendOnline && state.slmStatus !== 'offline' && state.dbStatus !== 'offline';
         this.circuitBreaker.classList.toggle('hidden', allSystemGo);
-        
+
         this.warmupPill.classList.toggle('hidden', state.modelReady);
         this.modelBadge.innerText = `MODEL: ${state.slmStatus.toUpperCase()}`;
 
@@ -168,7 +168,7 @@ class ZyrabitUI {
             <div id="${msgId}" class="flex animate-in fade-in slide-in-from-bottom-2 duration-300">
                 <div class="message-bubble p-4 rounded-2xl ${bubbleClass}">
                     ${isSystem ? '<div class="text-[9px] uppercase font-bold text-yellow-600 mb-2 tracking-widest">Security Guard</div>' : ''}
-                    <div class="text-sm message-content leading-relaxed whitespace-pre-wrap">${content}</div>
+                    <div class="text-sm message-content leading-relaxed">${content}</div>
                     <div class="metadata-area mt-3"></div>
                 </div>
             </div>

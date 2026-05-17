@@ -1,0 +1,151 @@
+FFF.F                                                                    [100%]
+=================================== FAILURES ===================================
+__________________________ test_full_sovereign_cycle ___________________________
+
+    @pytest.mark.asyncio
+    async def test_full_sovereign_cycle():
+        """
+        INTEGRATION TEST: Profile -> Ingest -> Context Aware Chat
+        """
+        # 1. Setup User Profile
+        SovereignStateManager.update_user_profile(
+            name="Kai",
+            role="Sovereign Architect",
+            interests="Local SLM Security"
+        )
+    
+        # 2. Setup Mocks
+        mock_inference = MagicMock()
+        mock_inference.generate.return_value = MagicMock(text="Hola Kai, veo que te interesa la seguridad.", latency_seconds=0.5)
+    
+        mock_vector = MagicMock()
+        mock_retriever = MagicMock()
+        mock_gatekeeper = MagicMock()
+        mock_gatekeeper.scan.return_value = ("Hola Zyra", {})
+        mock_cache = MagicMock()
+    
+        chat_use_case = ChatUseCase(mock_inference, mock_retriever, mock_gatekeeper, mock_cache)
+    
+        # 3. Execute Chat
+        response = await chat_use_case.execute("Hola Zyra", client_msg_id="test_session")
+    
+        # 4. Verify Memory & Context
+>       assert "Hola Kai" in response["response"]
+E       AssertionError: assert 'Hola Kai' in <MagicMock name='mock.get().__getitem__()' id='4704810768'>
+
+zyrabit-slm/api-rag/tests/test_core_v2.py:63: AssertionError
+---------------------------- Captured stderr setup -----------------------------
+{"timestamp": "2026-05-15T18:23:34.305144+00:00", "level": "INFO", "component": "zyrabit.api", "message": "\ud83c\udfdb\ufe0f Sovereign DB Initialized at /tmp/test_sovereign.db [WAL Mode Active]", "module": "state_tracker", "line": 48}
+_________________________ test_wal_concurrency_stress __________________________
+
+    @pytest.mark.asyncio
+    async def test_wal_concurrency_stress():
+        """
+        INTEGRATION TEST: Stress test SQLite WAL concurrency.
+        Simulate multiple agents writing to memory while one reads.
+        """
+        session_id = "stress_test_session"
+    
+        async def writer(i):
+            SovereignStateManager.store_message(session_id, "user", f"Message {i}")
+            await asyncio.sleep(0.01)
+    
+        # Run 50 concurrent writes
+>       await asyncio.gather(*[writer(i) for i in range(50)])
+
+zyrabit-slm/api-rag/tests/test_core_v2.py:82: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+i = 0
+
+    async def writer(i):
+>       SovereignStateManager.store_message(session_id, "user", f"Message {i}")
+
+zyrabit-slm/api-rag/tests/test_core_v2.py:78: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+cls = <class 'app.infrastructure.shared.state_tracker.SovereignStateManager'>
+session_id = 'stress_test_session', role = 'user', content = 'Message 0'
+
+    @classmethod
+    def store_message(cls, session_id: str, role: str, content: str):
+        with sqlite3.connect(cls.DB_PATH) as conn:
+>           conn.execute("""
+                INSERT INTO conversation_memory (session_id, role, content, timestamp)
+                VALUES (?, ?, ?, ?)
+            """, (session_id, role, content, datetime.now()))
+E           sqlite3.OperationalError: no such table: conversation_memory
+
+zyrabit-slm/api-rag/app/infrastructure/shared/state_tracker.py:106: OperationalError
+---------------------------- Captured stderr setup -----------------------------
+{"timestamp": "2026-05-15T18:23:34.451896+00:00", "level": "INFO", "component": "zyrabit.api", "message": "\ud83c\udfdb\ufe0f Sovereign DB Initialized at /tmp/test_sovereign.db [WAL Mode Active]", "module": "state_tracker", "line": 48}
+------------------------------ Captured log setup ------------------------------
+INFO     zyrabit.api:state_tracker.py:48 🏛️ Sovereign DB Initialized at /tmp/test_sovereign.db [WAL Mode Active]
+________________________ test_gatekeeper_pii_redaction _________________________
+
+    def test_gatekeeper_pii_redaction():
+        """
+        UNIT TEST: Validate Gatekeeper's ability to clean PII.
+        """
+        from app.domain.services.gatekeeper import Gatekeeper
+    
+        sensitive_text = "Mi email es test@example.com y mi API key es sk-1234567890abcdef"
+>       clean_text, entities = Gatekeeper.scan(sensitive_text)
+                               ^^^^^^^^^^^^^^^
+E       AttributeError: type object 'Gatekeeper' has no attribute 'scan'
+
+zyrabit-slm/api-rag/tests/test_core_v2.py:95: AttributeError
+---------------------------- Captured stderr setup -----------------------------
+{"timestamp": "2026-05-15T18:23:34.468170+00:00", "level": "INFO", "component": "zyrabit.api", "message": "\ud83c\udfdb\ufe0f Sovereign DB Initialized at /tmp/test_sovereign.db [WAL Mode Active]", "module": "state_tracker", "line": 48}
+------------------------------ Captured log setup ------------------------------
+INFO     zyrabit.api:state_tracker.py:48 🏛️ Sovereign DB Initialized at /tmp/test_sovereign.db [WAL Mode Active]
+_______________________ test_context_budgeting_trimming ________________________
+
+    @pytest.mark.asyncio
+    async def test_context_budgeting_trimming():
+        """
+        Logic Test: Verify ContextManager discards tokens correctly.
+        """
+        manager = ContextManager()
+    
+        # Create a long history
+        long_history = [{"role": "user", "content": "bla " * 500} for _ in range(10)]
+    
+        # Trimming should happen (budget is 1000)
+        trimmed = manager.trim_history(long_history)
+    
+        # Each "bla " is ~1 token. 500 tokens per turn.
+        # Budget of 1000 should allow only ~2 turns.
+        assert "user:" in trimmed
+>       assert trimmed.count("user:") <= 3 # Allow small margin
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       AssertionError: assert 10 <= 3
+E        +  where 10 = <built-in method count of str object at 0x94e22f000>('user:')
+E        +    where <built-in method count of str object at 0x94e22f000> = 'user: bla bla bla bla bla bla bla bla bla bla bla bla bla bla bla bla bla bla bla bla bla bla bla bla bla bla bla bla...bla bla bla bla bla bla bla bla bla bla bla bla bla bla bla bla bla bla bla bla bla bla bla bla bla bla bla bla bla \n'.count
+
+zyrabit-slm/api-rag/tests/test_core_v2.py:137: AssertionError
+---------------------------- Captured stderr setup -----------------------------
+{"timestamp": "2026-05-15T18:23:34.477793+00:00", "level": "INFO", "component": "zyrabit.api", "message": "\ud83c\udfdb\ufe0f Sovereign DB Initialized at /tmp/test_sovereign.db [WAL Mode Active]", "module": "state_tracker", "line": 48}
+------------------------------ Captured log setup ------------------------------
+INFO     zyrabit.api:state_tracker.py:48 🏛️ Sovereign DB Initialized at /tmp/test_sovereign.db [WAL Mode Active]
+=============================== warnings summary ===============================
+<frozen importlib._bootstrap>:488
+<frozen importlib._bootstrap>:488
+<frozen importlib._bootstrap>:488
+  <frozen importlib._bootstrap>:488: DeprecationWarning: builtin type SwigPyPacked has no __module__ attribute
+
+<frozen importlib._bootstrap>:488
+<frozen importlib._bootstrap>:488
+<frozen importlib._bootstrap>:488
+  <frozen importlib._bootstrap>:488: DeprecationWarning: builtin type SwigPyObject has no __module__ attribute
+
+<frozen importlib._bootstrap>:488
+  <frozen importlib._bootstrap>:488: DeprecationWarning: builtin type swigvarlink has no __module__ attribute
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED zyrabit-slm/api-rag/tests/test_core_v2.py::test_full_sovereign_cycle
+FAILED zyrabit-slm/api-rag/tests/test_core_v2.py::test_wal_concurrency_stress
+FAILED zyrabit-slm/api-rag/tests/test_core_v2.py::test_gatekeeper_pii_redaction
+FAILED zyrabit-slm/api-rag/tests/test_core_v2.py::test_context_budgeting_trimming
+4 failed, 1 passed, 7 warnings in 1.79s

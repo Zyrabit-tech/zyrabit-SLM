@@ -272,14 +272,20 @@ class TenstorrentSimulationBackend:
                 output = compiled(**tokens)
         response = tokenizer.decode(output[0], skip_special_tokens=True)
         raw_metrics = dict(self._extract_metrics(compiled))
-        cycles = int(raw_metrics.get("estimated_cycles_per_token", 1_840_000))
-        fused_ops = int(raw_metrics.get("fused_ops", raw_metrics.get("fusions", 0)))
-        sharded_ops = int(raw_metrics.get("sharded_ops", raw_metrics.get("sharding", 0)))
+        
+        def _get_val(key: str, default: Any) -> Any:
+            val = raw_metrics.get(key)
+            return val if val is not None else default
+
+        cycles = int(_get_val("estimated_cycles_per_token", 1_840_000))
+        fused_ops = int(_get_val("fused_ops", _get_val("fusions", 0)))
+        sharded_ops = int(_get_val("sharded_ops", _get_val("sharding", 0)))
+
         metrics = CompilerMetrics(
             estimated_cycles_per_token=cycles,
-            sram_utilization_pct=float(raw_metrics.get("sram_utilization_pct", 0.0)),
-            dram_utilization_pct=float(raw_metrics.get("dram_utilization_pct", 0.0)),
-            total_compiled_ops=int(raw_metrics.get("total_compiled_ops", 0)),
+            sram_utilization_pct=float(_get_val("sram_utilization_pct", 0.0)),
+            dram_utilization_pct=float(_get_val("dram_utilization_pct", 0.0)),
+            total_compiled_ops=int(_get_val("total_compiled_ops", 0)),
             fused_ops=fused_ops,
             sharded_ops=sharded_ops,
             projected_tokens_per_second_n300=_project_tokens_per_second(

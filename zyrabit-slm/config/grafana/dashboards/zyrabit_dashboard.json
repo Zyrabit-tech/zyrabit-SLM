@@ -1,37 +1,63 @@
 {
   "annotations": { "list": [] },
   "editable": true,
-  "gnetId": null,
+  "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": null,
+  "id": 1,
   "links": [],
+  "liveNow": false,
   "panels": [
     {
-      "title": "Total Requests (Traffic)",
-      "type": "stat",
+      "title": "🚀 Zyrabit API Latency (p95)",
+      "type": "timeseries",
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
       "targets": [
-        { "expr": "sum(rate(slm_requests_total[1m]))", "legendFormat": "Requests/sec" }
-      ]
+        {
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(http_request_duration_seconds_bucket[5m])))",
+          "legendFormat": "p95 Latency",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "s", "color": { "mode": "palette-classic" } }
+      }
     },
     {
-      "title": "slm Latency (Seconds)",
+      "title": "📊 Request Rate (Requests/sec)",
       "type": "timeseries",
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
       "targets": [
-        { "expr": "rate(slm_request_duration_seconds_sum[1m]) / rate(slm_request_duration_seconds_count[1m])", "legendFormat": "Avg Latency" }
+        {
+          "expr": "sum(rate(http_requests_total[5m]))",
+          "legendFormat": "Total Requests",
+          "refId": "A"
+        }
       ]
+    },
+    {
+      "title": "⚠️ Error Rate (5xx Errors)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 8 },
+      "targets": [
+        {
+          "expr": "sum(rate(http_requests_total{status=~\"5..\"}[5m]))",
+          "legendFormat": "5xx Errors",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "color": { "fixedColor": "red", "mode": "fixed" } }
+      }
     }
   ],
-  "schemaVersion": 36,
+  "refresh": "5s",
+  "schemaVersion": 38,
   "style": "dark",
   "tags": ["zyrabit", "slm"],
   "templating": { "list": [] },
   "time": { "from": "now-15m", "to": "now" },
   "timepicker": {},
   "timezone": "",
-  "title": "Zyrabit SLM Command Center",
-  "uid": "zyrabit-main",
-  "version": 1,
-  "weekStart": ""
+  "title": "Zyrabit SLM Performance",
+  "version": 1
 }
