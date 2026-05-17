@@ -123,11 +123,23 @@ class ContextManager:
 - send_telegram_notification(message: str): Sends a secure, PII-masked alert to Telegram.
 """
 
+        # [NEW] Discriminative RAG: Detect operational/drafting queries to compress context dynamically
+        is_operational = any(w in user_query.lower() for w in [
+            "mensaje", "redactar", "borrador", "plantilla", "generar", "escribe", "draft", 
+            "resumen", "summary", "escribir", "crear mensaje"
+        ])
         
+        if is_operational:
+            rag_budget = 400
+            logger.info("⚡ Discriminative RAG: Dynamic Context Compression active (Operational query -> budget capped at 400 tokens).")
+        else:
+            rag_budget = self.RAG_RESERVE
+
         trimmed_history = self.trim_history(history)
-        trimmed_rag = self.trim_rag_context(rag_docs)
+        trimmed_rag = self.trim_rag_context(rag_docs, budget=rag_budget)
         
         tone = user_profile.get("tone", "professional") if user_profile else "professional"
+
 
         profile_str = ""
         if user_profile and user_profile.get("onboarding_completed"):
