@@ -19,7 +19,7 @@ def test_zyra_up_defaults_to_qwen_family():
     assert "qwen2.5:1.5b" in content
     assert "nvidia-smi" in content
     assert "Darwin" in content
-    assert 'COMMAND="install"' in content
+    assert 'COMMANDS=("install")' in content
     assert "run_doctor()" in content
     assert "install)" in content
     assert "doctor)" in content

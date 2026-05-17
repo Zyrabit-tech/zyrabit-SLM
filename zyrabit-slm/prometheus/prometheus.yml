@@ -1,0 +1,16 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: 'zyrabit-api'
+    static_configs:
+      - targets: ['zyrabit-api:8080']
+
+  - job_name: 'zyrabit-db'
+    static_configs:
+      - targets: ['zyrabit-db:8000']
+
+  - job_name: 'zyrabit-prometheus'
+    static_configs:
+      - targets: ['localhost:9090']

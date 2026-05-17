@@ -8,57 +8,64 @@ services:
       - --api.dashboard=true
       - --providers.docker=true
       - --providers.docker.exposedbydefault=false
-      - --providers.file.filename=/etc/traefik/dynamic.yml
+      - --providers.file.directory=/etc/traefik/dynamic
+      - --metrics.prometheus=true
+      - --metrics.prometheus.buckets=0.1,0.3,1.2,5.0
       - --entryPoints.web.address=:80
       - --entryPoints.web.http.redirections.entryPoint.to=websecure
       - --entryPoints.web.http.redirections.entryPoint.scheme=https
       - --entryPoints.websecure.address=:443
       - --entryPoints.websecure.http.tls=true
       - --api.insecure=true
+      - --log.level=${TRAEFIK_LOG_LEVEL:-INFO}
     ports:
       - "80:80"
       - "443:443"
       - "8081:8080" # Dashboard access
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-      - ./traefik/dynamic.yml:/etc/traefik/dynamic.yml:ro
+      - ./traefik:/etc/traefik/dynamic:ro
     networks:
-      - frontend-network
-      - backend-network
+      - zyrabit-sovereign-net
 
   # 1. THE BRAIN: API RAG
   zyrabit-api:
     image: zyrabit-slm/api-rag
     build:
-      context: ./api-rag
+      context: ..
+      dockerfile: zyrabit-slm/api-rag/Dockerfile
     container_name: zyrabit-api
     env_file:
       - .env
     environment:
       - N8N_SERVICE_TOKEN_FILE=/run/secrets/n8n_service_token
       - N8N_WEBHOOK_SIGNING_SECRET_FILE=/run/secrets/n8n_webhook_signing_secret
+      - ONNXRUNTIME_LOGGING_LEVEL=3
     depends_on:
+
       zyrabit-db:
         condition: service_started
       zyrabit-engine:
         condition: service_started
     labels:
       - traefik.enable=true
-      - traefik.http.routers.zyrabit-api.rule=PathPrefix(`/v1`) || PathPrefix(`/socket.io`)
+      - traefik.http.routers.zyrabit-api.rule=Host(`${DOMAIN}`) && (PathPrefix(`/v1`) || PathPrefix(`/socket.io`))
       - traefik.http.routers.zyrabit-api.entrypoints=websecure
       - traefik.http.routers.zyrabit-api.tls=true
       - traefik.http.routers.zyrabit-api.middlewares=api-ratelimit@docker,secureHeaders@file
       - traefik.http.services.zyrabit-api.loadbalancer.server.port=8080
       - traefik.http.middlewares.api-ratelimit.ratelimit.average=25
       - traefik.http.middlewares.api-ratelimit.ratelimit.burst=50
-      - traefik.docker.network=zyrabit-slm_backend-network
+      - traefik.docker.network=zyrabit-slm_zyrabit-sovereign-net
     networks:
-      - backend-network
+      - zyrabit-sovereign-net
       - model-network
     volumes:
       - ./secrets:/run/secrets:ro
       - ./prompts:/app/prompts:ro
       - ./document_source:/app/document_source
+      - ./db_data:/app/db_data
+
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080/v1/health')"]
       interval: 30s
@@ -70,18 +77,19 @@ services:
   zyrabit-web:
     image: zyrabit-slm/web-ui
     build:
-      context: ./web-ui
+      context: ..
+      dockerfile: zyrabit-slm/web-ui/Dockerfile
     container_name: zyrabit-web
     labels:
       - traefik.enable=true
-      - traefik.http.routers.zyrabit-web.rule=PathPrefix(`/`)
+      - traefik.http.routers.zyrabit-web.rule=Host(`${DOMAIN}`) && PathPrefix(`/`)
       - traefik.http.routers.zyrabit-web.entrypoints=websecure
       - traefik.http.routers.zyrabit-web.tls=true
       - traefik.http.routers.zyrabit-web.middlewares=secureHeaders@file
       - traefik.http.services.zyrabit-web.loadbalancer.server.port=80
-      - traefik.docker.network=zyrabit-slm_backend-network
+      - traefik.docker.network=zyrabit-slm_zyrabit-sovereign-net
     networks:
-      - backend-network
+      - zyrabit-sovereign-net
     depends_on:
       - zyrabit-api
 
@@ -144,13 +152,16 @@ services:
       - ANONYMIZED_TELEMETRY=False
       - CHROMA_OTEL_COLLECTION_ENDPOINT=http://localhost:4317
       - CHROMA_OTEL_SERVICE_NAME=zyrabit-vector-db
+      - ORT_LOGGING_LEVEL=3
+
     volumes:
-      - ./chroma-data:/chroma/chroma
+      - ./chroma-data:/data
     networks:
-      - backend-network
+      - zyrabit-sovereign-net
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:8000/api/v1/heartbeat || exit 1"]
+      test: ["CMD-SHELL", "python -c 'import urllib.request; urllib.request.urlopen(\"http://localhost:8000/api/v2/heartbeat\")' || python3 -c 'import urllib.request; urllib.request.urlopen(\"http://localhost:8000/api/v2/heartbeat\")' || exit 1"]
       interval: 30s
+
       timeout: 10s
       retries: 3
 
@@ -164,7 +175,7 @@ services:
       - --web.external-url=https://localhost/prometheus
       - --web.route-prefix=/prometheus
     volumes:
-      - ./config/prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
       - prometheus-data:/prometheus
     labels:
       - traefik.enable=true
@@ -174,9 +185,9 @@ services:
       - traefik.http.routers.zyrabit-prometheus.middlewares=prometheus-auth@docker,secureHeaders@file
       - traefik.http.middlewares.prometheus-auth.basicauth.users=${PROMETHEUS_BASIC_AUTH:?set PROMETHEUS_BASIC_AUTH}
       - traefik.http.services.zyrabit-prometheus.loadbalancer.server.port=9090
-      - traefik.docker.network=zyrabit-slm_backend-network
+      - traefik.docker.network=zyrabit-slm_zyrabit-sovereign-net
     networks:
-      - backend-network
+      - zyrabit-sovereign-net
 
   # 5. THE MONITOR (Dashboard): Grafana
   zyrabit-grafana:
@@ -187,9 +198,8 @@ services:
       - GF_SERVER_SERVE_FROM_SUB_PATH=true
     volumes:
       - grafana-data:/var/lib/grafana
-      - ./config/grafana/datasources:/etc/grafana/provisioning/datasources
-      - ./config/grafana/dashboards:/etc/grafana/provisioning/dashboards
-      - ./config/grafana/dashboards:/var/lib/grafana/dashboards
+      - ./grafana/datasources:/etc/grafana/provisioning/datasources
+      - ./grafana/dashboards:/etc/grafana/provisioning/dashboards
     labels:
       - traefik.enable=true
       - traefik.http.routers.zyrabit-grafana.rule=PathPrefix(`/grafana`)
@@ -198,11 +208,11 @@ services:
       - traefik.http.routers.zyrabit-grafana.middlewares=grafana-auth@docker,secureHeaders@file
       - traefik.http.middlewares.grafana-auth.basicauth.users=${GRAFANA_BASIC_AUTH:?set GRAFANA_BASIC_AUTH}
       - traefik.http.services.zyrabit-grafana.loadbalancer.server.port=3000
-      - traefik.docker.network=zyrabit-slm_backend-network
+      - traefik.docker.network=zyrabit-slm_zyrabit-sovereign-net
     depends_on:
       - zyrabit-prometheus
     networks:
-      - backend-network
+      - zyrabit-sovereign-net
 
   zyrabit-loki:
     image: grafana/loki:latest
@@ -212,7 +222,7 @@ services:
     ports:
       - "3100:3100"
     networks:
-      - backend-network
+      - zyrabit-sovereign-net
 
 
   zyrabit-n8n:
@@ -233,11 +243,11 @@ services:
       - traefik.http.routers.zyrabit-n8n.tls=true
       - traefik.http.routers.zyrabit-n8n.middlewares=secureHeaders@file
       - traefik.http.services.zyrabit-n8n.loadbalancer.server.port=5678
-      - traefik.docker.network=zyrabit-slm_backend-network
+      - traefik.docker.network=zyrabit-slm_zyrabit-sovereign-net
     volumes:
       - ./n8n-data:/home/node/.n8n
     networks:
-      - backend-network
+      - zyrabit-sovereign-net
 
   # 6. SYSTEM ASSISTANT: MCP Installer Server
   zyrabit-mcp:
@@ -251,13 +261,10 @@ services:
     ports:
       - "8001:8001"
     networks:
-      - backend-network
-      - frontend-network
+      - zyrabit-sovereign-net
 
 networks:
-  frontend-network:
-    driver: bridge
-  backend-network:
+  zyrabit-sovereign-net:
     driver: bridge
   model-network:
     driver: bridge

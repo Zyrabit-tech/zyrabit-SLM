@@ -29,7 +29,7 @@ except ImportError:
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 # Configuration
-API_URL = os.getenv("API_URL", "https://localhost/v1/chat")
+API_URL = os.getenv("API_URL", "http://localhost:8080/v1/chat")
 MODEL_NAME = os.getenv("MODEL_NAME", "qwen2.5:7b")
 VERIFY_TLS = os.getenv("VERIFY_TLS", "false").lower() == "true"
 

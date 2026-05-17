@@ -9,6 +9,7 @@ router = APIRouter()
 class ChatQuery(BaseModel):
     text: str
     client_msg_id: Optional[str] = None
+    history: Optional[list] = []
 
 class ChatResponse(BaseModel):
     response: str
@@ -26,7 +27,8 @@ async def chat_router(
         # The logic is now encapsulated in the Use Case
         result = await chat_use_case.execute(
             text=query.text, 
-            client_msg_id=query.client_msg_id
+            client_msg_id=query.client_msg_id,
+            history=query.history
         )
         return ChatResponse(**result)
     except Exception as e:

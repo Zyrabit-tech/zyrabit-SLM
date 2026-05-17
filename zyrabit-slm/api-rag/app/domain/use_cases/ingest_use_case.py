@@ -1,7 +1,7 @@
 import os
 import uuid
 import logging
-from app.infrastructure.shared.state_tracker import IngestionTracker
+from app.infrastructure.shared.state_tracker import SovereignStateManager
 from app.infrastructure.shared.validators.ingestion_validator import IngestionValidator
 from app.infrastructure.persistence.pdf_processor import PDFProcessor
 from app.domain.services.document_chunker import DocumentChunker
@@ -29,8 +29,12 @@ class IngestUseCase:
             logger.error(f"❌ Validation failed for {filename}: {error}")
             return {"status": "error", "message": error}
             
+        # 1b. Hashing Check (Avoid Redundant Work)
+        if not SovereignStateManager.needs_reindexing(file_path):
+            logger.info(f"⏩ Skipping {filename} - already indexed and unchanged.")
+            return {"status": "skipped", "message": "unchanged"}
+
         doc_id = str(uuid.uuid4())
-        IngestionTracker.register_ingest(doc_id, filename)
         
         try:
             # 2. Extract (Markdown Paradigm)
@@ -43,12 +47,14 @@ class IngestUseCase:
             # In V5.0 we use the LangChain vector store directly
             self.vector_store.add_documents(chunks)
             
-            # 5. Update BM25 Index (for Hybrid Search)
             if self.retriever_service:
                 self.retriever_service.update_bm25_index(chunks)
             
-            IngestionTracker.complete_ingest(doc_id)
+            # Combine text for FTS5
+            full_text = "\n".join(chunk.page_content for chunk in chunks)
+            SovereignStateManager.update_vault_index(file_path, len(chunks), full_text_content=full_text)
             logger.info(f"✅ High-Precision Ingestion successful: {filename}")
+
             return {"status": "success", "doc_id": doc_id, "chunks": len(chunks)}
             
         except Exception as e:
