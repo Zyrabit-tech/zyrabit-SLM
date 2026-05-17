@@ -35,31 +35,17 @@ jobs:
           # Extract the minor version (the Y in X.Y.Z)
           MINOR_VERSION=$(echo $CURRENT_VERSION | cut -d. -f2)
           
-          # Check if minor is odd or even
-          if [ $((MINOR_VERSION % 2)) -ne 0 ]; then
-            TYPE="BETA (ODD)"
-            ALLOWED_BRANCH="beta"
-          else
-            TYPE="PRODUCTION (EVEN)"
-            ALLOWED_BRANCH="main"
-          fi
-          
-          echo "🔍 Version detected: $CURRENT_VERSION (Minor: $MINOR_VERSION -> $TYPE)"
-          
-          TARGET_BRANCH="${{ github.base_ref }}"
-          # If it's a push to a branch (not a PR), github.base_ref is empty.
-          # We use github.ref_name for push events.
-          CURRENT_BRANCH="${{ github.head_ref || github.ref_name }}"
-          
-          # Enforce policy ONLY on main and beta branches
-          if [[ "$CURRENT_BRANCH" == "main" || "$CURRENT_BRANCH" == "beta" ]]; then
-            if [ "$CURRENT_BRANCH" != "$ALLOWED_BRANCH" ]; then
+          # Enforce policy: 'main' strictly requires EVEN, 'beta' accepts both ODD and EVEN.
+          if [[ "$CURRENT_BRANCH" == "main" ]]; then
+            if [ $((MINOR_VERSION % 2)) -ne 0 ]; then
               echo "❌ ERROR: Versioning Policy Violation!"
-              echo "   Version $CURRENT_VERSION ($TYPE) is NOT allowed on branch '$CURRENT_BRANCH'."
-              echo "   Please use the '$ALLOWED_BRANCH' branch for this version series."
+              echo "   Version $CURRENT_VERSION (Minor: $MINOR_VERSION) is ODD."
+              echo "   The 'main' branch strictly requires EVEN (stable) minor versions."
               exit 1
             fi
-            echo "✅ Version $CURRENT_VERSION aligns with branch '$CURRENT_BRANCH'."
+            echo "✅ Version $CURRENT_VERSION (EVEN) aligns with 'main' branch."
+          elif [[ "$CURRENT_BRANCH" == "beta" ]]; then
+            echo "✅ Version $CURRENT_VERSION is allowed on 'beta' branch (supports both ODD and EVEN)."
           else
             echo "ℹ️ INFO: Branch '$CURRENT_BRANCH' is exempt from strict versioning policy."
           fi
