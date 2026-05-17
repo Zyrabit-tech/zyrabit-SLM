@@ -33,6 +33,16 @@ Zyrabit is designed as a zero-trust, air-gapped capable AI stack.
 
 ---
 
+## 💎 Sovereign Features (Zyrabit SLM v2.0)
+
+*   **Zero-Lag Command Router (<15ms)**: Direct interceptor for commands like `/stats`, `/vault`, `/clear`, `/tools` that bypasses LLM inference completely using SQLite state lookup.
+*   **FTS5 Hybrid RAG (<200ms)**: Hybrid keyword (FTS5 SQLite table virtual) and vector (ChromaDB) retrieval pipeline prioritizing fast local index lookup before vector fallback.
+*   **Obsidian Brain Sync**: Recursive scanning and ingestion of Markdown vaults into the secure RAG engine.
+*   **AutoLearner Background Loop**: An asynchronous background service that periodically synthesizes chat history and generates reflective self-learning notes written directly back to your Obsidian vault.
+*   **Dynamic Sovereign Identity**: Personalized assistant name locked dynamically through onboarding across Web and Telegram (eliminating hardcoded "Kai" references).
+
+---
+
 ## 🚀 Quick Start (The Sovereign Way)
 
 Zyrabit uses a unified orchestration script to manage your local infrastructure.
@@ -79,8 +89,9 @@ We provide pre-built, production-ready images for the Zyrabit stack.
 
 ```bash
 # Pull the latest stable version
-docker pull zyrabitcore/zyrabit-slm:1.7.5
+docker pull zyrabitcore/zyrabit-slm:2.0.0
 ```
+
 
 ---
 
