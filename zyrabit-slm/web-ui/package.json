@@ -10,7 +10,7 @@
   },
   "dependencies": {
     "socket.io-client": "^4.7.4",
-    "lucide-static": "^0.344.0"
+    "lucide-static": "^1.16.0"
   },
   "devDependencies": {
     "vite": "^6.4.2",
