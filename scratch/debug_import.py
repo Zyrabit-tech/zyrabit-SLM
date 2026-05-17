@@ -8,8 +8,8 @@ print(f"Adding to sys.path: {BACKEND_PATH}")
 sys.path.append(BACKEND_PATH)
 
 try:
-    from app.core.security import PipelineContext
-    print("✅ Successfully imported PipelineContext")
+    import app.core.security
+    print("✅ Successfully imported app.core.security")
 except ImportError as e:
     print(f"❌ Failed to import: {e}")
     # print(f"sys.path is: {sys.path}")

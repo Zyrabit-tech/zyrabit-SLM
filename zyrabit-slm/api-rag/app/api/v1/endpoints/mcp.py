@@ -1,9 +1,10 @@
-import json
-from fastapi import APIRouter, Response, Request
+import logging
+from fastapi import APIRouter, Request
 from typing import Dict, Any
 from app.domain.services.mcp_service import mcp
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 @router.get("/config.json")
 async def mcp_config():
@@ -20,8 +21,10 @@ async def list_mcp_tools_mcp():
     try:
         tools = [{"name": t.name, "description": t.description, "inputSchema": t.parameters} for t in mcp._tool_manager._tools.values()]
         return {"tools": tools}
-    except Exception as e:
-        return {"error": f"Failed to inspect FastMCP: {e}", "tools": []}
+    except Exception:
+        logger.exception("Failed to inspect FastMCP tools")
+        return {"error": "Failed to inspect FastMCP", "tools": []}
+
 
 
 @router.post("/rpc")

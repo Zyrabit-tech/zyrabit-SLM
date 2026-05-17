@@ -1,4 +1,3 @@
-import os
 import logging
 from typing import Optional, Dict, Any
 from app.infrastructure.shared.config import MODEL_NAME

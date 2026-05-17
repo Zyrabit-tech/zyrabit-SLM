@@ -73,7 +73,7 @@ def dedupe_entities(entities: List[EntitySpan]) -> List[EntitySpan]:
 
 class Detector(Protocol):
     def detect(self, text: str, offset: int = 0) -> List[EntitySpan]:
-        ...
+        pass
 
 class RegexDetector:
     def __init__(self, label: str, pattern: str, validation_func=None):
@@ -178,9 +178,11 @@ def build_default_pipeline(*args, **kwargs):
     overlap = kwargs.get("overlap", 100)
     return ShardAnonymizationInterceptor(shard_size=shard_size, overlap=overlap)
 
+def detect_entities(text: str, offset: int = 0) -> List[EntitySpan]:
+    """Public wrapper to detect all entity spans, avoiding unused private aliases."""
+    return _DEFAULT_ENGINE.detect_all(text, offset)
+
 # --- Backward Compatibility Aliases ---
-_is_luhn_valid = is_luhn_valid
-_build_shards = build_shards
-_dedupe_entities = dedupe_entities
-_detect_entities_in_shard = _DEFAULT_ENGINE.detect_all
 build_security_pipeline = build_default_pipeline
+
+

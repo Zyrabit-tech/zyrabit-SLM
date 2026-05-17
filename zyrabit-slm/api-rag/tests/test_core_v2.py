@@ -52,7 +52,6 @@ async def test_full_sovereign_cycle():
     mock_response.latency_seconds = 0.5
     mock_inference.generate.return_value = mock_response
     
-    mock_vector = MagicMock()
     mock_retriever = MagicMock()
     mock_gatekeeper = MagicMock()
     # Align with actual Gatekeeper.mask_pii
