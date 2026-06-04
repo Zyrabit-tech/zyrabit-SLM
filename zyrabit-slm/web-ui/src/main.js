@@ -218,6 +218,7 @@ class ZyrabitApp {
                 if (isOffline) {
                     this.showNotification("Connection Restored", "success");
                     isOffline = false;
+                    this.socket.connect();
                 }
             } catch (e) {
                 this.addGdprLog("SYSTEM", `HEALTH_CHECK_FAILED`);

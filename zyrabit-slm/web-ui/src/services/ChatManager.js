@@ -18,6 +18,7 @@ export class ChatManager {
         bus.on(EVENTS.CHAT.SEND, (data) => this.enqueue(data));
         bus.on(EVENTS.CHAT.RESPONSE_RECEIVED, (data) => this.onResponse(data));
         bus.on(EVENTS.SYSTEM.GATEWAY_CONNECTED, () => this.onGatewayConnected());
+        bus.on(EVENTS.SYSTEM.GATEWAY_DISCONNECTED, () => this.onGatewayDisconnected());
     }
 
 
@@ -89,6 +90,13 @@ export class ChatManager {
         if (this.queue.length > 0) {
             this.processNext();
         }
+    }
+
+    onGatewayDisconnected() {
+        console.warn("🔌 Gateway disconnected. Suspending chat processing...");
+        this.clearPendingTimeout();
+        this.isProcessing = false;
+        bus.emit(EVENTS.UI.THINKING, false);
     }
 
     onResponse(data) {
