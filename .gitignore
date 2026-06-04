@@ -52,6 +52,8 @@ zyrabit-slm/n8n-data/
 zyrabit-slm/.ai/
 zyrabit-slm/ollama-models/
 zyrabit-slm/.DS_Store
+zyrabit-slm/db_data/
+**/db_data/
 
 # SQLite / runtime
 *.sqlite
@@ -124,3 +126,4 @@ ops-private/
 
 # Model weights cache
 zyrabit-slm/hf-cache/
+zyrabit-slm/db_data/*

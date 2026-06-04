@@ -64,14 +64,15 @@ class ChatUseCase:
                         decision = "direct (fallback)"
 
             # 4. Inference
-            system_prompt = "You are Zyra, a helpful sovereign assistant."
+            # Load system prompt from user profile, fallback to default
+            user_profile = SovereignStateManager.get_user_profile()
+            system_prompt = (user_profile.get("system_prompt") or "").strip() or "You are Zyra, a helpful sovereign assistant."
 
             # 4. Memory Recovery
             if history is None:
                 history = SovereignStateManager.get_history(client_msg_id or "default")
             
-            # 4b. Fetch User Profile for Personalization
-            user_profile = SovereignStateManager.get_user_profile()
+            # 4b. Fetch User Profile for Personalization (already fetched above)
 
             # 5. Build Final Prompt via ContextManager
             prompt = self.context_manager.build_final_prompt(
@@ -161,7 +162,8 @@ class ChatUseCase:
                 logger.error(f"⚠️ RAG Search failed in stream_response: {e}")
 
         # Build prompt
-        system_prompt = "You are Zyra, a helpful sovereign assistant."
+        user_profile = user_profile or {}
+        system_prompt = (user_profile.get("system_prompt") or "").strip() or "You are Zyra, a helpful sovereign assistant."
         prompt = self.context_manager.build_final_prompt(
             system_prompt=system_prompt,
             history=history,

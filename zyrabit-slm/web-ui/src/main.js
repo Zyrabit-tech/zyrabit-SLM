@@ -138,9 +138,40 @@ class ZyrabitApp {
         bind(IDS.TOGGLE_GDPR, 'onclick', () => this.togglePanel(IDS.GDPR_PANEL));
         getSafeElement('toggle-ingest').onclick = () => this.togglePanel(IDS.INGEST_PANEL);
         getSafeElement('toggle-docs').onclick = () => this.togglePanel(IDS.DOCS_PANEL);
+        getSafeElement('toggle-settings').onclick = () => this.togglePanel('settings-panel');
         getSafeElement('close-gdpr').onclick = () => this.togglePanel(null);
         getSafeElement('close-ingest').onclick = () => this.togglePanel(null);
         getSafeElement('close-docs').onclick = () => this.togglePanel(null);
+        getSafeElement('close-settings').onclick = () => this.togglePanel(null);
+
+        // 3b. Settings Form Submit
+        const settingsForm = document.getElementById('settings-form');
+        if (settingsForm) {
+            settingsForm.onsubmit = async (e) => {
+                e.preventDefault();
+                const systemPrompt = getSafeElement('settings-system-prompt').value.trim();
+                
+                try {
+                    const res = await fetch('/v1/profile');
+                    if (!res.ok) throw new Error("Could not fetch profile");
+                    const profile = await res.json();
+                    
+                    profile.system_prompt = systemPrompt;
+                    
+                    const saveRes = await fetch('/v1/profile', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(profile)
+                    });
+                    if (!saveRes.ok) throw new Error("Save request failed");
+                    
+                    this.showNotification("System Prompt guardado correctamente", "success");
+                    this.togglePanel(null);
+                } catch (err) {
+                    this.showNotification("Error al guardar prompt", "error");
+                }
+            };
+        }
 
         // 4. File Ingest
         try {
@@ -166,7 +197,10 @@ class ZyrabitApp {
 
 
     togglePanel(id) {
-        const panels = [IDS.GDPR_PANEL, IDS.INGEST_PANEL, IDS.DOCS_PANEL];
+        if (id === 'settings-panel') {
+            this.loadSettings();
+        }
+        const panels = [IDS.GDPR_PANEL, IDS.INGEST_PANEL, IDS.DOCS_PANEL, 'settings-panel'];
         panels.forEach(p => {
 
             try {
@@ -178,6 +212,20 @@ class ZyrabitApp {
                 }
             } catch (e) {}
         });
+    }
+
+    async loadSettings() {
+        try {
+            const res = await fetch('/v1/profile');
+            if (!res.ok) throw new Error("Failed to fetch profile");
+            const profile = await res.json();
+            const textarea = document.getElementById('settings-system-prompt');
+            if (textarea && profile) {
+                textarea.value = profile.system_prompt || "";
+            }
+        } catch (e) {
+            console.error("Failed to load settings", e);
+        }
     }
 
 

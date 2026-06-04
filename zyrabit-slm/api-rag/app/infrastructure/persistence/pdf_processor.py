@@ -30,7 +30,10 @@ class PDFProcessor:
                 logger.info(f"📑 Extracting DOCX text: {file_path}")
                 md_text = PDFProcessor.extract_docx_text(file_path)
             else:
-                raise ValueError(f"Unsupported extension: {ext}")
+                raise ValueError(f"Unsupported file type: {ext}")
+            
+            if not md_text or not md_text.strip():
+                raise ValueError("Document contains no extractable text. This file may be scanned, image-only, or empty. Please use an OCR tool first.")
             
             doc = Document(
                 page_content=md_text,
