@@ -49,9 +49,9 @@ class HybridRetrieverService:
 
         if not self.ensemble_retriever:
             logger.warning("⚠️ Ensemble Retriever not initialized. Falling back to Vector-only.")
-            return self.vector_store.similarity_search(query, k=3)
+            return await self.vector_store.asimilarity_search(query, k=3)
             
         logger.info(f"🔎 Falling back to Hybrid Ensemble (Vector+BM25) for: '{query}'")
-        results = self.ensemble_retriever.invoke(query)
+        results = await self.ensemble_retriever.ainvoke(query)
         return results
 

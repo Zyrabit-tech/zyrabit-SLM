@@ -84,7 +84,13 @@ async function fetchVaultDocs() {
             const kb = (doc.size_bytes / 1024).toFixed(1);
             const div = document.createElement('div');
             div.className = 'p-3 bg-hardgray-700/50 rounded-lg text-[10px] border border-hardgray-600 flex justify-between items-center';
-            div.innerHTML = `<span>📄 ${doc.filename}</span> <span class="text-gray-500">${kb} KB</span>`;
+            const nameSpan = document.createElement('span');
+            nameSpan.textContent = `📄 ${doc.filename}`;
+            const sizeSpan = document.createElement('span');
+            sizeSpan.className = 'text-gray-500';
+            sizeSpan.textContent = `${kb} KB`;
+            div.appendChild(nameSpan);
+            div.appendChild(sizeSpan);
             list.appendChild(div);
         });
     } catch (err) {
@@ -133,11 +139,12 @@ function appendMessage(role, content, isLoading = false) {
     const innerHtml = `
         <div class="message-bubble p-4 rounded-2xl ${role === 'user' ? 'bg-zyrabit-primary text-white rounded-tr-none' : 'bg-hardgray-800 border border-hardgray-700 rounded-tl-none'}">
             ${role === 'system' ? '<div class="text-[10px] uppercase font-bold text-yellow-500 mb-2">System Guard</div>' : ''}
-            <div class="text-sm message-content leading-relaxed">${content}</div>
+            <div class="text-sm message-content leading-relaxed"></div>
             <div class="mt-2 metadata-area"></div>
         </div>
     `;
     div.innerHTML = innerHtml;
+    div.querySelector('.message-content').textContent = content;
     container.appendChild(div);
     container.scrollTo({ top: container.scrollHeight, behavior: 'smooth' });
     return msgId;
@@ -152,11 +159,15 @@ function updateAssistantMessage(id, content, metadata) {
         const metaArea = msg.querySelector('.metadata-area');
         metaArea.innerHTML = `
             <div class="flex items-center gap-2 mt-4 text-[9px] text-gray-500 uppercase font-bold">
-                <span class="px-2 py-0.5 bg-hardgray-900 rounded border border-hardgray-600">${metadata.route_decision}</span>
-                <span>${metadata.rag_hits || 0} hits</span>
-                <span>${metadata.latency_ms || 0}ms</span>
+                <span class="px-2 py-0.5 bg-hardgray-900 rounded border border-hardgray-600"></span>
+                <span></span>
+                <span></span>
             </div>
         `;
+        const spans = metaArea.querySelectorAll('span');
+        spans[0].textContent = metadata.route_decision;
+        spans[1].textContent = `${metadata.rag_hits || 0} hits`;
+        spans[2].textContent = `${metadata.latency_ms || 0}ms`;
     }
 }
 

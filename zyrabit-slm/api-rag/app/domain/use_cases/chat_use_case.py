@@ -93,7 +93,8 @@ class ChatUseCase:
                 prompt=prompt,
                 system_prompt=system_prompt
             )
-            response_obj = self.inference_provider.generate(request)
+            import asyncio
+            response_obj = await asyncio.to_thread(self.inference_provider.generate, request)
 
             
             # 6. Persist interaction to Sovereign State
@@ -130,3 +131,64 @@ class ChatUseCase:
         except Exception as e:
             logger.exception(f"❌ Critical error in ChatUseCase: {e}")
             return {"response": "Critical Error", "metadata": {"decision": "error"}}
+
+    def mask_query(self, query: str) -> tuple[str, bool]:
+        """
+        Sanitizes PII in user query.
+        Returns: (clean_text, pii_detected)
+        """
+        clean_text, entities = self.gatekeeper.mask_pii(query)
+        pii_detected = any(entities.values()) if isinstance(entities, dict) else bool(entities)
+        return clean_text, pii_detected
+
+    async def stream_response(
+        self,
+        clean_query: str,
+        history: list,
+        user_profile: dict,
+    ):
+        """
+        Runs RAG retrieval, composes prompt, and streams tokens.
+        Decoupled from HTTP delivery. Yields strings (tokens) first,
+        and finally yields a dict with metadata (e.g. rag_hits).
+        """
+        # RAG retrieval
+        context_docs = []
+        if self.retriever_service:
+            try:
+                context_docs = await self.retriever_service.search(clean_query)
+            except Exception as e:
+                logger.error(f"⚠️ RAG Search failed in stream_response: {e}")
+
+        # Build prompt
+        system_prompt = "You are Zyra, a helpful sovereign assistant."
+        prompt = self.context_manager.build_final_prompt(
+            system_prompt=system_prompt,
+            history=history,
+            rag_docs=context_docs,
+            user_query=clean_query,
+            user_profile=user_profile,
+            source="AG-UI"
+        )
+
+        # Select model based on profile preference
+        target_model = user_profile.get("preferred_model", MODEL_NAME) if user_profile else MODEL_NAME
+
+        # Stream tokens
+        from app.infrastructure.inference.ollama_stream_adapter import OllamaStreamAdapter
+        stream_adapter = OllamaStreamAdapter()
+        async for token in stream_adapter.stream(
+            model=target_model,
+            prompt=prompt,
+            system_prompt=system_prompt
+        ):
+            yield token
+
+        # Yield metadata at the end of the generator
+        yield {"rag_hits": len(context_docs)}
+
+    def save_interaction(self, thread_id: str, clean_query: str, response_text: str) -> None:
+        """Sovereign DB persistence - completely decoupled from HTTP transport."""
+        SovereignStateManager.store_message(thread_id, "user", clean_query)
+        SovereignStateManager.store_message(thread_id, "assistant", response_text)
+

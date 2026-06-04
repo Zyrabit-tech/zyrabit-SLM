@@ -114,7 +114,7 @@ Include:
 """
 
         # 3. Request LLM Inference
-        from app.domain.entities.inference import InferenceRequest
+        from app.ports.inference_port import InferenceRequest
         try:
             req = InferenceRequest(
                 model=profile.get("preferred_model", "qwen2.5:7b"),

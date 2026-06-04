@@ -49,7 +49,7 @@ services:
         condition: service_started
     labels:
       - traefik.enable=true
-      - traefik.http.routers.zyrabit-api.rule=Host(`${DOMAIN}`) && (PathPrefix(`/v1`) || PathPrefix(`/socket.io`))
+      - traefik.http.routers.zyrabit-api.rule=Host(`${DOMAIN}`) && (PathPrefix(`/v1`) || PathPrefix(`/socket.io`) || PathPrefix(`/ag-ui`))
       - traefik.http.routers.zyrabit-api.entrypoints=websecure
       - traefik.http.routers.zyrabit-api.tls=true
       - traefik.http.routers.zyrabit-api.middlewares=api-ratelimit@docker,secureHeaders@file

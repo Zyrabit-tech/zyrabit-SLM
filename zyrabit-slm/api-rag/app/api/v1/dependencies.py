@@ -23,3 +23,20 @@ def get_ingest_use_case(request: Request) -> IngestUseCase:
     if not hasattr(request.app.state, 'ingest_use_case'):
         raise HTTPException(status_code=503, detail="Ingest Use Case not initialized")
     return request.app.state.ingest_use_case
+
+def get_retriever_service(request: Request):
+    """
+    Returns the pre-initialized HybridRetrieverService from app state.
+    """
+    if not hasattr(request.app.state, 'retriever_service'):
+        raise HTTPException(status_code=503, detail="Retriever service not initialized")
+    return request.app.state.retriever_service
+
+def get_state_aggregator(request: Request):
+    """
+    Returns an instance of StateAggregatorUseCase.
+    """
+    from app.application.use_cases.state_aggregator_use_case import StateAggregatorUseCase
+    return StateAggregatorUseCase()
+
+

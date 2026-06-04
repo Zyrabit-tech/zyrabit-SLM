@@ -279,17 +279,23 @@ class ZyrabitApp {
             const res = await fetch('/v1/documents');
             const data = await res.json();
             const list = document.getElementById('vault-list');
-            list.innerHTML = data.documents.map(doc => `
-                <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-100 group">
+            list.innerHTML = '';
+            data.documents.forEach(doc => {
+                const div = document.createElement('div');
+                div.className = 'flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-100 group';
+                div.innerHTML = `
                     <div class="flex items-center gap-2 overflow-hidden">
                         <span class="text-lg">📄</span>
                         <div class="overflow-hidden">
-                            <div class="text-[10px] font-bold truncate">${doc.filename}</div>
-                            <div class="text-[8px] opacity-40">${(doc.size_bytes / 1024).toFixed(1)} KB</div>
+                            <div class="text-[10px] font-bold truncate doc-name"></div>
+                            <div class="text-[8px] opacity-40 doc-size"></div>
                         </div>
                     </div>
-                </div>
-            `).join('');
+                `;
+                div.querySelector('.doc-name').textContent = doc.filename;
+                div.querySelector('.doc-size').textContent = `${(doc.size_bytes / 1024).toFixed(1)} KB`;
+                list.appendChild(div);
+            });
         } catch (e) {}
     }
 
@@ -300,15 +306,21 @@ class ZyrabitApp {
             const tools = data.tools || [];
             const list = document.getElementById('tools-list');
             if (list) {
-                list.innerHTML = tools.map(tool => `
-                    <div class="p-3 bg-white rounded-lg border border-[#a9c4d9]/30 group hover:border-[#3f5a6d] transition shadow-sm">
+                list.innerHTML = '';
+                tools.forEach(tool => {
+                    const div = document.createElement('div');
+                    div.className = 'p-3 bg-white rounded-lg border border-[#a9c4d9]/30 group hover:border-[#3f5a6d] transition shadow-sm';
+                    div.innerHTML = `
                         <div class="flex items-center justify-between mb-1">
-                            <span class="text-[10px] font-bold text-[#3f5a6d] uppercase">${tool.name}</span>
+                            <span class="text-[10px] font-bold text-[#3f5a6d] uppercase tool-name"></span>
                             <span class="text-[8px] px-1 bg-[#e2ecf4] text-[#3f5a6d] rounded">TOOL</span>
                         </div>
-                        <p class="text-[9px] text-[#323439]/60 leading-tight">${tool.description}</p>
-                    </div>
-                `).join('');
+                        <p class="text-[9px] text-[#323439]/60 leading-tight tool-desc"></p>
+                    `;
+                    div.querySelector('.tool-name').textContent = tool.name;
+                    div.querySelector('.tool-desc').textContent = tool.description;
+                    list.appendChild(div);
+                });
             }
         } catch (e) {
             console.error("Failed to load tools", e);
