@@ -154,6 +154,14 @@ class ZyrabitApp {
 
         // 5. System Logs
         bus.on(EVENTS.SYSTEM.LOG, (data) => this.addGdprLog(data.type, data.event));
+
+        // 6. Gateway Status Notifications
+        bus.on(EVENTS.SYSTEM.GATEWAY_CONNECTED, () => {
+            this.showNotification("Conexión con el servidor restablecida.", "success");
+        });
+        bus.on(EVENTS.SYSTEM.GATEWAY_DISCONNECTED, (reason) => {
+            this.showNotification("Se perdió la conexión con el servidor. Reconectando...", "error");
+        });
     }
 
 

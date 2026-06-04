@@ -10,12 +10,14 @@ export class ChatManager {
     constructor() {
         this.queue = Storage.load('pending_messages') || [];
         this.isProcessing = false;
+        this.pendingTimeout = null;
         this.setupListeners();
     }
 
     setupListeners() {
         bus.on(EVENTS.CHAT.SEND, (data) => this.enqueue(data));
         bus.on(EVENTS.CHAT.RESPONSE_RECEIVED, (data) => this.onResponse(data));
+        bus.on(EVENTS.SYSTEM.GATEWAY_CONNECTED, () => this.onGatewayConnected());
     }
 
 
@@ -37,9 +39,17 @@ export class ChatManager {
         }
     }
 
+    clearPendingTimeout() {
+        if (this.pendingTimeout) {
+            clearTimeout(this.pendingTimeout);
+            this.pendingTimeout = null;
+        }
+    }
+
     processNext() {
         if (this.queue.length === 0) {
             this.isProcessing = false;
+            this.clearPendingTimeout();
             bus.emit(EVENTS.UI.THINKING, false);
             return;
         }
@@ -53,9 +63,36 @@ export class ChatManager {
             history: message.history,
             client_msg_id: message.id 
         });
+
+        // 45-second circuit breaker timeout
+        this.clearPendingTimeout();
+        this.pendingTimeout = setTimeout(() => {
+            console.warn("⚠️ Chat request timed out (45s). Triggering circuit breaker.");
+            this.handleRequestTimeout();
+        }, 45000);
+    }
+
+    handleRequestTimeout() {
+        this.isProcessing = false;
+        this.clearPendingTimeout();
+        bus.emit(EVENTS.UI.THINKING, false);
+        
+        bus.emit(EVENTS.SYSTEM.LOG, { 
+            type: 'WARNING', 
+            event: 'REQUEST_TIMEOUT', 
+            message: "La conexión está inestable o lenta. Reintentando..." 
+        });
+    }
+
+    onGatewayConnected() {
+        console.log("🔌 Gateway reconnected. Checking pending queue...");
+        if (this.queue.length > 0) {
+            this.processNext();
+        }
     }
 
     onResponse(data) {
+        this.clearPendingTimeout();
         const isNotification = data.metadata?.source === 'TELEGRAM';
 
         // Only shift if we were expecting a response from the web UI

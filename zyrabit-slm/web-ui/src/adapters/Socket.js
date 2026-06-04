@@ -50,6 +50,7 @@ export class SocketAdapter {
             this.isConnecting = false;
             console.log("🚀 Secure Gateway Established");
             bus.emit(EVENTS.SYSTEM.LOG, { type: 'SYSTEM', event: 'SECURE_GATEWAY_ESTABLISHED' });
+            bus.emit(EVENTS.SYSTEM.GATEWAY_CONNECTED);
         });
 
         this.socket.on("chat_response", (data) => {
@@ -67,6 +68,7 @@ export class SocketAdapter {
         this.socket.on("disconnect", (reason) => {
             console.warn(`⚠️ Gateway Disconnected: ${reason}`);
             bus.emit(EVENTS.SYSTEM.LOG, { type: 'WARNING', event: 'GATEWAY_DISCONNECTED' });
+            bus.emit(EVENTS.SYSTEM.GATEWAY_DISCONNECTED, reason);
             if (reason === "io server disconnect") {
 
                 // Server-side disconnect, don't auto-reconnect
