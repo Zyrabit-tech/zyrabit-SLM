@@ -40,9 +40,10 @@ def test_end_to_end_reject_query_flow(mock_execute, client):
     data = response.json()
     assert "out of scope" in data["response"].lower()
 
-@patch('app.domain.use_cases.ingest_use_case.IngestUseCase.execute')
+@patch('app.domain.use_cases.ingest_use_case.IngestUseCase.execute', new_callable=AsyncMock)
 @patch('app.domain.use_cases.chat_use_case.ChatUseCase.execute')
 def test_ingest_then_query_flow(mock_chat, mock_ingest, client, tmp_path):
+    mock_ingest.return_value = {"status": "success"}
     with patch('app.api.v1.endpoints.documents.DOCS_DIR', str(tmp_path)):
         pdf_content = b"%PDF-1.4 fake clean architecture book"
         files = {"file": ("clean_architecture.pdf", BytesIO(pdf_content), "application/pdf")}
