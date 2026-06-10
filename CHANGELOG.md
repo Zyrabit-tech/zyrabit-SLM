@@ -7,6 +7,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.0] - 2026-06-09
+
+### Added
+- **Advanced RAG (Cross-Encoder Re-Ranker)**: Integrated a lightweight token-intersection term-overlap scorer (`BGEReRankerAdapter`) to re-rank the top 10 search results and filter out chunks with a relevance score below `0.6` (max 3 chunks), preventing context pollution.
+- **Strict Sliding Window Memory**: Implemented sliding window memory (`SlidingWindowMemoryAdapter`) to limit active conversation history to the last 4 turns (8 messages) to prevent context collapse and reduce latency.
+- **Telegram Configuration Modal**: Added an instruction modal guide on how to configure Telegram bot token and chat ID in the local `.env` file, bound to the sidebar connectivity section.
+- **Real-Time Security Logging**: Log masked PII entities directly into the Gatekeeper logs panel in real-time.
+
+### Changed
+- **Exquisite Input Bar Design**: Redesigned the chat input container, removing the redundant paperclip attachment button in favor of a sleek, minimalist style (attaching files remains accessible via the sidebar Vault panel).
+- **Clean UI Header Layout**: Removed the redundant `K Z` badges and consolidated system status/model indicators in the header.
+- **Persistent Vault Storage**: Configured `zyrabit-api` to store document uploads under `/app/document_source` (persisted on host), preventing vault resets upon container recreations.
+- **Stable Chat Sessions**: Standardized UI WebSocket connections with stable client-side session IDs (`thread_id`) stored in `sessionStorage` to avoid session loss on reconnect.
+
 ## [2.0.0] - 2026-05-15
 
 ### Added

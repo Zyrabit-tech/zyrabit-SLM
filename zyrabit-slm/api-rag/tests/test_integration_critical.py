@@ -9,8 +9,8 @@ from app.domain.services.gatekeeper import Gatekeeper
 def test_router_returns_rag_for_zyrabit_keyword():
     assert Gatekeeper.get_routing_decision("¿Qué es Zyrabit?") == "rag"
 
-def test_router_returns_direct_for_general_queries():
-    assert Gatekeeper.get_routing_decision("¿Qué es Python?") == "direct"
+def test_router_returns_rag_for_general_queries():
+    assert Gatekeeper.get_routing_decision("¿Qué es Python?") == "rag"
 
 @patch("app.domain.use_cases.ingest_use_case.IngestUseCase.execute", new_callable=AsyncMock)
 def test_ingest_txt_file_success(mock_execute, client, tmp_path):

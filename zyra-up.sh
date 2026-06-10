@@ -2,7 +2,7 @@
 
 # ──────────────────────────────────────────────────────────────────────────────
 #   ZYRABIT SLM — Unified Orchestration Script
-#   Version: 2.0.0
+#   Version: 2.1.0
 #   Description: Unified entry point for installation, development, and maintenance.
 #   Usage: ./zyra-up.sh [command] [options]
 # ──────────────────────────────────────────────────────────────────────────────

@@ -110,13 +110,21 @@ async def lifespan(app: FastAPI):
         app.state.inference_provider = OllamaInferenceAdapter(endpoint=f"{SLM_URL}/api/generate")
         
         # 5. Use Cases (Singletons for the session)
+        from app.infrastructure.adapters.bge_reranker_adapter import BGEReRankerAdapter
+        from app.infrastructure.adapters.sliding_window_memory_adapter import SlidingWindowMemoryAdapter
+        
+        reranker = BGEReRankerAdapter()
+        memory_manager = SlidingWindowMemoryAdapter()
+        
         telemetry_adapter = PrometheusTelemetryAdapter()
         app.state.chat_use_case = ChatUseCase(
             inference_provider=app.state.inference_provider,
             retriever_service=app.state.retriever_service,
             gatekeeper=Gatekeeper,
             cache=global_cache,
-            telemetry=telemetry_adapter
+            telemetry=telemetry_adapter,
+            reranker=reranker,
+            memory_manager=memory_manager
         )
         app.state.ingest_use_case = IngestUseCase(vector_store=app.state.vector_store)
         
@@ -148,7 +156,7 @@ async def lifespan(app: FastAPI):
         app.state.tg_worker.stop()
     logger.info("🛑 Zyrabit SLM API Shutting down...")
 
-app = FastAPI(title=PROJECT_NAME, version="1.7.5", lifespan=lifespan)
+app = FastAPI(title=PROJECT_NAME, version="2.1.0", lifespan=lifespan)
 
 # Mount Socket.io
 app.mount("/socket.io", socket_app)
@@ -179,7 +187,7 @@ async def chat_message(sid, data):
 
     try:
         # 1. COMMAND INTERCEPTION (Zero-Lag)
-        command_res = await CommandRouter.handle(text, source="WEB", session_id=sid)
+        command_res = await CommandRouter.handle(text, source="WEB", session_id=thread_id)
         if command_res:
             await sio.emit("chat_response", command_res, to=sid)
             return

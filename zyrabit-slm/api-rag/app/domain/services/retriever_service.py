@@ -23,11 +23,12 @@ class HybridRetrieverService:
         """
         logger.info(f"📈 Updating BM25 index with {len(documents)} documents...")
         self.bm25_retriever = BM25Retriever.from_documents(documents)
+        self.bm25_retriever.k = 10
         
         # Configure Ensemble: 70% Vector / 30% BM25
         self.ensemble_retriever = EnsembleRetriever(
             retrievers=[
-                self.vector_store.as_retriever(search_kwargs={"k": 3}),
+                self.vector_store.as_retriever(search_kwargs={"k": 10}),
                 self.bm25_retriever
             ],
             weights=[0.7, 0.3]
@@ -40,7 +41,7 @@ class HybridRetrieverService:
         """
         if not self.ensemble_retriever:
             logger.warning("⚠️ Ensemble Retriever not initialized. Falling back to Vector-only search.")
-            return await self.vector_store.asimilarity_search(query, k=3)
+            return await self.vector_store.asimilarity_search(query, k=10)
             
         logger.info(f"🔎 Executing Hybrid Ensemble Search (Vector+BM25) for: '{query}'")
         results = await self.ensemble_retriever.ainvoke(query)

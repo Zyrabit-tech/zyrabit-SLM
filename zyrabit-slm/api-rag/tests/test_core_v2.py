@@ -60,7 +60,7 @@ async def test_full_sovereign_cycle():
     # Ensure cache.get returns None so it doesn't hit cache
     mock_cache.get.return_value = None
     
-    chat_use_case = ChatUseCase(mock_inference, mock_retriever, mock_gatekeeper, mock_cache)
+    chat_use_case = ChatUseCase(mock_inference, mock_retriever, mock_gatekeeper, mock_cache, MagicMock())
     
     # 3. Execute Chat
     response = await chat_use_case.execute("Hola Zyra", client_msg_id="test_session")

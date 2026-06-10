@@ -10,13 +10,24 @@ class ChatUseCase:
     """
     V5.0 Brain: Orchestrates Security, Hybrid RAG, and Inference.
     """
-    def __init__(self, inference_provider, retriever_service, gatekeeper, cache, telemetry: TelemetryPort):
+    def __init__(
+        self, 
+        inference_provider, 
+        retriever_service, 
+        gatekeeper, 
+        cache, 
+        telemetry: TelemetryPort,
+        reranker = None,
+        memory_manager = None
+    ):
         self.inference_provider = inference_provider
         self.retriever_service = retriever_service
         self.gatekeeper = gatekeeper
         self.cache = cache
         self.telemetry = telemetry
         self.context_manager = ContextManager()
+        self.reranker = reranker
+        self.memory_manager = memory_manager
 
     async def execute(self, text: str, client_msg_id: Optional[str] = None, history: Optional[list] = None, source: str = "WEB") -> Dict[str, Any]:
         try:
@@ -58,8 +69,16 @@ class ChatUseCase:
                     try:
                         results = await self.retriever_service.search(sanitized_text)
                         if results:
-                            context = "\n".join([r.page_content for r in results])
-                            sources = list(set([r.metadata.get("source", "unknown") for r in results]))
+                            if self.reranker:
+                                # Advanced RAG: Re-Rank candidates and filter
+                                ranked_docs = self.reranker.rerank(sanitized_text, results)
+                                results = [doc for doc, score in ranked_docs if score >= 0.6][:3]
+                            else:
+                                results = results[:3]
+                                
+                            if results:
+                                context = "\n".join([r.page_content for r in results])
+                                sources = list(set([r.metadata.get("source", "unknown") for r in results]))
                     except Exception as e:
                         self.telemetry.log_security_audit(f"RAG search failed: {e}")
                         decision = "direct (fallback)"
@@ -72,6 +91,9 @@ class ChatUseCase:
             # 4. Memory Recovery
             if history is None:
                 history = SovereignStateManager.get_history(client_msg_id or "default")
+            
+            if self.memory_manager:
+                history = self.memory_manager.get_context_window(history, max_turns=4)
             
             # 4b. Fetch User Profile for Personalization (already fetched above)
 
@@ -103,6 +125,7 @@ class ChatUseCase:
             SovereignStateManager.store_message(client_msg_id or "default", "user", sanitized_text)
             SovereignStateManager.store_message(client_msg_id or "default", "assistant", response_obj.text)
 
+            pii_masked = [k for k in entities.keys()] if isinstance(entities, dict) else []
             latency_ms = response_obj.latency_seconds * 1000
             final_response = {
                 "response": response_obj.text,
@@ -112,6 +135,7 @@ class ChatUseCase:
                     "sources": sources,
                     "rag_hits": len(sources) if (decision == "rag" and sources) else 0,
                     "pii_detected": any(entities.values()),
+                    "pii_masked": pii_masked,
                     "cached": False
                 }
             }
@@ -147,11 +171,21 @@ class ChatUseCase:
         Decoupled from HTTP delivery. Yields strings (tokens) first,
         and finally yields a dict with metadata (e.g. rag_hits).
         """
+        if self.memory_manager:
+            history = self.memory_manager.get_context_window(history, max_turns=4)
+
         # RAG retrieval
         context_docs = []
         if self.retriever_service:
             try:
-                context_docs = await self.retriever_service.search(clean_query)
+                candidates = await self.retriever_service.search(clean_query)
+                if candidates:
+                    if self.reranker:
+                        # Advanced RAG: Re-Rank candidates and filter
+                        ranked_docs = self.reranker.rerank(clean_query, candidates)
+                        context_docs = [doc for doc, score in ranked_docs if score >= 0.6][:3]
+                    else:
+                        context_docs = candidates[:3]
             except Exception as e:
                 self.telemetry.log_security_audit(f"RAG stream search failed: {e}")
 

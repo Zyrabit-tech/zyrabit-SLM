@@ -9,6 +9,11 @@ import { EVENTS } from "../core/Constants";
 export class ChatManager {
     constructor() {
         this.queue = Storage.load('pending_messages') || [];
+        this.sessionId = Storage.load('session_id');
+        if (!this.sessionId) {
+            this.sessionId = crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2) + Date.now().toString(36);
+            Storage.save('session_id', this.sessionId);
+        }
         this.isProcessing = false;
         this.pendingTimeout = null;
         this.setupListeners();
@@ -62,7 +67,8 @@ export class ChatManager {
         bus.emit(EVENTS.SOCKET.EMIT, { 
             text: message.text, 
             history: message.history,
-            client_msg_id: message.id 
+            client_msg_id: message.id,
+            thread_id: this.sessionId
         });
 
         // 45-second circuit breaker timeout
@@ -114,6 +120,12 @@ export class ChatManager {
             text: data.response, 
             metadata: data.metadata 
         });
+        
+        if (data.metadata?.command === '/clear') {
+            this.sessionId = crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2) + Date.now().toString(36);
+            Storage.save('session_id', this.sessionId);
+            bus.emit('UI:CLEAR_CHAT');
+        }
         
         // If there's more in the queue, keep going
         if (this.queue.length > 0) {

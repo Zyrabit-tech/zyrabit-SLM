@@ -122,7 +122,17 @@ class ZyrabitApp {
                 input.value = '';
             };
 
-
+            // Input focus styling for premium look
+            const inputContainer = input.closest('.glass-premium');
+            if (inputContainer) {
+                input.addEventListener('focus', () => {
+                    inputContainer.classList.add('ring-2', 'ring-[#3f5a6d]/20', 'border-[#3f5a6d]/30', 'shadow-3xl');
+                    inputContainer.style.transition = 'all 0.3s ease';
+                });
+                input.addEventListener('blur', () => {
+                    inputContainer.classList.remove('ring-2', 'ring-[#3f5a6d]/20', 'border-[#3f5a6d]/30', 'shadow-3xl');
+                });
+            }
 
             input.onkeydown = (e) => {
                 if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
@@ -143,6 +153,29 @@ class ZyrabitApp {
         getSafeElement('close-ingest').onclick = () => this.togglePanel(null);
         getSafeElement('close-docs').onclick = () => this.togglePanel(null);
         getSafeElement('close-settings').onclick = () => this.togglePanel(null);
+
+        // Telegram modal bindings
+        const triggerTelegram = document.getElementById('trigger-telegram');
+        const telegramModal = document.getElementById('telegram-modal');
+        const closeTelegramModal = document.getElementById('close-telegram-modal');
+
+        if (triggerTelegram && telegramModal) {
+            triggerTelegram.onclick = () => {
+                telegramModal.classList.remove('hidden');
+            };
+        }
+        if (closeTelegramModal && telegramModal) {
+            closeTelegramModal.onclick = () => {
+                telegramModal.classList.add('hidden');
+            };
+        }
+        if (telegramModal) {
+            telegramModal.onclick = (e) => {
+                if (e.target === telegramModal) {
+                    telegramModal.classList.add('hidden');
+                }
+            };
+        }
 
         // 3b. Settings Form Submit
         const settingsForm = document.getElementById('settings-form');
@@ -185,6 +218,23 @@ class ZyrabitApp {
 
         // 5. System Logs
         bus.on(EVENTS.SYSTEM.LOG, (data) => this.addGdprLog(data.type, data.event));
+
+        // 5b. Security Logs (Gatekeeper)
+        bus.on(EVENTS.CHAT.RESPONSE_RECEIVED, (data) => {
+            if (data && data.metadata && data.metadata.pii_masked && data.metadata.pii_masked.length > 0) {
+                data.metadata.pii_masked.forEach(placeholder => {
+                    let entityType = "PII";
+                    if (placeholder.includes("EMAIL")) entityType = "EMAIL";
+                    else if (placeholder.includes("PHONE")) entityType = "PHONE";
+                    else if (placeholder.includes("CARD")) entityType = "CREDIT_CARD";
+                    else if (placeholder.includes("NAME")) entityType = "NAME";
+                    else if (placeholder.includes("IP")) entityType = "IP_ADDRESS";
+                    
+                    const logMsg = `Filtered ${entityType}: ${placeholder} from query.`;
+                    this.addGdprLog("🛡️ GATEKEEPER", logMsg);
+                });
+            }
+        });
 
         // 6. Gateway Status Notifications
         bus.on(EVENTS.SYSTEM.GATEWAY_CONNECTED, () => {

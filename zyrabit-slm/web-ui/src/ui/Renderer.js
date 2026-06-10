@@ -17,6 +17,15 @@ export class Renderer {
     setupListeners() {
         bus.on(EVENTS.UI.MSG_ADDED, (data) => this.renderMessage(data.role, data.text, data.metadata));
         bus.on(EVENTS.UI.THINKING, (state) => this.toggleThinking(state));
+        bus.on('UI:CLEAR_CHAT', () => {
+            this.container.innerHTML = '';
+            this.lastDate = null;
+            const suggestions = document.getElementById('floating-suggestions');
+            if (suggestions) {
+                suggestions.style.display = 'flex';
+                suggestions.style.opacity = '1';
+            }
+        });
     }
 
 

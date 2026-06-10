@@ -88,7 +88,7 @@
         </nav>
 
         <div class="mt-auto pt-8 border-t border-black/5 flex items-center justify-between">
-            <span class="text-[10px] font-medium text-black/30">v2.0.0 Sovereign</span>
+            <span class="text-[10px] font-medium text-black/30">v2.1.0 Sovereign</span>
             <div class="w-2 h-2 rounded-full bg-green-500 animate-pulse shadow-lg shadow-green-500/20"></div>
         </div>
     </aside>
@@ -109,16 +109,7 @@
                     class="text-[11px] font-semibold text-black/40 bg-black/5 px-4 py-2 rounded-full">QWEN 2.5:7B</span>
             </div>
 
-            <div class="flex items-center gap-4">
-                <div class="flex -space-x-2">
-                    <div
-                        class="w-8 h-8 rounded-full border-2 border-white bg-[#3f5a6d] flex items-center justify-center text-[10px] text-white font-bold">
-                        K</div>
-                    <div
-                        class="w-8 h-8 rounded-full border-2 border-white bg-[#6090b4] flex items-center justify-center text-[10px] text-white font-bold">
-                        Z</div>
-                </div>
-            </div>
+            <!-- Redundant K Z badges removed for cleaner aesthetic -->
         </header>
 
         <!-- CHAT LIST -->
@@ -151,10 +142,7 @@
         <div class="w-full max-w-4xl px-6 z-20 mx-auto pb-10">
             <div class="glass-premium p-4 rounded-[2.5rem] shadow-2xl mb-4 border border-black/5">
                 <form id="chat-form" class="flex items-center gap-4">
-                    <button type="button" id="input-vault-btn"
-                        class="w-10 h-10 flex items-center justify-center rounded-full hover:bg-black/5 transition-all active:scale-90 text-xl text-[#3f5a6d]/60">
-                        📎
-                    </button>
+                    <!-- Clip button removed for exquisite look. Vault is accessible from sidebar button. -->
                     <textarea id="chat-input" rows="1"
                         class="flex-1 bg-transparent border-none py-2 px-2 outline-none resize-none placeholder-[#3f5a6d]/30 text-[15px] font-medium"
                         placeholder="Type your command..."></textarea>
@@ -348,6 +336,29 @@
         </div>
     </main>
 
+
+    <!-- TELEGRAM CONFIG MODAL -->
+    <div id="telegram-modal"
+        class="fixed inset-0 bg-black/40 backdrop-blur-xl z-[100] flex items-center justify-center hidden p-6">
+        <div class="bg-white rounded-[3rem] w-full max-w-md p-10 shadow-3xl animate-in zoom-in duration-300 relative border border-black/5">
+            <button id="close-telegram-modal"
+                class="absolute top-6 right-6 w-8 h-8 rounded-full bg-black/5 flex items-center justify-center hover:bg-black/10 transition-all font-bold text-sm">×</button>
+            <div class="text-center mb-6">
+                <span class="text-4xl mb-4 block">✈️</span>
+                <h3 class="text-xl font-bold text-[#3f5a6d]">Telegram Bridge Config</h3>
+                <p class="text-[11px] text-[#323439]/55 mt-2">Link your Zyrabit SLM to Telegram for sovereign remote control.</p>
+            </div>
+            <div class="space-y-4 text-xs text-[#323439]/75 leading-relaxed bg-black/5 p-5 rounded-2xl border border-black/5 font-medium animate-none">
+                <p><strong>1. Create Bot</strong>: Search for <a href="https://t.me/BotFather" target="_blank" class="text-blue-500 font-bold hover:underline">@BotFather</a> on Telegram, send <code>/newbot</code>, and copy the <strong>HTTP API Token</strong>.</p>
+                <p><strong>2. Get Chat ID</strong>: Search for <a href="https://t.me/userinfobot" target="_blank" class="text-blue-500 font-bold hover:underline">@userinfobot</a> and send any message to get your numeric <strong>Chat ID</strong>.</p>
+                <p><strong>3. Edit Environment</strong>: Open the local <code>.env</code> file in your workspace and add:
+                    <pre class="bg-black/10 p-2 rounded mt-1 font-mono text-[10px]">TELEGRAM_BOT_TOKEN="your_token"
+TELEGRAM_CHAT_ID="your_chat_id"</pre>
+                </p>
+                <p><strong>4. Restart Stack</strong>: Rebuild or restart the stack using: <code>./zyra-up.sh start</code>.</p>
+            </div>
+        </div>
+    </div>
 
     <script type="module" src="/src/ui/components.js"></script>
     <script type="module" src="/src/main.js"></script>

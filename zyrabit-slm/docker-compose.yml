@@ -41,6 +41,7 @@ services:
       - N8N_SERVICE_TOKEN_FILE=/run/secrets/n8n_service_token
       - N8N_WEBHOOK_SIGNING_SECRET_FILE=/run/secrets/n8n_webhook_signing_secret
       - ONNXRUNTIME_LOGGING_LEVEL=3
+      - DOCS_DIR=/app/document_source
     depends_on:
 
       zyrabit-db:
