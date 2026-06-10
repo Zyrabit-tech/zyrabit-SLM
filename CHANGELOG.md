@@ -14,12 +14,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Strict Sliding Window Memory**: Implemented sliding window memory (`SlidingWindowMemoryAdapter`) to limit active conversation history to the last 4 turns (8 messages) to prevent context collapse and reduce latency.
 - **Telegram Configuration Modal**: Added an instruction modal guide on how to configure Telegram bot token and chat ID in the local `.env` file, bound to the sidebar connectivity section.
 - **Real-Time Security Logging**: Log masked PII entities directly into the Gatekeeper logs panel in real-time.
+- **Automated Dependency Checker Task**: Added a weekly GitHub Actions workflow (`dependency-checker.yml`) that scans Python and Node dependencies and automatically opens or updates a GitHub Issue task with vulnerabilities and outdated versions.
 
 ### Changed
 - **Exquisite Input Bar Design**: Redesigned the chat input container, removing the redundant paperclip attachment button in favor of a sleek, minimalist style (attaching files remains accessible via the sidebar Vault panel).
 - **Clean UI Header Layout**: Removed the redundant `K Z` badges and consolidated system status/model indicators in the header.
 - **Persistent Vault Storage**: Configured `zyrabit-api` to store document uploads under `/app/document_source` (persisted on host), preventing vault resets upon container recreations.
 - **Stable Chat Sessions**: Standardized UI WebSocket connections with stable client-side session IDs (`thread_id`) stored in `sessionStorage` to avoid session loss on reconnect.
+- **Disabled Dependabot PRs**: Updated `.github/dependabot.yml` to disable automatic Dependabot pull requests, preventing violations of default branch merge policies.
+
+### Fixed
+- **CI Dependency Audit**: Upgraded vulnerable dependencies (`aiohttp`, `idna`, `pyjwt`, `starlette`, `pip`) in `uv.lock`. Ignored the unpatched and isolated ChromaDB vulnerability (`CVE-2026-45829`) in the `pip-audit` step of the security workflows to restore CI checks to green.
 
 ## [2.0.0] - 2026-05-15
 
