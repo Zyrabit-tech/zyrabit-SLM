@@ -1,6 +1,19 @@
 import pytest
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 from app.domain.use_cases.chat_use_case import ChatUseCase
+
+
+@pytest.fixture(autouse=True)
+def mock_sovereign_state():
+    """Prevent any real SQLite calls in unit tests."""
+    with patch(
+        "app.domain.use_cases.chat_use_case.SovereignStateManager"
+    ) as mock_ssm:
+        mock_ssm.get_user_profile.return_value = {}
+        mock_ssm.get_history.return_value = []
+        mock_ssm.store_message.return_value = None
+        yield mock_ssm
+
 
 @pytest.fixture
 def mock_infra():
@@ -19,7 +32,8 @@ async def test_chat_use_case_cache_hit(mock_infra):
         mock_infra["inference"],
         mock_infra["vector_store"],
         mock_infra["gatekeeper"],
-        mock_infra["cache"]
+        mock_infra["cache"],
+        MagicMock()
     )
     
     # Simulate a cache hit
@@ -40,7 +54,8 @@ async def test_chat_use_case_pii_masking_integration(mock_infra):
         mock_infra["inference"],
         mock_infra["vector_store"],
         mock_infra["gatekeeper"],
-        mock_infra["cache"]
+        mock_infra["cache"],
+        MagicMock()
     )
     
     mock_infra["cache"].get.return_value = None

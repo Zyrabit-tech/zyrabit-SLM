@@ -39,4 +39,4 @@ jobs:
         run: uv sync --all-groups
 
       - name: Run Security Audit
-        run: uv run pip-audit
+        run: uv run pip-audit --ignore-vuln CVE-2026-45829

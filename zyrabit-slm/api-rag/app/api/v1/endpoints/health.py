@@ -134,6 +134,7 @@ class UserProfileUpdate(BaseModel):
     preferred_model: str = 'qwen2.5:7b'
     tone: str = 'professional'
     assistant_name: str = 'Zyra'
+    system_prompt: str = ''
 
 @router.get("/profile")
 async def get_profile():
@@ -149,9 +150,9 @@ async def update_profile(profile: UserProfileUpdate):
         persona=profile.persona,
         preferred_model=profile.preferred_model,
         tone=profile.tone,
-        assistant_name=profile.assistant_name
+        assistant_name=profile.assistant_name,
+        system_prompt=profile.system_prompt
     )
-
     return {"status": "success"}
 
 

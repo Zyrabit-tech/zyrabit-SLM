@@ -68,6 +68,12 @@ class SovereignStateManager:
             except sqlite3.OperationalError:
                 pass # Column exists
 
+            # Migration: Add system_prompt if missing
+            try:
+                conn.execute("ALTER TABLE user_profile ADD COLUMN system_prompt TEXT DEFAULT ''")
+            except sqlite3.OperationalError:
+                pass # Column exists
+
             # 4. FTS5 Virtual Table for Zero-Lag Hybrid RAG
             try:
                 conn.execute("""
@@ -95,12 +101,12 @@ class SovereignStateManager:
             return {}
 
     @classmethod
-    def update_user_profile(cls, name: str, role: str, interests: str, email: str = "contact@zyrabit.com", persona: str = 'general', preferred_model: str = 'qwen2.5:7b', tone: str = 'professional', assistant_name: str = 'Zyra'):
+    def update_user_profile(cls, name: str, role: str, interests: str, email: str = "contact@zyrabit.com", persona: str = 'general', preferred_model: str = 'qwen2.5:7b', tone: str = 'professional', assistant_name: str = 'Zyra', system_prompt: str = ''):
         with sqlite3.connect(cls.DB_PATH) as conn:
             conn.execute("""
-                INSERT OR REPLACE INTO user_profile (id, name, email, role, interests, persona, preferred_model, tone, assistant_name, onboarding_completed)
-                VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, 1)
-            """, (name, email, role, interests, persona, preferred_model, tone, assistant_name))
+                INSERT OR REPLACE INTO user_profile (id, name, email, role, interests, persona, preferred_model, tone, assistant_name, system_prompt, onboarding_completed)
+                VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
+            """, (name, email, role, interests, persona, preferred_model, tone, assistant_name, system_prompt))
 
 
 

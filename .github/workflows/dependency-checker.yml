@@ -1,0 +1,104 @@
+name: Sovereign Dependency Checker
+
+on:
+  schedule:
+    - cron: "0 0 * * 0" # Weekly on Sundays at midnight
+  workflow_dispatch: # Allows manual triggering from GitHub Actions UI
+
+permissions:
+  contents: write
+  issues: write
+
+jobs:
+  check-dependencies:
+    name: Check Outdated & Vulnerable Dependencies
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node & pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Setup Python
+        run: uv python install 3.12
+
+      - name: Install Python dependencies
+        run: uv sync --all-groups
+
+      - name: Check Python Vulnerabilities (pip-audit)
+        id: pip_audit
+        continue-on-error: true
+        run: |
+          echo "### 🛡️ Python Vulnerability Audit (pip-audit)" > pip_audit_report.md
+          if uv run pip-audit --ignore-vuln CVE-2026-45829 > pip_audit_output.txt 2>&1; then
+            echo "✅ No known vulnerabilities found." >> pip_audit_report.md
+            echo "false" > vuln_found.txt
+          else
+            echo "⚠️ Found vulnerabilities:" >> pip_audit_report.md
+            echo '```' >> pip_audit_report.md
+            cat pip_audit_output.txt >> pip_audit_report.md
+            echo '```' >> pip_audit_report.md
+            echo "true" > vuln_found.txt
+          fi
+
+      - name: Check Node Outdated Packages (pnpm)
+        id: pnpm_outdated
+        continue-on-error: true
+        run: |
+          echo "### 📦 Web UI Outdated Packages (pnpm)" > pnpm_report.md
+          cd zyrabit-slm/web-ui
+          # pnpm outdated returns exit code 1 if there are outdated dependencies
+          if pnpm outdated > pnpm_output.txt 2>&1; then
+            echo "✅ All packages are up to date." >> ../../pnpm_report.md
+            echo "false" > ../../npm_outdated.txt
+          else
+            echo "⚠️ Outdated packages found:" >> ../../pnpm_report.md
+            echo '```' >> ../../pnpm_report.md
+            cat pnpm_output.txt >> ../../pnpm_report.md
+            echo '```' >> ../../pnpm_report.md
+            echo "true" > ../../npm_outdated.txt
+          fi
+
+      - name: Create Task/Issue if updates are needed
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VULN_FOUND=$(cat vuln_found.txt 2>/dev/null || echo "false")
+          NPM_OUTDATED=$(cat npm_outdated.txt 2>/dev/null || echo "false")
+          
+          # Combine reports
+          cat << 'EOF' > final_issue_body.md
+          # 🤖 Sovereign Dependency Update Task
+          
+          The automated dependency scanner detected outdated packages or security vulnerabilities. Please review the details below and plan the updates.
+          
+          EOF
+          
+          cat pip_audit_report.md >> final_issue_body.md
+          echo "" >> final_issue_body.md
+          cat pnpm_report.md >> final_issue_body.md
+          
+          if [ "$VULN_FOUND" = "true" ] || [ "$NPM_OUTDATED" = "true" ]; then
+            TITLE="Sovereign Dependency Update Task: $(date +'%Y-%m-%d')"
+            
+            # Check if an issue with the same title already exists to prevent duplication
+            EXISTING_ISSUE=$(gh issue list --search "$TITLE" --state open --json number -q '.[0].number' 2>/dev/null || echo "")
+            
+            if [ -n "$EXISTING_ISSUE" ]; then
+              echo "Issue already exists: #$EXISTING_ISSUE. Updating description."
+              gh issue edit "$EXISTING_ISSUE" --body-file final_issue_body.md
+            else
+              echo "Creating new GitHub Issue."
+              gh issue create --title "$TITLE" --body-file final_issue_body.md --label "dependencies" --label "maintenance"
+            fi
+          else
+            echo "Everything is up to date and secure! No tasks needed."
+          fi

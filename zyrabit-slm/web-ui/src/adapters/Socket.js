@@ -18,7 +18,8 @@ export class SocketAdapter {
 
 
     async connect() {
-        if (this.isConnecting || (this.socket && this.socket.connected)) return;
+        if (this.socket && this.socket.connected) return;
+        if (this.isConnecting) return;
         
         this.isConnecting = true;
         const socketUrl = window.location.origin;
@@ -33,15 +34,24 @@ export class SocketAdapter {
             return;
         }
 
-        // 2. Initialize Socket with strict limits
-        this.socket = io(socketUrl, { 
-            path: "/socket.io",
-            reconnectionAttempts: this.maxAttempts,
-            timeout: 5000,
-            autoConnect: true
-        });
-
-        this.setupSocketEvents();
+        if (!this.socket) {
+            // 2. Initialize Socket with auto-reconnection and infinite attempts
+            this.socket = io(socketUrl, { 
+                path: "/socket.io",
+                reconnection: true,
+                reconnectionAttempts: Infinity,
+                reconnectionDelay: 1000,
+                reconnectionDelayMax: 5000,
+                timeout: 5000,
+                autoConnect: true
+            });
+            this.setupSocketEvents();
+        } else {
+            console.log("🔌 Reconnecting existing Socket...");
+            this.socket.connect();
+        }
+        
+        this.isConnecting = false;
     }
 
     setupSocketEvents() {
@@ -50,42 +60,36 @@ export class SocketAdapter {
             this.isConnecting = false;
             console.log("🚀 Secure Gateway Established");
             bus.emit(EVENTS.SYSTEM.LOG, { type: 'SYSTEM', event: 'SECURE_GATEWAY_ESTABLISHED' });
+            bus.emit(EVENTS.SYSTEM.GATEWAY_CONNECTED);
         });
 
         this.socket.on("chat_response", (data) => {
             bus.emit(EVENTS.CHAT.RESPONSE_RECEIVED, data);
         });
 
-
         this.socket.on("connect_error", (err) => {
             this.reconnectAttempts++;
-            if (this.reconnectAttempts >= this.maxAttempts) {
-                this.handleConnectionFailure(true);
-            }
+            console.warn(`⚠️ Socket connection error (${this.reconnectAttempts}):`, err.message);
+            bus.emit(EVENTS.SYSTEM.LOG, { type: 'WARNING', event: `SOCKET_CONNECT_ERROR: ${err.message}` });
         });
 
         this.socket.on("disconnect", (reason) => {
             console.warn(`⚠️ Gateway Disconnected: ${reason}`);
             bus.emit(EVENTS.SYSTEM.LOG, { type: 'WARNING', event: 'GATEWAY_DISCONNECTED' });
+            bus.emit(EVENTS.SYSTEM.GATEWAY_DISCONNECTED, reason);
             if (reason === "io server disconnect") {
-
-                // Server-side disconnect, don't auto-reconnect
-                this.socket.close();
+                // Server-side disconnect, trigger manual reconnection check
+                setTimeout(() => {
+                    if (this.socket) this.socket.connect();
+                }, 5000);
             }
         });
     }
 
-    handleConnectionFailure(permanent = false) {
+    handleConnectionFailure() {
         this.isConnecting = false;
-        if (permanent) {
-            console.error("❌ Gateway Connection Timeout. Switching to Offline Mode.");
-            if (this.socket) this.socket.close();
-            bus.emit(EVENTS.SYSTEM.LOG, { type: 'ERROR', event: 'GATEWAY_TIMEOUT_OFFLINE' });
-        } else {
-
-            // Soft retry after 10s if not permanent
-            setTimeout(() => this.connect(), 10000);
-        }
+        console.warn("⚠️ Gateway Connection failed. Retrying socket connect in 10s...");
+        setTimeout(() => this.connect(), 10000);
     }
 
     setupBusListeners() {
@@ -94,6 +98,7 @@ export class SocketAdapter {
                 this.socket.emit("chat_message", data);
             } else {
                 bus.emit(EVENTS.SYSTEM.LOG, { type: 'ERROR', event: 'SOCKET_NOT_CONNECTED' });
+                bus.emit(EVENTS.SYSTEM.GATEWAY_DISCONNECTED, 'not_connected');
             }
         });
     }

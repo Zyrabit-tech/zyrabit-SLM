@@ -3,10 +3,13 @@
 from __future__ import annotations
 
 import time
+import logging
 from typing import Any, Dict
 from urllib.parse import urlparse
 
 import requests
+
+logger = logging.getLogger("zyrabit.inference")
 
 from app.ports.inference_port import (
     InferenceProviderError,
