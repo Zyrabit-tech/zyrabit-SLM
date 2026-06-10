@@ -36,22 +36,13 @@ class HybridRetrieverService:
 
     async def search(self, query: str, domain: Optional[str] = None) -> List[Document]:
         """
-        Executes hybrid search with FTS5 Fast-Path and Vector Fallback.
+        Executes hybrid search using Ensemble Retriever (Vector + BM25) with Reciprocal Rank Fusion.
         """
-        from app.infrastructure.shared.state_tracker import SovereignStateManager
-        
-        logger.info(f"⚡ FTS5 Fast-Path Search for: '{query}'")
-        fts_results = SovereignStateManager.search_fts(query)
-        
-        if fts_results:
-            logger.info(f"🚀 FTS5 Hit! Found {len(fts_results)} results instantly.")
-            return [Document(page_content=r["snippet"], metadata={"source": r["file_path"], "type": "fts5"}) for r in fts_results]
-
         if not self.ensemble_retriever:
-            logger.warning("⚠️ Ensemble Retriever not initialized. Falling back to Vector-only.")
+            logger.warning("⚠️ Ensemble Retriever not initialized. Falling back to Vector-only search.")
             return await self.vector_store.asimilarity_search(query, k=3)
             
-        logger.info(f"🔎 Falling back to Hybrid Ensemble (Vector+BM25) for: '{query}'")
+        logger.info(f"🔎 Executing Hybrid Ensemble Search (Vector+BM25) for: '{query}'")
         results = await self.ensemble_retriever.ainvoke(query)
         return results
 

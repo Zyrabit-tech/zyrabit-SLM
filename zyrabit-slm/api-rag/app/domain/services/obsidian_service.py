@@ -1,5 +1,6 @@
 import os
 import logging
+import asyncio
 from pathlib import Path
 from datetime import datetime
 from typing import Dict, Any
@@ -121,7 +122,7 @@ Include:
                 prompt=synthesis_prompt,
                 system_prompt="You are a precise, reflective AI writing system."
             )
-            response = inference_provider.generate(req)
+            response = await asyncio.to_thread(inference_provider.generate, req)
             note_content = response.text
         except Exception as e:
             logger.error(f"❌ LLM Synthesis failed: {e}. Generating fallback markdown.")

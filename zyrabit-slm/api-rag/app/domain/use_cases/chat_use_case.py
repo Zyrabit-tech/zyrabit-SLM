@@ -1,22 +1,21 @@
-import logging
+import time
 from typing import Optional, Dict, Any
+from app.domain.ports.telemetry_port import TelemetryPort
 from app.infrastructure.shared.config import MODEL_NAME
-from app.infrastructure.shared.metrics import TOKEN_USAGE_TOTAL, TOKEN_LATENCY_MS, SECURITY_HITS_TOTAL, RAG_HITS_TOTAL
 from app.infrastructure.shared.state_tracker import SovereignStateManager
 from app.domain.services.context_manager import ContextManager
 from app.ports.inference_port import InferenceRequest
-
-logger = logging.getLogger("zyrabit.api")
 
 class ChatUseCase:
     """
     V5.0 Brain: Orchestrates Security, Hybrid RAG, and Inference.
     """
-    def __init__(self, inference_provider, retriever_service, gatekeeper, cache):
+    def __init__(self, inference_provider, retriever_service, gatekeeper, cache, telemetry: TelemetryPort):
         self.inference_provider = inference_provider
         self.retriever_service = retriever_service
         self.gatekeeper = gatekeeper
         self.cache = cache
+        self.telemetry = telemetry
         self.context_manager = ContextManager()
 
     async def execute(self, text: str, client_msg_id: Optional[str] = None, history: Optional[list] = None, source: str = "WEB") -> Dict[str, Any]:
@@ -30,12 +29,13 @@ class ChatUseCase:
 
             # 1. Security Check (PII Masking)
             sanitized_text, entities = self.gatekeeper.mask_pii(text)
+            self.telemetry.log_security_audit(sanitized_text)
             
             if any(entities.values()):
                 found = [k for k, v in entities.items() if v]
-                logger.info(f"🛡️ PII Detected! Masked entities: {found}")
-                logger.debug(f"Original: {text}")
-                logger.info(f"Sanitized: {sanitized_text}")
+                self.telemetry.log_security_audit(
+                    f"PII detected ({found}): {sanitized_text}"
+                )
             
             # 2. Routing Decision
             decision = self.gatekeeper.get_routing_decision(sanitized_text)
@@ -49,6 +49,7 @@ class ChatUseCase:
             # 3. Hybrid Context Retrieval (RAG)
             context = ""
             sources = []
+            results = []  # ensure always defined for build_final_prompt
             if decision == "rag":
                 if not self.retriever_service:
                     logger.warning("⚠️ Hybrid Retriever not initialized. Falling back to direct.")
@@ -60,7 +61,7 @@ class ChatUseCase:
                             context = "\n".join([r.page_content for r in results])
                             sources = list(set([r.metadata.get("source", "unknown") for r in results]))
                     except Exception as e:
-                        logger.error(f"⚠️ Hybrid Search failed: {e}")
+                        self.telemetry.log_security_audit(f"RAG search failed: {e}")
                         decision = "direct (fallback)"
 
             # 4. Inference
@@ -114,14 +115,6 @@ class ChatUseCase:
                     "cached": False
                 }
             }
-            
-            # 5. Metrics Recording
-            TOKEN_LATENCY_MS.labels(model=MODEL_NAME).observe(latency_ms)
-            # Estimate tokens as words (approximate for SLM visibility)
-            token_count = len(response_obj.text.split())
-            TOKEN_USAGE_TOTAL.labels(model=MODEL_NAME, direction="output").inc(token_count)
-            if decision == "rag" and sources:
-                RAG_HITS_TOTAL.labels(collection="default").inc()
 
             # 6. Cache
             if client_msg_id:
@@ -130,7 +123,7 @@ class ChatUseCase:
             return final_response
 
         except Exception as e:
-            logger.exception(f"❌ Critical error in ChatUseCase: {e}")
+            self.telemetry.log_security_audit(f"CRITICAL ERROR: {e}")
             return {"response": "Critical Error", "metadata": {"decision": "error"}}
 
     def mask_query(self, query: str) -> tuple[str, bool]:
@@ -139,6 +132,7 @@ class ChatUseCase:
         Returns: (clean_text, pii_detected)
         """
         clean_text, entities = self.gatekeeper.mask_pii(query)
+        self.telemetry.log_security_audit(clean_text)
         pii_detected = any(entities.values()) if isinstance(entities, dict) else bool(entities)
         return clean_text, pii_detected
 
@@ -159,7 +153,7 @@ class ChatUseCase:
             try:
                 context_docs = await self.retriever_service.search(clean_query)
             except Exception as e:
-                logger.error(f"⚠️ RAG Search failed in stream_response: {e}")
+                self.telemetry.log_security_audit(f"RAG stream search failed: {e}")
 
         # Build prompt
         user_profile = user_profile or {}
@@ -179,11 +173,19 @@ class ChatUseCase:
         # Stream tokens
         from app.infrastructure.inference.ollama_stream_adapter import OllamaStreamAdapter
         stream_adapter = OllamaStreamAdapter()
+        
+        start_time = time.time()
+        first_chunk_received = False
+        
         async for token in stream_adapter.stream(
             model=target_model,
             prompt=prompt,
             system_prompt=system_prompt
         ):
+            if not first_chunk_received:
+                duration_ms = (time.time() - start_time) * 1000
+                self.telemetry.record_ttft(duration_ms)
+                first_chunk_received = True
             yield token
 
         # Yield metadata at the end of the generator

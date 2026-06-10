@@ -31,6 +31,7 @@ from app.domain.services.command_router import CommandRouter
 # Infrastructure Adapters
 from app.infrastructure.persistence.chroma_adapter import ChromaAdapter, DirectOllamaEmbeddings
 from app.infrastructure.inference.ollama_inference_adapter import OllamaInferenceAdapter
+from app.infrastructure.telemetry.prometheus_telemetry_adapter import PrometheusTelemetryAdapter
 from app.domain.services.retriever_service import HybridRetrieverService
 # pyrefly: ignore [missing-import]
 from langchain_chroma import Chroma
@@ -91,15 +92,31 @@ async def lifespan(app: FastAPI):
         # 3. Hybrid Retriever
         app.state.retriever_service = HybridRetrieverService(lc_chroma)
         
+        # Initialize BM25 on startup with existing documents from Vector DB
+        try:
+            from langchain_core.documents import Document
+            db_docs = lc_chroma.get()
+            if db_docs and db_docs.get("documents"):
+                documents = []
+                for text, metadata in zip(db_docs["documents"], db_docs["metadatas"]):
+                    documents.append(Document(page_content=text, metadata=metadata))
+                if documents:
+                    app.state.retriever_service.update_bm25_index(documents)
+                    logger.info(f"📈 Loaded {len(documents)} existing documents into BM25 index on startup.")
+        except Exception as e:
+            logger.error(f"⚠️ Failed to load existing documents for BM25: {e}")
+        
         # 4. Inference Provider
         app.state.inference_provider = OllamaInferenceAdapter(endpoint=f"{SLM_URL}/api/generate")
         
         # 5. Use Cases (Singletons for the session)
+        telemetry_adapter = PrometheusTelemetryAdapter()
         app.state.chat_use_case = ChatUseCase(
             inference_provider=app.state.inference_provider,
             retriever_service=app.state.retriever_service,
             gatekeeper=Gatekeeper,
-            cache=global_cache
+            cache=global_cache,
+            telemetry=telemetry_adapter
         )
         app.state.ingest_use_case = IngestUseCase(vector_store=app.state.vector_store)
         
@@ -155,9 +172,11 @@ async def chat_message(sid, data):
 
     text = data.get("text", "")
     msg_id = data.get("client_msg_id")
-    
+    # Use sid as thread_id so each socket session has its own persistent memory
+    thread_id = data.get("thread_id", sid)
+
     logger.info(f"💬 Socket RAG Query from {sid}: {text[:30]}...")
-    
+
     try:
         # 1. COMMAND INTERCEPTION (Zero-Lag)
         command_res = await CommandRouter.handle(text, source="WEB", session_id=sid)
@@ -165,12 +184,27 @@ async def chat_message(sid, data):
             await sio.emit("chat_response", command_res, to=sid)
             return
 
-        # 2. RAG BRAIN EXECUTION
-        result = await _global_app.state.chat_use_case.execute(text=text, client_msg_id=msg_id)
+        # 2. Recover history for this session (Sovereign Memory)
+        from app.infrastructure.shared.state_tracker import SovereignStateManager
+        history = SovereignStateManager.get_history(thread_id)
+
+        # 3. RAG BRAIN EXECUTION with history context
+        result = await _global_app.state.chat_use_case.execute(
+            text=text,
+            client_msg_id=msg_id,
+            history=history,
+        )
+
+        # 4. Record TTFT via telemetry (socket path uses execute(), not stream_response())
+        latency_ms = result.get("metadata", {}).get("latency_ms", 0)
+        if latency_ms and hasattr(_global_app.state, 'chat_use_case'):
+            _global_app.state.chat_use_case.telemetry.record_ttft(latency_ms)
+
         await sio.emit("chat_response", result, to=sid)
     except Exception as e:
         logger.error(f"❌ Socket RAG Error: {e}")
         await sio.emit("chat_response", {"response": "I encountered an error processing your request."}, to=sid)
+
 
 
 # Middleware

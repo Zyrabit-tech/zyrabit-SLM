@@ -189,9 +189,46 @@ class ZyrabitApp {
         // 6. Gateway Status Notifications
         bus.on(EVENTS.SYSTEM.GATEWAY_CONNECTED, () => {
             this.showNotification("Conexión con el servidor restablecida.", "success");
+            try {
+                const input = getSafeElement(IDS.CHAT_INPUT);
+                const submitBtn = getSafeElement(IDS.CHAT_SUBMIT);
+                input.disabled = false;
+                submitBtn.disabled = false;
+                input.placeholder = "Type your command...";
+                
+                const statusPill = document.getElementById("status-pill");
+                if (statusPill) {
+                    statusPill.className = "flex items-center gap-2 px-4 py-2 bg-green-500/10 border border-green-500/20 rounded-full animate-none";
+                    const dot = statusPill.querySelector("div");
+                    if (dot) dot.className = "w-2 h-2 rounded-full bg-green-500 shadow-sm";
+                    const text = statusPill.querySelector("span");
+                    if (text) text.textContent = "SYSTEM READY";
+                }
+            } catch (e) {
+                console.warn("⚠️ Failed to update UI elements on gateway connect:", e);
+            }
         });
         bus.on(EVENTS.SYSTEM.GATEWAY_DISCONNECTED, (reason) => {
             this.showNotification("Se perdió la conexión con el servidor. Reconectando...", "error");
+            try {
+                const input = getSafeElement(IDS.CHAT_INPUT);
+                const submitBtn = getSafeElement(IDS.CHAT_SUBMIT);
+                input.disabled = true;
+                submitBtn.disabled = true;
+                input.value = '';
+                input.placeholder = "Sin conexión con el servidor. Intentando reconectar...";
+                
+                const statusPill = document.getElementById("status-pill");
+                if (statusPill) {
+                    statusPill.className = "flex items-center gap-2 px-4 py-2 bg-red-500/10 border border-red-500/20 rounded-full";
+                    const dot = statusPill.querySelector("div");
+                    if (dot) dot.className = "w-2 h-2 rounded-full bg-red-500 shadow-sm animate-pulse";
+                    const text = statusPill.querySelector("span");
+                    if (text) text.textContent = "OFFLINE";
+                }
+            } catch (e) {
+                console.warn("⚠️ Failed to update UI elements on gateway disconnect:", e);
+            }
         });
     }
 

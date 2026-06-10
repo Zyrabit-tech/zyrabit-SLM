@@ -127,3 +127,4 @@ ops-private/
 # Model weights cache
 zyrabit-slm/hf-cache/
 zyrabit-slm/db_data/*
+validation/reports/

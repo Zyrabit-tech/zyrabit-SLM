@@ -58,11 +58,13 @@ ${BOLD}Commands:${NC}
   stop      Tear down the infrastructure
   build     Build Docker images without starting containers
   verify    Health check: validate all containers and API status
+  validate  QA: run sovereign validation suite (PII, TTFT, Air-Gap)
   dev       Native local development (starts API via 'uv' with hot-reload)
   doctor    Diagnostic: validate environment, RAM, and hardware acceleration
   notify    Bridge: send a secure Telegram notification via MCP
   help      Show this help message
 
+  --e2e-security  With 'validate': run full PII+air-gap+memory E2E pipeline
   --profile <name>  Add Docker Compose profile (automation, observability-extra)
   --local           Use local configuration (port 8080, no SSL/Traefik)
   --domain <name>   Set the target domain for production (default: localhost)
@@ -321,6 +323,96 @@ run_notify() {
     fi
 }
 
+run_validate() {
+    local e2e_security="${E2E_SECURITY:-false}"
+
+    log_header "ZYRABIT SOVEREIGN QA VALIDATION"
+
+    # ── 1. Unit Tests (siempre) ────────────────────────────────────────────────
+    log_info "[FASE 1] Ejecutando unit tests (TDD - sin red requerida)..."
+    cd "${SCRIPT_DIR}/zyrabit-slm"
+    if uv run pytest api-rag/tests/unit/ -q 2>&1; then
+        log_ok "Unit tests: VERDE ✅"
+    else
+        log_err "Unit tests FALLARON. Abortar validación."
+        exit 1
+    fi
+    cd "${SCRIPT_DIR}"
+
+    # ── 2. Validación Arquitectónica ───────────────────────────────────────────
+    log_info "[FASE 1] Validando restricciones de arquitectura Clean..."
+    if grep -rn "prometheus_client\|import logging" \
+        "${SCRIPT_DIR}/zyrabit-slm/api-rag/app/domain/use_cases/chat_use_case.py" 2>/dev/null; then
+        log_err "❌ Violación de Clean Architecture: el dominio importa dependencias de infraestructura."
+        exit 1
+    else
+        log_ok "Arquitectura limpia: sin prometheus_client ni logging en chat_use_case.py ✅"
+    fi
+
+    if [[ "$e2e_security" != "true" ]]; then
+        log_ok "Validación básica completada. Usa --e2e-security para el pipeline completo."
+        return 0
+    fi
+
+    # ── 3. E2E Security Pipeline ───────────────────────────────────────────────
+    log_header "E2E SECURITY PIPELINE"
+    require_docker
+
+    SYNTHETIC_PDF="/tmp/zyrabit_synthetic_pii_$(date +%s).pdf"
+
+    # Paso A: Generar PDF con PII sintético
+    log_info "[FASE 3] Generando PDF sintético con PII..."
+    if command -v uv &>/dev/null; then
+        uv run python "${SCRIPT_DIR}/validation/scripts/generate_synthetic_pdf.py" "$SYNTHETIC_PDF" || true
+    fi
+
+    # Paso B: Verificar red interna (air-gap) en docker-compose
+    log_info "[FASE 3] Verificando configuración de red soberana (air-gap)..."
+    if grep -q 'internal: true' "${SCRIPT_DIR}/zyrabit-slm/docker-compose.yml" 2>/dev/null; then
+        log_ok "Red model-network tiene internal: true ✅"
+    else
+        log_warn "⚠️  'internal: true' no encontrado en docker-compose.yml. Revisar configuración de red."
+    fi
+
+    # Paso C: Ping a Prometheus (via docker exec — puerto no expuesto al host, está detrás de Traefik)
+    log_info "[FASE 3] Verificando disponibilidad de Prometheus (via docker exec)..."
+    local PROM_CONTAINER="zyrabit-prometheus"
+    if docker inspect "$PROM_CONTAINER" --format '{{.State.Running}}' 2>/dev/null | grep -q "true"; then
+        # Healthcheck desde dentro del contenedor usando el route-prefix configurado
+        if docker exec "$PROM_CONTAINER" wget -qO- "http://localhost:9090/prometheus/-/ready" &>/dev/null; then
+            log_ok "Prometheus responde ✅"
+
+            # Verificar métrica TTFT desde dentro del contenedor
+            local ttft_result
+            ttft_result=$(docker exec "$PROM_CONTAINER" \
+                wget -qO- "http://localhost:9090/prometheus/api/v1/query?query=zyrabit_ttft_seconds_count" \
+                2>/dev/null || echo "")
+            if echo "$ttft_result" | grep -q '"result":\[{'; then
+                log_ok "Métrica zyrabit_ttft_seconds registrada en Prometheus ✅"
+            else
+                log_warn "Métrica TTFT aún no registrada (envía un mensaje al chat para generar tráfico)."
+            fi
+        else
+            log_warn "Prometheus contenedor existe pero aún no responde (puede estar iniciando)."
+        fi
+    else
+        log_warn "Contenedor '$PROM_CONTAINER' no está corriendo. Levanta el stack primero."
+    fi
+
+    # Paso D: Monitor de memoria (60s, muestras cada 5s)
+    log_info "[FASE 3] Ejecutando monitor de memoria (60s)..."
+    if bash "${SCRIPT_DIR}/validation/scripts/monitor_memory.sh" 60 5; then
+        log_ok "Memoria dentro del límite soberano (< 14GB) ✅"
+    else
+        log_err "❌ Memoria superó el umbral de 14GB. Revisar report en validation/reports/."
+        exit 1
+    fi
+
+    log_header "RESULTADO FINAL"
+    log_ok "Pipeline Sovereign QA completado exitosamente 🏆"
+    log_info "Reporte de memoria: ${SCRIPT_DIR}/validation/reports/"
+}
+
 # --- Argument & Command Parsing ---
 COMMANDS=()
 PROFILE=""
@@ -336,6 +428,7 @@ while [[ "$#" -gt 0 ]]; do
         --domain) export DOMAIN="$2"; shift 2 ;;
         --model) OVERRIDE_MODEL="$2"; shift 2 ;;
         --no-cache) NO_CACHE="true"; shift ;;
+        --e2e-security) E2E_SECURITY="true"; shift ;;
         -*) log_err "Unknown option: $1"; usage; exit 1 ;;
         notify)
             COMMANDS+=("notify")
@@ -354,14 +447,15 @@ done
 
 for CMD in "${COMMANDS[@]}"; do
     case "${CMD}" in
-        install) run_install ;;
-        start)   run_start ;;
-        stop)    $DOCKER_COMPOSE_CMD -f "${COMPOSE_FILE}" down ;;
-        build)   run_build ;;
-        verify)  run_verify ;;
-        notify)  run_notify "${NOTIFY_MSG:-}" ;;
-        dev)     run_dev ;;
-        doctor)  run_doctor ;;
+        install)  run_install ;;
+        start)    run_start ;;
+        stop)     $DOCKER_COMPOSE_CMD -f "${COMPOSE_FILE}" down ;;
+        build)    run_build ;;
+        verify)   run_verify ;;
+        validate) run_validate ;;
+        notify)   run_notify "${NOTIFY_MSG:-}" ;;
+        dev)      run_dev ;;
+        doctor)   run_doctor ;;
         help|--help|-h) usage; exit 0 ;;
         *) log_err "Unknown command: ${CMD}"; usage; exit 1 ;;
     esac

@@ -11,7 +11,7 @@ class Gatekeeper:
     Follows SRP by delegating low-level masking to the pii_pipeline.
     """
     
-    # Scope Keywords (Policy-level configuration)
+    # Scope Keywords for is_in_scope (kept for future use / telemetry)
     SCOPE_KEYWORDS = ["zyrabit", "slm", "architecture", "infrastructure", "docker", "mcp", "ollama", "rag"]
 
     @classmethod
@@ -44,8 +44,9 @@ class Gatekeeper:
     @classmethod
     def get_routing_decision(cls, text: str) -> str:
         """
-        Policy: Decide if we need RAG or direct SLM response.
+        Policy: Always use RAG to search user-uploaded documents first.
+        The LLM gracefully handles cases where the vector store has no
+        relevant hits — it will simply answer from its own knowledge.
+        Routing to 'direct' was causing user documents to be silently ignored.
         """
-        if cls.is_in_scope(text):
-            return "rag"
-        return "direct"
+        return "rag"

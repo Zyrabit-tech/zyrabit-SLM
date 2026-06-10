@@ -43,6 +43,7 @@ dev = [
     "pytest-asyncio>=0.24.0",
     "pip-audit>=2.8.0",
     "autopep8>=2.3.2",
+    "reportlab>=4.0.0",  # E2E validation: PDF generator for PII testing
 ]
 
 [tool.uv]

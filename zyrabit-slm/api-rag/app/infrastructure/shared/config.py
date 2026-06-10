@@ -7,7 +7,10 @@ PROJECT_NAME: str = os.getenv("PROJECT_NAME", "zyrabit-slm")
 API_V1_STR: str = "/v1"
 
 # Infrastructure URLs
-SLM_URL: str = os.getenv("SLM_URL", "http://zyrabit-engine:11434")
+# IMPORTANT: SLM_URL must be the base URL only (e.g. http://host:11434).
+# Do NOT include /api/generate or any path — adapters append their own paths.
+_raw_slm_url: str = os.getenv("SLM_URL", "http://zyrabit-engine:11434")
+SLM_URL: str = _raw_slm_url.rstrip("/").removesuffix("/api/generate")
 
 # DB Configuration (Flexible for Docker/Local)
 DB_HOST: str = os.getenv("DB_HOST", "zyrabit-db")
