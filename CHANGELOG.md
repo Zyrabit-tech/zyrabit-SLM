@@ -21,7 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Clean UI Header Layout**: Removed the redundant `K Z` badges and consolidated system status/model indicators in the header.
 - **Persistent Vault Storage**: Configured `zyrabit-api` to store document uploads under `/app/document_source` (persisted on host), preventing vault resets upon container recreations.
 - **Stable Chat Sessions**: Standardized UI WebSocket connections with stable client-side session IDs (`thread_id`) stored in `sessionStorage` to avoid session loss on reconnect.
-- **Disabled Dependabot PRs**: Updated `.github/dependabot.yml` to disable automatic Dependabot pull requests, preventing violations of default branch merge policies.
+- **Removed Dependabot**: Deleted `.github/dependabot.yml` to disable automatic Dependabot pull requests entirely, preventing configuration parser errors and PR policy violations on the `main` branch.
 
 ### Fixed
 - **CI Dependency Audit**: Upgraded vulnerable dependencies (`aiohttp`, `idna`, `pyjwt`, `starlette`, `pip`) in `uv.lock`. Ignored the unpatched and isolated ChromaDB vulnerability (`CVE-2026-45829`) in the `pip-audit` step of the security workflows to restore CI checks to green.
