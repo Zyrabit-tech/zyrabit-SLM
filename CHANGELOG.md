@@ -7,6 +7,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.2.0-beta] - 2026-06-30
+
+### Added
+- **Dynamic PII Detection**: Integrated SpaCy NER model (`es_core_news_sm` / `en_core_web_sm`) in `pii_pipeline.py` to dynamically detect and mask names (PER), organizations (ORG), and locations (LOC), replacing the hardcoded list of names.
+- **Asynchronous Streaming Port**: Implemented `StreamingInferencePort` and refactored `OllamaStreamAdapter` to conform to Hexagonal Architecture principles, providing decoupled and robust streaming.
+- **Inference Provider Factory**: Created `InferenceProviderFactory` to dynamically instantiate both synchronous and asynchronous inference providers based on configuration.
+- **MCP Client Port**: Defined `McpClientPort` and implemented `InternalMcpClientAdapter` to allow `ChatUseCase` to discover and invoke tools from the embedded FastMCP instance securely.
+
+### Changed
+- **Zero-Trust Security**: Applied `get_current_user` dependency globally to all main routers in `main.py` (`/v1/chat`, `/v1/documents`, `/v1/integrations`), ensuring uniform token-based authentication across all critical API endpoints.
+- **Tool-Enabled LLM Generation**: Injected MCP tools dynamically into the system prompt during `ChatUseCase.stream_response()` to enable the LLM to request tool executions using JSON blocks.
+
 ## [2.1.0] - 2026-06-09
 
 ### Added

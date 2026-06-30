@@ -7,6 +7,22 @@ import { getSafeElement } from "./utils/DOM";
 
 
 /**
+ * Auth Interceptor
+ * Automatically injects the local service token into API requests
+ */
+const originalFetch = window.fetch;
+window.fetch = async function(resource, init) {
+    init = init || {};
+    if (typeof resource === 'string' && resource.startsWith('/v1')) {
+        init.headers = {
+            ...init.headers,
+            'Authorization': 'Bearer zyrabit-local-token'
+        };
+    }
+    return originalFetch(resource, init);
+};
+
+/**
  * Zyrabit App Orchestrator
  * Bootstraps the system and wires dependencies.
  */
@@ -408,11 +424,11 @@ class ZyrabitApp {
             this.addGdprLog("SYSTEM", "LOCAL_OLLAMA_OFFLINE - Make sure Ollama app is open on your Mac");
         }
 
-        // Show document count in log if it changes (simple check)
+        // Show document count in log if it changes
         if (db.metrics?.documents > 0) {
             const count = db.metrics.documents;
             if (this._lastDocCount !== count) {
-                this.addGdprLog("VAULT", `SYNCED_${count}_DOCUMENTS`);
+                this.addGdprLog("VAULT", `Synchronized ${count} documents for context-aware inference.`);
                 this._lastDocCount = count;
             }
         }
@@ -421,9 +437,18 @@ class ZyrabitApp {
     async loadVault() {
         try {
             const res = await fetch('/v1/documents');
+            if (!res.ok) throw new Error(`HTTP Error: ${res.status}`);
             const data = await res.json();
             const list = document.getElementById('vault-list');
+            if (!list) return;
+            
             list.innerHTML = '';
+            
+            if (!data.documents || data.documents.length === 0) {
+                list.innerHTML = '<div class="text-xs text-center text-black/40 mt-4">No documents in vault</div>';
+                return;
+            }
+            
             data.documents.forEach(doc => {
                 const div = document.createElement('div');
                 div.className = 'flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-100 group';
@@ -440,7 +465,13 @@ class ZyrabitApp {
                 div.querySelector('.doc-size').textContent = `${(doc.size_bytes / 1024).toFixed(1)} KB`;
                 list.appendChild(div);
             });
-        } catch (e) {}
+        } catch (e) {
+            console.error("Failed to load documents:", e);
+            const list = document.getElementById('vault-list');
+            if (list) {
+                list.innerHTML = '<div class="text-xs text-center text-red-500 mt-4">Failed to load documents</div>';
+            }
+        }
     }
 
     async loadTools() {

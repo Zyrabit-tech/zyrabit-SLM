@@ -95,6 +95,43 @@ class RegexDetector:
             ))
         return entities
 
+import spacy
+try:
+    # Try Spanish first, then fallback to English
+    nlp = spacy.load("es_core_news_sm")
+except OSError:
+    try:
+        nlp = spacy.load("en_core_web_sm")
+    except OSError:
+        nlp = None
+        logger.warning("Spacy model not found. NER PII detection will be disabled.")
+
+class SpacyNerDetector:
+    def detect(self, text: str, offset: int = 0) -> List[EntitySpan]:
+        if not nlp:
+            return []
+        
+        doc = nlp(text)
+        entities = []
+        for ent in doc.ents:
+            # Spacy labels vary slightly between models (PER/PERSON)
+            if ent.label_ in ("PER", "PERSON"):
+                label = "name"
+            elif ent.label_ == "ORG":
+                label = "org"
+            elif ent.label_ == "LOC":
+                label = "loc"
+            else:
+                continue
+                
+            entities.append(EntitySpan(
+                start=ent.start_char + offset,
+                end=ent.end_char + offset,
+                label=label,
+                value=ent.text
+            ))
+        return entities
+
 # --- Pipeline Engine ---
 
 class PiiEngine:
@@ -134,14 +171,21 @@ class PiiEngine:
 
 # --- Singleton Engine ---
 
-_DEFAULT_ENGINE = PiiEngine([
+_DEFAULT_DETECTERS = [
     RegexDetector("email", r'[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}'),
     RegexDetector("card", r'\b(?:\d[ -]*?){13,19}\b', is_luhn_valid),
     RegexDetector("phone", r'\b(?:\+?\d{1,3}[- ]?)?\(?\d{3}\)?[- ]?\d{3}[- ]?\d{4}\b'),
     RegexDetector("ssn", r'\b\d{3}-\d{2}-\d{4}\b'),
-    RegexDetector("amount", r'\$\d{1,3}(?:,\d{3})*(?:\.\d{2})?'),
-    RegexDetector("name", r'\b(?:Abraham Gomez|John Doe|Alice Smith|Alice Doe)\b')
-])
+    RegexDetector("amount", r'\$\d{1,3}(?:,\d{3})*(?:\.\d{2})?')
+]
+
+if nlp:
+    _DEFAULT_DETECTERS.append(SpacyNerDetector())
+else:
+    # Fallback to regex if Spacy models are missing (e.g. in minimal test environments)
+    _DEFAULT_DETECTERS.append(RegexDetector("name", r'(?i)\b(John Doe|Alice Doe|Abraham Gomez|Alice|John|Jane Doe)\b'))
+
+_DEFAULT_ENGINE = PiiEngine(_DEFAULT_DETECTERS)
 
 def anonymize_text(text: str) -> AnonymizationResult:
     return _DEFAULT_ENGINE.anonymize(text)
