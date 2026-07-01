@@ -14,7 +14,6 @@ except ImportError:
     import unittest.mock as mock
     FastMCP = mock.MagicMock()
 
-from app.infrastructure.shared.state_tracker import SovereignStateManager
 from app.infrastructure.shared.config import DOCS_DIR
 
 logger = logging.getLogger("zyrabit.api")
@@ -73,7 +72,6 @@ async def send_telegram_notification(message: str) -> str:
     Sends a secure notification to the user's Telegram.
     Intercepts and masks PII via Gatekeeper before transmission.
     """
-    import httpx
     from app.domain.services.gatekeeper import Gatekeeper
     
     token = os.getenv("TELEGRAM_BOT_TOKEN", "").strip('"').strip("'")

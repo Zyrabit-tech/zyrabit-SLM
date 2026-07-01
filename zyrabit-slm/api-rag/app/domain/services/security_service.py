@@ -1,4 +1,3 @@
-import time
 from typing import Tuple
 from app.core.security import pii_pipeline
 from app.ports.inference_port import InferenceRequest

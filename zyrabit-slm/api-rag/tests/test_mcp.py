@@ -1,4 +1,3 @@
-import tempfile
 
 def test_mcp_config_endpoint(client):
     response = client.get("/mcp/config.json")

@@ -1,6 +1,6 @@
 import re
 import logging
-from typing import Dict, List, Tuple, Optional, Any, Protocol
+from typing import Dict, List, Tuple, Protocol
 from dataclasses import dataclass, field
 
 logger = logging.getLogger("zyrabit.security")

@@ -1,7 +1,6 @@
 import hashlib
 import hmac
 import pathlib
-import pytest
 
 def _signature(secret: str, body: bytes) -> str:
     digest = hmac.new(secret.encode("utf-8"), body, hashlib.sha256).hexdigest()

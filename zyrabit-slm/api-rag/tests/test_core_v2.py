@@ -15,7 +15,6 @@ except ImportError:
     mcp = MagicMock()
 
 from app.domain.use_cases.chat_use_case import ChatUseCase
-from app.domain.use_cases.ingest_use_case import IngestUseCase
 from app.infrastructure.shared.state_tracker import SovereignStateManager
 from app.domain.services.context_manager import ContextManager
 import logging

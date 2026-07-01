@@ -1,7 +1,5 @@
-import pytest
-from unittest.mock import patch, MagicMock, AsyncMock
+from unittest.mock import patch, AsyncMock
 from io import BytesIO
-from fastapi.testclient import TestClient
 from app.domain.services.gatekeeper import Gatekeeper
 
 from app.domain.services.gatekeeper import Gatekeeper

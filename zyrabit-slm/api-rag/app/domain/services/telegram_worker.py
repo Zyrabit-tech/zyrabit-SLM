@@ -3,8 +3,6 @@ import asyncio
 import logging
 import httpx
 from app.domain.use_cases.chat_use_case import ChatUseCase
-from app.domain.services.gatekeeper import Gatekeeper
-from app.infrastructure.shared.cache import global_cache
 
 logger = logging.getLogger("zyrabit.telegram")
 
