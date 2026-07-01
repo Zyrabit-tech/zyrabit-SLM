@@ -20,11 +20,13 @@ from typing import AsyncIterator
 import httpx
 
 from app.infrastructure.shared.config import SLM_URL
+from app.ports.streaming_inference_port import StreamingInferencePort
+from app.ports.inference_port import InferenceRequest
 
 logger = logging.getLogger("zyrabit.inference.stream")
 
 
-class OllamaStreamAdapter:
+class OllamaStreamAdapter(StreamingInferencePort):
     """Async streaming adapter for Ollama /api/generate endpoint."""
 
     def __init__(
@@ -35,13 +37,7 @@ class OllamaStreamAdapter:
         self.endpoint = (endpoint or f"{SLM_URL}/api/generate").strip()
         self.timeout = httpx.Timeout(timeout_seconds, connect=10.0)
 
-    async def stream(
-        self,
-        *,
-        model: str,
-        prompt: str,
-        system_prompt: str | None = None,
-    ) -> AsyncIterator[str]:
+    async def stream_generate(self, request: InferenceRequest) -> AsyncIterator[str]:
         """
         Yield tokens one at a time from Ollama's streaming response.
 
@@ -50,12 +46,12 @@ class OllamaStreamAdapter:
         "done": true is received.
         """
         payload = {
-            "model": model,
-            "prompt": prompt,
+            "model": request.model,
+            "prompt": request.prompt,
             "stream": True,
         }
-        if system_prompt:
-            payload["system"] = system_prompt
+        if request.system_prompt:
+            payload["system"] = request.system_prompt
 
         async with httpx.AsyncClient(timeout=self.timeout) as client:
             async with client.stream(
@@ -86,3 +82,6 @@ class OllamaStreamAdapter:
                     token = chunk.get("response", "")
                     if token:
                         yield token
+
+    # Backward compatibility for existing tests
+    stream = stream_generate

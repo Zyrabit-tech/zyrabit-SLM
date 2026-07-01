@@ -18,7 +18,9 @@ class ChatUseCase:
         cache, 
         telemetry: TelemetryPort,
         reranker = None,
-        memory_manager = None
+        memory_manager = None,
+        streaming_provider = None,
+        mcp_client = None
     ):
         self.inference_provider = inference_provider
         self.retriever_service = retriever_service
@@ -28,6 +30,8 @@ class ChatUseCase:
         self.context_manager = ContextManager()
         self.reranker = reranker
         self.memory_manager = memory_manager
+        self.streaming_provider = streaming_provider
+        self.mcp_client = mcp_client
 
     async def execute(self, text: str, client_msg_id: Optional[str] = None, history: Optional[list] = None, source: str = "WEB") -> Dict[str, Any]:
         try:
@@ -95,7 +99,17 @@ class ChatUseCase:
             if self.memory_manager:
                 history = self.memory_manager.get_context_window(history, max_turns=4)
             
-            # 4b. Fetch User Profile for Personalization (already fetched above)
+            # 4b. Fetch User Profile for Personalization
+            
+            # 4c. Inject MCP Tools into system prompt
+            if self.mcp_client:
+                try:
+                    tools = await self.mcp_client.get_tools()
+                    if tools:
+                        tools_desc = "\\n".join([f"- {t['name']}: {t['description']} (Schema: {t['inputSchema']})" for t in tools])
+                        system_prompt += f"\\n\\nYou have access to the following tools:\\n{tools_desc}\\nIf you need to use a tool, reply ONLY with a JSON block: ```json\\n{{\"tool\": \"tool_name\", \"arguments\": {{}}}}```"
+                except Exception as e:
+                    self.telemetry.log_security_audit(f"Failed to fetch MCP tools: {e}")
 
             # 5. Build Final Prompt via ContextManager
             prompt = self.context_manager.build_final_prompt(
@@ -192,6 +206,17 @@ class ChatUseCase:
         # Build prompt
         user_profile = user_profile or {}
         system_prompt = (user_profile.get("system_prompt") or "").strip() or "You are Zyra, a helpful sovereign assistant."
+        
+        # Inject MCP Tools for stream
+        if self.mcp_client:
+            try:
+                tools = await self.mcp_client.get_tools()
+                if tools:
+                    tools_desc = "\\n".join([f"- {t['name']}: {t['description']}" for t in tools])
+                    system_prompt += f"\\n\\nYou have access to the following tools:\\n{tools_desc}\\nIf you need to use a tool, reply ONLY with a JSON block: ```json\\n{{\"tool\": \"tool_name\", \"arguments\": {{}}}}```"
+            except Exception as e:
+                self.telemetry.log_security_audit(f"Failed to fetch MCP tools for stream: {e}")
+                
         prompt = self.context_manager.build_final_prompt(
             system_prompt=system_prompt,
             history=history,
@@ -205,17 +230,20 @@ class ChatUseCase:
         target_model = user_profile.get("preferred_model", MODEL_NAME) if user_profile else MODEL_NAME
 
         # Stream tokens
-        from app.infrastructure.inference.ollama_stream_adapter import OllamaStreamAdapter
-        stream_adapter = OllamaStreamAdapter()
+        if not self.streaming_provider:
+            raise RuntimeError("Streaming provider not configured for ChatUseCase")
         
         start_time = time.time()
         first_chunk_received = False
         
-        async for token in stream_adapter.stream(
+        request = InferenceRequest(
             model=target_model,
             prompt=prompt,
-            system_prompt=system_prompt
-        ):
+            system_prompt=system_prompt,
+            stream=True
+        )
+        
+        async for token in self.streaming_provider.stream_generate(request):
             if not first_chunk_received:
                 duration_ms = (time.time() - start_time) * 1000
                 self.telemetry.record_ttft(duration_ms)

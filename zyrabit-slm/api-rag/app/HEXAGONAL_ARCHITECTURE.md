@@ -25,9 +25,13 @@ This project applies **Hexagonal Architecture (Ports & Adapters)** to ensure the
 └──────────────┬──────────────────────────┬───────────────────┘
                │ via Ports                │ via Ports
 ┌──────────────▼──────────┐   ┌──────────▼──────────────────┐
-│   InferencePort          │   │   VectorStorePort            │
-│   OllamaInferenceAdapter │   │   ChromaAdapter              │
-│   OpenAICompatAdapter    │   │   HybridRetrieverService     │
+│   InferencePort         │   │   VectorStorePort           │
+│   StreamingInferencePort│   │   ChromaAdapter             │
+│   McpClientPort         │   │   HybridRetrieverService    │
+│                         │   │                             │
+│   OllamaInferenceAdapter│   │                             │
+│   OllamaStreamAdapter   │   │                             │
+│   InternalMcpClient     │   │                             │
 └─────────────────────────┘   └──────────────────────────────┘
 ```
 
@@ -77,8 +81,10 @@ Abstract contracts that the domain depends on. Infrastructure must implement the
 | Port | Contract |
 |---|---|
 | `InferencePort` | `generate(request) → InferenceResult` |
+| `StreamingInferencePort` | `stream_generate(request) → AsyncIterator[str]` |
 | `VectorStorePort` | `similarity_search()`, `add_texts()`, `heartbeat()` |
 | `AutomationPort` | Webhook adapter contract for n8n and future integrations |
+| `McpClientPort` | `get_tools()`, `call_tool()` for interacting with MCP servers |
 
 ### 5. Secondary Adapters — Infrastructure (`app/infrastructure/`)
 The **driven side** — implementations of the ports.
@@ -86,9 +92,11 @@ The **driven side** — implementations of the ports.
 | Adapter | Port | Technology |
 |---|---|---|
 | `OllamaInferenceAdapter` | `InferencePort` | Ollama HTTP API |
+| `OllamaStreamAdapter` | `StreamingInferencePort` | Ollama Streaming API |
 | `ChromaAdapter` | `VectorStorePort` | ChromaDB + LangChain |
 | `DirectOllamaEmbeddings` | Embeddings | Ollama embeddings endpoint |
 | `n8nWebhookAdapter` | `AutomationPort` | HMAC-signed webhooks |
+| `InternalMcpClientAdapter` | `McpClientPort` | Direct connection to FastMCP |
 
 ### 6. Core (`app/core/`)
 Cross-cutting concerns shared across layers.

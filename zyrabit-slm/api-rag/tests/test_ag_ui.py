@@ -22,7 +22,7 @@ async def test_ag_ui_endpoint_success(client):
         yield "Hello "
         yield "world!"
 
-    with patch("app.infrastructure.inference.ollama_stream_adapter.OllamaStreamAdapter.stream", new=mock_stream), \
+    with patch("app.infrastructure.inference.ollama_stream_adapter.OllamaStreamAdapter.stream_generate", new=mock_stream), \
          patch("app.domain.use_cases.chat_use_case.ChatUseCase.save_interaction") as mock_save:
         
         payload = {
@@ -84,6 +84,10 @@ async def test_ag_ui_endpoint_unauthorized(client):
         "forwardedProps": {}
     }
     
+    from app.main import app
+    from app.core.security.auth import get_current_user
+    app.dependency_overrides.pop(get_current_user, None)
+    
     # 1. No auth header
     response = client.post("/ag-ui/", json=payload)
     assert response.status_code == 401
@@ -108,7 +112,7 @@ async def test_ag_ui_endpoint_disconnect(client):
         yield "Token 2 "
         yield "Token 3 "
 
-    with patch("app.infrastructure.inference.ollama_stream_adapter.OllamaStreamAdapter.stream", new=mock_stream), \
+    with patch("app.infrastructure.inference.ollama_stream_adapter.OllamaStreamAdapter.stream_generate", new=mock_stream), \
          patch("fastapi.Request.is_disconnected", new_callable=AsyncMock) as mock_disconnected:
         
         # Disconnect on the second token check (First check returns False, second returns True)

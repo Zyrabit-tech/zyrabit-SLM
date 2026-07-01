@@ -1,6 +1,6 @@
 # 🤖 Zyrabit SLM
 
-[![Version](https://img.shields.io/badge/version-2.1.0-orange.svg)](VERSION)
+[![Version](https://img.shields.io/badge/version-2.2.0--beta-orange.svg)](VERSION)
 [![CI](https://github.com/Zyrabit-tech/zyrabit-SLM/actions/workflows/ci.yml/badge.svg)](https://github.com/Zyrabit-tech/zyrabit-SLM/actions/workflows/ci.yml)
 [![Security Audit](https://github.com/Zyrabit-tech/zyrabit-SLM/actions/workflows/security.yml/badge.svg)](https://github.com/Zyrabit-tech/zyrabit-SLM/actions/workflows/security.yml)
 [![Docker Hub](https://img.shields.io/badge/docker-zyrabitcore-blue.svg)](https://hub.docker.com/r/zyrabitcore/zyrabit-slm)
@@ -33,7 +33,7 @@ Zyrabit is designed as a zero-trust, air-gapped capable AI stack.
 
 ---
 
-## 💎 Sovereign Features (Zyrabit SLM v2.1)
+## 💎 Sovereign Features (Zyrabit SLM v2.2-beta)
 
 *   **Zero-Lag Command Router (<15ms)**: Direct interceptor for commands like `/stats`, `/vault`, `/clear`, `/tools` that bypasses LLM inference completely using SQLite state lookup.
 *   **FTS5 Hybrid RAG (<200ms)**: Hybrid keyword (FTS5 SQLite table virtual) and vector (ChromaDB) retrieval pipeline prioritizing fast local index lookup before vector fallback.
