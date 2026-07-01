@@ -1,5 +1,8 @@
 import time
+import logging
 from typing import Optional, Dict, Any
+
+logger = logging.getLogger(__name__)
 from app.domain.ports.telemetry_port import TelemetryPort
 from app.infrastructure.shared.config import MODEL_NAME
 from app.infrastructure.shared.state_tracker import SovereignStateManager
@@ -62,7 +65,6 @@ class ChatUseCase:
                 }
 
             # 3. Hybrid Context Retrieval (RAG)
-            context = ""
             sources = []
             results = []  # ensure always defined for build_final_prompt
             if decision == "rag":
@@ -81,7 +83,6 @@ class ChatUseCase:
                                 results = results[:3]
                                 
                             if results:
-                                context = "\n".join([r.page_content for r in results])
                                 sources = list(set([r.metadata.get("source", "unknown") for r in results]))
                     except Exception as e:
                         self.telemetry.log_security_audit(f"RAG search failed: {e}")
