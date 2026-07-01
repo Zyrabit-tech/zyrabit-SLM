@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 import requests
 import sys
-import json
 
 API_URL = "http://localhost:8082/v1/chat"
 

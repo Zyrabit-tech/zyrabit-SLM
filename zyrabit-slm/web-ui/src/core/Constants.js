@@ -16,7 +16,9 @@ export const EVENTS = {
         EMIT: 'SOCKET:EMIT'
     },
     SYSTEM: {
-        LOG: 'SYSTEM:LOG'
+        LOG: 'SYSTEM:LOG',
+        GATEWAY_CONNECTED: 'SYSTEM:GATEWAY_CONNECTED',
+        GATEWAY_DISCONNECTED: 'SYSTEM:GATEWAY_DISCONNECTED'
     }
 };
 

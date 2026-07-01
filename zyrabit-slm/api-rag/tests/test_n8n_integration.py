@@ -1,7 +1,6 @@
 import hashlib
 import hmac
 import pathlib
-import pytest
 
 def _signature(secret: str, body: bytes) -> str:
     digest = hmac.new(secret.encode("utf-8"), body, hashlib.sha256).hexdigest()
@@ -42,6 +41,8 @@ def test_n8n_webhook_accepts_valid_token_and_signature(client, monkeypatch):
 def test_n8n_webhook_rejects_invalid_token(client, monkeypatch):
     from app.main import app
     from app.api.v1.endpoints.integrations import get_n8n_adapter
+    from app.core.security.auth import get_current_user
+    app.dependency_overrides.pop(get_current_user, None)
     app.dependency_overrides[get_n8n_adapter] = _build_adapter
     raw_body = b'{"text":"run report"}'
     headers = {
@@ -56,7 +57,7 @@ def test_n8n_webhook_rejects_invalid_token(client, monkeypatch):
         headers=headers,
     )
     assert response.status_code == 401
-    assert "invalid n8n bearer token" in response.json()["detail"].lower()
+    assert "invalid token" in response.json()["detail"].lower()
 
 def test_n8n_webhook_requires_text_field(client, monkeypatch):
     from app.main import app

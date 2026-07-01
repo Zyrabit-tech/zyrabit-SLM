@@ -143,14 +143,24 @@ class ZyrabitUI {
     }
 
     renderDocuments(docs) {
-        this.vaultList.innerHTML = docs.length === 0
-            ? '<p class="text-[10px] text-gray-400 text-center py-8 italic uppercase tracking-widest font-bold">Vault Empty</p>'
-            : docs.map(doc => `
-                <div class="p-3 bg-zyrabit-surface/40 hover:bg-zyrabit-surface rounded-lg text-[10px] border border-zyrabit-border flex justify-between items-center transition-colors">
-                    <span class="font-medium">📄 ${doc.filename}</span>
-                    <span class="text-zyrabit-muted">${(doc.size_bytes / 1024).toFixed(1)} KB</span>
-                </div>
-            `).join('');
+        this.vaultList.innerHTML = '';
+        if (docs.length === 0) {
+            this.vaultList.innerHTML = '<p class="text-[10px] text-gray-400 text-center py-8 italic uppercase tracking-widest font-bold">Vault Empty</p>';
+            return;
+        }
+        docs.forEach(doc => {
+            const div = document.createElement('div');
+            div.className = 'p-3 bg-zyrabit-surface/40 hover:bg-zyrabit-surface rounded-lg text-[10px] border border-zyrabit-border flex justify-between items-center transition-colors';
+            const nameSpan = document.createElement('span');
+            nameSpan.className = 'font-medium';
+            nameSpan.textContent = `📄 ${doc.filename}`;
+            const sizeSpan = document.createElement('span');
+            sizeSpan.className = 'text-zyrabit-muted';
+            sizeSpan.textContent = `${(doc.size_bytes / 1024).toFixed(1)} KB`;
+            div.appendChild(nameSpan);
+            div.appendChild(sizeSpan);
+            this.vaultList.appendChild(div);
+        });
     }
 
     appendMessage(role, content) {
@@ -168,13 +178,15 @@ class ZyrabitUI {
             <div id="${msgId}" class="flex animate-in fade-in slide-in-from-bottom-2 duration-300">
                 <div class="message-bubble p-4 rounded-2xl ${bubbleClass}">
                     ${isSystem ? '<div class="text-[9px] uppercase font-bold text-yellow-600 mb-2 tracking-widest">Security Guard</div>' : ''}
-                    <div class="text-sm message-content leading-relaxed">${content}</div>
+                    <div class="text-sm message-content leading-relaxed"></div>
                     <div class="metadata-area mt-3"></div>
                 </div>
             </div>
         `;
 
         this.chatContainer.insertAdjacentHTML('beforeend', html);
+        const msgEl = document.getElementById(msgId);
+        if (msgEl) msgEl.querySelector('.message-content').textContent = content;
         this.chatContainer.scrollTo({ top: this.chatContainer.scrollHeight, behavior: 'smooth' });
         return msgId;
     }
@@ -185,14 +197,19 @@ class ZyrabitUI {
 
         msgNode.querySelector('.message-content').innerText = content;
         if (metadata) {
-            msgNode.querySelector('.metadata-area').innerHTML = `
+            const metaArea = msgNode.querySelector('.metadata-area');
+            metaArea.innerHTML = `
                 <div class="flex items-center gap-2 text-[9px] text-zyrabit-muted uppercase font-bold tracking-tighter">
-                    <span class="px-1.5 py-0.5 bg-zyrabit-surface rounded border border-zyrabit-border">${metadata.route_decision}</span>
-                    <span>${metadata.rag_hits || 0} hits</span>
+                    <span class="px-1.5 py-0.5 bg-zyrabit-surface rounded border border-zyrabit-border"></span>
+                    <span></span>
                     <span class="opacity-50">•</span>
-                    <span>${metadata.latency_ms || 0}ms</span>
+                    <span></span>
                 </div>
             `;
+            const spans = metaArea.querySelectorAll('span');
+            spans[0].textContent = metadata.route_decision;
+            spans[1].textContent = `${metadata.rag_hits || 0} hits`;
+            spans[3].textContent = `${metadata.latency_ms || 0}ms`;
         }
     }
 }

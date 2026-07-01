@@ -1,6 +1,5 @@
 import logging
 from fastapi import APIRouter, Request
-from typing import Dict, Any
 from app.domain.services.mcp_service import mcp
 
 router = APIRouter()

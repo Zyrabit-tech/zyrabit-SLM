@@ -34,6 +34,7 @@ def mock_infrastructure():
 
     mock_retriever = MagicMock()
     mock_retriever.retrieve.return_value = []
+    mock_retriever.search = AsyncMock(return_value=[])
 
     with patch(
         "app.infrastructure.persistence.chroma_adapter.ChromaAdapter",
@@ -41,6 +42,9 @@ def mock_infrastructure():
     ), patch(
         "app.infrastructure.inference.ollama_inference_adapter.OllamaInferenceAdapter",
         return_value=mock_inference,
+    ), patch(
+        "app.infrastructure.inference.ollama_stream_adapter.OllamaStreamAdapter.stream",
+        new=AsyncMock(return_value=["Mocked", " streamed", " response."]),
     ), patch(
         "app.domain.services.retriever_service.HybridRetrieverService",
         return_value=mock_retriever,
@@ -50,8 +54,14 @@ def mock_infrastructure():
     ), patch(
         "app.auto_ingest.run_auto_ingest",
         new=AsyncMock(return_value=None),
+    ), patch(
+        "app.infrastructure.shared.state_tracker.SovereignStateManager",
+        return_value=MagicMock()
     ):
         from app.main import app
+        from app.core.security.auth import get_current_user, User
+        app.dependency_overrides[get_current_user] = lambda: User(id=1, name="Test User")
+        
         # Ensure state is set before each test
         app.state.vector_store = mock_chroma
         app.state.inference_provider = mock_inference
@@ -62,11 +72,15 @@ def mock_infrastructure():
         from app.domain.services.gatekeeper import Gatekeeper
         from app.infrastructure.shared.cache import global_cache
         
+        from app.infrastructure.inference.ollama_stream_adapter import OllamaStreamAdapter
+        
         app.state.chat_use_case = ChatUseCase(
             inference_provider=mock_inference,
+            streaming_provider=OllamaStreamAdapter(endpoint="http://mock"),
             retriever_service=mock_retriever,
             gatekeeper=Gatekeeper,
-            cache=global_cache
+            cache=global_cache,
+            telemetry=MagicMock()
         )
         app.state.ingest_use_case = IngestUseCase(vector_store=mock_chroma)
 

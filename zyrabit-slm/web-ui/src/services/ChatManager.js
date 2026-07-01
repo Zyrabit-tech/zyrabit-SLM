@@ -9,13 +9,21 @@ import { EVENTS } from "../core/Constants";
 export class ChatManager {
     constructor() {
         this.queue = Storage.load('pending_messages') || [];
+        this.sessionId = Storage.load('session_id');
+        if (!this.sessionId) {
+            this.sessionId = this.generateSessionId();
+            Storage.save('session_id', this.sessionId);
+        }
         this.isProcessing = false;
+        this.pendingTimeout = null;
         this.setupListeners();
     }
 
     setupListeners() {
         bus.on(EVENTS.CHAT.SEND, (data) => this.enqueue(data));
         bus.on(EVENTS.CHAT.RESPONSE_RECEIVED, (data) => this.onResponse(data));
+        bus.on(EVENTS.SYSTEM.GATEWAY_CONNECTED, () => this.onGatewayConnected());
+        bus.on(EVENTS.SYSTEM.GATEWAY_DISCONNECTED, () => this.onGatewayDisconnected());
     }
 
 
@@ -37,9 +45,17 @@ export class ChatManager {
         }
     }
 
+    clearPendingTimeout() {
+        if (this.pendingTimeout) {
+            clearTimeout(this.pendingTimeout);
+            this.pendingTimeout = null;
+        }
+    }
+
     processNext() {
         if (this.queue.length === 0) {
             this.isProcessing = false;
+            this.clearPendingTimeout();
             bus.emit(EVENTS.UI.THINKING, false);
             return;
         }
@@ -51,11 +67,46 @@ export class ChatManager {
         bus.emit(EVENTS.SOCKET.EMIT, { 
             text: message.text, 
             history: message.history,
-            client_msg_id: message.id 
+            client_msg_id: message.id,
+            thread_id: this.sessionId
+        });
+
+        // 45-second circuit breaker timeout
+        this.clearPendingTimeout();
+        this.pendingTimeout = setTimeout(() => {
+            console.warn("⚠️ Chat request timed out (45s). Triggering circuit breaker.");
+            this.handleRequestTimeout();
+        }, 45000);
+    }
+
+    handleRequestTimeout() {
+        this.isProcessing = false;
+        this.clearPendingTimeout();
+        bus.emit(EVENTS.UI.THINKING, false);
+        
+        bus.emit(EVENTS.SYSTEM.LOG, { 
+            type: 'WARNING', 
+            event: 'REQUEST_TIMEOUT', 
+            message: "La conexión está inestable o lenta. Reintentando..." 
         });
     }
 
+    onGatewayConnected() {
+        console.log("🔌 Gateway reconnected. Checking pending queue...");
+        if (this.queue.length > 0) {
+            this.processNext();
+        }
+    }
+
+    onGatewayDisconnected() {
+        console.warn("🔌 Gateway disconnected. Suspending chat processing...");
+        this.clearPendingTimeout();
+        this.isProcessing = false;
+        bus.emit(EVENTS.UI.THINKING, false);
+    }
+
     onResponse(data) {
+        this.clearPendingTimeout();
         const isNotification = data.metadata?.source === 'TELEGRAM';
 
         // Only shift if we were expecting a response from the web UI
@@ -70,6 +121,12 @@ export class ChatManager {
             metadata: data.metadata 
         });
         
+        if (data.metadata?.command === '/clear') {
+            this.sessionId = this.generateSessionId();
+            Storage.save('session_id', this.sessionId);
+            bus.emit('UI:CLEAR_CHAT');
+        }
+        
         // If there's more in the queue, keep going
         if (this.queue.length > 0) {
             this.processNext();
@@ -80,6 +137,17 @@ export class ChatManager {
         }
     }
 
+    generateSessionId() {
+        if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+            return crypto.randomUUID();
+        }
+        if (typeof crypto !== 'undefined' && typeof crypto.getRandomValues === 'function') {
+            const bytes = new Uint8Array(16);
+            crypto.getRandomValues(bytes);
+            return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
+        }
+        throw new Error('Secure random number generator is unavailable for session ID generation.');
+    }
 
     persist() {
         Storage.save('pending_messages', this.queue);

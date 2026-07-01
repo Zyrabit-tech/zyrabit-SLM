@@ -7,6 +7,22 @@ import { getSafeElement } from "./utils/DOM";
 
 
 /**
+ * Auth Interceptor
+ * Automatically injects the local service token into API requests
+ */
+const originalFetch = window.fetch;
+window.fetch = async function(resource, init) {
+    init = init || {};
+    if (typeof resource === 'string' && resource.startsWith('/v1')) {
+        init.headers = {
+            ...init.headers,
+            'Authorization': 'Bearer zyrabit-local-token'
+        };
+    }
+    return originalFetch(resource, init);
+};
+
+/**
  * Zyrabit App Orchestrator
  * Bootstraps the system and wires dependencies.
  */
@@ -122,7 +138,17 @@ class ZyrabitApp {
                 input.value = '';
             };
 
-
+            // Input focus styling for premium look
+            const inputContainer = input.closest('.glass-premium');
+            if (inputContainer) {
+                input.addEventListener('focus', () => {
+                    inputContainer.classList.add('ring-2', 'ring-[#3f5a6d]/20', 'border-[#3f5a6d]/30', 'shadow-3xl');
+                    inputContainer.style.transition = 'all 0.3s ease';
+                });
+                input.addEventListener('blur', () => {
+                    inputContainer.classList.remove('ring-2', 'ring-[#3f5a6d]/20', 'border-[#3f5a6d]/30', 'shadow-3xl');
+                });
+            }
 
             input.onkeydown = (e) => {
                 if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
@@ -138,9 +164,63 @@ class ZyrabitApp {
         bind(IDS.TOGGLE_GDPR, 'onclick', () => this.togglePanel(IDS.GDPR_PANEL));
         getSafeElement('toggle-ingest').onclick = () => this.togglePanel(IDS.INGEST_PANEL);
         getSafeElement('toggle-docs').onclick = () => this.togglePanel(IDS.DOCS_PANEL);
+        getSafeElement('toggle-settings').onclick = () => this.togglePanel('settings-panel');
         getSafeElement('close-gdpr').onclick = () => this.togglePanel(null);
         getSafeElement('close-ingest').onclick = () => this.togglePanel(null);
         getSafeElement('close-docs').onclick = () => this.togglePanel(null);
+        getSafeElement('close-settings').onclick = () => this.togglePanel(null);
+
+        // Telegram modal bindings
+        const triggerTelegram = document.getElementById('trigger-telegram');
+        const telegramModal = document.getElementById('telegram-modal');
+        const closeTelegramModal = document.getElementById('close-telegram-modal');
+
+        if (triggerTelegram && telegramModal) {
+            triggerTelegram.onclick = () => {
+                telegramModal.classList.remove('hidden');
+            };
+        }
+        if (closeTelegramModal && telegramModal) {
+            closeTelegramModal.onclick = () => {
+                telegramModal.classList.add('hidden');
+            };
+        }
+        if (telegramModal) {
+            telegramModal.onclick = (e) => {
+                if (e.target === telegramModal) {
+                    telegramModal.classList.add('hidden');
+                }
+            };
+        }
+
+        // 3b. Settings Form Submit
+        const settingsForm = document.getElementById('settings-form');
+        if (settingsForm) {
+            settingsForm.onsubmit = async (e) => {
+                e.preventDefault();
+                const systemPrompt = getSafeElement('settings-system-prompt').value.trim();
+                
+                try {
+                    const res = await fetch('/v1/profile');
+                    if (!res.ok) throw new Error("Could not fetch profile");
+                    const profile = await res.json();
+                    
+                    profile.system_prompt = systemPrompt;
+                    
+                    const saveRes = await fetch('/v1/profile', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(profile)
+                    });
+                    if (!saveRes.ok) throw new Error("Save request failed");
+                    
+                    this.showNotification("System Prompt guardado correctamente", "success");
+                    this.togglePanel(null);
+                } catch (err) {
+                    this.showNotification("Error al guardar prompt", "error");
+                }
+            };
+        }
 
         // 4. File Ingest
         try {
@@ -154,11 +234,76 @@ class ZyrabitApp {
 
         // 5. System Logs
         bus.on(EVENTS.SYSTEM.LOG, (data) => this.addGdprLog(data.type, data.event));
+
+        // 5b. Security Logs (Gatekeeper)
+        bus.on(EVENTS.CHAT.RESPONSE_RECEIVED, (data) => {
+            if (data && data.metadata && data.metadata.pii_masked && data.metadata.pii_masked.length > 0) {
+                data.metadata.pii_masked.forEach(placeholder => {
+                    let entityType = "PII";
+                    if (placeholder.includes("EMAIL")) entityType = "EMAIL";
+                    else if (placeholder.includes("PHONE")) entityType = "PHONE";
+                    else if (placeholder.includes("CARD")) entityType = "CREDIT_CARD";
+                    else if (placeholder.includes("NAME")) entityType = "NAME";
+                    else if (placeholder.includes("IP")) entityType = "IP_ADDRESS";
+                    
+                    const logMsg = `Filtered ${entityType}: ${placeholder} from query.`;
+                    this.addGdprLog("🛡️ GATEKEEPER", logMsg);
+                });
+            }
+        });
+
+        // 6. Gateway Status Notifications
+        bus.on(EVENTS.SYSTEM.GATEWAY_CONNECTED, () => {
+            this.showNotification("Conexión con el servidor restablecida.", "success");
+            try {
+                const input = getSafeElement(IDS.CHAT_INPUT);
+                const submitBtn = getSafeElement(IDS.CHAT_SUBMIT);
+                input.disabled = false;
+                submitBtn.disabled = false;
+                input.placeholder = "Type your command...";
+                
+                const statusPill = document.getElementById("status-pill");
+                if (statusPill) {
+                    statusPill.className = "flex items-center gap-2 px-4 py-2 bg-green-500/10 border border-green-500/20 rounded-full animate-none";
+                    const dot = statusPill.querySelector("div");
+                    if (dot) dot.className = "w-2 h-2 rounded-full bg-green-500 shadow-sm";
+                    const text = statusPill.querySelector("span");
+                    if (text) text.textContent = "SYSTEM READY";
+                }
+            } catch (e) {
+                console.warn("⚠️ Failed to update UI elements on gateway connect:", e);
+            }
+        });
+        bus.on(EVENTS.SYSTEM.GATEWAY_DISCONNECTED, (reason) => {
+            this.showNotification("Se perdió la conexión con el servidor. Reconectando...", "error");
+            try {
+                const input = getSafeElement(IDS.CHAT_INPUT);
+                const submitBtn = getSafeElement(IDS.CHAT_SUBMIT);
+                input.disabled = true;
+                submitBtn.disabled = true;
+                input.value = '';
+                input.placeholder = "Sin conexión con el servidor. Intentando reconectar...";
+                
+                const statusPill = document.getElementById("status-pill");
+                if (statusPill) {
+                    statusPill.className = "flex items-center gap-2 px-4 py-2 bg-red-500/10 border border-red-500/20 rounded-full";
+                    const dot = statusPill.querySelector("div");
+                    if (dot) dot.className = "w-2 h-2 rounded-full bg-red-500 shadow-sm animate-pulse";
+                    const text = statusPill.querySelector("span");
+                    if (text) text.textContent = "OFFLINE";
+                }
+            } catch (e) {
+                console.warn("⚠️ Failed to update UI elements on gateway disconnect:", e);
+            }
+        });
     }
 
 
     togglePanel(id) {
-        const panels = [IDS.GDPR_PANEL, IDS.INGEST_PANEL, IDS.DOCS_PANEL];
+        if (id === 'settings-panel') {
+            this.loadSettings();
+        }
+        const panels = [IDS.GDPR_PANEL, IDS.INGEST_PANEL, IDS.DOCS_PANEL, 'settings-panel'];
         panels.forEach(p => {
 
             try {
@@ -170,6 +315,20 @@ class ZyrabitApp {
                 }
             } catch (e) {}
         });
+    }
+
+    async loadSettings() {
+        try {
+            const res = await fetch('/v1/profile');
+            if (!res.ok) throw new Error("Failed to fetch profile");
+            const profile = await res.json();
+            const textarea = document.getElementById('settings-system-prompt');
+            if (textarea && profile) {
+                textarea.value = profile.system_prompt || "";
+            }
+        } catch (e) {
+            console.error("Failed to load settings", e);
+        }
     }
 
 
@@ -210,6 +369,7 @@ class ZyrabitApp {
                 if (isOffline) {
                     this.showNotification("Connection Restored", "success");
                     isOffline = false;
+                    this.socket.connect();
                 }
             } catch (e) {
                 this.addGdprLog("SYSTEM", `HEALTH_CHECK_FAILED`);
@@ -264,11 +424,11 @@ class ZyrabitApp {
             this.addGdprLog("SYSTEM", "LOCAL_OLLAMA_OFFLINE - Make sure Ollama app is open on your Mac");
         }
 
-        // Show document count in log if it changes (simple check)
+        // Show document count in log if it changes
         if (db.metrics?.documents > 0) {
             const count = db.metrics.documents;
             if (this._lastDocCount !== count) {
-                this.addGdprLog("VAULT", `SYNCED_${count}_DOCUMENTS`);
+                this.addGdprLog("VAULT", `Synchronized ${count} documents for context-aware inference.`);
                 this._lastDocCount = count;
             }
         }
@@ -277,20 +437,41 @@ class ZyrabitApp {
     async loadVault() {
         try {
             const res = await fetch('/v1/documents');
+            if (!res.ok) throw new Error(`HTTP Error: ${res.status}`);
             const data = await res.json();
             const list = document.getElementById('vault-list');
-            list.innerHTML = data.documents.map(doc => `
-                <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-100 group">
+            if (!list) return;
+            
+            list.innerHTML = '';
+            
+            if (!data.documents || data.documents.length === 0) {
+                list.innerHTML = '<div class="text-xs text-center text-black/40 mt-4">No documents in vault</div>';
+                return;
+            }
+            
+            data.documents.forEach(doc => {
+                const div = document.createElement('div');
+                div.className = 'flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-100 group';
+                div.innerHTML = `
                     <div class="flex items-center gap-2 overflow-hidden">
                         <span class="text-lg">📄</span>
                         <div class="overflow-hidden">
-                            <div class="text-[10px] font-bold truncate">${doc.filename}</div>
-                            <div class="text-[8px] opacity-40">${(doc.size_bytes / 1024).toFixed(1)} KB</div>
+                            <div class="text-[10px] font-bold truncate doc-name"></div>
+                            <div class="text-[8px] opacity-40 doc-size"></div>
                         </div>
                     </div>
-                </div>
-            `).join('');
-        } catch (e) {}
+                `;
+                div.querySelector('.doc-name').textContent = doc.filename;
+                div.querySelector('.doc-size').textContent = `${(doc.size_bytes / 1024).toFixed(1)} KB`;
+                list.appendChild(div);
+            });
+        } catch (e) {
+            console.error("Failed to load documents:", e);
+            const list = document.getElementById('vault-list');
+            if (list) {
+                list.innerHTML = '<div class="text-xs text-center text-red-500 mt-4">Failed to load documents</div>';
+            }
+        }
     }
 
     async loadTools() {
@@ -300,15 +481,21 @@ class ZyrabitApp {
             const tools = data.tools || [];
             const list = document.getElementById('tools-list');
             if (list) {
-                list.innerHTML = tools.map(tool => `
-                    <div class="p-3 bg-white rounded-lg border border-[#a9c4d9]/30 group hover:border-[#3f5a6d] transition shadow-sm">
+                list.innerHTML = '';
+                tools.forEach(tool => {
+                    const div = document.createElement('div');
+                    div.className = 'p-3 bg-white rounded-lg border border-[#a9c4d9]/30 group hover:border-[#3f5a6d] transition shadow-sm';
+                    div.innerHTML = `
                         <div class="flex items-center justify-between mb-1">
-                            <span class="text-[10px] font-bold text-[#3f5a6d] uppercase">${tool.name}</span>
+                            <span class="text-[10px] font-bold text-[#3f5a6d] uppercase tool-name"></span>
                             <span class="text-[8px] px-1 bg-[#e2ecf4] text-[#3f5a6d] rounded">TOOL</span>
                         </div>
-                        <p class="text-[9px] text-[#323439]/60 leading-tight">${tool.description}</p>
-                    </div>
-                `).join('');
+                        <p class="text-[9px] text-[#323439]/60 leading-tight tool-desc"></p>
+                    `;
+                    div.querySelector('.tool-name').textContent = tool.name;
+                    div.querySelector('.tool-desc').textContent = tool.description;
+                    list.appendChild(div);
+                });
             }
         } catch (e) {
             console.error("Failed to load tools", e);

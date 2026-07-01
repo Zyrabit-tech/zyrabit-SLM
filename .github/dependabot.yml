@@ -1,18 +1,29 @@
 version: 2
 updates:
   - package-ecosystem: "pip"
-    directory: "/zyrabit-slm/api-rag"
+    directory: "/"
     schedule:
       interval: "weekly"
+    target-branch: "beta"
     groups:
       python-dependencies:
         patterns:
           - "*"
+
   - package-ecosystem: "npm"
     directory: "/zyrabit-slm/web-ui"
     schedule:
       interval: "weekly"
+    target-branch: "beta"
+
+  - package-ecosystem: "npm"
+    directory: "/docs-portal"
+    schedule:
+      interval: "weekly"
+    target-branch: "beta"
+
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
       interval: "monthly"
+    target-branch: "beta"

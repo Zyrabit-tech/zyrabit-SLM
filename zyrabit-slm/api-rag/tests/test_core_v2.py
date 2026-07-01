@@ -15,7 +15,6 @@ except ImportError:
     mcp = MagicMock()
 
 from app.domain.use_cases.chat_use_case import ChatUseCase
-from app.domain.use_cases.ingest_use_case import IngestUseCase
 from app.infrastructure.shared.state_tracker import SovereignStateManager
 from app.domain.services.context_manager import ContextManager
 import logging
@@ -60,7 +59,7 @@ async def test_full_sovereign_cycle():
     # Ensure cache.get returns None so it doesn't hit cache
     mock_cache.get.return_value = None
     
-    chat_use_case = ChatUseCase(mock_inference, mock_retriever, mock_gatekeeper, mock_cache)
+    chat_use_case = ChatUseCase(mock_inference, mock_retriever, mock_gatekeeper, mock_cache, MagicMock())
     
     # 3. Execute Chat
     response = await chat_use_case.execute("Hola Zyra", client_msg_id="test_session")

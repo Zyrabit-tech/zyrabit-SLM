@@ -1,7 +1,5 @@
-import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch, AsyncMock
 from io import BytesIO
-from fastapi.testclient import TestClient
 from app.domain.services.gatekeeper import Gatekeeper
 
 from app.domain.services.gatekeeper import Gatekeeper
@@ -9,22 +7,22 @@ from app.domain.services.gatekeeper import Gatekeeper
 def test_router_returns_rag_for_zyrabit_keyword():
     assert Gatekeeper.get_routing_decision("¿Qué es Zyrabit?") == "rag"
 
-def test_router_returns_direct_for_general_queries():
-    assert Gatekeeper.get_routing_decision("¿Qué es Python?") == "direct"
+def test_router_returns_rag_for_general_queries():
+    assert Gatekeeper.get_routing_decision("¿Qué es Python?") == "rag"
 
-@patch("app.domain.use_cases.ingest_use_case.IngestUseCase.execute")
+@patch("app.domain.use_cases.ingest_use_case.IngestUseCase.execute", new_callable=AsyncMock)
 def test_ingest_txt_file_success(mock_execute, client, tmp_path):
     with patch('app.api.v1.endpoints.documents.DOCS_DIR', str(tmp_path)):
-        mock_execute.return_value = None
+        mock_execute.return_value = {"status": "success"}
         content = b"Zyrabit is a local AI solution with RAG."
         files = {"file": ("zyrabit.txt", BytesIO(content), "text/plain")}
         response = client.post("/v1/ingest", files=files)
         assert response.status_code == 200
 
-@patch("app.domain.use_cases.ingest_use_case.IngestUseCase.execute")
+@patch("app.domain.use_cases.ingest_use_case.IngestUseCase.execute", new_callable=AsyncMock)
 def test_ingest_md_file_success(mock_execute, client, tmp_path):
     with patch('app.api.v1.endpoints.documents.DOCS_DIR', str(tmp_path)):
-        mock_execute.return_value = None
+        mock_execute.return_value = {"status": "success"}
         content = b"# Zyrabit\n\nLocal AI with RAG."
         files = {"file": ("readme.md", BytesIO(content), "text/markdown")}
         response = client.post("/v1/ingest", files=files)

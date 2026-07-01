@@ -4,7 +4,7 @@ import logging
 # pyrefly: ignore [missing-import]
 import socketio
 # pyrefly: ignore [missing-import]
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends
 # pyrefly: ignore [missing-import]
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
@@ -30,7 +30,8 @@ from app.domain.services.command_router import CommandRouter
 
 # Infrastructure Adapters
 from app.infrastructure.persistence.chroma_adapter import ChromaAdapter, DirectOllamaEmbeddings
-from app.infrastructure.inference.ollama_inference_adapter import OllamaInferenceAdapter
+from app.infrastructure.inference.factory import InferenceProviderFactory
+from app.infrastructure.telemetry.prometheus_telemetry_adapter import PrometheusTelemetryAdapter
 from app.domain.services.retriever_service import HybridRetrieverService
 # pyrefly: ignore [missing-import]
 from langchain_chroma import Chroma
@@ -91,15 +92,44 @@ async def lifespan(app: FastAPI):
         # 3. Hybrid Retriever
         app.state.retriever_service = HybridRetrieverService(lc_chroma)
         
+        # Initialize BM25 on startup with existing documents from Vector DB
+        try:
+            from langchain_core.documents import Document
+            db_docs = lc_chroma.get()
+            if db_docs and db_docs.get("documents"):
+                documents = []
+                for text, metadata in zip(db_docs["documents"], db_docs["metadatas"]):
+                    documents.append(Document(page_content=text, metadata=metadata))
+                if documents:
+                    app.state.retriever_service.update_bm25_index(documents)
+                    logger.info(f"📈 Loaded {len(documents)} existing documents into BM25 index on startup.")
+        except Exception as e:
+            logger.error(f"⚠️ Failed to load existing documents for BM25: {e}")
+        
         # 4. Inference Provider
-        app.state.inference_provider = OllamaInferenceAdapter(endpoint=f"{SLM_URL}/api/generate")
+        app.state.inference_provider = InferenceProviderFactory.create_sync_provider("ollama")
+        app.state.streaming_provider = InferenceProviderFactory.create_stream_provider("ollama")
         
         # 5. Use Cases (Singletons for the session)
+        from app.infrastructure.adapters.bge_reranker_adapter import BGEReRankerAdapter
+        from app.infrastructure.adapters.sliding_window_memory_adapter import SlidingWindowMemoryAdapter
+        from app.infrastructure.adapters.mcp_client_adapter import InternalMcpClientAdapter
+        
+        reranker = BGEReRankerAdapter()
+        memory_manager = SlidingWindowMemoryAdapter()
+        mcp_client = InternalMcpClientAdapter()
+        
+        telemetry_adapter = PrometheusTelemetryAdapter()
         app.state.chat_use_case = ChatUseCase(
             inference_provider=app.state.inference_provider,
             retriever_service=app.state.retriever_service,
             gatekeeper=Gatekeeper,
-            cache=global_cache
+            cache=global_cache,
+            telemetry=telemetry_adapter,
+            reranker=reranker,
+            memory_manager=memory_manager,
+            streaming_provider=app.state.streaming_provider,
+            mcp_client=mcp_client
         )
         app.state.ingest_use_case = IngestUseCase(vector_store=app.state.vector_store)
         
@@ -131,7 +161,7 @@ async def lifespan(app: FastAPI):
         app.state.tg_worker.stop()
     logger.info("🛑 Zyrabit SLM API Shutting down...")
 
-app = FastAPI(title=PROJECT_NAME, version="1.7.5", lifespan=lifespan)
+app = FastAPI(title=PROJECT_NAME, version="2.1.0", lifespan=lifespan)
 
 # Mount Socket.io
 app.mount("/socket.io", socket_app)
@@ -155,22 +185,39 @@ async def chat_message(sid, data):
 
     text = data.get("text", "")
     msg_id = data.get("client_msg_id")
-    
+    # Use sid as thread_id so each socket session has its own persistent memory
+    thread_id = data.get("thread_id", sid)
+
     logger.info(f"💬 Socket RAG Query from {sid}: {text[:30]}...")
-    
+
     try:
         # 1. COMMAND INTERCEPTION (Zero-Lag)
-        command_res = await CommandRouter.handle(text, source="WEB", session_id=sid)
+        command_res = await CommandRouter.handle(text, source="WEB", session_id=thread_id)
         if command_res:
             await sio.emit("chat_response", command_res, to=sid)
             return
 
-        # 2. RAG BRAIN EXECUTION
-        result = await _global_app.state.chat_use_case.execute(text=text, client_msg_id=msg_id)
+        # 2. Recover history for this session (Sovereign Memory)
+        from app.infrastructure.shared.state_tracker import SovereignStateManager
+        history = SovereignStateManager.get_history(thread_id)
+
+        # 3. RAG BRAIN EXECUTION with history context
+        result = await _global_app.state.chat_use_case.execute(
+            text=text,
+            client_msg_id=msg_id,
+            history=history,
+        )
+
+        # 4. Record TTFT via telemetry (socket path uses execute(), not stream_response())
+        latency_ms = result.get("metadata", {}).get("latency_ms", 0)
+        if latency_ms and hasattr(_global_app.state, 'chat_use_case'):
+            _global_app.state.chat_use_case.telemetry.record_ttft(latency_ms)
+
         await sio.emit("chat_response", result, to=sid)
     except Exception as e:
         logger.error(f"❌ Socket RAG Error: {e}")
         await sio.emit("chat_response", {"response": "I encountered an error processing your request."}, to=sid)
+
 
 
 # Middleware
@@ -189,12 +236,14 @@ app.add_middleware(
 Instrumentator().instrument(app).expose(app)
 
 # Register Routers
-from app.api.v1.endpoints import chat, health, mcp, documents, integrations
-app.include_router(chat.router, prefix=API_V1_STR, tags=["Chat"])
+from app.core.security import get_current_user
+from app.api.v1.endpoints import chat, health, mcp, documents, integrations, ag_ui
+app.include_router(chat.router, prefix=API_V1_STR, tags=["Chat"], dependencies=[Depends(get_current_user)])
 app.include_router(health.router, prefix=API_V1_STR, tags=["Monitoring"])
 app.include_router(mcp.router, prefix="/mcp", tags=["MCP"])
-app.include_router(documents.router, prefix=API_V1_STR, tags=["Documents"])
-app.include_router(integrations.router, prefix=API_V1_STR, tags=["Integrations"])
+app.include_router(documents.router, prefix=API_V1_STR, tags=["Documents"], dependencies=[Depends(get_current_user)])
+app.include_router(integrations.router, prefix=API_V1_STR, tags=["Integrations"], dependencies=[Depends(get_current_user)])
+app.include_router(ag_ui.router, prefix="/ag-ui", tags=["AG-UI"])
 
 @app.get("/", include_in_schema=False)
 async def root():

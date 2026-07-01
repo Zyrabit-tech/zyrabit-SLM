@@ -7,3 +7,5 @@ from .pii_pipeline import (
     PipelineContext,
     ShardAnonymizationInterceptor
 )
+from .auth import get_current_user
+

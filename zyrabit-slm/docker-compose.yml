@@ -41,6 +41,7 @@ services:
       - N8N_SERVICE_TOKEN_FILE=/run/secrets/n8n_service_token
       - N8N_WEBHOOK_SIGNING_SECRET_FILE=/run/secrets/n8n_webhook_signing_secret
       - ONNXRUNTIME_LOGGING_LEVEL=3
+      - DOCS_DIR=/app/document_source
     depends_on:
 
       zyrabit-db:
@@ -49,7 +50,7 @@ services:
         condition: service_started
     labels:
       - traefik.enable=true
-      - traefik.http.routers.zyrabit-api.rule=Host(`${DOMAIN}`) && (PathPrefix(`/v1`) || PathPrefix(`/socket.io`))
+      - traefik.http.routers.zyrabit-api.rule=Host(`${DOMAIN}`) && (PathPrefix(`/v1`) || PathPrefix(`/socket.io`) || PathPrefix(`/ag-ui`))
       - traefik.http.routers.zyrabit-api.entrypoints=websecure
       - traefik.http.routers.zyrabit-api.tls=true
       - traefik.http.routers.zyrabit-api.middlewares=api-ratelimit@docker,secureHeaders@file
@@ -159,7 +160,7 @@ services:
     networks:
       - zyrabit-sovereign-net
     healthcheck:
-      test: ["CMD-SHELL", "python -c 'import urllib.request; urllib.request.urlopen(\"http://localhost:8000/api/v2/heartbeat\")' || python3 -c 'import urllib.request; urllib.request.urlopen(\"http://localhost:8000/api/v2/heartbeat\")' || exit 1"]
+      test: ["CMD-SHELL", "bash -c 'cat < /dev/null > /dev/tcp/127.0.0.1/8000' || exit 1"]
       interval: 30s
 
       timeout: 10s

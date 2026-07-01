@@ -1,5 +1,11 @@
-# STAGE 1: Builder
-FROM python:3.12-slim AS builder
+# ──────────────────────────────────────────────────────────────────────────────
+#   ZYRABIT API-RAG — Multi-Stage Dockerfile (Distroless Runtime)
+#   Zero-Trust: No shell, no package manager, no attack surface in runtime.
+# ──────────────────────────────────────────────────────────────────────────────
+
+# STAGE 1: Builder ─────────────────────────────────────────────────────────────
+# Full toolchain for compiling native extensions (spacy, chromadb, etc.)
+FROM python:3.12-slim-bookworm AS builder
 
 WORKDIR /app
 ENV PYTHONDONTWRITEBYTECODE=1 \
@@ -12,44 +18,53 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Install uv
+# Install uv (fast Python package manager)
 RUN curl -LsSf https://astral.sh/uv/install.sh | sh
 ENV PATH="/root/.local/bin:$PATH"
 
 COPY pyproject.toml uv.lock ./
-# 1. Sync dependencies (this creates /app/.venv by default)
-RUN uv sync --no-dev --no-install-project
 
-# 2. Download spacy
+# Sync dependencies (creates /app/.venv)
+RUN uv sync --frozen --no-dev --no-install-project
+
+# Download spacy model into the venv
 RUN uv run python -m spacy download en_core_web_sm
 
-# STAGE 2: Runtime
+# Create placeholder directory and file
+RUN mkdir -p /app/document_source && touch /app/document_source/.keep
+
+
+
+# STAGE 2: Runtime (Hardened Slim Python) ──────────────────────────────────────
+# Using python:3.12-slim-bookworm to match builder python version (3.12).
+# Hardened: Runs as non-root user (65534).
 FROM python:3.12-slim-bookworm
 
 WORKDIR /app
 
-ENV PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1 \
-    PATH="/app/.venv/bin:$PATH"
-
-# Hardening: Update system, cleanup and REMOVE pip
-RUN apt-get update && apt-get upgrade -y && \
-    apt-get purge -y --auto-remove python3-pip && \
-    rm -rf /var/lib/apt/lists/*
-
-# Copiamos el entorno virtual estándar
+# Copy the pre-built virtual environment from builder
 COPY --from=builder /app/.venv /app/.venv
 
-# Crear usuario no-root
-RUN addgroup --system zyrabituser && adduser --system --group zyrabituser
-
-# Copiamos solo la carpeta app (Ruta desde la raíz del proyecto)
+# Copy application code (path relative to build context root)
 COPY zyrabit-slm/api-rag/app ./app
 
-RUN mkdir -p /app/document_source && \
-    chown -R zyrabituser:zyrabituser /app
+# Set Python path to use the venv's site-packages
+ENV PYTHONPATH="/app/.venv/lib/python3.12/site-packages:/app" \
+    PATH="/app/.venv/bin:$PATH" \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
 
-USER zyrabituser
+# Copy document_source directory
+COPY --from=builder /app/document_source /app/document_source
+
+# Create non-root group and user, and set ownership
+RUN groupadd -g 10001 nonroot && \
+    useradd -r -u 10001 -g nonroot nonroot && \
+    chown -R nonroot:nonroot /app
+
+USER nonroot
+
 EXPOSE 8080
 
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8080"]
+# Use the venv's uvicorn directly (no shell needed)
+ENTRYPOINT ["python3", "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8080"]

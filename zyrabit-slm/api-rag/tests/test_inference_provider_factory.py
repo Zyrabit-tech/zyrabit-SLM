@@ -9,11 +9,13 @@ from app.inference_factory import create_inference_provider
 from app.ports.inference_port import InferenceProviderError, InferenceRequest
 
 
+from app.infrastructure.shared.config import SLM_URL
+
 @patch.dict("os.environ", {}, clear=True)
 def test_factory_defaults_to_ollama_provider():
     provider = create_inference_provider()
     assert isinstance(provider, OllamaInferenceAdapter)
-    assert provider.endpoint == "http://zyrabit-engine:11434/api/generate"
+    assert provider.endpoint == f"{SLM_URL}/api/generate"
 
 
 @patch.dict(
