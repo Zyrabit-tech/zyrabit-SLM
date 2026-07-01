@@ -1,8 +1,6 @@
 import pytest
 import json
-import asyncio
-from unittest.mock import AsyncMock, MagicMock, patch
-from fastapi.testclient import TestClient
+from unittest.mock import AsyncMock, patch
 
 from app.infrastructure.shared.state_tracker import SovereignStateManager
 from app.infrastructure.shared.config import N8N_SERVICE_TOKEN

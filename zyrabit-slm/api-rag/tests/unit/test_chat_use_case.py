@@ -1,5 +1,5 @@
 import pytest
-from unittest.mock import MagicMock, patch, AsyncMock
+from unittest.mock import MagicMock, patch
 from app.domain.use_cases.chat_use_case import ChatUseCase
 from app.domain.ports.telemetry_port import TelemetryPort
 

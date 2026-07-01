@@ -1,5 +1,4 @@
 import os
-import pytest
 from docx import Document as DocxDocument
 from app.infrastructure.persistence.pdf_processor import PDFProcessor
 

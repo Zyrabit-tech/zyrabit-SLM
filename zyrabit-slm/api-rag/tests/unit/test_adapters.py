@@ -1,4 +1,3 @@
-import pytest
 from app.infrastructure.adapters.bge_reranker_adapter import BGEReRankerAdapter
 from app.infrastructure.adapters.sliding_window_memory_adapter import SlidingWindowMemoryAdapter
 from langchain_core.documents import Document

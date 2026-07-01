@@ -11,7 +11,6 @@ Uso:
 """
 import sys
 import os
-from pathlib import Path
 
 # Dependencia mínima: reportlab (ya en el entorno o instalar con `uv pip install reportlab`)
 try:

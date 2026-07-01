@@ -1,7 +1,6 @@
 """
 Factory for creating inference provider adapters dynamically based on configuration.
 """
-from typing import Optional
 from app.ports.inference_port import InferenceProviderPort
 from app.ports.streaming_inference_port import StreamingInferencePort
 from app.infrastructure.inference.ollama_inference_adapter import OllamaInferenceAdapter

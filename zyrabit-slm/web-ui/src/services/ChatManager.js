@@ -11,7 +11,7 @@ export class ChatManager {
         this.queue = Storage.load('pending_messages') || [];
         this.sessionId = Storage.load('session_id');
         if (!this.sessionId) {
-            this.sessionId = crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2) + Date.now().toString(36);
+            this.sessionId = this.generateSessionId();
             Storage.save('session_id', this.sessionId);
         }
         this.isProcessing = false;
@@ -122,7 +122,7 @@ export class ChatManager {
         });
         
         if (data.metadata?.command === '/clear') {
-            this.sessionId = crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2) + Date.now().toString(36);
+            this.sessionId = this.generateSessionId();
             Storage.save('session_id', this.sessionId);
             bus.emit('UI:CLEAR_CHAT');
         }
@@ -137,6 +137,17 @@ export class ChatManager {
         }
     }
 
+    generateSessionId() {
+        if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+            return crypto.randomUUID();
+        }
+        if (typeof crypto !== 'undefined' && typeof crypto.getRandomValues === 'function') {
+            const bytes = new Uint8Array(16);
+            crypto.getRandomValues(bytes);
+            return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
+        }
+        throw new Error('Secure random number generator is unavailable for session ID generation.');
+    }
 
     persist() {
         Storage.save('pending_messages', this.queue);
