@@ -109,7 +109,7 @@ services:
     volumes:
       - ./chroma-data:/data
     healthcheck:
-      test: [ "CMD-SHELL", "python3 -c 'import urllib.request; urllib.request.urlopen(\"http://localhost:8000/api/v2/heartbeat\")' || exit 1" ]
+      test: ["CMD-SHELL", "bash -c 'cat < /dev/null > /dev/tcp/127.0.0.1/8000' || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 5
