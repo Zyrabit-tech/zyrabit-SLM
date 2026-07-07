@@ -21,6 +21,13 @@ class ContextManager:
     TOOLS_RESERVE = 600
     RAG_RESERVE = TOTAL_BUDGET - (SYSTEM_RESERVE + MEMORY_RESERVE + TOOLS_RESERVE)
 
+    # ReAct-specific budgets (separated from direct inference path)
+    REACT_SYSTEM_BUDGET = 800   # Identity + compact ReAct instructions
+    REACT_TOOLS_BUDGET = 400    # Only lazy-loaded relevant tools
+    REACT_HISTORY_BUDGET = 600  # Max 3 conversation turns
+    REACT_RAG_BUDGET = 500      # Top-3 fragments trimmed
+    REACT_RESPONSE_RESERVE = 796  # Guaranteed space for model response
+
     def __init__(self, model_name: str = "qwen2.5:7b"):
         # Default to cl100k_base (standard for many modern models)
         try:
@@ -32,6 +39,21 @@ class ContextManager:
 
     def count_tokens(self, text: str) -> int:
         return len(self.encoder.encode(text))
+
+    def estimate_react_budget(self, system_prompt: str, user_prompt: str) -> dict:
+        """Estimate token usage for a ReAct iteration and return budget status."""
+        sys_tokens = self.count_tokens(system_prompt)
+        usr_tokens = self.count_tokens(user_prompt)
+        total = sys_tokens + usr_tokens
+        limit = int(self.TOTAL_BUDGET * 0.70)
+        return {
+            "system_tokens": sys_tokens,
+            "user_tokens": usr_tokens,
+            "total": total,
+            "limit": limit,
+            "over_budget": total > limit,
+            "remaining": max(limit - total, 0)
+        }
 
     def trim_history(self, history: List[Dict[str, str]], budget: int = MEMORY_RESERVE) -> str:
         """Keep only the last N turns that fit in the budget."""

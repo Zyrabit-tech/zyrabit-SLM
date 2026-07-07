@@ -48,6 +48,21 @@ class MockInferenceProvider(InferenceProviderPort):
         return {"ok": True}
 
 
+# Helper to build the new harness.execute() call with all required params
+def _exec_kwargs(user_query, token_map=None):
+    """Returns the kwargs dict for harness.execute() with V2.0 signature."""
+    return {
+        "user_query": user_query,
+        "system_prompt": "You are Zyra.",
+        "history": [],
+        "rag_docs": [],
+        "user_profile": {"assistant_name": "Zyra", "name": "Test User", "role": "Tester", "tone": "professional"},
+        "source": "WEB",
+        "token_map": token_map or {},
+        "model_name": "mock-model",
+    }
+
+
 @pytest.mark.asyncio
 async def test_react_loop_happy_path():
     responses = [
@@ -62,12 +77,8 @@ async def test_react_loop_happy_path():
     registry = ToolRegistry(mcp_client)
     harness = ReactHarness(provider, registry, Gatekeeper, max_iterations=3)
 
-    token_map = {}
     answer, steps = await harness.execute(
-        user_query="How do I start on Windows?",
-        base_system_prompt="You are Zyra.",
-        token_map=token_map,
-        model_name="mock-model"
+        **_exec_kwargs("How do I start on Windows? quick start guide install")
     )
 
     assert answer == "Use .\\zyra-up.ps1 to start."
@@ -101,10 +112,7 @@ async def test_react_loop_pii_sandwich():
 
     token_map = {"<USER_EMAIL_1>": "user@example.com"}
     answer, steps = await harness.execute(
-        user_query="Get guide for <USER_EMAIL_1>",
-        base_system_prompt="You are Zyra.",
-        token_map=token_map,
-        model_name="mock-model"
+        **_exec_kwargs("Get guide for <USER_EMAIL_1> quick start install", token_map=token_map)
     )
 
     assert answer == "Resolved for user."
@@ -127,12 +135,8 @@ async def test_react_loop_self_healing_json():
     registry = ToolRegistry(mcp_client)
     harness = ReactHarness(provider, registry, Gatekeeper, max_iterations=3)
 
-    token_map = {}
     answer, steps = await harness.execute(
-        user_query="Help me.",
-        base_system_prompt="You are Zyra.",
-        token_map=token_map,
-        model_name="mock-model"
+        **_exec_kwargs("Help me.")
     )
 
     assert answer == "Corrected answer."

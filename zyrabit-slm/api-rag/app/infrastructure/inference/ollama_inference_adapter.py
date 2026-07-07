@@ -46,11 +46,17 @@ class OllamaInferenceAdapter(InferenceProviderPort):
             "model": request.model,
             "prompt": request.prompt,
             "stream": request.stream,
+            "options": {"num_ctx": 4096},
         }
         if request.system_prompt:
             payload["system"] = request.system_prompt
         if request.options:
-            payload.update(request.options)
+            # Separate top-level Ollama API params from model options
+            for key, value in request.options.items():
+                if key in ("format",):
+                    payload[key] = value
+                else:
+                    payload["options"][key] = value
 
         timeout = request.timeout_seconds or self.default_timeout_seconds
         last_exc: Exception = InferenceProviderError("No attempts made")

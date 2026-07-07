@@ -62,6 +62,7 @@ services:
       - zyrabit-sovereign-net
       - model-network
     volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
       - ./secrets:/run/secrets:ro
       - ./prompts:/app/prompts:ro
       - ./document_source:/app/document_source
@@ -259,6 +260,8 @@ services:
     build:
       context: ../mcp
     container_name: zyrabit-mcp
+    env_file:
+      - .env
     volumes:
       - ../README.md:/app/README.md:ro
       - ../CONTRIBUTING.md:/app/CONTRIBUTING.md:ro

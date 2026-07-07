@@ -50,10 +50,12 @@ services:
       - backend-network
       - model-network
     volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
       - ./secrets:/run/secrets:ro
       - ./prompts:/app/prompts:ro
       - ./document_source:/app/document_source
       - ../README.md:/app/README.md:ro # For auto-ingest
+      - ./db_data:/app/db_data
     extra_hosts:
       - "host.docker.internal:host-gateway"
 

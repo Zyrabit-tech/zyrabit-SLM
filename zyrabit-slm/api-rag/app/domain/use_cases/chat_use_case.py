@@ -107,29 +107,23 @@ class ChatUseCase:
             start_inference_time = time.time()
 
             if self.mcp_client:
-                # Run the ReAct agentic loop!
+                # Run the ReAct agentic loop with lean component passing
                 from app.domain.agent.tool_registry import ToolRegistry
                 from app.domain.agent.react_harness import ReactHarness
                 from app.core.security.pii_pipeline import deanonymize_text
 
-                # Build a base prompt including prior history and context documents
-                base_prompt = self.context_manager.build_final_prompt(
-                    system_prompt=system_prompt,
-                    history=history,
-                    rag_docs=results if decision == "rag" else [],
-                    user_query=sanitized_text,
-                    user_profile=user_profile,
-                    source=source
-                )
-
                 registry = ToolRegistry(self.mcp_client)
                 harness = ReactHarness(self.inference_provider, registry, self.gatekeeper)
 
-                # Run ReAct execution
+                # Pass raw components — the harness assembles the prompt once
                 raw_response_text, steps = await harness.execute(
-                    user_query=base_prompt,
-                    base_system_prompt=system_prompt,
-                    token_map=entities,  # token_map containing masking details
+                    user_query=sanitized_text,
+                    system_prompt=system_prompt,
+                    history=history,
+                    rag_docs=results if decision == "rag" else [],
+                    user_profile=user_profile,
+                    source=source,
+                    token_map=entities,
                     model_name=target_model
                 )
 
