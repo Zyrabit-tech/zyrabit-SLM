@@ -46,6 +46,11 @@ class SovereignStateManager:
                     timestamp TIMESTAMP
                 )
             """)
+            # Performance index for session-based lookups
+            conn.execute("""
+                CREATE INDEX IF NOT EXISTS idx_conversation_session
+                ON conversation_memory(session_id)
+            """)
 
             # 3. User Profile (Onboarding & Persona)
             conn.execute("""

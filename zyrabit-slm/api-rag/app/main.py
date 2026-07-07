@@ -65,6 +65,10 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.error(f"❌ Failed to initialize Sovereign State: {e}")
 
+    # 0b. Load API Key Store (multi-key auth)
+    from app.core.security.api_key_store import ApiKeyStore
+    ApiKeyStore.load()
+
 
     logger.info("🚀 Zyrabit SLM API Starting...")
     
