@@ -306,6 +306,16 @@ class ReactHarness:
             )
             react_steps.append(f"Observation: {masked_output}")
 
-        # ── Loop exhausted ──
+        # ── Loop exhausted (Graceful Degradation) ──
         logger.warning("⚠️ ReAct Harness: Maximum iterations reached without final_answer.")
-        return "Error: Maximum iterations reached without resolving query.", steps_log
+        
+        fallback_msg = (
+            "Parece que me he enredado un poco procesando tanta información. "
+            "¿Podrías replantear tu pregunta o darme instrucciones más específicas?"
+        )
+        if steps_log:
+            last_thought = steps_log[-1].get("thought", "")
+            if last_thought:
+                fallback_msg = f"{fallback_msg}\n\n*Último pensamiento interno:* {last_thought}"
+                
+        return fallback_msg, steps_log
