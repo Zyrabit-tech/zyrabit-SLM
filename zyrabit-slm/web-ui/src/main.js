@@ -4,6 +4,7 @@ import { ChatManager } from "./services/ChatManager";
 import { Renderer } from "./ui/Renderer";
 import { EVENTS, IDS } from "./core/Constants";
 import { getSafeElement } from "./utils/DOM";
+import { Storage } from "./adapters/Storage";
 
 
 /**
@@ -31,7 +32,9 @@ class ZyrabitApp {
         this.renderer = new Renderer();
         this.socket = new SocketAdapter();
         this.chat = new ChatManager();
-        this.history = []; // Conversation memory
+        
+        // Recover Conversation memory from Storage
+        this.history = Storage.load('chat_history') || []; 
         
         this.init();
     }
@@ -43,8 +46,13 @@ class ZyrabitApp {
         this.checkOnboarding();
         this.chat.recover(); // Recover Shadow State
         
+        // Restore visual history
+        this.history.forEach(msg => {
+            this.renderer.renderMessage(msg.role, msg.content, msg.metadata);
+        });
+        
         // Hide floating suggestions if history exists
-        if (this.chat.queue.length > 0) {
+        if (this.chat.queue.length > 0 || this.history.length > 0) {
             const suggestions = document.getElementById('floating-suggestions');
             if (suggestions) suggestions.style.display = 'none';
         }
@@ -128,13 +136,15 @@ class ZyrabitApp {
                 const text = input.value.trim();
                 if (!text) return;
                 
-                // Ocultar sugerencias flotantes al iniciar conversación
                 const suggestions = document.getElementById('floating-suggestions');
                 if (suggestions) suggestions.style.opacity = '0';
                 
                 bus.emit(EVENTS.UI.THINKING, true);
                 bus.emit(EVENTS.CHAT.SEND, { text, history: this.history });
                 this.history.push({ role: 'user', content: text });
+                
+                Storage.save('chat_history', this.history);
+                
                 input.value = '';
             };
 
@@ -235,8 +245,14 @@ class ZyrabitApp {
         // 5. System Logs
         bus.on(EVENTS.SYSTEM.LOG, (data) => this.addGdprLog(data.type, data.event));
 
-        // 5b. Security Logs (Gatekeeper)
+        // 5b. Security Logs (Gatekeeper) & History Update
         bus.on(EVENTS.CHAT.RESPONSE_RECEIVED, (data) => {
+            // Update History with Assistant's response
+            if (data && data.response) {
+                this.history.push({ role: 'assistant', content: data.response, metadata: data.metadata });
+                Storage.save('chat_history', this.history);
+            }
+
             if (data && data.metadata && data.metadata.pii_masked && data.metadata.pii_masked.length > 0) {
                 data.metadata.pii_masked.forEach(placeholder => {
                     let entityType = "PII";
