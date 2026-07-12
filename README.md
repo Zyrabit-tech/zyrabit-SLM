@@ -1,130 +1,108 @@
-# 🤖 Zyrabit SLM
+# Zyrabit SLM
 
-[![Version](https://img.shields.io/badge/version-2.2.0--beta-orange.svg)](VERSION)
-[![CI](https://github.com/Zyrabit-tech/zyrabit-SLM/actions/workflows/ci.yml/badge.svg)](https://github.com/Zyrabit-tech/zyrabit-SLM/actions/workflows/ci.yml)
-[![Security Audit](https://github.com/Zyrabit-tech/zyrabit-SLM/actions/workflows/security.yml/badge.svg)](https://github.com/Zyrabit-tech/zyrabit-SLM/actions/workflows/security.yml)
-[![Docker Hub](https://img.shields.io/badge/docker-zyrabitcore-blue.svg)](https://hub.docker.com/r/zyrabitcore/zyrabit-slm)
-[![License](https://img.shields.io/badge/license-MIT-yellow.svg)](LICENSE)
+Zyrabit SLM is a local-first sovereign AI stack for regulated environments. It is designed to run on-premise, support air-gapped deployments, and keep sensitive data inside customer-controlled infrastructure.
 
-**Sovereign Operating System for Local AI: Persistent memory, hardware-aware orchestration, and native MCP v1.0.**
+## What it is
 
----
+- Local RAG and inference orchestration for private workloads
+- FastAPI backend with security-first request handling
+- MCP integration for controlled tool access
+- SQLite-based state, audit, and memory primitives
+- Docker-oriented deployment for isolated environments
 
-## 🏛️ Architecture Topology
+## Design Principles
 
-Zyrabit is designed as a zero-trust, air-gapped capable AI stack.
+- Data sovereignty first: no dependency on external AI APIs for sensitive data paths
+- Air-gapped capable: operate without internet access once dependencies are present
+- Hardware-aware: optimized for constrained local clusters
+- Auditable by default: explicit flows, visible state, minimal hidden behavior
+- Regulated-sector ready: aligned with GDPR, DORA, FedRAMP-style operational constraints
+
+## Repository Layout
+
+- `zyrabit-slm/api-rag/`: main FastAPI application, tests, and domain code
+- `mcp/`: MCP server utilities and support scripts
+- `internal/`: hardware-specific and experimental integrations
+- `validation/`: validation scripts and generated artifacts
+- `zyra-up.sh`: primary lifecycle and operator entrypoint
+
+## Architecture
 
 ```text
-                     ┌─────────────────────────────────────────┐
-                     │         frontend-network (bridge)        │
-                     └──────────────┬──────────────────────────┘
-                            Traefik │ (TLS, rate-limit, auth)
-                     ┌─────────────▼──────────────────────────┐
-                     │          backend-network (bridge)       │
-                     │  api-rag   chroma-db   prometheus       │
-                     │  grafana   mcp         n8n (optional)   │
-                     └──────────────┬─────────────────────────┘
-                                    │
-                     ┌──────────────▼─────────────────────────┐
-                     │   model-network (internal: true)        │
-                     │   zyrabit-engine (Ollama)               │
-                     └────────────────────────────────────────┘
+Client -> API Gateway / FastAPI -> Gatekeeper / PII pipeline -> Retriever / RAG
+       -> Inference provider -> State tracker / audit store -> Response
 ```
 
----
+The stack is intentionally local:
 
-## 💎 Sovereign Features (Zyrabit SLM v2.2-beta)
+- Requests are sanitized before retrieval or inference
+- State is stored in SQLite with WAL mode
+- Retrieval can combine keyword and vector search
+- Inference can target local Ollama-compatible backends
 
-*   **Zero-Lag Command Router (<15ms)**: Direct interceptor for commands like `/stats`, `/vault`, `/clear`, `/tools` that bypasses LLM inference completely using SQLite state lookup.
-*   **FTS5 Hybrid RAG (<200ms)**: Hybrid keyword (FTS5 SQLite table virtual) and vector (ChromaDB) retrieval pipeline prioritizing fast local index lookup before vector fallback.
-*   **Obsidian Brain Sync**: Recursive scanning and ingestion of Markdown vaults into the secure RAG engine.
-*   **AutoLearner Background Loop**: An asynchronous background service that periodically synthesizes chat history and generates reflective self-learning notes written directly back to your Obsidian vault.
-*   **Dynamic Sovereign Identity**: Personalized assistant name locked dynamically through onboarding across Web and Telegram (eliminating hardcoded "Kai" references).
+## Getting Started
 
----
+### Prerequisites
 
-## 🚀 Quick Start (The Sovereign Way)
+- Python 3.12.x
+- `uv`
+- Docker and Docker Compose, if you plan to run the full stack
 
-Zyrabit uses a unified orchestration script to manage your local infrastructure.
+### Local development
 
 ```bash
-# 1. Clone the repository
 git clone https://github.com/Zyrabit-tech/zyrabit-SLM.git
 cd zyrabit-SLM
-
-# 2. Configure your environment
-cp zyrabit-slm/example.env zyrabit-slm/.env
-# Edit .env to set your SLM_URL and DB_URL
-
-# 3. System Check & Install
-./zyra-up.sh doctor     # Check RAM and hardware acceleration
-./zyra-up.sh install    # Build images, start stack, and pull models
+uv sync --dev
+source .venv/bin/activate
+pytest -q zyrabit-slm/api-rag/tests
 ```
 
----
-
-## 🛠️ CLI Tool: `zyra-up.sh`
-
-The `zyra-up.sh` script is your primary interface for managing the Zyrabit lifecycle.
-
-| Command | Description |
-|---|---|
-| `install` | Full setup: build images, start stack, and pull AI models |
-| `start` | Bring up the infrastructure only |
-| `stop` | Tear down the infrastructure |
-| `build` | Build Docker images without starting containers |
-| `verify` | Visual health check of all services and API probes |
-| `dev` | Native local development using `uv` with hot-reload |
-| `doctor` | Diagnostic: validate environment, RAM, and hardware |
-
----
-
-## 🐳 Docker Hub & Sovereign Images
-
-We provide pre-built, production-ready images for the Zyrabit stack.
-
-> [!TIP]
-> You can find our official images at **[Docker Hub: zyrabitcore/zyrabit-slm](https://hub.docker.com/r/zyrabitcore/zyrabit-slm)**.
-> Use these images if you prefer not to build locally or if you are deploying to an air-gapped environment.
+### Run the API
 
 ```bash
-# Pull the latest stable version
-docker pull zyrabitcore/zyrabit-slm:2.1.0
+cd zyrabit-slm/api-rag
+python -m uvicorn app.main:app --host 0.0.0.0 --port 8080
 ```
 
+## Configuration
 
----
+Configuration is loaded from environment variables and `.env` files.
 
-## 🔒 Security & Privacy
+Common variables:
 
-Zyrabit is built on a **Security-First** philosophy:
+- `SLM_URL`: base URL for the local inference service
+- `DB_PATH`: path to the SQLite state database
+- `MODEL_NAME`: default model identifier
+- `DOCS_DIR`: documents directory for ingestion
+- `ALLOWED_ORIGINS`: CORS allowlist
 
-*   **PII Scrubbing**: A heuristic pipeline anonymizes sensitive data (emails, SSNs, etc.) *before* it leaves the `api-rag` container.
-*   **Isolated Models**: The `model-network` has no external access (`internal: true`).
-*   **Zero-Trust Ingress**: Traefik handles all incoming traffic with rate-limiting and TLS.
+## Testing
 
----
+The main Python test suite lives under `zyrabit-slm/api-rag/tests/`.
 
-## 📂 Repository Structure
+Recommended commands:
 
-*   `zyrabit-slm/`: The core Docker stack (API, UI, MCP, Config).
-*   `internal/`: Engines and hardware-specific bridges (Tenstorrent).
-*   `mcp/`: Model Context Protocol server implementation.
-*   `validation/`: Pentest checklists and performance benchmarks.
-*   `zyra-up.sh`: Unified orchestration CLI.
+```bash
+pytest -q zyrabit-slm/api-rag/tests
+pytest -q zyrabit-slm/api-rag/tests/unit
+```
 
----
+The codebase is intended to run offline. If a test attempts to reach the network, treat that as a bug in the test or implementation.
 
-## 📖 Extended Documentation
+## Security Notes
 
-*   🤝 **[Contributing](CONTRIBUTING.md)**: How to help us build the future of sovereign AI.
-*   🔒 **[Security Policy](SECURITY.md)**: Vulnerability disclosure and privacy standards.
-*   🏗️ **[Hexagonal Architecture](zyrabit-slm/api-rag/app/HEXAGONAL_ARCHITECTURE.md)**: Deep dive into the backend design.
-*   🐳 **[Docker Debugging](DOCKER_DEBUG_GUIDE.md)**: Troubleshooting common container issues.
-*   📡 **[cURL Examples](zyrabit-slm/docs/CURL_EXAMPLES.md)**: How to interact with the API.
+- PII should be masked before the model sees the prompt.
+- Tool access should be mediated through explicit adapters and policies.
+- Secrets must stay on-premise and out of prompts, logs, and exported artifacts.
+- Production deployments should define explicit allowlists for origins, tokens, and integrations.
 
----
+## Operational Notes
 
-## 📜 License
+- The repo is optimized for local or on-prem deployments, not cloud-only workflows.
+- Keep model dependencies and state stores inside the same trust boundary.
+- Prefer deterministic behavior, explicit fallbacks, and small surface area changes.
 
-MIT © Zyrabit
+## License
+
+MIT
