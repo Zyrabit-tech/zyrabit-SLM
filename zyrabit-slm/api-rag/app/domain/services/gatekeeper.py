@@ -34,6 +34,13 @@ class Gatekeeper:
         return result.sanitized_text, result.token_map
 
     @classmethod
+    def scan(cls, text: str) -> Tuple[str, Dict[str, Any]]:
+        """
+        Backward-compatible alias used by older tests and integrations.
+        """
+        return cls.mask_pii(text)
+
+    @classmethod
     def is_in_scope(cls, text: str) -> bool:
         """
         Policy: Determine if the query is within the Sovereign AI's domain.

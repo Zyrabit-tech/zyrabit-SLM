@@ -135,7 +135,7 @@ class SovereignStateManager:
 
     @classmethod
     def get_user_profile(cls) -> dict:
-
+        cls._ensure_db()
         with sqlite3.connect(cls.DB_PATH) as conn:
             conn.row_factory = sqlite3.Row
             cursor = conn.execute("SELECT * FROM user_profile WHERE id = 1")
@@ -183,6 +183,7 @@ class SovereignStateManager:
 
     @classmethod
     def update_vault_index(cls, file_path: str, token_count: int, full_text_content: str = ""):
+        cls._ensure_db()
         current_hash = cls.get_file_hash(file_path)
         with sqlite3.connect(cls.DB_PATH) as conn:
             conn.execute("""
@@ -227,6 +228,7 @@ class SovereignStateManager:
 
     @classmethod
     def store_message(cls, session_id: str, role: str, content: str):
+        cls._ensure_db()
         with sqlite3.connect(cls.DB_PATH) as conn:
             conn.execute("""
                 INSERT INTO conversation_memory (session_id, role, content, timestamp)
@@ -246,6 +248,7 @@ class SovereignStateManager:
 
     @classmethod
     def get_history(cls, session_id: str, limit: int = 10):
+        cls._ensure_db()
         with sqlite3.connect(cls.DB_PATH) as conn:
             cursor = conn.execute("""
                 SELECT role, content FROM conversation_memory 
@@ -258,6 +261,7 @@ class SovereignStateManager:
     @classmethod
     def get_stats(cls) -> dict:
         """Returns infrastructure and vault metrics."""
+        cls._ensure_db()
         with sqlite3.connect(cls.DB_PATH) as conn:
             cursor = conn.execute("SELECT COUNT(*), SUM(token_count) FROM vault_index")
             vault_count, total_tokens = cursor.fetchone()
@@ -275,7 +279,15 @@ class SovereignStateManager:
     @classmethod
     def clear_session(cls, session_id: str):
         """Resets the conversation memory for a session."""
+        cls._ensure_db()
         with sqlite3.connect(cls.DB_PATH) as conn:
             conn.execute("DELETE FROM conversation_memory WHERE session_id = ?", (session_id,))
             logger.info(f"🧹 Session {session_id} cleared from Sovereign State.")
 
+    @classmethod
+    def _ensure_db(cls):
+        try:
+            with sqlite3.connect(cls.DB_PATH) as conn:
+                conn.execute("SELECT 1 FROM conversation_memory LIMIT 1")
+        except sqlite3.OperationalError:
+            cls.init_db()
