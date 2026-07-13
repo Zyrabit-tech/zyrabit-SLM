@@ -2,7 +2,7 @@ name: zyrabit-slm
 
 services:
   traefik:
-    image: traefik:latest
+    image: traefik:v3.0
     container_name: zyrabit-traefik
     command:
       - --api.dashboard=true
@@ -97,7 +97,7 @@ services:
 
   # 2. THE MUSCLE: SLM Server
   zyrabit-engine:
-    image: ollama/ollama:latest
+    image: ollama/ollama:0.3.1
     container_name: zyrabit-engine
     environment:
       - OLLAMA_NUM_PARALLEL=${OLLAMA_NUM_PARALLEL:-1}
@@ -151,7 +151,7 @@ services:
 
   # 3. THE MEMORY: Vector DB
   zyrabit-db:
-    image: chromadb/chroma:latest
+    image: chromadb/chroma:0.5.3
     container_name: zyrabit-db
     environment:
       - ANONYMIZED_TELEMETRY=False
@@ -172,7 +172,7 @@ services:
 
   # 4. THE MONITOR (Scraper): Prometheus
   zyrabit-prometheus:
-    image: prom/prometheus:latest
+    image: prom/prometheus:v2.53.0
     container_name: zyrabit-prometheus
     command:
       - --config.file=/etc/prometheus/prometheus.yml
@@ -196,7 +196,7 @@ services:
 
   # 5. THE MONITOR (Dashboard): Grafana
   zyrabit-grafana:
-    image: grafana/grafana:latest
+    image: grafana/grafana:11.1.0
     container_name: zyrabit-grafana
     environment:
       - GF_SERVER_ROOT_URL=https://localhost/grafana
@@ -220,7 +220,7 @@ services:
       - zyrabit-sovereign-net
 
   zyrabit-loki:
-    image: grafana/loki:latest
+    image: grafana/loki:3.1.0
     container_name: zyrabit-loki
     command: -config.file=/etc/loki/local-config.yaml
     profiles: [ "observability-extra" ]
@@ -231,7 +231,7 @@ services:
 
 
   zyrabit-n8n:
-    image: n8nio/n8n:latest
+    image: n8nio/n8n:1.50.0
     container_name: zyrabit-n8n
     profiles: [ "automation" ]
     environment:
