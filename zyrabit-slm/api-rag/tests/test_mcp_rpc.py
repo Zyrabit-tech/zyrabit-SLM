@@ -1,10 +1,6 @@
 from unittest.mock import patch
-from fastapi.testclient import TestClient
-from app.main import app
 
-client = TestClient(app)
-
-def test_mcp_rpc_list_tools():
+def test_mcp_rpc_list_tools(client):
     """Test listing tools via MCP JSON-RPC."""
     payload = {
         "jsonrpc": "2.0",
@@ -24,7 +20,7 @@ def test_mcp_rpc_list_tools():
     assert "send_telegram_notification" in tool_names
 
 @patch("requests.post")
-def test_mcp_rpc_call_telegram_tool_mocked(mock_post):
+def test_mcp_rpc_call_telegram_tool_mocked(mock_post, client):
     """Test calling the Telegram tool via MCP JSON-RPC with mocked network."""
     # Mock successful Telegram response
     mock_post.return_value.status_code = 200
@@ -58,7 +54,7 @@ def test_mcp_rpc_call_telegram_tool_mocked(mock_post):
     assert "chat_id" in kwargs["json"]
 
 
-def test_mcp_rpc_call_tool_not_found():
+def test_mcp_rpc_call_tool_not_found(client):
     """Test calling a non-existent tool via MCP JSON-RPC."""
     payload = {
         "jsonrpc": "2.0",
@@ -75,7 +71,7 @@ def test_mcp_rpc_call_tool_not_found():
     assert "error" in data
     assert "not found" in data["error"]["message"].lower()
 
-def test_mcp_rpc_invalid_jsonrpc_version():
+def test_mcp_rpc_invalid_jsonrpc_version(client):
     """Test sending invalid JSON-RPC version."""
     payload = {
         "jsonrpc": "1.0",

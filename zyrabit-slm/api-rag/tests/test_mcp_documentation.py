@@ -1,9 +1,4 @@
-from fastapi.testclient import TestClient
-from app.main import app
-
-client = TestClient(app)
-
-def test_mcp_list_documentation_tools():
+def test_mcp_list_documentation_tools(client):
     payload = {
         "jsonrpc": "2.0",
         "method": "tools/list",
@@ -23,7 +18,7 @@ def test_mcp_list_documentation_tools():
     assert "get_environment_variables_reference" in tool_names
     assert "run_self_diagnostic" in tool_names
 
-def test_mcp_call_quick_start_guide():
+def test_mcp_get_quick_start_guide(client):
     payload = {
         "jsonrpc": "2.0",
         "method": "tools/call",
@@ -40,7 +35,7 @@ def test_mcp_call_quick_start_guide():
     text = data["result"]["content"][0]["text"]
     assert "Quickstart Fundamentals" in text
 
-def test_mcp_call_api_reference():
+def test_mcp_get_api_reference(client):
     payload = {
         "jsonrpc": "2.0",
         "method": "tools/call",
@@ -56,7 +51,7 @@ def test_mcp_call_api_reference():
     text = data["result"]["content"][0]["text"]
     assert "Chat Completion" in text
 
-def test_mcp_call_troubleshooting_guide():
+def test_mcp_get_troubleshooting_guide(client):
     payload = {
         "jsonrpc": "2.0",
         "method": "tools/call",
@@ -72,7 +67,7 @@ def test_mcp_call_troubleshooting_guide():
     text = data["result"]["content"][0]["text"]
     assert "Debugging Guide" in text
 
-def test_mcp_call_self_diagnostic():
+def test_mcp_run_self_diagnostic(client):
     payload = {
         "jsonrpc": "2.0",
         "method": "tools/call",
