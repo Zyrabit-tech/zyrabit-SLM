@@ -36,10 +36,10 @@ export class ChatManager {
         };
         this.queue.push(message);
         this.persist();
-        
+
         bus.emit(EVENTS.UI.MSG_ADDED, { role: 'user', text: data.text });
 
-        
+
         if (!this.isProcessing) {
             this.processNext();
         }
@@ -62,10 +62,10 @@ export class ChatManager {
 
         this.isProcessing = true;
         bus.emit(EVENTS.UI.THINKING, true);
-        
+
         const message = this.queue[0];
-        bus.emit(EVENTS.SOCKET.EMIT, { 
-            text: message.text, 
+        bus.emit(EVENTS.SOCKET.EMIT, {
+            text: message.text,
             history: message.history,
             client_msg_id: message.id,
             thread_id: this.sessionId
@@ -79,11 +79,11 @@ export class ChatManager {
         this.isProcessing = false;
         this.clearPendingTimeout();
         bus.emit(EVENTS.UI.THINKING, false);
-        
-        bus.emit(EVENTS.SYSTEM.LOG, { 
-            type: 'WARNING', 
-            event: 'REQUEST_TIMEOUT', 
-            message: "La conexión está inestable o lenta. Reintentando..." 
+
+        bus.emit(EVENTS.SYSTEM.LOG, {
+            type: 'WARNING',
+            event: 'REQUEST_TIMEOUT',
+            message: "La conexión está inestable o lenta. Reintentando..."
         });
     }
 
@@ -110,19 +110,19 @@ export class ChatManager {
             this.queue.shift();
             this.persist();
         }
-        
-        bus.emit(EVENTS.UI.MSG_ADDED, { 
-            role: 'assistant', 
-            text: data.response, 
-            metadata: data.metadata 
+
+        bus.emit(EVENTS.UI.MSG_ADDED, {
+            role: 'assistant',
+            text: data.response,
+            metadata: data.metadata
         });
-        
+
         if (data.metadata?.command === '/clear') {
             this.sessionId = this.generateSessionId();
             Storage.save('session_id', this.sessionId);
             bus.emit('UI:CLEAR_CHAT');
         }
-        
+
         // If there's more in the queue, keep going
         if (this.queue.length > 0) {
             this.processNext();
