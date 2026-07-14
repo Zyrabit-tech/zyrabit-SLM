@@ -28,6 +28,6 @@ async def run_auto_ingest(vector_store, retriever_service=None):
         except Exception as e:
             logger.error(f"❌ Failed to auto-ingest README.md: {e}")
     else:
-        logger.warning(f"⚠️ README.md not found. Skipping auto-ingest.")
+        logger.warning("⚠️ README.md not found. Skipping auto-ingest.")
     
     logger.info("🏁 Auto-Ingest Protocol Completed.")

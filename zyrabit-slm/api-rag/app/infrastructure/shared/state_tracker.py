@@ -214,7 +214,7 @@ class SovereignStateManager:
                 if not fts_query:
                     return []
                     
-                cursor = conn.execute(f"""
+                cursor = conn.execute("""
                     SELECT file_path, snippet(fts_vault, 1, '<b>', '</b>', '...', 64) as snippet, rank 
                     FROM fts_vault 
                     WHERE fts_vault MATCH ? 

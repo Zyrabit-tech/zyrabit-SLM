@@ -13,10 +13,10 @@ from app.core.security.pii_pipeline import (
 
 def test_luhn_validity():
     # Valid credit card numbers algorithms check
-    assert is_luhn_valid("4242424242424242") == True
-    assert is_luhn_valid("49927398717") == False
-    assert is_luhn_valid("1234") == False  # Too short < 13
-    assert is_luhn_valid("123456789012345678901") == False # Too long > 19
+    assert is_luhn_valid("4242424242424242")
+    assert not is_luhn_valid("49927398717")
+    assert not is_luhn_valid("1234")  # Too short < 13
+    assert not is_luhn_valid("123456789012345678901") # Too long > 19
 
 def test_build_shards():
     text = "A" * 200

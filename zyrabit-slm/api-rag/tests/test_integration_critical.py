@@ -2,7 +2,6 @@ from unittest.mock import patch, AsyncMock
 from io import BytesIO
 from app.domain.services.gatekeeper import Gatekeeper
 
-from app.domain.services.gatekeeper import Gatekeeper
 
 def test_router_returns_rag_for_zyrabit_keyword():
     assert Gatekeeper.get_routing_decision("¿Qué es Zyrabit?") == "rag"

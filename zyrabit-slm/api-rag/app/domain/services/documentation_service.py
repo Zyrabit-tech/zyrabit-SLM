@@ -2,14 +2,12 @@
 Documentation Service — Dynamically reads and serves project documentation
 directly from the repository files, avoiding duplicated content.
 """
-import os
 import psutil
 import platform
 import sqlite3
 import time
 import logging
 from pathlib import Path
-from typing import Dict, Any, List
 
 logger = logging.getLogger("zyrabit.docs")
 

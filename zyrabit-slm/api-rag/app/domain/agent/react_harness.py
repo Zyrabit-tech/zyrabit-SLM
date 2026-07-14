@@ -9,7 +9,7 @@ import re
 import json
 import logging
 import asyncio
-from typing import Dict, Any, Tuple, List, Optional
+from typing import Dict, Any, Tuple, List
 from pydantic import BaseModel, Field
 
 from app.domain.agent.prompt_builder import PromptBuilder

@@ -1,10 +1,8 @@
 import pytest
-from unittest.mock import MagicMock, AsyncMock
 from app.domain.agent.react_harness import ReactHarness
 from app.domain.agent.tool_registry import ToolRegistry
 from app.ports.inference_port import InferenceProviderPort, InferenceResult
 from app.domain.services.gatekeeper import Gatekeeper
-from app.core.security.pii_pipeline import anonymize_text
 
 # A mock tool registry that returns pre-registered tool schemas and output
 class MockMcpClient:

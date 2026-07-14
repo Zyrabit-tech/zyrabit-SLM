@@ -1,4 +1,3 @@
-import os
 import pytest
 from app.core.security.api_key_store import ApiKeyStore
 from app.core.security.auth import get_current_user

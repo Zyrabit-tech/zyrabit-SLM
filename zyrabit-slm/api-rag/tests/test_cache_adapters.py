@@ -1,6 +1,4 @@
 import time
-import pytest
-import sqlite3
 from app.infrastructure.adapters.sqlite_cache_adapter import SqliteCacheAdapter
 from app.infrastructure.shared.state_tracker import SovereignStateManager
 

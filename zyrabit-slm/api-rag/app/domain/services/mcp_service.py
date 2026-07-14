@@ -248,7 +248,6 @@ async def docker_inspect_container(container_name: str) -> str:
 # ---------------------------------------------------------
 # DOCKER DIAGNOSTICS MCP (Read-Only)
 # ---------------------------------------------------------
-from app.infrastructure.mcp.docker_mcp_client import docker_client
 
 @mcp.tool()
 async def docker_list_containers() -> str:
