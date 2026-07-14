@@ -2,7 +2,7 @@ name: zyrabit-monitoring
 
 services:
   prometheus:
-    image: prom/prometheus:latest
+    image: prom/prometheus:v2.53.0
     container_name: zyrabit-prometheus-local
     command:
       - --config.file=/etc/prometheus/prometheus.yml
@@ -15,7 +15,7 @@ services:
       - "host.docker.internal:host-gateway"
 
   grafana:
-    image: grafana/grafana:latest
+    image: grafana/grafana:11.1.0
     container_name: zyrabit-grafana-local
     environment:
       - GF_AUTH_ANONYMOUS_ENABLED=true

@@ -44,6 +44,7 @@ dev = [
     "pip-audit>=2.8.0",
     "autopep8>=2.3.2",
     "reportlab>=4.0.0",  # E2E validation: PDF generator for PII testing
+    "pillow>=12.3.0",    # Pinned to fix CVEs (PYSEC-2026-2253 etc)
 ]
 
 [tool.uv]

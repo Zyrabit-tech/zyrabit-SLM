@@ -71,12 +71,8 @@ export class ChatManager {
             thread_id: this.sessionId
         });
 
-        // 45-second circuit breaker timeout
-        this.clearPendingTimeout();
-        this.pendingTimeout = setTimeout(() => {
-            console.warn("⚠️ Chat request timed out (45s). Triggering circuit breaker.");
-            this.handleRequestTimeout();
-        }, 45000);
+        // Event-driven loader: We rely exclusively on onResponse or onGatewayDisconnected
+        // to stop the thinking indicator. No hardcoded timeouts.
     }
 
     handleRequestTimeout() {

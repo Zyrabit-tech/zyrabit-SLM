@@ -1,11 +1,15 @@
 import os
 import platform
+import logging
 import psutil
 from datetime import datetime
 from fastapi import APIRouter, Depends, Request
 from app.infrastructure.shared.config import MODEL_NAME, PROJECT_NAME, SLM_URL
 from app.api.v1.dependencies import get_vector_store, get_inference_provider
 from app.domain.services.mcp_service import mcp
+from app.core.security import get_current_user
+
+logger = logging.getLogger("zyrabit.api")
 
 router = APIRouter()
 
@@ -137,11 +141,11 @@ class UserProfileUpdate(BaseModel):
     system_prompt: str = ''
 
 @router.get("/profile")
-async def get_profile():
+async def get_profile(_user=Depends(get_current_user)):
     return SovereignStateManager.get_user_profile()
 
 @router.post("/profile")
-async def update_profile(profile: UserProfileUpdate):
+async def update_profile(profile: UserProfileUpdate, _user=Depends(get_current_user)):
     SovereignStateManager.update_user_profile(
         name=profile.name,
         email=profile.email,
@@ -157,7 +161,7 @@ async def update_profile(profile: UserProfileUpdate):
 
 
 @router.get("/tools")
-async def list_mcp_tools():
+async def list_mcp_tools(_user=Depends(get_current_user)):
     """
     Expose the native FastMCP tools dynamically to the Web UI.
     """

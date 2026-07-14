@@ -109,7 +109,9 @@ detect_hardware() {
         accelerator="cpu"
     fi
 
-    echo -e "${GREEN}✅ Hardware Profile: ${BOLD}${accelerator^^}${NC} (RAM: ${ram_gb}GB, Cores: ${cores})"
+    local acc_upper
+    acc_upper=$(echo "$accelerator" | tr '[:lower:]' '[:upper:]')
+    echo -e "${GREEN}✅ Hardware Profile: ${BOLD}${acc_upper}${NC} (RAM: ${ram_gb}GB, Cores: ${cores})"
     echo "${ram_gb}|${cores}|${accelerator}"
 }
 

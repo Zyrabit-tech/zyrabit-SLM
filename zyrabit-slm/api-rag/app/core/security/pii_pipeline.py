@@ -174,7 +174,7 @@ class PiiEngine:
 _DEFAULT_DETECTERS = [
     RegexDetector("email", r'[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}'),
     RegexDetector("card", r'\b(?:\d[ -]*?){13,19}\b', is_luhn_valid),
-    RegexDetector("phone", r'\b(?:\+?\d{1,3}[- ]?)?\(?\d{3}\)?[- ]?\d{3}[- ]?\d{4}\b'),
+    RegexDetector("phone", r'\b(?:\+?\d{1,3}[- ]?)?(?:\(?\d{3}\)?[- ]?)?\d{3}[- ]?\d{4}\b'),
     RegexDetector("ssn", r'\b\d{3}-\d{2}-\d{4}\b'),
     RegexDetector("amount", r'\$\d{1,3}(?:,\d{3})*(?:\.\d{2})?')
 ]
@@ -182,8 +182,15 @@ _DEFAULT_DETECTERS = [
 if nlp:
     _DEFAULT_DETECTERS.append(SpacyNerDetector())
 else:
-    # Fallback to regex if Spacy models are missing (e.g. in minimal test environments)
-    _DEFAULT_DETECTERS.append(RegexDetector("name", r'(?i)\b(John Doe|Alice Doe|Abraham Gomez|Alice|John|Jane Doe)\b'))
+    # Fallback name detector when SpaCy models are unavailable.
+    # Customize via PII_CUSTOM_NAMES env var (comma-separated).
+    # Example: PII_CUSTOM_NAMES="John Doe,Jane Doe,Alice Smith"
+    import os as _os
+    _custom_names_str = _os.getenv("PII_CUSTOM_NAMES", "John Doe,Alice Doe,Abraham Gomez,Alice,John,Jane Doe")
+    _custom_names = [n.strip() for n in _custom_names_str.split(",") if n.strip()]
+    if _custom_names:
+        _name_pattern = r'(?i)\b(' + '|'.join(re.escape(n) for n in _custom_names) + r')\b'
+        _DEFAULT_DETECTERS.append(RegexDetector("name", _name_pattern))
 
 _DEFAULT_ENGINE = PiiEngine(_DEFAULT_DETECTERS)
 
