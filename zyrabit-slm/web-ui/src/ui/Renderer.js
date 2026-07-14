@@ -118,6 +118,7 @@ export class Renderer {
     toggleThinking(state) {
         const button = document.getElementById('chat-submit');
         const loader = document.getElementById('thinking-bubble');
+        const input = document.getElementById(IDS.CHAT_INPUT);
         if (!button) return;
 
         const btnText = button.querySelector('.button-text');
@@ -126,6 +127,10 @@ export class Renderer {
         if (state) {
             button.disabled = true;
             button.classList.add('opacity-80', 'cursor-not-allowed');
+            if (input) {
+                input.disabled = true;
+                input.classList.add('opacity-80', 'cursor-not-allowed');
+            }
             if (btnText) btnText.classList.add('hidden');
             if (btnSpinner) btnSpinner.classList.remove('hidden');
             
@@ -181,6 +186,11 @@ export class Renderer {
         } else {
             button.disabled = false;
             button.classList.remove('opacity-80', 'cursor-not-allowed');
+            if (input) {
+                input.disabled = false;
+                input.classList.remove('opacity-80', 'cursor-not-allowed');
+                input.focus(); // Auto-focus back on input
+            }
             if (btnText) btnText.classList.remove('hidden');
             if (btnSpinner) btnSpinner.classList.add('hidden');
             if (loader) loader.remove();

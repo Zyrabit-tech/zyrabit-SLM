@@ -24,7 +24,6 @@ from app.infrastructure.shared.cache import global_cache
 from app.domain.services.gatekeeper import Gatekeeper
 from app.domain.use_cases.chat_use_case import ChatUseCase
 from app.domain.use_cases.ingest_use_case import IngestUseCase
-from app.domain.services.mcp_service import mcp
 from app.domain.services.command_router import CommandRouter
 
 
@@ -64,6 +63,10 @@ async def lifespan(app: FastAPI):
         logger.info(f"✅ Sovereign State initialized at {SovereignStateManager.DB_PATH}")
     except Exception as e:
         logger.error(f"❌ Failed to initialize Sovereign State: {e}")
+
+    # 0b. Load API Key Store (multi-key auth)
+    from app.core.security.api_key_store import ApiKeyStore
+    ApiKeyStore.load()
 
 
     logger.info("🚀 Zyrabit SLM API Starting...")
@@ -237,10 +240,10 @@ Instrumentator().instrument(app).expose(app)
 
 # Register Routers
 from app.core.security import get_current_user
-from app.api.v1.endpoints import chat, health, mcp, documents, integrations, ag_ui
+from app.api.v1.endpoints import chat, health, mcp as mcp_router, documents, integrations, ag_ui
 app.include_router(chat.router, prefix=API_V1_STR, tags=["Chat"], dependencies=[Depends(get_current_user)])
 app.include_router(health.router, prefix=API_V1_STR, tags=["Monitoring"])
-app.include_router(mcp.router, prefix="/mcp", tags=["MCP"])
+app.include_router(mcp_router.router, prefix="/mcp", tags=["MCP"])
 app.include_router(documents.router, prefix=API_V1_STR, tags=["Documents"], dependencies=[Depends(get_current_user)])
 app.include_router(integrations.router, prefix=API_V1_STR, tags=["Integrations"], dependencies=[Depends(get_current_user)])
 app.include_router(ag_ui.router, prefix="/ag-ui", tags=["AG-UI"])

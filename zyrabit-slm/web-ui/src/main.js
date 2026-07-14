@@ -4,6 +4,7 @@ import { ChatManager } from "./services/ChatManager";
 import { Renderer } from "./ui/Renderer";
 import { EVENTS, IDS } from "./core/Constants";
 import { getSafeElement } from "./utils/DOM";
+import { Storage } from "./adapters/Storage";
 
 
 /**
@@ -11,7 +12,7 @@ import { getSafeElement } from "./utils/DOM";
  * Automatically injects the local service token into API requests
  */
 const originalFetch = window.fetch;
-window.fetch = async function(resource, init) {
+window.fetch = async function (resource, init) {
     init = init || {};
     if (typeof resource === 'string' && resource.startsWith('/v1')) {
         init.headers = {
@@ -31,8 +32,10 @@ class ZyrabitApp {
         this.renderer = new Renderer();
         this.socket = new SocketAdapter();
         this.chat = new ChatManager();
-        this.history = []; // Conversation memory
-        
+
+        // Recover Conversation memory from Storage
+        this.history = Storage.load('chat_history') || [];
+
         this.init();
     }
 
@@ -42,13 +45,18 @@ class ZyrabitApp {
         this.startHealthChecks();
         this.checkOnboarding();
         this.chat.recover(); // Recover Shadow State
-        
+
+        // Restore visual history
+        this.history.forEach(msg => {
+            this.renderer.renderMessage(msg.role, msg.content, msg.metadata);
+        });
+
         // Hide floating suggestions if history exists
-        if (this.chat.queue.length > 0) {
+        if (this.chat.queue.length > 0 || this.history.length > 0) {
             const suggestions = document.getElementById('floating-suggestions');
             if (suggestions) suggestions.style.display = 'none';
         }
-        
+
         this.loadVault();
         this.loadTools();
 
@@ -58,7 +66,7 @@ class ZyrabitApp {
         try {
             const res = await fetch('/v1/profile');
             const profile = await res.json();
-            
+
             if (!profile || !profile.onboarding_completed) {
                 document.getElementById('onboarding-modal').classList.remove('hidden');
             }
@@ -96,7 +104,7 @@ class ZyrabitApp {
                     preferred_model: 'qwen2.5:7b'
                 };
 
-                
+
                 try {
                     await fetch('/v1/profile', {
                         method: 'POST',
@@ -105,15 +113,15 @@ class ZyrabitApp {
                     });
                     getSafeElement('onboarding-modal').classList.add('hidden');
                     this.showNotification(`System Initialized: Welcome, ${profile.name}`, "success");
-                    bus.emit(EVENTS.CHAT.SEND, { 
-                        text: `System initialization complete. Identity: ${profile.name}. Role: ${profile.role}. Persona Active: ${profile.persona}. Tone: ${profile.tone}. Await commands.`, 
-                        history: [] 
+                    bus.emit(EVENTS.CHAT.SEND, {
+                        text: `System initialization complete. Identity: ${profile.name}. Role: ${profile.role}. Persona Active: ${profile.persona}. Tone: ${profile.tone}. Await commands.`,
+                        history: []
                     });
                 } catch (e) {
                     this.showNotification("Error guardando perfil", "error");
                 }
             };
-            
+
             const skipBtn = document.getElementById('ob-skip');
             if (skipBtn) skipBtn.onclick = () => getSafeElement('onboarding-modal').classList.add('hidden');
         }
@@ -127,14 +135,16 @@ class ZyrabitApp {
                 e.preventDefault();
                 const text = input.value.trim();
                 if (!text) return;
-                
-                // Ocultar sugerencias flotantes al iniciar conversación
+
                 const suggestions = document.getElementById('floating-suggestions');
                 if (suggestions) suggestions.style.opacity = '0';
-                
+
                 bus.emit(EVENTS.UI.THINKING, true);
                 bus.emit(EVENTS.CHAT.SEND, { text, history: this.history });
                 this.history.push({ role: 'user', content: text });
+
+                Storage.save('chat_history', this.history);
+
                 input.value = '';
             };
 
@@ -199,21 +209,21 @@ class ZyrabitApp {
             settingsForm.onsubmit = async (e) => {
                 e.preventDefault();
                 const systemPrompt = getSafeElement('settings-system-prompt').value.trim();
-                
+
                 try {
                     const res = await fetch('/v1/profile');
                     if (!res.ok) throw new Error("Could not fetch profile");
                     const profile = await res.json();
-                    
+
                     profile.system_prompt = systemPrompt;
-                    
+
                     const saveRes = await fetch('/v1/profile', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify(profile)
                     });
                     if (!saveRes.ok) throw new Error("Save request failed");
-                    
+
                     this.showNotification("System Prompt guardado correctamente", "success");
                     this.togglePanel(null);
                 } catch (err) {
@@ -235,8 +245,14 @@ class ZyrabitApp {
         // 5. System Logs
         bus.on(EVENTS.SYSTEM.LOG, (data) => this.addGdprLog(data.type, data.event));
 
-        // 5b. Security Logs (Gatekeeper)
+        // 5b. Security Logs (Gatekeeper) & History Update
         bus.on(EVENTS.CHAT.RESPONSE_RECEIVED, (data) => {
+            // Update History with Assistant's response
+            if (data && data.response) {
+                this.history.push({ role: 'assistant', content: data.response, metadata: data.metadata });
+                Storage.save('chat_history', this.history);
+            }
+
             if (data && data.metadata && data.metadata.pii_masked && data.metadata.pii_masked.length > 0) {
                 data.metadata.pii_masked.forEach(placeholder => {
                     let entityType = "PII";
@@ -245,7 +261,7 @@ class ZyrabitApp {
                     else if (placeholder.includes("CARD")) entityType = "CREDIT_CARD";
                     else if (placeholder.includes("NAME")) entityType = "NAME";
                     else if (placeholder.includes("IP")) entityType = "IP_ADDRESS";
-                    
+
                     const logMsg = `Filtered ${entityType}: ${placeholder} from query.`;
                     this.addGdprLog("🛡️ GATEKEEPER", logMsg);
                 });
@@ -261,7 +277,7 @@ class ZyrabitApp {
                 input.disabled = false;
                 submitBtn.disabled = false;
                 input.placeholder = "Type your command...";
-                
+
                 const statusPill = document.getElementById("status-pill");
                 if (statusPill) {
                     statusPill.className = "flex items-center gap-2 px-4 py-2 bg-green-500/10 border border-green-500/20 rounded-full animate-none";
@@ -283,7 +299,7 @@ class ZyrabitApp {
                 submitBtn.disabled = true;
                 input.value = '';
                 input.placeholder = "Sin conexión con el servidor. Intentando reconectar...";
-                
+
                 const statusPill = document.getElementById("status-pill");
                 if (statusPill) {
                     statusPill.className = "flex items-center gap-2 px-4 py-2 bg-red-500/10 border border-red-500/20 rounded-full";
@@ -313,7 +329,7 @@ class ZyrabitApp {
                 } else {
                     el.classList.remove('active');
                 }
-            } catch (e) {}
+            } catch (e) { }
         });
     }
 
@@ -340,7 +356,7 @@ class ZyrabitApp {
             const time = new Date().toLocaleTimeString();
             const div = document.createElement('div');
             div.className = 'border-b border-gray-100 pb-2 mb-2 animate-in slide-in-from-right-4 duration-300';
-            
+
             // Using a safer approach for the inner content
             div.innerHTML = `
                 <div class="flex justify-between items-center mb-1">
@@ -365,7 +381,7 @@ class ZyrabitApp {
                 if (!res.ok) throw new Error(`HTTP_${res.status}`);
                 const data = await res.json();
                 this.updateUIStatus(data);
-                
+
                 if (isOffline) {
                     this.showNotification("Connection Restored", "success");
                     isOffline = false;
@@ -415,7 +431,7 @@ class ZyrabitApp {
             const modelName = slm.name ? slm.name.split('(')[1]?.replace(')', '') : '...';
             modelBadge.innerText = `MODEL: ${modelName || '...'}`;
         }
-        
+
         // Detailed log if DB or SLM are offline (only log once per state change ideally, but here simple is fine)
         if (db.status === 'OFFLINE') {
             this.addGdprLog("SYSTEM", "VECTOR_DB_DISCONNECTED - Check zyrabit-db container");
@@ -441,14 +457,14 @@ class ZyrabitApp {
             const data = await res.json();
             const list = document.getElementById('vault-list');
             if (!list) return;
-            
+
             list.innerHTML = '';
-            
+
             if (!data.documents || data.documents.length === 0) {
                 list.innerHTML = '<div class="text-xs text-center text-black/40 mt-4">No documents in vault</div>';
                 return;
             }
-            
+
             data.documents.forEach(doc => {
                 const div = document.createElement('div');
                 div.className = 'flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-100 group';
@@ -507,7 +523,7 @@ class ZyrabitApp {
             const formData = new FormData();
             formData.append('file', file);
             this.addGdprLog("INGEST", `PROCESSING_${file.name.toUpperCase()}`);
-            
+
             // UI Feedback: Loading
             const dropZone = document.getElementById('drop-zone-content');
             const loader = document.getElementById('drop-zone-loader');
@@ -548,7 +564,7 @@ class ZyrabitApp {
         };
 
         el.className = `snackbar snackbar-${type} snackbar-enter`;
-        
+
         const iconSpan = document.createElement('span');
         iconSpan.className = 'snackbar-icon text-xl';
         iconSpan.textContent = icons[type] || 'ℹ️';

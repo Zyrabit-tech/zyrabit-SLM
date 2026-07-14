@@ -1,130 +1,208 @@
-# 🤖 Zyrabit SLM
+<div align="center">
 
-[![Version](https://img.shields.io/badge/version-2.2.0--beta-orange.svg)](VERSION)
+<img src="https://assets.zyrabit.com/logo_zyrabit.png" alt="Zyrabit SLM" width="120" />
+
+# Zyrabit SLM
+
+**Sovereign AI infrastructure for regulated environments.**
+Run language models entirely on your infrastructure — no external APIs, no data leakage, full audit trail.
+
 [![CI](https://github.com/Zyrabit-tech/zyrabit-SLM/actions/workflows/ci.yml/badge.svg)](https://github.com/Zyrabit-tech/zyrabit-SLM/actions/workflows/ci.yml)
-[![Security Audit](https://github.com/Zyrabit-tech/zyrabit-SLM/actions/workflows/security.yml/badge.svg)](https://github.com/Zyrabit-tech/zyrabit-SLM/actions/workflows/security.yml)
-[![Docker Hub](https://img.shields.io/badge/docker-zyrabitcore-blue.svg)](https://hub.docker.com/r/zyrabitcore/zyrabit-slm)
-[![License](https://img.shields.io/badge/license-MIT-yellow.svg)](LICENSE)
+[![Security](https://github.com/Zyrabit-tech/zyrabit-SLM/actions/workflows/security.yml/badge.svg)](https://github.com/Zyrabit-tech/zyrabit-SLM/actions/workflows/security.yml)
+[![Version](https://img.shields.io/badge/v2.2.3-Sovereign-3f5a6d?style=flat-square&labelColor=e2ecf4)](CHANGELOG.md)
+[![License: MIT](https://img.shields.io/badge/License-MIT-6090b4?style=flat-square)](LICENSE)
+[![Python 3.12](https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white&style=flat-square)](https://python.org)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.115-009688?logo=fastapi&style=flat-square)](https://fastapi.tiangolo.com)
+[![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker&logoColor=white&style=flat-square)](https://docs.docker.com/compose/)
+[![Ollama](https://img.shields.io/badge/Ollama-compatible-3f5a6d?style=flat-square)](https://ollama.com)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-6090b4?style=flat-square)](CONTRIBUTING.md)
 
-**Sovereign Operating System for Local AI: Persistent memory, hardware-aware orchestration, and native MCP v1.0.**
+[Quickstart](#-quickstart) · [Architecture](#-architecture) · [Contributing](CONTRIBUTING.md) · [Security](SECURITY.md)
+
+</div>
 
 ---
 
-## 🏛️ Architecture Topology
+## What Zyrabit SLM actually is
 
-Zyrabit is designed as a zero-trust, air-gapped capable AI stack.
+Zyrabit SLM is a **local-first AI runtime** built for teams that cannot send data to the cloud — healthcare, finance, legal, government, and defense. It gives you:
+
+- A **FastAPI inference API** with PII masking before the model ever sees a prompt
+- **RAG (Retrieval-Augmented Generation)** over your own documents, combining keyword and vector search
+- **MCP (Model Context Protocol)** for controlled, auditable tool access — the model only accesses what you explicitly allow
+- **SQLite state store** in WAL mode for session memory, audit logs, and conversation history
+- **Grafana + Prometheus observability** stack — latency, throughput, model health in real time
+- **Traefik reverse proxy** with routing and TLS termination for production on-prem deployments
+- **Air-gap capable**: once dependencies are present, zero internet access required
+
+> Think of it as your own private ChatGPT backend — minus the telemetry, plus compliance.
+
+---
+
+## 🏗 Architecture
 
 ```text
-                     ┌─────────────────────────────────────────┐
-                     │         frontend-network (bridge)        │
-                     └──────────────┬──────────────────────────┘
-                            Traefik │ (TLS, rate-limit, auth)
-                     ┌─────────────▼──────────────────────────┐
-                     │          backend-network (bridge)       │
-                     │  api-rag   chroma-db   prometheus       │
-                     │  grafana   mcp         n8n (optional)   │
-                     └──────────────┬─────────────────────────┘
-                                    │
-                     ┌──────────────▼─────────────────────────┐
-                     │   model-network (internal: true)        │
-                     │   zyrabit-engine (Ollama)               │
-                     └────────────────────────────────────────┘
+                    Client Request
+                         │
+                         ▼
+               ┌─────────────────┐
+               │   API Gateway   │  FastAPI + Traefik (TLS)
+               │  Rate limiting  │
+               └────────┬────────┘
+                         │
+                    ┌────▼────┐
+                    │Gatekeeper│  PII detection, prompt sanitization, policy enforcement
+                    └────┬────┘
+                         │
+                  ┌──────┴──────┐
+                  │             │
+             ┌────▼───┐   ┌────▼────┐
+             │  RAG   │   │  State  │  SQLite WAL — session memory, audit log
+             │ Engine │   │  Store  │
+             └────┬───┘   └─────────┘
+                  │
+        ┌─────────▼──────────┐
+        │  Inference Layer   │  Ollama-compatible local backends (Mistral, Phi-3, Llama-3, etc.)
+        └────────────────────┘
+                  │
+             ┌────▼────┐
+             │ Response │  Auditable, stateful, no external calls
+             └─────────┘
 ```
 
----
-
-## 💎 Sovereign Features (Zyrabit SLM v2.2-beta)
-
-*   **Zero-Lag Command Router (<15ms)**: Direct interceptor for commands like `/stats`, `/vault`, `/clear`, `/tools` that bypasses LLM inference completely using SQLite state lookup.
-*   **FTS5 Hybrid RAG (<200ms)**: Hybrid keyword (FTS5 SQLite table virtual) and vector (ChromaDB) retrieval pipeline prioritizing fast local index lookup before vector fallback.
-*   **Obsidian Brain Sync**: Recursive scanning and ingestion of Markdown vaults into the secure RAG engine.
-*   **AutoLearner Background Loop**: An asynchronous background service that periodically synthesizes chat history and generates reflective self-learning notes written directly back to your Obsidian vault.
-*   **Dynamic Sovereign Identity**: Personalized assistant name locked dynamically through onboarding across Web and Telegram (eliminating hardcoded "Kai" references).
+All traffic is local. State never leaves your trust boundary.
 
 ---
 
-## 🚀 Quick Start (The Sovereign Way)
+## ⚡ Quickstart
 
-Zyrabit uses a unified orchestration script to manage your local infrastructure.
+**Prerequisites:** Python 3.12, [uv](https://github.com/astral-sh/uv), Docker & Docker Compose, [Ollama](https://ollama.com) running locally
 
 ```bash
-# 1. Clone the repository
+# 1. Clone and install
 git clone https://github.com/Zyrabit-tech/zyrabit-SLM.git
 cd zyrabit-SLM
+uv sync --dev
+source .venv/bin/activate
 
-# 2. Configure your environment
+# 2. Configure environment
 cp zyrabit-slm/example.env zyrabit-slm/.env
-# Edit .env to set your SLM_URL and DB_URL
+# Edit .env: set SLM_URL, MODEL_NAME, DOCS_DIR
 
-# 3. System Check & Install
-./zyra-up.sh doctor     # Check RAM and hardware acceleration
-./zyra-up.sh install    # Build images, start stack, and pull models
+# 3. Start the full stack
+./zyra-up.sh
+
+# 4. Test it
+curl -X POST http://localhost:8080/query \
+  -H "Content-Type: application/json" \
+  -d '{"query": "Summarize our Q3 compliance report", "session_id": "user-001"}'
 ```
 
 ---
 
-## 🛠️ CLI Tool: `zyra-up.sh`
+## 🔍 Real-world use cases
 
-The `zyra-up.sh` script is your primary interface for managing the Zyrabit lifecycle.
-
-| Command | Description |
+| Scenario | What Zyrabit SLM does |
 |---|---|
-| `install` | Full setup: build images, start stack, and pull AI models |
-| `start` | Bring up the infrastructure only |
-| `stop` | Tear down the infrastructure |
-| `build` | Build Docker images without starting containers |
-| `verify` | Visual health check of all services and API probes |
-| `dev` | Native local development using `uv` with hot-reload |
-| `doctor` | Diagnostic: validate environment, RAM, and hardware |
+| **Legal firm** asks AI to review contracts | Documents stay on firm servers; PII masked before inference |
+| **Hospital** needs RAG over patient records | Air-gapped, HIPAA-aligned; no record ever leaves the datacenter |
+| **Bank** runs internal compliance Q&A | Audit log of every query, model response, and retrieved chunk |
+| **Government agency** deploys on classified infra | Fully offline after initial setup; Ollama + local model weights |
+| **Enterprise IT** builds internal knowledge bot | Grafana dashboard shows latency, model load, and query volume |
 
 ---
 
-## 🐳 Docker Hub & Sovereign Images
+## 📦 Stack components
 
-We provide pre-built, production-ready images for the Zyrabit stack.
+```text
+zyrabit-slm/
+├── api-rag/              # FastAPI app — inference, RAG, PII pipeline, audit
+├── config/               # Environment-specific configuration
+├── prompts/              # Versioned system prompts (auditable artifacts)
+├── web-ui/               # Browser interface for local interaction
+├── grafana/              # Dashboards — latency, throughput, model health
+├── prometheus/           # Metrics collection and alerting rules
+├── traefik/              # Reverse proxy, TLS, routing
+├── scripts/              # Operational helpers
+└── docker-compose.yml
+mcp/                      # Model Context Protocol server (controlled tool access)
+internal/                 # Hardware-specific integrations (edge/constrained clusters)
+validation/               # Validation scripts and compliance artifacts
+zyra-up.sh                # Full lifecycle operator (start, stop, reset, upgrade)
+```
 
-> [!TIP]
-> You can find our official images at **[Docker Hub: zyrabitcore/zyrabit-slm](https://hub.docker.com/r/zyrabitcore/zyrabit-slm)**.
-> Use these images if you prefer not to build locally or if you are deploying to an air-gapped environment.
+---
+
+## 🧪 Testing
 
 ```bash
-# Pull the latest stable version
-docker pull zyrabitcore/zyrabit-slm:2.1.0
+# Full test suite
+pytest -q zyrabit-slm/api-rag/tests
+
+# Unit tests only
+pytest -q zyrabit-slm/api-rag/tests/unit
 ```
 
+> **Rule**: if a test reaches the network, it's a bug. The entire test suite runs offline.
 
 ---
 
-## 🔒 Security & Privacy
+## 🎯 Challenges & Community Contributions
 
-Zyrabit is built on a **Security-First** philosophy:
+We grow through community challenges. Pick one and open a PR:
 
-*   **PII Scrubbing**: A heuristic pipeline anonymizes sensitive data (emails, SSNs, etc.) *before* it leaves the `api-rag` container.
-*   **Isolated Models**: The `model-network` has no external access (`internal: true`).
-*   **Zero-Trust Ingress**: Traefik handles all incoming traffic with rate-limiting and TLS.
+### 🟢 Good First Issues
 
----
+- [ ] **Add a new PII pattern** — extend the masking pipeline to detect CURP (Mexico) or NHS numbers (UK)
+- [ ] **Write a new Grafana panel** — visualize average tokens per query over time
+- [ ] **Add a model switcher endpoint** — `POST /model` to hot-swap the inference target without restart
 
-## 📂 Repository Structure
+### 🟡 Intermediate
 
-*   `zyrabit-slm/`: The core Docker stack (API, UI, MCP, Config).
-*   `internal/`: Engines and hardware-specific bridges (Tenstorrent).
-*   `mcp/`: Model Context Protocol server implementation.
-*   `validation/`: Pentest checklists and performance benchmarks.
-*   `zyra-up.sh`: Unified orchestration CLI.
+- [ ] **Build a document connector** — ingest from Notion, Google Drive, or SharePoint into the RAG store
+- [ ] **Implement session expiry** — auto-purge SQLite sessions older than N days via cron or background task
+- [ ] **Add RBAC to the API** — role-based access where different API keys get different tool permissions
 
----
+### 🔴 Advanced
 
-## 📖 Extended Documentation
-
-*   🤝 **[Contributing](CONTRIBUTING.md)**: How to help us build the future of sovereign AI.
-*   🔒 **[Security Policy](SECURITY.md)**: Vulnerability disclosure and privacy standards.
-*   🏗️ **[Hexagonal Architecture](zyrabit-slm/api-rag/app/HEXAGONAL_ARCHITECTURE.md)**: Deep dive into the backend design.
-*   🐳 **[Docker Debugging](DOCKER_DEBUG_GUIDE.md)**: Troubleshooting common container issues.
-*   📡 **[cURL Examples](zyrabit-slm/docs/CURL_EXAMPLES.md)**: How to interact with the API.
+- [ ] **MCP adapter for a new tool** — implement a sandboxed SQL query tool with explicit allow/deny policies
+- [ ] **Benchmark harness** — measure RAG retrieval quality vs. chunk size and embedding model across 3+ models
+- [ ] **Edge deployment guide** — document and test running the stack on a Raspberry Pi 5 or Jetson Orin Nano
 
 ---
 
-## 📜 License
+## 🛡 Security Model
 
-MIT © Zyrabit
+- **PII masking** runs before the prompt reaches the model — the model never sees raw sensitive data
+- **Tool access** via MCP requires explicit adapter registration — no implicit function calling
+- **Secrets** stay on-premise: never in prompts, logs, or exported artifacts
+- **Production deployments** must define explicit allowlists for origins, tokens, and integrations
+- See [SECURITY.md](SECURITY.md) for vulnerability reporting
+
+---
+
+## 📋 Compliance alignment
+
+| Standard | Relevant capability |
+|---|---|
+| **GDPR** | PII masking, data residency, right-to-erasure via session purge |
+| **DORA** | Audit log, deterministic fallbacks, explicit state |
+| **HIPAA** | Air-gap capable, no PHI leaves infrastructure |
+| **FedRAMP** | On-prem deployment, no third-party API dependencies |
+| **ISO 27001** | Access control via RBAC (roadmap), audit trail |
+
+---
+
+## 🤝 Contributing
+
+Read [CONTRIBUTING.md](CONTRIBUTING.md) before opening a PR. The short version:
+
+1. Fork → branch from `main` → PR with tests
+2. No network calls in tests — treat them as bugs
+3. Prefer small, auditable changes over large refactors
+
+---
+
+## License
+
+MIT © [Zyrabit](https://zyrabit.com)

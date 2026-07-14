@@ -1,5 +1,8 @@
 {
   "extraPaths": [
     "zyrabit-slm/api-rag"
-  ]
+  ],
+  "execution": {
+    "baseDirectory": "/workspaces/zyrabit-slm/api-rag"
+  }
 }

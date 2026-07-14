@@ -66,7 +66,7 @@ async def mcp_rpc(request: Request):
                     "content": [{"type": "text", "text": str(result)}]
                 }
             }
-        except Exception as e:
+        except Exception:
             logger.exception("Error while calling MCP tool '%s'", tool_name)
             return {
                 "jsonrpc": "2.0",

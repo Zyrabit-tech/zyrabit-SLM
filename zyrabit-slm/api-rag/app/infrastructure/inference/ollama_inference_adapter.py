@@ -17,6 +17,10 @@ from app.ports.inference_port import (
     InferenceRequest,
     InferenceResult,
 )
+from app.infrastructure.inference.circuit_breaker import get_ollama_circuit_breaker
+
+# Exponential backoff delays between retries (seconds)
+_RETRY_DELAYS = [1, 2, 4]
 
 
 class OllamaInferenceAdapter(InferenceProviderPort):
@@ -33,48 +37,64 @@ class OllamaInferenceAdapter(InferenceProviderPort):
         self.provider_name = provider_name
 
     def generate(self, request: InferenceRequest) -> InferenceResult:
+        breaker = get_ollama_circuit_breaker()
+        return breaker.call(self._generate_with_retry, request)
+
+    def _generate_with_retry(self, request: InferenceRequest) -> InferenceResult:
+        """Internal generate with exponential backoff retry (3 attempts)."""
         payload: Dict[str, Any] = {
             "model": request.model,
             "prompt": request.prompt,
             "stream": request.stream,
+            "options": {"num_ctx": 4096},
         }
         if request.system_prompt:
             payload["system"] = request.system_prompt
         if request.options:
-            payload.update(request.options)
+            # Separate top-level Ollama API params from model options
+            for key, value in request.options.items():
+                if key in ("format",):
+                    payload[key] = value
+                else:
+                    payload["options"][key] = value
 
         timeout = request.timeout_seconds or self.default_timeout_seconds
-        start_time = time.time()
-        try:
-            response = requests.post(self.endpoint, json=payload, timeout=timeout)
-        except requests.exceptions.ConnectionError as exc:
-            raise InferenceProviderError(
-                f"Cannot connect to Ollama endpoint ({self.endpoint})."
-            ) from exc
-        except requests.exceptions.Timeout as exc:
-            raise InferenceProviderError(
-                f"Ollama request timed out after {timeout:.1f}s."
-            ) from exc
-        except requests.exceptions.RequestException as exc:
-            raise InferenceProviderError(f"Ollama request failed: {exc}") from exc
+        last_exc: Exception = InferenceProviderError("No attempts made")
 
-        latency = max(time.time() - start_time, 0.0)
-        if response.status_code != 200:
-            raise InferenceProviderError(
-                f"Ollama server error ({response.status_code}): {response.text}"
-            )
+        for attempt, delay in enumerate(_RETRY_DELAYS):
+            start_time = time.time()
+            try:
+                response = requests.post(self.endpoint, json=payload, timeout=timeout)
+                latency = max(time.time() - start_time, 0.0)
 
-        try:
-            body = response.json()
-        except ValueError as exc:
-            raise InferenceProviderError("Ollama returned invalid JSON response.") from exc
+                if response.status_code != 200:
+                    raise InferenceProviderError(
+                        f"Ollama server error ({response.status_code}): {response.text}"
+                    )
 
-        return InferenceResult(
-            text=str(body.get("response", "")),
-            latency_seconds=latency,
-            provider=self.provider_name,
-            raw_payload=body,
-        )
+                try:
+                    body = response.json()
+                except ValueError as exc:
+                    raise InferenceProviderError("Ollama returned invalid JSON response.") from exc
+
+                return InferenceResult(
+                    text=str(body.get("response", "")),
+                    latency_seconds=latency,
+                    provider=self.provider_name,
+                    raw_payload=body,
+                )
+
+            except (requests.exceptions.ConnectionError, requests.exceptions.Timeout) as exc:
+                last_exc = InferenceProviderError(f"Ollama connection error (attempt {attempt + 1}): {exc}")
+                if attempt < len(_RETRY_DELAYS) - 1:
+                    logger.warning(f"⚠️ Inference retry {attempt + 1}/{len(_RETRY_DELAYS)} in {delay}s...")
+                    time.sleep(delay)
+            except InferenceProviderError:
+                raise  # Don't retry on logical errors (bad JSON, bad status)
+            except requests.exceptions.RequestException as exc:
+                raise InferenceProviderError(f"Ollama request failed: {exc}") from exc
+
+        raise last_exc
 
     def health(self) -> Dict[str, Any]:
         parsed = urlparse(self.endpoint)

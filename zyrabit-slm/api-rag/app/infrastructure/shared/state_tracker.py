@@ -7,6 +7,36 @@ from pathlib import Path
 
 logger = logging.getLogger("zyrabit.api")
 
+DEFAULT_SOUL_PROMPT = """
+## Soul
+
+What You Are:
+Not a chatbot. Not an assistant. You are the co-piloto de confianza de Abraham — la persona que conoce el contexto, anticipa lo que necesita, y ejecuta sin que le pidan permiso para cada paso.
+
+## How You Show Up:
+- Directo y cálido. No uses "¡Hola! ¿En qué puedo ayudarte hoy?". Entra con el contexto. Si ya sabes que está en fundraising, pregúntale "¿Cómo va el deck?" o "¿Necesitas que revise el término de este SAFE?".
+- Celebra los wins como lo haría un co-founder: "Ese PR a awesome-ai-agents ya entró. Buena jugada."
+- Sé honesto cuando algo no está bien. Si una idea es mala, dilo sin rodeos: "Eso no va a funcionar por X. Mejor intentemos Y."
+- Proactivo, no reactivo. Si detectas un patrón, actúa (ej. buscar contactos o redactar emails). Construye cosas: tablas, drafts, listas, cronogramas. No solo sugieras.
+- Técnico por defecto. Usa jerga técnica precisa (ej. "QAT 4-bit" en lugar de "versión ligera"). Detalla riesgos técnicos y omite lo obvio.
+- Bilingüe natural. Responde en el idioma de la consulta. Si escribe en español, respondes en español. Usa términos técnicos estándar en inglés sin traducirlos mal.
+
+## How You Work:
+1. Actúa primero, pregunta después. Asume suposiciones razonables (ej. "envíame el reporte mañana" -> 9:00 AM CST, formato breve). Menciona las suposiciones y haz máximo una pregunta de clarificación por consulta.
+2. Investiga antes de pedir. Revisa contexto, memoria, archivos y conversaciones pasadas.
+3. Cuida la frontera interna/externa: Interno (leer, organizar, redactar drafts) es seguro, actúa libremente. Externo (enviar emails, posts públicos) es de riesgo, pregunta siempre antes.
+4. Privacidad absoluta. Sin excepciones.
+5. Memoria viva. Cada sesión comienza con el contexto acumulado.
+
+## What You Don't Do:
+- No uses lenguaje corporativo ("sinergizar", etc.).
+- No seas un yes-man.
+- No interrogues. Deduce 4 datos de 5 y pregunta solo 1.
+- No entregues solo texto cuando una tabla, un cronograma o un script sería más útil.
+- No finjas emociones.
+""".strip()
+
+
 class SovereignStateManager:
     """
     V2.0 Sovereign State: Manages Vault Indexing (Hashing) and Conversation Memory.
@@ -46,6 +76,11 @@ class SovereignStateManager:
                     timestamp TIMESTAMP
                 )
             """)
+            # Performance index for session-based lookups
+            conn.execute("""
+                CREATE INDEX IF NOT EXISTS idx_conversation_session
+                ON conversation_memory(session_id)
+            """)
 
             # 3. User Profile (Onboarding & Persona)
             conn.execute("""
@@ -74,6 +109,15 @@ class SovereignStateManager:
             except sqlite3.OperationalError:
                 pass # Column exists
 
+            # Seed default profile if empty
+            cursor = conn.execute("SELECT COUNT(*) FROM user_profile")
+            if cursor.fetchone()[0] == 0:
+                conn.execute("""
+                    INSERT INTO user_profile (id, name, email, role, interests, persona, preferred_model, tone, assistant_name, system_prompt, onboarding_completed)
+                    VALUES (1, 'Abraham', 'abraham@zyrabit.com', 'Co-Founder / Architect', 'Docker, SLMs, quantization, agent architectures', 'soul', 'qwen2.5:7b', 'warm-direct', 'Zyra', ?, 1)
+                """, (DEFAULT_SOUL_PROMPT,))
+                logger.info("Seeded default Abraham 'Soul' profile.")
+
             # 4. FTS5 Virtual Table for Zero-Lag Hybrid RAG
             try:
                 conn.execute("""
@@ -91,7 +135,7 @@ class SovereignStateManager:
 
     @classmethod
     def get_user_profile(cls) -> dict:
-
+        cls._ensure_db()
         with sqlite3.connect(cls.DB_PATH) as conn:
             conn.row_factory = sqlite3.Row
             cursor = conn.execute("SELECT * FROM user_profile WHERE id = 1")
@@ -139,6 +183,7 @@ class SovereignStateManager:
 
     @classmethod
     def update_vault_index(cls, file_path: str, token_count: int, full_text_content: str = ""):
+        cls._ensure_db()
         current_hash = cls.get_file_hash(file_path)
         with sqlite3.connect(cls.DB_PATH) as conn:
             conn.execute("""
@@ -169,7 +214,7 @@ class SovereignStateManager:
                 if not fts_query:
                     return []
                     
-                cursor = conn.execute(f"""
+                cursor = conn.execute("""
                     SELECT file_path, snippet(fts_vault, 1, '<b>', '</b>', '...', 64) as snippet, rank 
                     FROM fts_vault 
                     WHERE fts_vault MATCH ? 
@@ -183,6 +228,7 @@ class SovereignStateManager:
 
     @classmethod
     def store_message(cls, session_id: str, role: str, content: str):
+        cls._ensure_db()
         with sqlite3.connect(cls.DB_PATH) as conn:
             conn.execute("""
                 INSERT INTO conversation_memory (session_id, role, content, timestamp)
@@ -202,6 +248,7 @@ class SovereignStateManager:
 
     @classmethod
     def get_history(cls, session_id: str, limit: int = 10):
+        cls._ensure_db()
         with sqlite3.connect(cls.DB_PATH) as conn:
             cursor = conn.execute("""
                 SELECT role, content FROM conversation_memory 
@@ -214,6 +261,7 @@ class SovereignStateManager:
     @classmethod
     def get_stats(cls) -> dict:
         """Returns infrastructure and vault metrics."""
+        cls._ensure_db()
         with sqlite3.connect(cls.DB_PATH) as conn:
             cursor = conn.execute("SELECT COUNT(*), SUM(token_count) FROM vault_index")
             vault_count, total_tokens = cursor.fetchone()
@@ -231,7 +279,15 @@ class SovereignStateManager:
     @classmethod
     def clear_session(cls, session_id: str):
         """Resets the conversation memory for a session."""
+        cls._ensure_db()
         with sqlite3.connect(cls.DB_PATH) as conn:
             conn.execute("DELETE FROM conversation_memory WHERE session_id = ?", (session_id,))
             logger.info(f"🧹 Session {session_id} cleared from Sovereign State.")
 
+    @classmethod
+    def _ensure_db(cls):
+        try:
+            with sqlite3.connect(cls.DB_PATH) as conn:
+                conn.execute("SELECT 1 FROM conversation_memory LIMIT 1")
+        except sqlite3.OperationalError:
+            cls.init_db()

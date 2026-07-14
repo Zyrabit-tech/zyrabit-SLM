@@ -11,14 +11,14 @@ def chat(query):
     }
     
     try:
-        print(f"\n[ZYRA]: Procesando consulta...\n")
+        print("\n[ZYRA]: Procesando consulta...\n")
         response = requests.post(API_URL, json=payload)
         response.raise_for_status()
         data = response.json()
         
-        print(f"--- RESPUESTA ---")
+        print("--- RESPUESTA ---")
         print(data.get("response"))
-        print(f"-----------------")
+        print("-----------------")
         
         meta = data.get("metadata", {})
         print(f"\n[META] Latencia: {meta.get('latency_ms')}ms | Modo: {meta.get('decision')} | Hits RAG: {meta.get('rag_hits')}")

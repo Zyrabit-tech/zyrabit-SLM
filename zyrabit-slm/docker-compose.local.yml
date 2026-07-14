@@ -2,7 +2,7 @@ name: zyrabit-slm
 
 services:
   traefik:
-    image: traefik:latest
+    image: traefik:v3.0
     container_name: zyrabit-traefik
     command:
       - --api.dashboard=true
@@ -50,10 +50,12 @@ services:
       - backend-network
       - model-network
     volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
       - ./secrets:/run/secrets:ro
       - ./prompts:/app/prompts:ro
       - ./document_source:/app/document_source
       - ../README.md:/app/README.md:ro # For auto-ingest
+      - ./db_data:/app/db_data
     extra_hosts:
       - "host.docker.internal:host-gateway"
 
@@ -100,7 +102,7 @@ services:
 
   # 3. THE MEMORY: Vector DB
   zyrabit-db:
-    image: chromadb/chroma:latest
+    image: chromadb/chroma:0.5.3
     container_name: zyrabit-db
     environment:
       - ANONYMIZED_TELEMETRY=False
@@ -109,7 +111,7 @@ services:
     volumes:
       - ./chroma-data:/data
     healthcheck:
-      test: [ "CMD-SHELL", "python3 -c 'import urllib.request; urllib.request.urlopen(\"http://localhost:8000/api/v2/heartbeat\")' || exit 1" ]
+      test: ["CMD-SHELL", "bash -c 'cat < /dev/null > /dev/tcp/127.0.0.1/8000' || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 5
@@ -119,7 +121,7 @@ services:
 
   # 4. OBSERVABILITY: Grafana & Prometheus
   zyrabit-prometheus:
-    image: prom/prometheus:latest
+    image: prom/prometheus:v2.53.0
     container_name: zyrabit-prometheus
     volumes:
       - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
@@ -130,7 +132,7 @@ services:
       - backend-network
 
   zyrabit-grafana:
-    image: grafana/grafana:latest
+    image: grafana/grafana:11.1.0
     container_name: zyrabit-grafana
     ports:
       - "3001:3000"

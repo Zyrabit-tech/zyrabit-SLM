@@ -1,6 +1,11 @@
 import pytest
+import os
 from unittest.mock import MagicMock, AsyncMock, patch
 from fastapi.testclient import TestClient
+
+# Mock environment variables GLOBALLY before any app modules are imported
+os.environ["TELEGRAM_BOT_TOKEN"] = "mock_token"
+os.environ["TELEGRAM_CHAT_ID"] = "mock_chat_id"
 
 @pytest.fixture
 def client():

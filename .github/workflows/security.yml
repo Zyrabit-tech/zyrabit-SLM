@@ -2,7 +2,7 @@ name: Zyrabit Sovereign Security Audit
 
 on:
   push:
-    branches: [ main, feat/* ]
+    branches: [ main, beta, feat/* ]
   pull_request:
     branches: [ main, beta ]
   schedule:

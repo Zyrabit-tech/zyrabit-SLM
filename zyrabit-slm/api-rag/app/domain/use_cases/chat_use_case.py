@@ -102,48 +102,64 @@ class ChatUseCase:
             
             # 4b. Fetch User Profile for Personalization
             
-            # 4c. Inject MCP Tools into system prompt
-            if self.mcp_client:
-                try:
-                    tools = await self.mcp_client.get_tools()
-                    if tools:
-                        tools_desc = "\\n".join([f"- {t['name']}: {t['description']} (Schema: {t['inputSchema']})" for t in tools])
-                        system_prompt += f"\\n\\nYou have access to the following tools:\\n{tools_desc}\\nIf you need to use a tool, reply ONLY with a JSON block: ```json\\n{{\"tool\": \"tool_name\", \"arguments\": {{}}}}```"
-                except Exception as e:
-                    self.telemetry.log_security_audit(f"Failed to fetch MCP tools: {e}")
-
-            # 5. Build Final Prompt via ContextManager
-            prompt = self.context_manager.build_final_prompt(
-                system_prompt=system_prompt,
-                history=history,
-                rag_docs=results if decision == "rag" else [],
-                user_query=sanitized_text,
-                user_profile=user_profile,
-                source=source
-            )
-
-
-
-            # [NEW] Model Switching based on Persona/Profile Preference
+            # 4c. Inject MCP Tools and run ReAct Loop or Direct Inference
             target_model = user_profile.get("preferred_model", MODEL_NAME) if user_profile else MODEL_NAME
+            start_inference_time = time.time()
 
-            request = InferenceRequest(
-                model=target_model, 
-                prompt=prompt,
-                system_prompt=system_prompt
-            )
-            import asyncio
-            response_obj = await asyncio.to_thread(self.inference_provider.generate, request)
+            if self.mcp_client:
+                # Run the ReAct agentic loop with lean component passing
+                from app.domain.agent.tool_registry import ToolRegistry
+                from app.domain.agent.react_harness import ReactHarness
+                from app.core.security.pii_pipeline import deanonymize_text
 
-            
-            # 6. Persist interaction to Sovereign State
-            SovereignStateManager.store_message(client_msg_id or "default", "user", sanitized_text)
-            SovereignStateManager.store_message(client_msg_id or "default", "assistant", response_obj.text)
+                registry = ToolRegistry(self.mcp_client)
+                harness = ReactHarness(self.inference_provider, registry, self.gatekeeper)
+
+                # Pass raw components — the harness assembles the prompt once
+                raw_response_text, steps = await harness.execute(
+                    user_query=sanitized_text,
+                    system_prompt=system_prompt,
+                    history=history,
+                    rag_docs=results if decision == "rag" else [],
+                    user_profile=user_profile,
+                    source=source,
+                    token_map=entities,
+                    model_name=target_model
+                )
+
+                # Store raw response (which might contain tokens) in state DB
+                SovereignStateManager.store_message(client_msg_id or "default", "user", sanitized_text)
+                SovereignStateManager.store_message(client_msg_id or "default", "assistant", raw_response_text)
+
+                # Restore PII on the response returned to the user
+                response_text = deanonymize_text(raw_response_text, entities)
+                latency_ms = (time.time() - start_inference_time) * 1000
+            else:
+                # Classic direct / RAG flow
+                prompt = self.context_manager.build_final_prompt(
+                    system_prompt=system_prompt,
+                    history=history,
+                    rag_docs=results if decision == "rag" else [],
+                    user_query=sanitized_text,
+                    user_profile=user_profile,
+                    source=source
+                )
+                request = InferenceRequest(
+                    model=target_model,
+                    prompt=prompt,
+                    system_prompt=system_prompt
+                )
+                import asyncio
+                response_obj = await asyncio.to_thread(self.inference_provider.generate, request)
+                response_text = response_obj.text
+                latency_ms = (time.time() - start_inference_time) * 1000
+
+                SovereignStateManager.store_message(client_msg_id or "default", "user", sanitized_text)
+                SovereignStateManager.store_message(client_msg_id or "default", "assistant", response_text)
 
             pii_masked = [k for k in entities.keys()] if isinstance(entities, dict) else []
-            latency_ms = response_obj.latency_seconds * 1000
             final_response = {
-                "response": response_obj.text,
+                "response": response_text,
                 "metadata": {
                     "decision": decision,
                     "latency_ms": round(latency_ms, 2),
