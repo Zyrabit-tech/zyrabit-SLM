@@ -43,7 +43,7 @@ jobs:
         working-directory: docs-portal
 
       - name: Configure GitHub Pages
-        uses: actions/configure-pages@v5
+        uses: actions/configure-pages@v6
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
