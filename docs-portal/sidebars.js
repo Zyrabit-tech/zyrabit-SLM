@@ -7,30 +7,34 @@ module.exports = {
     },
     {
       type: "category",
-      label: "Sovereign Core v2.0",
-      items: [
-        "core-v2",
-        "telegram-bridge",
-        "zds-manifesto",
-      ],
-    },
-    {
-      type: "category",
       label: "Getting Started",
+      collapsed: false,
       items: [
+        "getting-started/macos-quickstart",
         "getting-started/fundamentals",
-        "first-rag",
-        "installation",
+        "getting-started/bare-metal-setup",
       ],
     },
     {
       type: "category",
-      label: "Core Architecture",
+      label: "Core Platform",
+      items: [
+        "models",
+        "agents-and-personality",
+        "mcp-server",
+        "n8n-automation",
+        "telegram-bridge",
+      ],
+    },
+    {
+      type: "category",
+      label: "Architecture",
       items: [
         "architecture-mermaid",
-        "models",
+        "core-v2",
         "data-portability",
         "core-architecture/pluggability",
+        "frontend-architecture",
       ],
     },
     {
@@ -40,6 +44,7 @@ module.exports = {
         "api-reference",
         "integration-playbook",
         "erp-connection",
+        "first-rag",
       ],
     },
     {
@@ -48,6 +53,8 @@ module.exports = {
       items: [
         "production-hardening",
         "compliance-report",
+        "zds-manifesto",
+        "zds-style-guide",
       ],
     },
   ],
