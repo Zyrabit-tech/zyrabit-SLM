@@ -80,11 +80,31 @@ async def lifespan(app: FastAPI):
         # 1. Direct Embeddings
         embeddings = DirectOllamaEmbeddings(model=EMBEDDING_MODEL, base_url=SLM_URL)
         
-        # 2. Vector Store (Connecting to remote Chroma Server)
+        # 2. Vector Store (Connecting to remote Chroma Server with retry loop)
         import chromadb
-        # Use HttpClient to connect to the zyrabit-db container
-        chroma_client = chromadb.HttpClient(host=DB_HOST, port=DB_PORT)
+        from chromadb.config import Settings
+        import time
         
+        chroma_settings = Settings(anonymized_telemetry=False)
+        chroma_client = None
+        for attempt in range(1, 6):
+            try:
+                client = chromadb.HttpClient(host=DB_HOST, port=DB_PORT, settings=chroma_settings)
+                client.heartbeat()
+                chroma_client = client
+                logger.info(f"✅ Connected to ChromaDB at {DB_HOST}:{DB_PORT}")
+                break
+            except Exception as conn_err:
+                logger.warning(f"⚠️ Waiting for ChromaDB at {DB_HOST}:{DB_PORT} (attempt {attempt}/5): {conn_err}")
+                time.sleep(2)
+        
+        if not chroma_client:
+            try:
+                chroma_client = chromadb.HttpClient(host=DB_HOST, port=DB_PORT, settings=chroma_settings)
+            except Exception as client_err:
+                logger.error(f"⚠️ Could not initialize HttpClient for ChromaDB: {client_err}. Falling back to EphemeralClient.")
+                chroma_client = chromadb.EphemeralClient(settings=chroma_settings)
+
         lc_chroma = Chroma(
             client=chroma_client,
             collection_name=RAG_COLLECTION,
@@ -109,9 +129,10 @@ async def lifespan(app: FastAPI):
         except Exception as e:
             logger.error(f"⚠️ Failed to load existing documents for BM25: {e}")
         
-        # 4. Inference Provider
-        app.state.inference_provider = InferenceProviderFactory.create_sync_provider("ollama")
-        app.state.streaming_provider = InferenceProviderFactory.create_stream_provider("ollama")
+        # 4. Inference Provider (Dynamic from INFERENCE_PROVIDER env)
+        provider_env = os.getenv("INFERENCE_PROVIDER", "ollama")
+        app.state.inference_provider = InferenceProviderFactory.create_sync_provider(provider_env)
+        app.state.streaming_provider = InferenceProviderFactory.create_stream_provider(provider_env)
         
         # 5. Use Cases (Singletons for the session)
         from app.infrastructure.adapters.bge_reranker_adapter import BGEReRankerAdapter
@@ -155,7 +176,7 @@ async def lifespan(app: FastAPI):
         logger.info("✅ Infrastructure initialized successfully.")
 
     except Exception as e:
-        logger.error(f"❌ Failed to initialize infrastructure: {e}")
+        logger.error(f"❌ Failed to initialize infrastructure: {e}", exc_info=True)
 
 
     yield

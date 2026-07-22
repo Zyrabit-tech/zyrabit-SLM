@@ -139,9 +139,34 @@ detect_hardware() {
         accelerator="cpu"
     fi
 
-    local acc_upper
-    acc_upper=$(echo "$accelerator" | tr '[:lower:]' '[:upper:]')
-    echo -e "${GREEN}✅ Hardware Profile: ${BOLD}${acc_upper}${NC} (RAM: ${ram_gb}GB, Cores: ${cores})" >&2
+    local cpu_arch="Generic CPU Architecture"
+    local mem_label="${ram_gb} GB RAM"
+    local accel_label="CPU Inference Engine"
+
+    if [[ "$(uname -s)" == "Darwin" && "$(uname -m)" == "arm64" ]]; then
+        cpu_arch="Apple Silicon M-Series"
+        mem_label="${ram_gb} GB Unified Memory"
+        accel_label="Metal Accelerator"
+    elif [[ "$accelerator" == "cuda" ]]; then
+        cpu_arch="x86_64 High Performance Workstation"
+        mem_label="${ram_gb} GB System Memory"
+        accel_label="NVIDIA CUDA GPU"
+    elif [[ "$accelerator" == "tenstorrent" ]]; then
+        cpu_arch="Tenstorrent AI Cluster Node"
+        mem_label="${ram_gb} GB System Memory"
+        accel_label="Tenstorrent P150 / Blackhole NPU"
+    fi
+
+    {
+        echo -e "${BRAND_ICE}────────────────────────────────────────────────────────────${NC}"
+        echo -e "  ${GREEN}✓ ${BOLD}${cpu_arch}${NC}"
+        echo -e "  ${BRAND_LIGHT}• ${mem_label}${NC}"
+        echo -e "  ${BRAND_LIGHT}• ${cores} CPU Cores${NC}"
+        echo -e "  ${BRAND_AMBER}• ${accel_label}${NC}"
+        echo -e "  ${BRAND_SLATE}ℹ Detected Automatically${NC}"
+        echo -e "${BRAND_ICE}────────────────────────────────────────────────────────────${NC}\n"
+    } >&2
+
     echo "${ram_gb}|${cores}|${accelerator}"
 }
 
@@ -302,18 +327,26 @@ run_start() {
         log_ok "Zyrabit API is ONLINE and HEALTHY."
     fi
 
-    # --- Print Service URLs ---
-    echo -e "\n${BOLD}🚀 Zyrabit SLM is ready! Access your services below:${NC}"
-    if [[ "${USE_LOCAL:-}" == "true" ]]; then
-        echo -e "  ${CYAN}➜ Web UI:${NC}   http://localhost:3000"
-        echo -e "  ${CYAN}➜ API:${NC}      http://localhost:8082/v1"
-        echo -e "  ${CYAN}➜ Vector DB:${NC} http://localhost:8000"
-    else
-        echo -e "  ${CYAN}➜ Web UI:${NC}   https://localhost"
-        echo -e "  ${CYAN}➜ API:${NC}      https://localhost/v1"
-        echo -e "  ${CYAN}➜ Grafana:${NC}  https://localhost/grafana"
-        echo -e "  ${CYAN}➜ Prom:${NC}     https://localhost/prometheus"
+    # --- Print Sovereign AI Completion Card ---
+    local ui_url="http://localhost:3000"
+    local api_endpoint="http://localhost:8082/v1"
+    
+    if [[ "${USE_LOCAL:-}" != "true" ]]; then
+        ui_url="https://localhost"
+        api_endpoint="https://localhost/v1"
     fi
+
+    echo -e "\n${BRAND_ICE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo -e "${BOLD}${BRAND_SLATE}  Your Sovereign AI Platform is Ready.${NC}\n"
+    echo -e "  ${BOLD}Runtime${NC}        ${GREEN}✓${NC}"
+    echo -e "  ${BOLD}Observability${NC}  ${GREEN}✓${NC}"
+    echo -e "  ${BOLD}Security${NC}       ${GREEN}✓${NC}"
+    echo -e "  ${BOLD}Routing${NC}        ${GREEN}✓${NC}"
+    echo -e "  ${BOLD}Inference${NC}      ${GREEN}✓${NC}\n"
+    echo -e "  ${BOLD}Platform Status${NC} ${GREEN}READY${NC}\n"
+    echo -e "  ${CYAN}Open${NC}           ${ui_url}"
+    echo -e "  ${CYAN}API${NC}            ${api_endpoint}"
+    echo -e "${BRAND_ICE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}\n"
     echo -e "  ${YELLOW}ℹ Use './zyra-up.sh verify' to check detailed health status.${NC}\n"
 }
 
@@ -346,20 +379,17 @@ setup_wizard() {
         rec_model="qwen2.5:1.5b"
     fi
 
-    local accel_upper
-    accel_upper=$(echo "${accel}" | tr '[:lower:]' '[:upper:]')
-    echo -e "${BOLD}${CYAN}🔍 Detected Hardware:${NC} RAM: ${ram}GB | Cores: ${cores} | Accelerator: ${accel_upper}"
     echo -e "${GREEN}★ Recommended Engine:${NC} ${rec_provider} (${rec_url}) | ${rec_model}\n"
 
-    # ── Step 1: Select Inference Engine / Provider ────────────────────────────
-    echo -e "${BOLD}1. Select Inference Engine / Hardware Backend:${NC}"
+    # ── Step 1: Choose your AI Runtime ──────────────────────────────────────
+    echo -e "${BOLD}1. Choose your AI Runtime:${NC}"
     echo -e "  ${CYAN}1)${NC} Ollama (Mac Metal Host)   → http://host.docker.internal:11434 ${GREEN}[Default for Mac]${NC}"
     echo -e "  ${CYAN}2)${NC} Ollama (Docker Container) → http://zyrabit-engine:11434"
     echo -e "  ${CYAN}3)${NC} vLLM / llama.cpp server   → http://host.docker.internal:8080/v1/chat/completions"
     echo -e "  ${CYAN}4)${NC} Tenstorrent P150 Bridge   → http://zyrabit-tt-bridge:8000"
     echo -e "  ${CYAN}5)${NC} Google Gemini (Cloud API) → Requires GEMINI_API_KEY"
 
-    read -rp "Select engine [1-5] (default: 1): " engine_choice < /dev/tty || engine_choice="1"
+    read -rp "Select runtime [1-5] (default: 1): " engine_choice < /dev/tty || engine_choice="1"
 
     local sel_provider="ollama"
     local sel_url="http://zyrabit-engine:11434"
@@ -373,18 +403,18 @@ setup_wizard() {
         *) sel_provider="${rec_provider}"; sel_url="${rec_url}" ;;
     esac
 
-    # ── Step 2: Select Model ──────────────────────────────────────────────────
+    # ── Step 2: Foundation Model ─────────────────────────────────────────────
     local current_model
     current_model=$(grep "^MODEL_NAME=" "${ENV_FILE}" 2>/dev/null | cut -d= -f2 || echo "qwen2.5:7b")
 
-    echo -e "\n${BOLD}2. Select Language Model (SLM):${NC}"
+    echo -e "\n${BOLD}2. Foundation Model:${NC}"
     echo -e "  ${CYAN}1)${NC} qwen2.5:7b      (Recommended for 12GB+ RAM)"
     echo -e "  ${CYAN}2)${NC} qwen2.5:1.5b    (Fast & lightweight for low RAM)"
     echo -e "  ${CYAN}3)${NC} mistral         (General reasoning)"
     echo -e "  ${CYAN}4)${NC} llama3.2:3b     (Meta balanced SLM)"
     echo -e "  ${CYAN}5)${NC} Keep current    [${current_model}]"
 
-    read -rp "Select model [1-5] (default: 1): " model_choice < /dev/tty || model_choice="1"
+    read -rp "Select foundation model [1-5] (default: 1): " model_choice < /dev/tty || model_choice="1"
 
     local selected_model="qwen2.5:7b"
     case "$model_choice" in
@@ -396,19 +426,41 @@ setup_wizard() {
         *) selected_model="${rec_model}" ;;
     esac
 
+    # ── Step 3: Infrastructure Profile ────────────────────────────────────────
+    echo -e "\n${BOLD}3. Infrastructure Profile:${NC}"
+    echo -e "  ${CYAN}1)${NC} Local Development  → Lightweight (API:8082, UI:3000, DB:8000) ${GREEN}[Default & Ultra Fast]${NC}"
+    echo -e "  ${CYAN}2)${NC} Production On-Prem → Traefik Reverse Proxy + HTTPS / SSL + Observability"
+
+    read -rp "Select mode [1-2] (default: 1): " mode_choice < /dev/tty || mode_choice="1"
+
+    local sel_domain="localhost"
+    if [[ "$mode_choice" == "2" ]]; then
+        export USE_LOCAL="false"
+        echo -e "\n${BOLD}Production Mode Selected.${NC}"
+        read -rp "Enter target production domain [default: localhost]: " custom_domain < /dev/tty || custom_domain="localhost"
+        if [[ -n "$custom_domain" ]]; then
+            sel_domain="$custom_domain"
+        fi
+        export DOMAIN="$sel_domain"
+    else
+        export USE_LOCAL="true"
+    fi
+
     # ── Save to .env ──────────────────────────────────────────────────────────
     log_info "Saving configuration to .env..."
     if [[ "$(uname -s)" == "Darwin" ]]; then
         sed -i '' "s|^INFERENCE_PROVIDER=.*|INFERENCE_PROVIDER=${sel_provider}|" "${ENV_FILE}"
         sed -i '' "s|^SLM_URL=.*|SLM_URL=${sel_url}|" "${ENV_FILE}"
         sed -i '' "s|^MODEL_NAME=.*|MODEL_NAME=${selected_model}|" "${ENV_FILE}"
+        sed -i '' "s|^DOMAIN=.*|DOMAIN=${sel_domain}|" "${ENV_FILE}" 2>/dev/null || echo "DOMAIN=${sel_domain}" >> "${ENV_FILE}"
     else
         sed -i "s|^INFERENCE_PROVIDER=.*|INFERENCE_PROVIDER=${sel_provider}|" "${ENV_FILE}"
         sed -i "s|^SLM_URL=.*|SLM_URL=${sel_url}|" "${ENV_FILE}"
         sed -i "s|^MODEL_NAME=.*|MODEL_NAME=${selected_model}|" "${ENV_FILE}"
+        sed -i "s|^DOMAIN=.*|DOMAIN=${sel_domain}|" "${ENV_FILE}" 2>/dev/null || echo "DOMAIN=${sel_domain}" >> "${ENV_FILE}"
     fi
 
-    log_ok "Configuration saved: Provider=${sel_provider} | SLM_URL=${sel_url} | Model=${selected_model}"
+    log_ok "Configuration saved: Provider=${sel_provider} | Model=${selected_model} | Mode=$([[ "${USE_LOCAL:-}" == "true" ]] && echo "Local" || echo "Production (${sel_domain})")"
 }
 
 run_install() {
