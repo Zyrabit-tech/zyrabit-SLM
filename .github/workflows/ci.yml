@@ -2,9 +2,12 @@ name: CI
 
 on:
   pull_request:
-    branches: [beta, main]
+    branches:
+      - main
+      - beta-**
   push:
-    branches: [beta]
+    branches:
+      - beta-**
   workflow_dispatch:
 
 permissions:
@@ -25,14 +28,38 @@ jobs:
       - name: Validate PR base branch policy
         if: github.event_name == 'pull_request'
         run: |
-          echo "PR: ${{ github.head_ref }} → ${{ github.base_ref }}"
-          if [ "${{ github.base_ref }}" = "main" ] && [ "${{ github.head_ref }}" != "beta" ]; then
-            echo "❌ ERROR: Only 'beta' can merge into 'main'."
-            echo "   Your branch '${{ github.head_ref }}' must target 'beta' first."
-            exit 1
+          HEAD="${{ github.head_ref }}"
+          BASE="${{ github.base_ref }}"
+          echo "PR: ${HEAD} → ${BASE}"
+
+          # Rule 1: PRs to main must come ONLY from a beta-X.Y.Z branch
+          if [ "${BASE}" = "main" ]; then
+            if ! echo "${HEAD}" | grep -qE '^beta-[0-9]+\.[0-9]+\.[0-9]+$'; then
+              echo ""
+              echo "❌ ERROR: Los PRs a 'main' solo se aceptan desde una rama 'beta-X.Y.Z'."
+              echo "   Rama detectada: '${HEAD}'"
+              echo ""
+              echo "   ¿Cómo resolverlo?"
+              echo "   1. Identifica la versión activa: ej. beta-2.3.0"
+              echo "   2. Haz PR de tu rama → beta-2.3.0 primero."
+              echo "   3. Luego, desde beta-2.3.0, abre el PR → main."
+              echo ""
+              exit 1
+            fi
+            echo "✅ PR desde rama beta versionada: ${HEAD}"
           fi
-          if [ "${{ github.base_ref }}" != "beta" ] && [ "${{ github.base_ref }}" != "main" ]; then
-            echo "❌ ERROR: Pull requests must target 'beta' or 'main'."
+
+          # Rule 2: PRs to beta-X.Y.Z are allowed from any feature branch
+          if echo "${BASE}" | grep -qE '^beta-[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "✅ PR a rama beta versionada: ${BASE}"
+          fi
+
+          # Rule 3: Block PRs to unversioned 'beta' — legacy branch
+          if [ "${BASE}" = "beta" ]; then
+            echo ""
+            echo "❌ ERROR: La rama 'beta' ya no acepta PRs directos."
+            echo "   Usa una rama versionada como 'beta-2.3.0' como destino."
+            echo ""
             exit 1
           fi
       - name: Policy check summary

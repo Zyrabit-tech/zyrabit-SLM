@@ -2,9 +2,10 @@
 
 # ──────────────────────────────────────────────────────────────────────────────
 #   ZYRABIT SLM — Unified Orchestration Script
-#   Version: 2.1.0
+#   Version: 2.3.0
 #   Description: Unified entry point for installation, development, and maintenance.
 #   Usage: ./zyra-up.sh [command] [options]
+#   Default mode: local (HTTP, port 8080, no SSL/Traefik)
 # ──────────────────────────────────────────────────────────────────────────────
 
 set -euo pipefail
@@ -64,12 +65,17 @@ ${BOLD}Commands:${NC}
   notify    Bridge: send a secure Telegram notification via MCP
   help      Show this help message
 
+${BOLD}Options:${NC}
   --e2e-security  With 'validate': run full PII+air-gap+memory E2E pipeline
   --profile <name>  Add Docker Compose profile (automation, observability-extra)
-  --local           Use local configuration (port 8080, no SSL/Traefik)
+  --local           Use local configuration — ${GREEN}default${NC} (port 8080, no SSL/Traefik)
+  --production      Use production configuration (HTTPS, SSL/Traefik required)
   --domain <name>   Set the target domain for production (default: localhost)
   --model <name>    Override the default SLM model (e.g., llama3, mistral)
   --no-cache        Force build without using Docker cache
+
+${BOLD}Default mode:${NC} local (HTTP on port 8080, no certificates required)
+  To use production SSL mode, pass: ${YELLOW}--production${NC}
 EOF
 }
 
@@ -418,7 +424,8 @@ run_validate() {
 # --- Argument & Command Parsing ---
 COMMANDS=()
 PROFILE=""
-USE_LOCAL="false"
+USE_LOCAL="true"   # Default: local mode (HTTP, no SSL)
+USE_PRODUCTION="false"
 OVERRIDE_MODEL=""
 NO_CACHE="false"
 
@@ -427,6 +434,7 @@ while [[ "$#" -gt 0 ]]; do
     case "$1" in
         --profile) PROFILE="$2"; shift 2 ;;
         --local) USE_LOCAL="true"; shift ;;
+        --production) USE_LOCAL="false"; USE_PRODUCTION="true"; shift ;;
         --domain) export DOMAIN="$2"; shift 2 ;;
         --model) OVERRIDE_MODEL="$2"; shift 2 ;;
         --no-cache) NO_CACHE="true"; shift ;;

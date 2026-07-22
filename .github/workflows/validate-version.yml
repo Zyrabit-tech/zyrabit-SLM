@@ -1,14 +1,10 @@
-name: Validate Version Bump
+name: Validate Version — Branching Policy
 
 on:
   pull_request:
     branches:
       - main
-      - beta
-  push:
-    branches:
-      - main
-      - beta
+      - beta-**
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
@@ -22,55 +18,108 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Ensure PR comes from beta (only if targeting main)
+      # ── RULE 1 ──────────────────────────────────────────────────────────────
+      # When PR targets main: the HEAD branch MUST be beta-X.Y.Z
+      # (ci.yml already enforces this, but we double-check here for clarity)
+      # ────────────────────────────────────────────────────────────────────────
+      - name: "[main ← beta-X.Y.Z] Validate beta branch name format"
+        if: github.base_ref == 'main'
         run: |
-          if [ "${{ github.base_ref }}" = "main" ] && [ "${{ github.head_ref }}" != "beta" ]; then
-            echo "❌ ERROR: Pull requests to main must originate from beta."
+          HEAD="${{ github.head_ref }}"
+          BETA_VERSION=$(echo "${HEAD}" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' || true)
+
+          if [ -z "${BETA_VERSION}" ]; then
+            echo ""
+            echo "❌ ERROR: El nombre de la rama '${HEAD}' no contiene una versión válida (X.Y.Z)."
+            echo "   Ejemplo correcto: beta-2.3.0"
+            echo ""
+            exit 1
+          fi
+          echo "✅ Versión extraída del nombre de rama: ${BETA_VERSION}"
+          echo "BETA_VERSION=${BETA_VERSION}" >> $GITHUB_ENV
+
+      # ── RULE 2 ──────────────────────────────────────────────────────────────
+      # When PR targets main: version in beta branch name must be >= main version
+      # ────────────────────────────────────────────────────────────────────────
+      - name: "[main ← beta-X.Y.Z] Version must not be lower than main"
+        if: github.base_ref == 'main'
+        run: |
+          git fetch origin main
+
+          MAIN_VERSION=$(git show origin/main:VERSION 2>/dev/null | tr -d '\n' | xargs || echo "0.0.0")
+          BETA_VERSION="${{ env.BETA_VERSION }}"
+
+          echo "Versión en main:             ${MAIN_VERSION}"
+          echo "Versión en nombre de rama:   ${BETA_VERSION}"
+
+          # semver comparison using sort -V
+          LOWER=$(printf '%s\n%s' "${BETA_VERSION}" "${MAIN_VERSION}" | sort -V | head -n1)
+
+          if [ "${LOWER}" = "${BETA_VERSION}" ] && [ "${BETA_VERSION}" != "${MAIN_VERSION}" ]; then
+            echo ""
+            echo "❌ ERROR: La versión '${BETA_VERSION}' es MENOR que la versión en main ('${MAIN_VERSION}')."
+            echo "   No puedes hacer retroceder la versión del proyecto."
+            echo "   Crea una rama beta con versión >= ${MAIN_VERSION}."
+            echo ""
+            exit 1
+          fi
+          echo "✅ Versión ${BETA_VERSION} es válida (>= ${MAIN_VERSION} en main)."
+
+      # ── RULE 3 ──────────────────────────────────────────────────────────────
+      # When PR targets main: VERSION file content must match the beta branch version
+      # ────────────────────────────────────────────────────────────────────────
+      - name: "[main ← beta-X.Y.Z] VERSION file must match branch version"
+        if: github.base_ref == 'main'
+        run: |
+          FILE_VERSION=$(cat VERSION | tr -d '\n' | xargs)
+          BETA_VERSION="${{ env.BETA_VERSION }}"
+
+          echo "Versión en archivo VERSION:  ${FILE_VERSION}"
+          echo "Versión en nombre de rama:   ${BETA_VERSION}"
+
+          if [ "${FILE_VERSION}" != "${BETA_VERSION}" ]; then
+            echo ""
+            echo "❌ ERROR: El archivo VERSION contiene '${FILE_VERSION}'"
+            echo "   pero el nombre de la rama indica '${BETA_VERSION}'."
+            echo "   Actualiza el archivo VERSION para que coincidan."
+            echo ""
+            exit 1
+          fi
+          echo "✅ VERSION file (${FILE_VERSION}) coincide con el nombre de la rama."
+
+      # ── RULE 4 ──────────────────────────────────────────────────────────────
+      # When PR targets beta-X.Y.Z: validate the target beta version >= main
+      # This catches stale beta targets (e.g. targeting an already-merged beta)
+      # ────────────────────────────────────────────────────────────────────────
+      - name: "[beta-X.Y.Z ← feature] Validate target beta version >= main"
+        if: "startsWith(github.base_ref, 'beta-')"
+        run: |
+          BASE="${{ github.base_ref }}"
+          TARGET_VERSION=$(echo "${BASE}" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' || true)
+
+          if [ -z "${TARGET_VERSION}" ]; then
+            echo "❌ ERROR: La rama destino '${BASE}' no tiene formato beta-X.Y.Z válido."
             exit 1
           fi
 
-      - name: Enforce Odd/Even versioning policy
-        run: |
-          CURRENT_VERSION=$(cat VERSION | tr -d '\n' | xargs)
-          # Extract the minor version (the Y in X.Y.Z)
-          MINOR_VERSION=$(echo $CURRENT_VERSION | cut -d. -f2)
-          
-          # Enforce policy: 'main' strictly requires EVEN, 'beta' accepts both ODD and EVEN.
-          if [[ "$CURRENT_BRANCH" == "main" ]]; then
-            if [ $((MINOR_VERSION % 2)) -ne 0 ]; then
-              echo "❌ ERROR: Versioning Policy Violation!"
-              echo "   Version $CURRENT_VERSION (Minor: $MINOR_VERSION) is ODD."
-              echo "   The 'main' branch strictly requires EVEN (stable) minor versions."
-              exit 1
-            fi
-            echo "✅ Version $CURRENT_VERSION (EVEN) aligns with 'main' branch."
-          elif [[ "$CURRENT_BRANCH" == "beta" ]]; then
-            echo "✅ Version $CURRENT_VERSION is allowed on 'beta' branch (supports both ODD and EVEN)."
+          git fetch origin main
+          MAIN_VERSION=$(git show origin/main:VERSION 2>/dev/null | tr -d '\n' | xargs || echo "0.0.0")
+
+          echo "Versión de la beta destino:  ${TARGET_VERSION}"
+          echo "Versión actual en main:      ${MAIN_VERSION}"
+
+          LOWER=$(printf '%s\n%s' "${TARGET_VERSION}" "${MAIN_VERSION}" | sort -V | head -n1)
+
+          if [ "${LOWER}" = "${TARGET_VERSION}" ] && [ "${TARGET_VERSION}" != "${MAIN_VERSION}" ]; then
+            echo ""
+            echo "⚠️  ADVERTENCIA: La beta '${BASE}' (v${TARGET_VERSION}) ya está por detrás de main (v${MAIN_VERSION})."
+            echo "   Es posible que esta beta ya haya sido integrada a main."
+            echo "   Considera hacer rebase a la beta activa más reciente."
+            echo ""
+            # Informative only — not a hard failure for feature → beta PRs
           else
-            echo "ℹ️ INFO: Branch '$CURRENT_BRANCH' is exempt from strict versioning policy."
-          fi
-          
-          echo "✅ Version $CURRENT_VERSION aligns with branch '$CURRENT_BRANCH'."
-
-      - name: Compare VERSION with target branch
-        run: |
-          TARGET_BRANCH="${{ github.base_ref }}"
-          if [ -z "$TARGET_BRANCH" ]; then
-            echo "Skipping comparison (not a PR event)."
-            exit 0
-          fi
-          
-          git fetch origin $TARGET_BRANCH || echo "Base branch '$TARGET_BRANCH' might not exist locally"
-          
-          CURRENT_VERSION=$(cat VERSION | tr -d '\n' | xargs)
-          BASE_VERSION=$(git show origin/$TARGET_BRANCH:VERSION 2>/dev/null | tr -d '\n' | xargs || echo "0.0.0")
-
-          echo "Current PR version: $CURRENT_VERSION"
-          echo "Target branch ($TARGET_BRANCH) version: $BASE_VERSION"
-
-          if [ "$CURRENT_VERSION" = "$BASE_VERSION" ] && [ "$TARGET_BRANCH" = "main" ]; then
-            echo "❌ ERROR: The version in the VERSION file has not been incremented from $TARGET_BRANCH. Please bump the version in the VERSION file."
-            exit 1
+            echo "✅ Beta destino ${TARGET_VERSION} es válida."
           fi
 
-          echo "✅ Version validation passed"
+      - name: Summary
+        run: echo "✅ Validación de versión completada."
