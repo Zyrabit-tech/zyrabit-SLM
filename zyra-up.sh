@@ -10,7 +10,12 @@
 
 set -euo pipefail
 
-# --- Colors & UI ---
+# --- Colors & UI (Zyrabit Brand Palette: #3F5A6D Slate, #6090B4 Ice Blue, #E2ECF4 Soft Light) ---
+BRAND_SLATE='\033[38;2;63;90;109m'     # #3F5A6D
+BRAND_ICE='\033[38;2;96;144;180m'      # #6090B4
+BRAND_LIGHT='\033[38;2;226;236;244m'   # #E2ECF4
+BRAND_AMBER='\033[38;2;245;176;65m'    # Zyrabit Bee Yellow #F5B041
+BRAND_DARK='\033[38;2;40;40;40m'       # Bee Black Stripes
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
@@ -91,12 +96,12 @@ require_docker() {
 }
 
 print_banner() {
-    echo -e "${YELLOW}"
-    echo '         \  /      '
-    echo '       / .. \      '
-    echo '     -(  ||  )-    '
-    echo '       \ __ /      '
-    echo -e "${CYAN}"
+    echo -e "        ${BRAND_LIGHT}_${NC}"
+    echo -e "       ${BRAND_LIGHT}/_/_      .'''.${NC}"
+    echo -e "    ${BRAND_DARK}=${BRAND_AMBER}O${BRAND_DARK}(${BRAND_AMBER}_${BRAND_DARK}))${BRAND_AMBER}))${NC} ${BRAND_LIGHT}...'     \`${NC}"
+    echo -e "       ${BRAND_LIGHT}\\\\_\\\\            \`.    .'''${NC}"
+    echo -e "                        ${BRAND_LIGHT}\`..'${NC}"
+    echo -e "${BRAND_ICE}"
     echo '  ███████╗██╗   ██╗██████╗  █████╗ ██████╗ ██╗████████╗'
     echo '  ╚══███╔╝╚██╗ ██╔╝██╔══██╗██╔══██╗██╔══██╗██║╚══██╔══╝'
     echo '    ███╔╝  ╚████╔╝ ██████╔╝███████║██████╔╝██║   ██║   '
@@ -104,8 +109,8 @@ print_banner() {
     echo '  ███████╗   ██║   ██║  ██║██║  ██║██████╔╝██║   ██║   '
     echo '  ╚══════╝   ╚═╝   ╚═╝  ╚═╝╚═╝  ╚═╝╚═════╝ ╚═╝   ╚═╝   '
     echo -e "${NC}"
-    echo -e "${BOLD}${CYAN}   🐝 ZYRABIT SLM — Sovereign AI Runtime${NC}"
-    echo -e "${BLUE}════════════════════════════════════════════════════════════${NC}\n"
+    echo -e "${BOLD}${BRAND_SLATE}   🐝 ZYRABIT SLM — Sovereign AI Runtime${NC}"
+    echo -e "${BRAND_ICE}════════════════════════════════════════════════════════════${NC}\n"
 }
 
 detect_hardware() {
@@ -223,15 +228,17 @@ run_verify() {
     
     # API Probe
     local api_url="https://localhost/v1/health"
-    [[ "${USE_LOCAL:-}" == "true" ]] && api_url="http://localhost:8080/v1/health"
+    [[ "${USE_LOCAL:-}" == "true" ]] && api_url="http://localhost:8082/v1/health"
     
     log_info "Probing API at ${api_url}..."
     if curl -sk -f "${api_url}" >/dev/null 2>&1; then
         log_ok "API is responding correctly."
+        return 0
     else
         log_warn "API is not responding yet (it might still be initializing)."
         log_info "Checking container logs for zyrabit-api..."
         docker logs --tail 20 zyrabit-api
+        return 1
     fi
 }
 
@@ -271,15 +278,35 @@ run_start() {
         log_info "Launching full infrastructure..."
         $DOCKER_COMPOSE_CMD "${compose_args[@]}" up -d
     fi
-    log_ok "Infrastructure is up."
+    # --- Active Readiness Gate ---
+    local api_url="https://localhost/v1/health"
+    [[ "${USE_LOCAL:-}" == "true" ]] && api_url="http://localhost:8082/v1/health"
+
+    log_info "Waiting for Zyrabit API to initialize..."
+    local attempts=0
+    local max_attempts=30
+    while [[ $attempts -lt $max_attempts ]]; do
+        if curl -sk -f "${api_url}" >/dev/null 2>&1; then
+            break
+        fi
+        echo -n "."
+        sleep 2
+        ((attempts++))
+    done
+    echo ""
+
+    if [[ $attempts -ge $max_attempts ]]; then
+        log_warn "API taking longer than expected to initialize. Check logs with: docker logs -f zyrabit-api"
+    else
+        log_ok "Zyrabit API is ONLINE and HEALTHY."
+    fi
 
     # --- Print Service URLs ---
     echo -e "\n${BOLD}🚀 Zyrabit SLM is ready! Access your services below:${NC}"
     if [[ "${USE_LOCAL:-}" == "true" ]]; then
         echo -e "  ${CYAN}➜ Web UI:${NC}   http://localhost:3000"
-        echo -e "  ${CYAN}➜ API:${NC}      http://localhost:8080/v1"
-        echo -e "  ${CYAN}➜ DB Admin:${NC} http://localhost:8000/api/v2/heartbeat"
-        echo -e "  ${CYAN}➜ Grafana:${NC}  http://localhost:3001"
+        echo -e "  ${CYAN}➜ API:${NC}      http://localhost:8082/v1"
+        echo -e "  ${CYAN}➜ Vector DB:${NC} http://localhost:8000"
     else
         echo -e "  ${CYAN}➜ Web UI:${NC}   https://localhost"
         echo -e "  ${CYAN}➜ API:${NC}      https://localhost/v1"
@@ -289,14 +316,109 @@ run_start() {
     echo -e "  ${YELLOW}ℹ Use './zyra-up.sh verify' to check detailed health status.${NC}\n"
 }
 
+setup_wizard() {
+    log_header "ZYRABIT INTERACTIVE SETUP WIZARD"
+    
+    if [[ ! -f "${ENV_FILE}" ]]; then
+        log_info "Creating .env configuration from example.env..."
+        cp "${SCRIPT_DIR}/zyrabit-slm/example.env" "${ENV_FILE}"
+    fi
+
+    local hw_info ram cores accel
+    hw_info=$(detect_hardware)
+    IFS='|' read -r ram cores accel <<< "$hw_info"
+
+    # --- Smart Recommendation Badge ---
+    local rec_provider="ollama"
+    local rec_url="http://zyrabit-engine:11434"
+    local rec_model="qwen2.5:7b"
+
+    if [[ "${accel}" == "metal" ]]; then
+        rec_provider="ollama_host"
+        rec_url="http://host.docker.internal:11434"
+    elif [[ "${accel}" == "tenstorrent" ]]; then
+        rec_provider="ollama"
+        rec_url="http://zyrabit-tt-bridge:8000"
+    fi
+
+    if [[ "${ram}" -lt 12 ]]; then
+        rec_model="qwen2.5:1.5b"
+    fi
+
+    echo -e "${BOLD}${CYAN}🔍 Detected Hardware:${NC} RAM: ${ram}GB | Cores: ${cores} | Accelerator: ${accel^^}"
+    echo -e "${GREEN}★ Recommended Engine:${NC} ${rec_provider} (${rec_url}) | ${rec_model}\n"
+
+    # ── Step 1: Select Inference Engine / Provider ────────────────────────────
+    echo -e "${BOLD}1. Select Inference Engine / Hardware Backend:${NC}"
+    echo -e "  ${CYAN}1)${NC} Ollama (Mac Metal Host)   → http://host.docker.internal:11434 ${GREEN}[Default for Mac]${NC}"
+    echo -e "  ${CYAN}2)${NC} Ollama (Docker Container) → http://zyrabit-engine:11434"
+    echo -e "  ${CYAN}3)${NC} vLLM / llama.cpp server   → http://host.docker.internal:8080/v1/chat/completions"
+    echo -e "  ${CYAN}4)${NC} Tenstorrent P150 Bridge   → http://zyrabit-tt-bridge:8000"
+    echo -e "  ${CYAN}5)${NC} Google Gemini (Cloud API) → Requires GEMINI_API_KEY"
+
+    read -rp "Select engine [1-5] (default: 1): " engine_choice < /dev/tty || engine_choice="1"
+
+    local sel_provider="ollama"
+    local sel_url="http://zyrabit-engine:11434"
+
+    case "$engine_choice" in
+        1) sel_provider="ollama_host"; sel_url="http://host.docker.internal:11434" ;;
+        2) sel_provider="ollama"; sel_url="http://zyrabit-engine:11434" ;;
+        3) sel_provider="vllm"; sel_url="http://host.docker.internal:8080/v1/chat/completions" ;;
+        4) sel_provider="ollama"; sel_url="http://zyrabit-tt-bridge:8000" ;;
+        5) sel_provider="gemini"; sel_url="https://generativelanguage.googleapis.com" ;;
+        *) sel_provider="${rec_provider}"; sel_url="${rec_url}" ;;
+    esac
+
+    # ── Step 2: Select Model ──────────────────────────────────────────────────
+    local current_model
+    current_model=$(grep "^MODEL_NAME=" "${ENV_FILE}" 2>/dev/null | cut -d= -f2 || echo "qwen2.5:7b")
+
+    echo -e "\n${BOLD}2. Select Language Model (SLM):${NC}"
+    echo -e "  ${CYAN}1)${NC} qwen2.5:7b      (Recommended for 12GB+ RAM)"
+    echo -e "  ${CYAN}2)${NC} qwen2.5:1.5b    (Fast & lightweight for low RAM)"
+    echo -e "  ${CYAN}3)${NC} mistral         (General reasoning)"
+    echo -e "  ${CYAN}4)${NC} llama3.2:3b     (Meta balanced SLM)"
+    echo -e "  ${CYAN}5)${NC} Keep current    [${current_model}]"
+
+    read -rp "Select model [1-5] (default: 1): " model_choice < /dev/tty || model_choice="1"
+
+    local selected_model="qwen2.5:7b"
+    case "$model_choice" in
+        1) selected_model="qwen2.5:7b" ;;
+        2) selected_model="qwen2.5:1.5b" ;;
+        3) selected_model="mistral" ;;
+        4) selected_model="llama3.2:3b" ;;
+        5) selected_model="${current_model}" ;;
+        *) selected_model="${rec_model}" ;;
+    esac
+
+    # ── Save to .env ──────────────────────────────────────────────────────────
+    log_info "Saving configuration to .env..."
+    if [[ "$(uname -s)" == "Darwin" ]]; then
+        sed -i '' "s|^INFERENCE_PROVIDER=.*|INFERENCE_PROVIDER=${sel_provider}|" "${ENV_FILE}"
+        sed -i '' "s|^SLM_URL=.*|SLM_URL=${sel_url}|" "${ENV_FILE}"
+        sed -i '' "s|^MODEL_NAME=.*|MODEL_NAME=${selected_model}|" "${ENV_FILE}"
+    else
+        sed -i "s|^INFERENCE_PROVIDER=.*|INFERENCE_PROVIDER=${sel_provider}|" "${ENV_FILE}"
+        sed -i "s|^SLM_URL=.*|SLM_URL=${sel_url}|" "${ENV_FILE}"
+        sed -i "s|^MODEL_NAME=.*|MODEL_NAME=${selected_model}|" "${ENV_FILE}"
+    fi
+
+    log_ok "Configuration saved: Provider=${sel_provider} | SLM_URL=${sel_url} | Model=${selected_model}"
+}
+
 run_install() {
     local hw_info ram cores accel model_name
     hw_info=$(detect_hardware)
     IFS='|' read -r ram cores accel <<< "$hw_info"
     
-    # Intelligence: select model based on RAM
-    model_name="${OVERRIDE_MODEL:-qwen2.5:7b}"
-    if [[ "${ram}" -lt 12 ]]; then model_name="qwen2.5:1.5b"; fi
+    # Run setup wizard in interactive terminal mode
+    if [[ -t 0 ]]; then
+        setup_wizard
+    fi
+
+    model_name="${OVERRIDE_MODEL:-$(grep "^MODEL_NAME=" "${ENV_FILE}" 2>/dev/null | cut -d= -f2 || echo "qwen2.5:7b")}"
     
     log_info "System Detection: ${ram}GB RAM / ${accel} Accelerator"
     log_info "Target Model: ${model_name}"

@@ -3,9 +3,13 @@ from app.domain.use_cases.chat_use_case import ChatUseCase
 from app.domain.use_cases.ingest_use_case import IngestUseCase
 
 def get_vector_store(request: Request):
+    if not hasattr(request.app.state, 'vector_store'):
+        raise HTTPException(status_code=503, detail="Vector store is initializing")
     return request.app.state.vector_store
 
 def get_inference_provider(request: Request):
+    if not hasattr(request.app.state, 'inference_provider'):
+        raise HTTPException(status_code=503, detail="Inference provider is initializing")
     return request.app.state.inference_provider
 
 def get_chat_use_case(request: Request) -> ChatUseCase:

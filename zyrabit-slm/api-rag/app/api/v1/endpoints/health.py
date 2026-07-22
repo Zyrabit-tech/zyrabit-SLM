@@ -40,22 +40,25 @@ async def health_check(
     # 2. Vector DB Check
     db_status = "OFFLINE"
     doc_count = 0
-    if vector_store:
+    if vector_store and vector_store != "INITIALIZING":
         try:
             if vector_store.heartbeat():
                 db_status = "ONLINE"
                 # Accessing underlying chroma collection for count
-                if hasattr(vector_store.vector_store, "_collection"):
+                if hasattr(vector_store, "vector_store") and hasattr(vector_store.vector_store, "_collection"):
                     doc_count = vector_store.vector_store._collection.count()
-        except:
+        except Exception:
             pass
 
     # 3. SLM Engine Check
     slm_status = "OFFLINE"
     slm_metadata = {"ok": False}
-    if inference_provider:
-        slm_metadata = inference_provider.health()
-        slm_status = "ONLINE" if slm_metadata.get("ok") else "OFFLINE"
+    if inference_provider and inference_provider != "INITIALIZING":
+        try:
+            slm_metadata = inference_provider.health()
+            slm_status = "ONLINE" if slm_metadata.get("ok") else "OFFLINE"
+        except Exception:
+            pass
 
     # 4. Mode Detection
     is_local_host = any(x in SLM_URL for x in ["host.docker.internal", "localhost", "127.0.0.1"])
