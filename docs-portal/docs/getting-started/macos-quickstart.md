@@ -506,6 +506,9 @@ To run the full validation suite (requires a running stack):
 # System diagnostics (hardware, Docker, Ollama)
 ./zyra-up.sh doctor
 
+# Continuous Watchdog diagnostic loop & trace watcher
+./zyra-up.sh watch
+
 # Run unit tests (fully offline)
 uv run pytest -q zyrabit-slm/api-rag/tests/unit
 

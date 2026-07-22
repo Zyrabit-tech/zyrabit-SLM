@@ -67,6 +67,7 @@ ${BOLD}Commands:${NC}
   validate  QA: run sovereign validation suite (PII, TTFT, Air-Gap)
   dev       Native local development (starts API via 'uv' with hot-reload)
   doctor    Diagnostic: validate environment, RAM, and hardware acceleration
+  watch     Watchdog: continuous diagnostic loop & trace watcher for installation
   notify    Bridge: send a secure Telegram notification via MCP
   help      Show this help message
 
@@ -345,7 +346,9 @@ setup_wizard() {
         rec_model="qwen2.5:1.5b"
     fi
 
-    echo -e "${BOLD}${CYAN}🔍 Detected Hardware:${NC} RAM: ${ram}GB | Cores: ${cores} | Accelerator: ${accel^^}"
+    local accel_upper
+    accel_upper=$(echo "${accel}" | tr '[:lower:]' '[:upper:]')
+    echo -e "${BOLD}${CYAN}🔍 Detected Hardware:${NC} RAM: ${ram}GB | Cores: ${cores} | Accelerator: ${accel_upper}"
     echo -e "${GREEN}★ Recommended Engine:${NC} ${rec_provider} (${rec_url}) | ${rec_model}\n"
 
     # ── Step 1: Select Inference Engine / Provider ────────────────────────────
@@ -426,9 +429,18 @@ run_install() {
     run_build
     run_start
     
-    log_info "Pulling models into engine..."
-    $DOCKER_COMPOSE_CMD -f "${COMPOSE_FILE}" exec -T zyrabit-engine ollama pull "${model_name}"
-    $DOCKER_COMPOSE_CMD -f "${COMPOSE_FILE}" exec -T zyrabit-engine ollama pull "mxbai-embed-large"
+    log_info "Pulling models (${model_name}, mxbai-embed-large)..."
+    if check_local_ollama && [[ "${PROFILE:-}" != *"engine"* ]]; then
+        if command -v ollama >/dev/null 2>&1; then
+            ollama pull "${model_name}" || log_warn "Failed to pull ${model_name} on host Ollama."
+            ollama pull "mxbai-embed-large" || log_warn "Failed to pull mxbai-embed-large on host Ollama."
+        else
+            log_warn "Ollama host detected but 'ollama' CLI not in PATH."
+        fi
+    else
+        $DOCKER_COMPOSE_CMD -f "${COMPOSE_FILE}" exec -T zyrabit-engine ollama pull "${model_name}" || true
+        $DOCKER_COMPOSE_CMD -f "${COMPOSE_FILE}" exec -T zyrabit-engine ollama pull "mxbai-embed-large" || true
+    fi
     
     log_ok "Installation complete."
     run_verify
@@ -561,6 +573,53 @@ run_validate() {
     log_info "Reporte de memoria: ${SCRIPT_DIR}/validation/reports/"
 }
 
+run_watch() {
+    log_header "ZYRABIT INSTALLATION WATCHDOG — Continuous Diagnostic Loop"
+    log_info "Monitoring stack health and installation traces every 10 seconds..."
+    log_info "Press Ctrl+C to stop watchdog."
+    
+    local interval=10
+    local count=0
+
+    while true; do
+        ((count++))
+        echo -e "\n${BOLD}${CYAN}[Watchdog Tick #${count} — $(date +%H:%M:%S)]${NC}"
+
+        # 1. Inspect Docker containers status
+        local api_status db_status web_status
+        api_status=$(docker inspect --format='{{.State.Status}}' zyrabit-api 2>/dev/null || echo "missing")
+        db_status=$(docker inspect --format='{{.State.Status}}' zyrabit-db 2>/dev/null || echo "missing")
+        web_status=$(docker inspect --format='{{.State.Status}}' zyrabit-web 2>/dev/null || echo "missing")
+
+        echo -e "  • zyrabit-api: ${api_status} | zyrabit-db: ${db_status} | zyrabit-web: ${web_status}"
+
+        # 2. Check API Health Probe
+        local api_url="http://localhost:8082/v1/health"
+        [[ "${USE_LOCAL:-}" != "true" ]] && api_url="https://localhost/v1/health"
+
+        if curl -sk -f "${api_url}" >/dev/null 2>&1; then
+            log_ok "Zyrabit API is HEALTHY (200 OK)."
+        else
+            log_warn "API Probe (${api_url}) is NOT responding yet."
+            
+            # Diagnostic: inspect recent error traces from zyrabit-api logs
+            if [[ "$api_status" == "running" ]]; then
+                log_info "Recent log traces from zyrabit-api:"
+                docker logs --tail 5 zyrabit-api 2>&1 | sed 's/^/    /'
+            fi
+        fi
+
+        # 3. Check Inference Engine connectivity
+        if check_local_ollama; then
+            log_ok "Inference Provider (Host Ollama Metal): CONNECTED"
+        else
+            log_warn "Host Ollama not detected on http://127.0.0.1:11434"
+        fi
+
+        sleep $interval
+    done
+}
+
 # --- Argument & Command Parsing ---
 COMMANDS=()
 PROFILE=""
@@ -608,6 +667,7 @@ for CMD in "${COMMANDS[@]}"; do
         notify)   run_notify "${NOTIFY_MSG:-}" ;;
         dev)      run_dev ;;
         doctor)   run_doctor ;;
+        watch)    run_watch ;;
         help|--help|-h) usage; exit 0 ;;
         *) log_err "Unknown command: ${CMD}"; usage; exit 1 ;;
     esac

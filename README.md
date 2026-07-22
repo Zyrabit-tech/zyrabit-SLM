@@ -100,6 +100,25 @@ curl -X POST http://localhost:8080/query \
 
 ---
 
+## ⚡ Quick CLI Commands
+
+Essential commands for local operation via `./zyra-up.sh`:
+
+| Action | Command | Description |
+|---|---|---|
+| **First Install** | `./zyra-up.sh install` | Interactive setup wizard, builds stack & pulls models |
+| **Start Stack** | `./zyra-up.sh start` | Launches light local infrastructure (API, UI, ChromaDB) |
+| **Stop Stack** | `./zyra-up.sh stop` | Tears down containers |
+| **Watchdog** | `./zyra-up.sh watch` | Continuous diagnostic loop & real-time log trace watcher |
+| **Diagnostics** | `./zyra-up.sh doctor` | System check: RAM, CPU cores, Metal/CUDA accelerator |
+| **Health Check** | `./zyra-up.sh verify` | Validates container statuses & API endpoints |
+| **Native Dev** | `./zyra-up.sh dev` | Fast Python API hot-reload with `uv` |
+| **Automations** | `./zyra-up.sh start --profile automation` | Enables n8n integration at `https://localhost/n8n` |
+
+> 📚 **Complete Documentation**: For full command options, architecture guides, and API specs, visit the [Zyrabit SLM Documentation Portal](./docs-portal/docs/intro.md) or open [macOS Quickstart](./docs-portal/docs/getting-started/macos-quickstart.md).
+
+---
+
 ## 🔍 Real-world use cases
 
 | Scenario | What Zyrabit SLM does |
