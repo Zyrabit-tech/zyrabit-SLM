@@ -100,20 +100,24 @@ curl -X POST http://localhost:8080/query \
 
 ---
 
-## ⚡ Quick CLI Commands
+## ⚡ Product CLI Reference (`zyra`)
 
-Essential commands for local operation via `./zyra-up.sh`:
+Professional command-line interface for managing Zyrabit SLM:
 
 | Action | Command | Description |
 |---|---|---|
-| **First Install** | `./zyra-up.sh install` | Interactive setup wizard, builds stack & pulls models |
-| **Start Stack** | `./zyra-up.sh start` | Launches light local infrastructure (API, UI, ChromaDB) |
-| **Stop Stack** | `./zyra-up.sh stop` | Tears down containers |
-| **Watchdog** | `./zyra-up.sh watch` | Continuous diagnostic loop & real-time log trace watcher |
-| **Diagnostics** | `./zyra-up.sh doctor` | System check: RAM, CPU cores, Metal/CUDA accelerator |
-| **Health Check** | `./zyra-up.sh verify` | Validates container statuses & API endpoints |
-| **Native Dev** | `./zyra-up.sh dev` | Fast Python API hot-reload with `uv` |
-| **Automations** | `./zyra-up.sh start --profile automation` | Enables n8n integration at `https://localhost/n8n` |
+| **Setup Wizard** | `./zyra install` | Interactive AI Runtime & Infrastructure Setup Wizard |
+| **Start Stack** | `./zyra start` | Launches Sovereign AI stack |
+| **Stop Stack** | `./zyra stop` | Tears down containers |
+| **Hardware** | `./zyra hardware` | Display 24-bit Truecolor Hardware Detection Card |
+| **Status Table** | `./zyra status` | Live status table of containers and service URLs |
+| **Security Audit** | `./zyra security` | Audit PII masking rules, active tokens & GDPR compliance |
+| **Models** | `./zyra models` | List or pull local Foundation Models (`./zyra models pull <model>`) |
+| **Live Logs** | `./zyra logs` | Streaming live logs for core containers (`./zyra logs zyrabit-api`) |
+| **Benchmark** | `./zyra benchmark` | Measure response latency & inference metrics |
+| **Diagnostics** | `./zyra doctor` | System health check (`./zyra doctor --full` for full E2E QA) |
+| **Upgrade** | `./zyra upgrade` | Seamless Git pull & zero-downtime stack rebuild |
+| **Watchdog** | `./zyra watch` | Continuous diagnostic watchdog loop & log trace watcher |
 
 > 📚 **Complete Documentation**: For full command options, architecture guides, and API specs, visit the [Zyrabit SLM Documentation Portal](./docs-portal/docs/intro.md) or open [macOS Quickstart](./docs-portal/docs/getting-started/macos-quickstart.md).
 

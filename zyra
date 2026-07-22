@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+# ──────────────────────────────────────────────────────────────────────────────
+#   ZYRABIT PRODUCT CLI — Sovereign AI Platform Interface
+# ──────────────────────────────────────────────────────────────────────────────
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+exec "${SCRIPT_DIR}/zyra-up.sh" "$@"
