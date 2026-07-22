@@ -105,12 +105,26 @@ The `INFERENCE_PROVIDER` environment variable controls how the API connects to t
 
 | Value | Description |
 |---|---|
-| `ollama` | Default — connects to `zyrabit-engine` Docker container |
-| `ollama_host` | Connects to Ollama running natively on the host |
-| `ollama_docker` | Explicit Docker-based Ollama |
-| `openai_compatible` | Any OpenAI-compatible HTTP endpoint |
+| `ollama` | Default — connects to `zyrabit-engine` Docker container (`http://zyrabit-engine:11434`) |
+| `ollama_host` | Connects to Ollama running natively on the host (Mac Metal: `http://host.docker.internal:11434`) |
+| `vllm` | Compatible with vLLM engine, `llama.cpp` (`llama-server`), or LM Studio |
+| `gemini` | Google Gemini API (requires `GEMINI_API_KEY`) |
 
-In macOS local mode, `SLM_URL` is automatically set to `http://host.docker.internal:11434` to reach native Ollama.
+### Example 1: Connecting to `llama.cpp` (`llama-server`) or `vLLM`
+If you run `llama-server` (the native HTTP server from `llama.cpp`) or a `vLLM` instance on your machine:
+
+```env
+INFERENCE_PROVIDER=vllm
+SLM_URL=http://host.docker.internal:8080/v1/chat/completions
+MODEL_NAME=meta-llama/Llama-3.2-3B-Instruct
+```
+
+### Example 2: Connecting to Google Gemini
+```env
+INFERENCE_PROVIDER=gemini
+GEMINI_API_KEY=AIzaSy...
+MODEL_NAME=gemini-1.5-flash
+```
 
 ---
 
