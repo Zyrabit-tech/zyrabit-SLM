@@ -90,6 +90,23 @@ require_docker() {
     fi
 }
 
+print_banner() {
+    echo -e "${CYAN}"
+    echo '          ___     '
+    echo '      ___/\   \    '
+    echo '     /   \ \___\   '
+    echo '     \___/ /   /   '
+    echo '         \/___/    '
+    echo '   __  ______  ___  ___  ______ _____ '
+    echo '  / / / / __ \/ _ \/ _ \/  _/\__  /   '
+    echo ' / /_/ / /_/ / /_/ / /_/ / /   / /    '
+    echo ' \__, /\____/ .___/ .___/___/ /_/     '
+    echo '/____/     /_/   /_/                  '
+    echo -e "${NC}"
+    echo -e "${BOLD}${CYAN}   🐝 ZYRABIT SLM — Sovereign AI Runtime${NC}"
+    echo -e "${BLUE}════════════════════════════════════════════════════════════${NC}\n"
+}
+
 detect_hardware() {
     local ram_gb cores accelerator
     
@@ -117,7 +134,7 @@ detect_hardware() {
 
     local acc_upper
     acc_upper=$(echo "$accelerator" | tr '[:lower:]' '[:upper:]')
-    echo -e "${GREEN}✅ Hardware Profile: ${BOLD}${acc_upper}${NC} (RAM: ${ram_gb}GB, Cores: ${cores})"
+    echo -e "${GREEN}✅ Hardware Profile: ${BOLD}${acc_upper}${NC} (RAM: ${ram_gb}GB, Cores: ${cores})" >&2
     echo "${ram_gb}|${cores}|${accelerator}"
 }
 
@@ -454,6 +471,8 @@ done
 
 # Default command if none provided
 [[ ${#COMMANDS[@]} -eq 0 ]] && COMMANDS=("install")
+
+print_banner
 
 for CMD in "${COMMANDS[@]}"; do
     case "${CMD}" in
