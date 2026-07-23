@@ -7,6 +7,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.3.0] - 2026-07-23
+
+### Added
+- **Product CLI (`zyra`)**: Created a high-level CLI wrapper (`./zyra`) providing commands for `hardware`, `models`, `status`, `security`, `logs`, `benchmark`, `doctor`, `upgrade`, `watch`, `install`, `start`, and `stop`.
+- **Truecolor 24-Bit Hardware Card & Bee Logo**: Integrated brand ASCII bee logo and hardware detection profile card displaying CPU architecture, unified/system memory, cores, and accelerator.
+- **Interactive Setup Wizard**: Added 3-step setup wizard in `./zyra install` for selecting AI Runtime backend (Ollama Host Metal, Ollama Docker, vLLM/llama.cpp, Tenstorrent, Gemini), Foundation Model, and Infrastructure Profile (Local Dev vs Production On-Prem with domain configuration).
+- **Architecture & Component Swapping Manual**: Published detailed guide on interchanging Frontends (Angular, Next.js), Backends (Node.js, Go), Vector Stores (PostgreSQL + `pgvector`), and Obsidian Vault integration in Docusaurus docs portal (`docs/core-architecture/pluggability.md`).
+- **Resilient Startup & Fallback**: Added a 5-attempt retry loop with `EphemeralClient` fallback for ChromaDB connection in `main.py` to prevent startup failures.
+
+### Changed
+- **Default Local Mode**: Streamlined local environment (`docker-compose.local.yml`) running API (:8082), Web UI (:3000), and ChromaDB (:8000) with native Metal GPU acceleration, removing heavy production services (Traefik, Prometheus, Grafana) from local dev.
+- **Dynamic Provider Resolution**: Updated FastAPI startup to dynamically initialize inference providers from `INFERENCE_PROVIDER` environment variable (`ollama_host`, `ollama`, `vllm`, `gemini`).
+
 ## [2.2.0-beta] - 2026-06-30
 
 ### Added
