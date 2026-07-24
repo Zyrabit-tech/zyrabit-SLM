@@ -36,7 +36,7 @@ class ChatUseCase:
         self.streaming_provider = streaming_provider
         self.mcp_client = mcp_client
 
-    async def execute(self, text: str, client_msg_id: Optional[str] = None, history: Optional[list] = None, source: str = "WEB") -> Dict[str, Any]:
+    async def execute(self, text: str, client_msg_id: Optional[str] = None, history: Optional[list] = None, source: str = "WEB", provider: Optional[str] = None) -> Dict[str, Any]:
         try:
             # 0. Idempotency Check
             if client_msg_id:
@@ -106,6 +106,13 @@ class ChatUseCase:
             target_model = user_profile.get("preferred_model", MODEL_NAME) if user_profile else MODEL_NAME
             start_inference_time = time.time()
 
+            # Dynamic inference provider resolution
+            if provider:
+                from app.infrastructure.inference.factory import InferenceProviderFactory
+                inf_provider = InferenceProviderFactory.create_sync_provider(provider)
+            else:
+                inf_provider = self.inference_provider
+
             if self.mcp_client:
                 # Run the ReAct agentic loop with lean component passing
                 from app.domain.agent.tool_registry import ToolRegistry
@@ -113,7 +120,7 @@ class ChatUseCase:
                 from app.core.security.pii_pipeline import deanonymize_text
 
                 registry = ToolRegistry(self.mcp_client)
-                harness = ReactHarness(self.inference_provider, registry, self.gatekeeper)
+                harness = ReactHarness(inf_provider, registry, self.gatekeeper)
 
                 # Pass raw components — the harness assembles the prompt once
                 raw_response_text, steps = await harness.execute(
@@ -150,7 +157,7 @@ class ChatUseCase:
                     system_prompt=system_prompt
                 )
                 import asyncio
-                response_obj = await asyncio.to_thread(self.inference_provider.generate, request)
+                response_obj = await asyncio.to_thread(inf_provider.generate, request)
                 response_text = response_obj.text
                 latency_ms = (time.time() - start_inference_time) * 1000
 

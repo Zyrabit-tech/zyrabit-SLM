@@ -5,6 +5,7 @@ import logging
 from app.infrastructure.shared.config import DOCS_DIR
 from app.api.v1.dependencies import get_ingest_use_case
 from app.domain.use_cases.ingest_use_case import IngestUseCase
+from app.domain.services.whisper_transcription_service import WhisperTranscriptionService
 
 logger = logging.getLogger("uvicorn.error")
 router = APIRouter()
@@ -30,6 +31,26 @@ async def background_ingestion_task(file_path: str, filename: str, ingest_use_ca
     Ingests the file and notifies the user via Socket.io upon completion.
     """
     try:
+        ext = os.path.splitext(file_path)[1].lower()
+        audio_extensions = (".wav", ".mp3", ".m4a", ".mp4", ".webm", ".mpeg", ".mpga", ".ogg", ".flac")
+        
+        if ext in audio_extensions:
+            logger.info(f"🎙️ Audio/Video file detected for ingestion: {filename}. Transcribing with Whisper...")
+            whisper_service = WhisperTranscriptionService()
+            transcription_res = whisper_service.transcribe(file_path)
+            
+            # Save transcription as a markdown file
+            transcript_text = transcription_res["text"]
+            transcript_filename = f"{os.path.splitext(filename)[0]}_transcript.md"
+            transcript_path = os.path.join(os.path.dirname(file_path), transcript_filename)
+            
+            with open(transcript_path, "w", encoding="utf-8") as f:
+                f.write(f"# Transcription of {filename}\n\n{transcript_text}\n")
+            
+            # Swap target file to the markdown transcript path
+            file_path = transcript_path
+            filename = transcript_filename
+
         logger.info(f"🧬 Processing background ingestion for: {filename}")
         res = await ingest_use_case.execute(file_path)
         
@@ -106,3 +127,31 @@ async def ingest_document(
     except Exception as e:
         logger.error(f"Failed to initiate ingestion for {file.filename}: {e}")
         raise HTTPException(status_code=500, detail="Internal server error.")
+
+@router.post("/audio/transcriptions")
+async def transcribe_audio(
+    file: UploadFile = File(...),
+):
+    """
+    OpenAI-compatible transcription endpoint using Whisper.
+    """
+    ext = os.path.splitext(file.filename)[1].lower()
+    audio_extensions = (".wav", ".mp3", ".m4a", ".mp4", ".webm", ".mpeg", ".mpga", ".ogg", ".flac")
+    if ext not in audio_extensions:
+        raise HTTPException(status_code=400, detail=f"Unsupported audio format: {ext}")
+        
+    os.makedirs(DOCS_DIR, exist_ok=True)
+    temp_path = os.path.join(DOCS_DIR, f"temp_{file.filename}")
+    try:
+        with open(temp_path, "wb") as f:
+            f.write(await file.read())
+            
+        whisper_service = WhisperTranscriptionService()
+        result = whisper_service.transcribe(temp_path)
+        return {"text": result["text"]}
+    except Exception as e:
+        logger.error(f"Failed to transcribe audio: {e}")
+        raise HTTPException(status_code=500, detail=f"Transcription error: {str(e)}")
+    finally:
+        if os.path.exists(temp_path):
+            os.remove(temp_path)
