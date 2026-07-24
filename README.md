@@ -9,7 +9,7 @@ Run language models entirely on your infrastructure — no external APIs, no dat
 
 [![CI](https://github.com/Zyrabit-tech/zyrabit-SLM/actions/workflows/ci.yml/badge.svg)](https://github.com/Zyrabit-tech/zyrabit-SLM/actions/workflows/ci.yml)
 [![Security](https://github.com/Zyrabit-tech/zyrabit-SLM/actions/workflows/security.yml/badge.svg)](https://github.com/Zyrabit-tech/zyrabit-SLM/actions/workflows/security.yml)
-[![Version](https://img.shields.io/badge/v2.3.0-Sovereign-3f5a6d?style=flat-square&labelColor=e2ecf4)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/v2.3.0--beta-Testing-amber?style=flat-square&labelColor=3f5a6d)](CHANGELOG.md)
 [![License: MIT](https://img.shields.io/badge/License-MIT-6090b4?style=flat-square)](LICENSE)
 [![Python 3.12](https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white&style=flat-square)](https://python.org)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115-009688?logo=fastapi&style=flat-square)](https://fastapi.tiangolo.com)

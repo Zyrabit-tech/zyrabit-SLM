@@ -511,8 +511,22 @@ setup_wizard() {
         *) selected_model="${rec_model}" ;;
     esac
 
-    # ── Step 3: Infrastructure Profile ────────────────────────────────────────
-    echo -e "\n${BOLD}3. Infrastructure Profile:${NC}"
+    # ── Step 3: Sovereign Memory Engine ───────────────────────────────────────
+    echo -e "\n${BOLD}3. Sovereign Memory Engine:${NC}"
+    echo -e "  ${CYAN}1)${NC} Sovereign Vault (ChromaDB)           → Ultra-Fast Local Vector Store ${GREEN}[Default & Zero Config]${NC}"
+    echo -e "  ${CYAN}2)${NC} Enterprise Matrix (PostgreSQL+vector) → ACID Compliance & Relational Hybrid Search"
+
+    read -rp "Select memory engine [1-2] (default: 1): " db_choice < /dev/tty || db_choice="1"
+
+    local sel_vectordb="chroma"
+    case "$db_choice" in
+        1) sel_vectordb="chroma" ;;
+        2) sel_vectordb="pgvector" ;;
+        *) sel_vectordb="chroma" ;;
+    esac
+
+    # ── Step 4: Infrastructure Profile ────────────────────────────────────────
+    echo -e "\n${BOLD}4. Infrastructure Profile:${NC}"
     echo -e "  ${CYAN}1)${NC} Local Development  → Lightweight (API:8082, UI:3000, DB:8000) ${GREEN}[Default & Ultra Fast]${NC}"
     echo -e "  ${CYAN}2)${NC} Production On-Prem → Traefik Reverse Proxy + HTTPS / SSL + Observability"
 
@@ -537,15 +551,17 @@ setup_wizard() {
         sed -i '' "s|^INFERENCE_PROVIDER=.*|INFERENCE_PROVIDER=${sel_provider}|" "${ENV_FILE}"
         sed -i '' "s|^SLM_URL=.*|SLM_URL=${sel_url}|" "${ENV_FILE}"
         sed -i '' "s|^MODEL_NAME=.*|MODEL_NAME=${selected_model}|" "${ENV_FILE}"
+        sed -i '' "s|^VECTOR_DB_TYPE=.*|VECTOR_DB_TYPE=${sel_vectordb}|" "${ENV_FILE}" 2>/dev/null || echo "VECTOR_DB_TYPE=${sel_vectordb}" >> "${ENV_FILE}"
         sed -i '' "s|^DOMAIN=.*|DOMAIN=${sel_domain}|" "${ENV_FILE}" 2>/dev/null || echo "DOMAIN=${sel_domain}" >> "${ENV_FILE}"
     else
         sed -i "s|^INFERENCE_PROVIDER=.*|INFERENCE_PROVIDER=${sel_provider}|" "${ENV_FILE}"
         sed -i "s|^SLM_URL=.*|SLM_URL=${sel_url}|" "${ENV_FILE}"
         sed -i "s|^MODEL_NAME=.*|MODEL_NAME=${selected_model}|" "${ENV_FILE}"
+        sed -i "s|^VECTOR_DB_TYPE=.*|VECTOR_DB_TYPE=${sel_vectordb}|" "${ENV_FILE}" 2>/dev/null || echo "VECTOR_DB_TYPE=${sel_vectordb}" >> "${ENV_FILE}"
         sed -i "s|^DOMAIN=.*|DOMAIN=${sel_domain}|" "${ENV_FILE}" 2>/dev/null || echo "DOMAIN=${sel_domain}" >> "${ENV_FILE}"
     fi
 
-    log_ok "Configuration saved: Provider=${sel_provider} | Model=${selected_model} | Mode=$([[ "${USE_LOCAL:-}" == "true" ]] && echo "Local" || echo "Production (${sel_domain})")"
+    log_ok "Configuration saved: Provider=${sel_provider} | Model=${selected_model} | Memory=${sel_vectordb} | Mode=$([[ "${USE_LOCAL:-}" == "true" ]] && echo "Local" || echo "Production (${sel_domain})")"
 }
 
 run_install() {

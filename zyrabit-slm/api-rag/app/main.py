@@ -84,7 +84,7 @@ async def lifespan(app: FastAPI):
         import chromadb
         from chromadb.config import Settings
         import time
-        
+
         chroma_settings = Settings(anonymized_telemetry=False)
         chroma_client = None
         for attempt in range(1, 6):

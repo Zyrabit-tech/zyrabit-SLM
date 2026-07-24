@@ -151,7 +151,7 @@ services:
 
   # 3. THE MEMORY: Vector DB
   zyrabit-db:
-    image: chromadb/chroma:0.5.3
+    image: chromadb/chroma:0.5.20
     container_name: zyrabit-db
     # SECURITY: CVE-2026-45829 (ChromaToast) — no public port binding.
     # ChromaDB is ONLY reachable from zyrabit-api on the internal Docker network.
