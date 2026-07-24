@@ -135,7 +135,7 @@ class ContextManager:
         # Format the identity with assistant name
         try:
             persona_desc = persona_raw.format(assistant_name=assistant_name)
-        except:
+        except (KeyError, IndexError):
             persona_desc = persona_raw
         
         # Override identity for specific channels

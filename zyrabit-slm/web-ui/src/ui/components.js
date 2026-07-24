@@ -4,6 +4,22 @@
  */
 
 /**
+ * Minimal HTML escaper — prevents XSS when interpolating
+ * server-controlled or user-controlled values into innerHTML.
+ * @param {unknown} value
+ * @returns {string}
+ */
+function escapeHtml(value) {
+    const str = String(value ?? '');
+    return str
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
+/**
  * <zyra-status-dot>
  * Managed status indicator for infrastructure services.
  */
@@ -75,7 +91,9 @@ function parseMarkdown(text) {
         }
         code = code.trim();
         const placeholder = `__CODE_BLOCK_PLACEHOLDER_${codeBlocks.length}__`;
-        codeBlocks.push(`<pre><code class="language-${lang}">${code}</code></pre>`);
+        // Escape lang attribute to prevent attribute injection (e.g. lang="" onload=...)
+        const safeLang = lang.replace(/[^a-zA-Z0-9-]/g, '');
+        codeBlocks.push(`<pre><code class="language-${safeLang}">${code}</code></pre>`);
         return placeholder;
     });
 
@@ -318,11 +336,19 @@ class ZyraChatMessage extends HTMLElement {
     renderMetadata() {
         if (!this._metadata) return '';
         const m = this._metadata;
-        const sources = m.sources ? [...new Set(m.sources)].map(s => `<span class="source-pill">${s}</span>`).join('') : '';
+        // SECURITY: Escape all server-controlled values before HTML interpolation
+        // Source filenames, decision strings, and numeric metadata come from the API
+        // and could contain HTML/JS if the model output is manipulated.
+        const sources = m.sources
+            ? [...new Set(m.sources)].map(s => `<span class="source-pill">${escapeHtml(s)}</span>`).join('')
+            : '';
+        const decision = escapeHtml((m.decision || 'direct').toUpperCase());
+        const latency  = escapeHtml(m.latency_ms  ?? 0);
+        const hits     = escapeHtml(m.rag_hits     ?? 0);
 
         return `
             <div class="meta">
-                <span>${(m.decision || 'direct').toUpperCase()} | ${m.latency_ms || 0}ms | HITS: ${m.rag_hits || 0}</span>
+                <span>${decision} | ${latency}ms | HITS: ${hits}</span>
                 ${sources ? `<div class="sources"><strong>SOURCES:</strong> ${sources}</div>` : ''}
             </div>
         `;

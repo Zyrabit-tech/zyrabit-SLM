@@ -4,3 +4,13 @@
 # Por ejemplo:
 # CVE-2023-12345
 # PYSEC-2023-444
+
+# CVE-2026-45829 (ChromaToast — pre-auth RCE in ChromaDB Python FastAPI server)
+# STATUS: Sin parche oficial disponible como de 2026-07-24.
+# MITIGACIÓN APLICADA:
+#   - ChromaDB NO tiene puerto público expuesto. Solo accesible desde zyrabit-api en red Docker interna.
+#   - CHROMA_SERVER_CORS_ALLOW_ORIGINS restringido a http://zyrabit-api:8080
+#   - ALLOW_RESET=FALSE para bloquear el endpoint de reset no autenticado
+#   - Traefik como proxy reverso filtra todo el tráfico externo
+# ACCIÓN: Monitorear chromadb >= 2.0.0 para fix oficial. Eliminar esta línea cuando se publique.
+CVE-2026-45829

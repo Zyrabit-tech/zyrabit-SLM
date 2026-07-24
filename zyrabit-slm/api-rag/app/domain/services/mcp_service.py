@@ -31,16 +31,26 @@ async def import_to_vault(source_path: str, destination_name: str) -> str:
     if not src.exists():
         return f"Error: Source file {source_path} not found."
 
-    # SECURITY CHECK: Block executable patterns
+    # SECURITY: Prevent path traversal — resolve destination inside DOCS_DIR only.
+    # e.g. destination_name='../../etc/cron.d/evil' would escape the vault.
+    vault_root = Path(DOCS_DIR).resolve()
+    dest_path = (vault_root / Path(destination_name).name).resolve()  # .name strips any directory component
+    if not str(dest_path).startswith(str(vault_root)):
+        logger.warning(f"🛡️ Security Block: Path traversal attempt in destination_name: {destination_name!r}")
+        return "Security Alert: Destination path is outside the Vault directory."
+
+    # SECURITY CHECK: Block executable patterns (check first 10KB only)
     try:
         with open(src, "r", encoding="utf-8", errors="ignore") as f:
-            content = f.read(10000) # Check first 10k characters
-            
+            content = f.read(10000)
+
+            # More precise patterns — avoid blocking Python documentation files
             forbidden_patterns = [
-                "#!/bin/", "#!/usr/bin/", "os.system(", "subprocess.run(", 
-                "<script>", "eval(", "exec(", "import os"
+                "#!/bin/", "#!/usr/bin/",
+                "os.system(", "subprocess.run(",
+                "<script>", "eval(", "exec(",
             ]
-            
+
             for pattern in forbidden_patterns:
                 if pattern in content:
                     logger.warning(f"🛡️ Security Block: Executable pattern '{pattern}' detected in {source_path}")
@@ -49,11 +59,10 @@ async def import_to_vault(source_path: str, destination_name: str) -> str:
         return f"Error during security scan: {e}"
 
     # Move to Vault
-    dest_path = Path(DOCS_DIR) / destination_name
     try:
         shutil.copy2(src, dest_path)
-        logger.info(f"📥 Vault: Imported {destination_name} successfully.")
-        return f"Success: File imported to Vault as {destination_name}"
+        logger.info(f"📥 Vault: Imported {dest_path.name} successfully.")
+        return f"Success: File imported to Vault as {dest_path.name}"
     except Exception as e:
         return f"Error moving file: {e}"
 
@@ -245,33 +254,6 @@ async def docker_inspect_container(container_name: str) -> str:
     return json.dumps(info, indent=2)
 
 
-# ---------------------------------------------------------
-# DOCKER DIAGNOSTICS MCP (Read-Only)
-# ---------------------------------------------------------
-
-@mcp.tool()
-async def docker_list_containers() -> str:
-    """List all local Docker containers and their status."""
-    containers = docker_client.list_containers()
-    import json
-    return json.dumps(containers, indent=2)
-
-@mcp.tool()
-async def docker_get_logs(container_name: str, tail: int = 50) -> str:
-    """
-    Get the latest logs for a specific Docker container.
-    Use this to diagnose failures or check application output.
-    """
-    return docker_client.get_container_logs(container_name, tail)
-
-@mcp.tool()
-async def docker_inspect_container(container_name: str) -> str:
-    """
-    Inspect a Docker container to see its health, network ports, and restart count.
-    """
-    info = docker_client.inspect_container(container_name)
-    import json
-    return json.dumps(info, indent=2)
 
 
 @mcp.tool()
@@ -286,12 +268,13 @@ async def generate_radar_report(send_email: bool = True) -> str:
     import json
     import re
     import smtplib
+    from datetime import date
     from email.mime.text import MIMEText
     from email.mime.multipart import MIMEMultipart
 
     logger.info("Generating daily Zyra-Radar report...")
 
-    # 1. Fetch arXiv Papers
+    today_str = date.today().isoformat()  # Safe — no shell subprocess needed
     arxiv_url = 'http://export.arxiv.org/api/query?search_query=all:RAG+OR+all:"graph+rag"+OR+all:"hybrid+rag"+OR+all:"agent+memory"+OR+all:"edge+llm"&max_results=5&sortBy=submittedDate&sortOrder=descending'
     arxiv_papers = []
     try:
@@ -332,7 +315,7 @@ async def generate_radar_report(send_email: bool = True) -> str:
     report = f"""
 📡 ZYRA-RADAR INTELLIGENCE BRIEFING
 ===================================
-Fecha: {os.popen('date "+%Y-%m-%d"').read().strip()}
+Fecha: {today_str}
 
 1. MERCADO Y HARDWARE DE IA ESPECIALIZADA (Últimas 48h)
 -------------------------------------------------------
@@ -378,7 +361,7 @@ Fecha: {os.popen('date "+%Y-%m-%d"').read().strip()}
             msg = MIMEMultipart()
             msg['From'] = user
             msg['To'] = to_email
-            msg['Subject'] = f"📡 Zyra-Radar - Intelligence Briefing {os.popen('date \"+%Y-%m-%d\"').read().strip()}"
+            msg['Subject'] = f"📡 Zyra-Radar - Intelligence Briefing {today_str}"
             msg.attach(MIMEText(report, 'plain'))
             try:
                 server = smtplib.SMTP(host, port)

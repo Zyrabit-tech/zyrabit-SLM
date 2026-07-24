@@ -205,15 +205,28 @@ class SovereignStateManager:
         try:
             with sqlite3.connect(cls.DB_PATH) as conn:
                 conn.row_factory = sqlite3.Row
-                # Escape query to prevent FTS syntax errors (basic protection)
-                safe_query = query.replace('"', '""').replace("'", "''")
-                # FTS requires exact match or wildcard, we use OR strategy
-                tokens = safe_query.split()
-                fts_query = " OR ".join(f"{t}*" for t in tokens if len(t) > 2)
-                
+
+                # SECURITY: Sanitize each token before building the FTS5 match expression.
+                # FTS5 treats AND, OR, NOT, and quoted phrases as operators.
+                # We strip any character that is not alphanumeric or a hyphen,
+                # then use the 'token*' prefix-match form which is always safe.
+                def _safe_fts_token(t: str) -> str:
+                    # Keep only alphanumeric and hyphens; quote remaining via FTS5 double-quote escaping
+                    sanitized = ''.join(c for c in t if c.isalnum() or c == '-')
+                    return sanitized
+
+                tokens = [
+                    _safe_fts_token(t)
+                    for t in query.split()
+                    if len(t) > 2
+                ]
+                # Drop empty tokens that became empty after sanitization
+                tokens = [t for t in tokens if t]
+                fts_query = " OR ".join(f"{t}*" for t in tokens)
+
                 if not fts_query:
                     return []
-                    
+
                 cursor = conn.execute("""
                     SELECT file_path, snippet(fts_vault, 1, '<b>', '</b>', '...', 64) as snippet, rank 
                     FROM fts_vault 
