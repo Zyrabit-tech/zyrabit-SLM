@@ -13,7 +13,7 @@ services:
     environment:
       - N8N_SERVICE_TOKEN_FILE=/run/secrets/n8n_service_token
       - N8N_WEBHOOK_SIGNING_SECRET_FILE=/run/secrets/n8n_webhook_signing_secret
-      - SLM_URL=http://host.docker.internal:11434
+      - SLM_URL=${SLM_URL:-http://host.docker.internal:11434}
       - DB_URL=http://zyrabit-db:8000
     ports:
       - "8082:8080" # Moved from 8080 to avoid Mac system conflicts

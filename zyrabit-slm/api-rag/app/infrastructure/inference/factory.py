@@ -16,13 +16,14 @@ class InferenceProviderFactory:
     @staticmethod
     def create_sync_provider(provider_name: str = "ollama", **kwargs) -> InferenceProviderPort:
         """Creates a synchronous inference provider."""
-        if provider_name.lower() == "ollama":
+        name_clean = provider_name.lower()
+        if name_clean in ("ollama", "ollama_host", "ollama_docker"):
             endpoint = kwargs.get("endpoint", f"{SLM_URL}/api/generate")
             return OllamaInferenceAdapter(endpoint=endpoint)
-        elif provider_name.lower() == "vllm":
+        elif name_clean == "vllm":
             endpoint = kwargs.get("endpoint", f"{SLM_URL}/v1/chat/completions")
             return VllmInferenceAdapter(endpoint=endpoint)
-        elif provider_name.lower() == "gemini":
+        elif name_clean == "gemini":
             api_key = kwargs.get("api_key")
             if not api_key:
                 raise ValueError("API key required for Gemini inference provider.")
@@ -33,7 +34,8 @@ class InferenceProviderFactory:
     @staticmethod
     def create_stream_provider(provider_name: str = "ollama", **kwargs) -> StreamingInferencePort:
         """Creates a streaming inference provider."""
-        if provider_name.lower() == "ollama":
+        name_clean = provider_name.lower()
+        if name_clean in ("ollama", "ollama_host", "ollama_docker"):
             endpoint = kwargs.get("endpoint", f"{SLM_URL}/api/generate")
             return OllamaStreamAdapter(endpoint=endpoint)
         elif provider_name.lower() == "vllm":

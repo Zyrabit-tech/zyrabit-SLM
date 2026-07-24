@@ -235,6 +235,7 @@ class ReactHarness:
                 response_obj = await asyncio.to_thread(
                     self.inference_provider.generate, request
                 )
+                self.last_response_obj = response_obj
                 response_text = response_obj.text
             except Exception as e:
                 logger.error(f"Inference error during ReAct step: {e}")

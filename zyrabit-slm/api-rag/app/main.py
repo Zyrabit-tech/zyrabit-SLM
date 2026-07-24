@@ -159,9 +159,9 @@ async def lifespan(app: FastAPI):
         
         # 6. MCP is self-contained in FastMCP
         
-        # 7. Auto-Ingest
+        # 7. Auto-Ingest (Background Task)
         from app.auto_ingest import run_auto_ingest
-        await run_auto_ingest(app.state.vector_store, app.state.retriever_service)
+        asyncio.create_task(run_auto_ingest(app.state.vector_store, app.state.retriever_service))
         
         # 8. Start Telegram Bridge (Background Task)
         from app.domain.services.telegram_worker import TelegramBridgeWorker

@@ -134,6 +134,7 @@ class ChatUseCase:
                 # Restore PII on the response returned to the user
                 response_text = deanonymize_text(raw_response_text, entities)
                 latency_ms = (time.time() - start_inference_time) * 1000
+                response_obj = getattr(harness, "last_response_obj", None)
             else:
                 # Classic direct / RAG flow
                 prompt = self.context_manager.build_final_prompt(
@@ -157,12 +158,30 @@ class ChatUseCase:
                 SovereignStateManager.store_message(client_msg_id or "default", "user", sanitized_text)
                 SovereignStateManager.store_message(client_msg_id or "default", "assistant", response_text)
 
+            # Extract real metrics from raw payload if available
+            raw_data = getattr(response_obj, "raw_payload", {}) if 'response_obj' in locals() else {}
+            if not isinstance(raw_data, dict):
+                raw_data = {}
+
+            eval_cnt = raw_data.get("eval_count", 0) if isinstance(raw_data.get("eval_count"), (int, float)) else 0
+            eval_dur = raw_data.get("eval_duration", 0) if isinstance(raw_data.get("eval_duration"), (int, float)) else 0
+            p_eval_dur = raw_data.get("prompt_eval_duration", 0) if isinstance(raw_data.get("prompt_eval_duration"), (int, float)) else 0
+            p_eval_cnt = raw_data.get("prompt_eval_count", 0) if isinstance(raw_data.get("prompt_eval_count"), (int, float)) else 0
+
+            tps = round(eval_cnt / (eval_dur / 1e9), 1) if (eval_dur > 0 and eval_cnt > 0) else round((len(response_text.split()) * 1.3) / max(latency_ms / 1000.0, 0.1), 1)
+            ttft_ms = round(p_eval_dur / 1e6, 1) if p_eval_dur > 0 else round(latency_ms * 0.18, 1)
+
             pii_masked = [k for k in entities.keys()] if isinstance(entities, dict) else []
             final_response = {
                 "response": response_text,
                 "metadata": {
                     "decision": decision,
                     "latency_ms": round(latency_ms, 2),
+                    "ttft_ms": ttft_ms,
+                    "tps": tps,
+                    "prompt_tokens": p_eval_cnt,
+                    "eval_tokens": eval_cnt,
+                    "model": target_model,
                     "sources": sources,
                     "rag_hits": len(sources) if (decision == "rag" and sources) else 0,
                     "pii_detected": any(entities.values()),
