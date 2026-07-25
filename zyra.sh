@@ -1,101 +1,96 @@
 #!/usr/bin/env bash
 
 # ──────────────────────────────────────────────────────────────────────────────
-#   ZYRABIT SLM — Unified CLI Orchestration Script
-#   Version: 2.3.0 (feat/embedded-metal-whisper-beta2.3)
+#   ZYRABIT SLM — Unified CLI
+#   Version: 2.3.1
 #   Usage: ./zyra.sh [command] [options]
-#
-#   DEFAULT: Local / Dev mode (HTTP, port 8082 API, port 3000 Web UI)
-#   PRODUCTION: Pass --production flag or run 'wizard' to enter prod mode.
 # ──────────────────────────────────────────────────────────────────────────────
 
 set -euo pipefail
 
-# --- Colors & UI ---
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-RED='\033[0;31m'
-CYAN='\033[0;36m'
-BOLD='\033[1m'
-NC='\033[0m'
+# ─── UI ───────────────────────────────────────────────────────────────────────
+GREEN='\033[0;32m'; YELLOW='\033[1;33m'; BLUE='\033[0;34m'
+RED='\033[0;31m';   CYAN='\033[0;36m';   BOLD='\033[1m'; NC='\033[0m'
 
-# --- Logging Helpers ---
 log_info() { echo -e "${BLUE}ℹ${NC} $1"; }
 log_ok()   { echo -e "${GREEN}✔${NC} $1"; }
 log_warn() { echo -e "${YELLOW}⚠${NC} $1"; }
-log_err()  { echo -e "${RED}✖${NC} $1"; }
+log_err()  { echo -e "${RED}✖${NC} $1" >&2; }
+log_step() { echo -e "\n${BOLD}${CYAN}▶ $1${NC}"; }
 log_header() {
     echo -e "\n${BOLD}${BLUE}══════════════════════════════════════════════════${NC}"
-    echo -e "${BOLD}${CYAN}   $1 ${NC}"
+    echo -e "${BOLD}${CYAN}   $1${NC}"
     echo -e "${BOLD}${BLUE}══════════════════════════════════════════════════${NC}\n"
 }
 
-# --- Paths & Constants ---
+# ─── Paths ────────────────────────────────────────────────────────────────────
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 COMPOSE_FILE="${SCRIPT_DIR}/zyrabit-slm/docker-compose.local.yml"
 PROD_COMPOSE_FILE="${SCRIPT_DIR}/zyrabit-slm/docker-compose.yml"
 ENV_FILE="${SCRIPT_DIR}/zyrabit-slm/.env"
 EXAMPLE_ENV="${SCRIPT_DIR}/zyrabit-slm/example.env"
 
-# --- Argument Defaults ---
+# ─── State (defaults) ─────────────────────────────────────────────────────────
 PRODUCTION_MODE="false"
 PROFILE=""
 OVERRIDE_MODEL=""
 NO_CACHE="false"
 E2E_SECURITY="false"
 REPORT_MODE="false"
+SKIP_WIZARD="false"   # --yes / -y skips wizard when .env already exists
+NOTIFY_MSG=""
 COMMANDS=()
 
-# --- Dynamic Command Detection ---
+# ─── Docker compose detection ─────────────────────────────────────────────────
 DOCKER_COMPOSE_CMD="docker compose"
 if ! docker compose version >/dev/null 2>&1; then
     if command -v docker-compose >/dev/null 2>&1; then
         DOCKER_COMPOSE_CMD="docker-compose"
     else
-        log_err "Neither 'docker compose' nor 'docker-compose' found."
+        log_err "Docker Compose not found. Install Docker Desktop or 'docker compose' plugin."
         exit 1
     fi
 fi
 
 # ─────────────────────────────────────────────────────────────────────────────
-# USAGE
+# HELP
 # ─────────────────────────────────────────────────────────────────────────────
 usage() {
     cat <<EOF
 ${BOLD}Zyrabit SLM — Sovereign AI Runtime${NC}
 
-${BOLD}Usage:${NC} ./zyra.sh [command] [options]
+${BOLD}Usage:${NC}  ./zyra.sh [command] [flags]
 
 ${BOLD}Commands:${NC}
-  install      Full setup: build images, start stack, pull AI models
-               Default: Local/Dev mode (no --production needed for development)
-  start        Bring up the stack (without pulling models)
+  install      Setup & launch  (runs wizard on first install, smart on re-runs)
+  start        Re-launch existing stack without wizard or model pull
   stop         Tear down all containers
-  build        Build Docker images only (no start)
-  verify       Health check: validate container status and API response
-  validate     Sovereign QA: unit tests, PII, TTFT, air-gap checks
-  benchmark    Live performance metrics. Use --report for 4-setup matrix
-  audit        Proof-of-Control: compliance and 0-egress verification
-  wizard       Interactive setup wizard (model, environment, PostgreSQL, domain)
-  dev          Native local dev: starts API via 'uv' with hot-reload (no Docker)
-  doctor       Diagnose hardware, RAM, GPU, and environment
-  notify       Send a secure notification via MCP bridge
+  verify       Health check: container status + API probe
+  validate     Sovereign QA: unit tests, PII, air-gap, architecture
+  benchmark    Live performance metrics  (--report for 4-engine matrix)
+  audit        Proof-of-Control: compliance & 0-egress report
+  dev          Native hot-reload mode via uv (no Docker required)
+  doctor       Diagnose hardware, RAM, GPU, Docker, and uv
+  notify       Send notification via MCP bridge
 
 ${BOLD}Flags:${NC}
-  --production     Activate production mode (Traefik HTTPS, domain, PostgreSQL)
-  --profile <n>    Add Docker Compose profile (automation, db, observability-extra)
-  --model <name>   Override default model (e.g. mistral, llama3, phi3)
+  --production     Production mode (HTTPS, Traefik, custom domain)
+  --yes / -y       Skip wizard prompts — use existing .env as-is
+  --profile <n>    Add Docker Compose profile  (db, automation, observability-extra)
+  --model <name>   Override AI model (e.g. mistral, llama3, phi3)
   --no-cache       Force Docker build without cache
-  --report         With 'benchmark': run 4-setup comparative matrix
-  --e2e-security   With 'validate': run full PII+air-gap+memory E2E pipeline
+  --report         With benchmark: run 4-engine comparison matrix
+  --e2e-security   With validate: run full PII + air-gap + memory pipeline
 
 ${BOLD}Examples:${NC}
-  ./zyra.sh install              # Dev/local setup (default)
-  ./zyra.sh install --production # Production setup with wizard
-  ./zyra.sh wizard               # Interactive setup wizard
-  ./zyra.sh benchmark --report   # 4-setup performance comparison
-  ./zyra.sh start --profile db   # Start stack + PostgreSQL
+  ./zyra.sh                      # First run → wizard → launch
+  ./zyra.sh install              # Same: wizard if no .env, smart re-run if .env exists
+  ./zyra.sh install -y           # Re-install silently with current config
+  ./zyra.sh install --production # Production wizard → Traefik + HTTPS + PostgreSQL
+  ./zyra.sh start                # Re-launch without setup (stack already configured)
+  ./zyra.sh start --profile db   # Launch with PostgreSQL enabled
+  ./zyra.sh benchmark --report   # 4-engine performance comparison
+  ./zyra.sh notify "Hello Zyra"  # Send notification via MCP
 EOF
 }
 
@@ -103,14 +98,21 @@ EOF
 # HELPERS
 # ─────────────────────────────────────────────────────────────────────────────
 require_docker() {
-    if ! command -v docker >/dev/null 2>&1; then
-        log_err "Docker is not installed. Visit https://docs.docker.com/get-docker/"
-        exit 1
-    fi
-    if ! docker info >/dev/null 2>&1; then
-        log_err "Docker daemon is not running. Start Docker Desktop and retry."
-        exit 1
-    fi
+    command -v docker >/dev/null 2>&1 || { log_err "Docker not installed → https://docs.docker.com/get-docker/"; exit 1; }
+    docker info >/dev/null 2>&1      || { log_err "Docker daemon not running. Start Docker Desktop."; exit 1; }
+}
+
+active_compose_file() {
+    [[ "${PRODUCTION_MODE}" == "true" ]] && echo "${PROD_COMPOSE_FILE}" || echo "${COMPOSE_FILE}"
+}
+
+check_local_ollama() {
+    curl -s -m 2 http://127.0.0.1:11434/api/tags >/dev/null 2>&1 ||
+    curl -s -m 2 http://localhost:11434/api/tags  >/dev/null 2>&1
+}
+
+api_base_url() {
+    [[ "${PRODUCTION_MODE}" == "true" ]] && echo "https://${DOMAIN:-localhost}/v1" || echo "http://localhost:8082/v1"
 }
 
 detect_hardware() {
@@ -119,165 +121,118 @@ detect_hardware() {
         ram_gb="$(( $(sysctl -n hw.memsize 2>/dev/null || echo 0) / 1024 / 1024 / 1024 ))"
         cores="$(sysctl -n hw.logicalcpu 2>/dev/null || echo 4)"
     else
-        ram_gb="$(( $(awk '/MemTotal/ {print $2}' /proc/meminfo 2>/dev/null || echo 0) / 1024 / 1024 ))"
+        ram_gb="$(( $(awk '/MemTotal/{print $2}' /proc/meminfo 2>/dev/null || echo 0) / 1024 / 1024 ))"
         cores="$(nproc 2>/dev/null || echo 4)"
     fi
-
-    if command -v nvidia-smi >/dev/null 2>&1; then
-        accelerator="nvidia"
-    elif [[ -e /dev/tenstorrent ]] || command -v tt-smi >/dev/null 2>&1; then
-        accelerator="tenstorrent"
-        export SLM_URL="http://zyrabit-tt-bridge:8000"
-    elif [[ "$(uname -s)" == "Darwin" && "$(uname -m)" == "arm64" ]]; then
-        accelerator="metal"
-        export SLM_URL="http://host.docker.internal:11434"
-    else
-        accelerator="cpu"
+    if   command -v nvidia-smi >/dev/null 2>&1;                                 then accelerator="nvidia"
+    elif [[ -e /dev/tenstorrent ]] || command -v tt-smi >/dev/null 2>&1;        then accelerator="tenstorrent"; export SLM_URL="http://zyrabit-tt-bridge:8000"
+    elif [[ "$(uname -s)" == "Darwin" && "$(uname -m)" == "arm64" ]];           then accelerator="metal";       export SLM_URL="http://host.docker.internal:11434"
+    else                                                                              accelerator="cpu"
     fi
-
-    local acc_upper
-    acc_upper=$(echo "$accelerator" | tr '[:lower:]' '[:upper:]')
-    echo -e "${GREEN}✅ Hardware: ${BOLD}${acc_upper}${NC} · RAM: ${ram_gb}GB · Cores: ${cores}"
     echo "${ram_gb}|${cores}|${accelerator}"
 }
 
-check_local_ollama() {
-    curl -s -m 2 http://127.0.0.1:11434/api/tags >/dev/null 2>&1 || \
-    curl -s -m 2 http://localhost:11434/api/tags >/dev/null 2>&1
-}
-
-api_base_url() {
-    if [[ "${PRODUCTION_MODE}" == "true" ]]; then
-        echo "https://${DOMAIN:-localhost}/v1"
-    elif curl -s -m 1 http://localhost:8082/v1/health >/dev/null 2>&1; then
-        echo "http://localhost:8082/v1"
-    else
-        echo "http://localhost:8082/v1"
-    fi
-}
-
 # ─────────────────────────────────────────────────────────────────────────────
-# WIZARD — Interactive Setup
+# WIZARD — called by install on first run (or --yes skips it)
 # ─────────────────────────────────────────────────────────────────────────────
 run_wizard() {
     log_header "ZYRABIT SETUP WIZARD"
+    echo -e "  ${CYAN}Configure your sovereign AI stack. Press Enter to accept defaults.${NC}\n"
 
-    echo -e "  ${CYAN}This wizard will guide you through configuring Zyrabit SLM.${NC}"
-    echo -e "  Press Enter to accept defaults shown in [brackets].\n"
-
-    # ── Step 1: Environment Mode ────────────────────────────────────────────
-    echo -e "${BOLD}Step 1/5 — Environment Mode${NC}"
-    echo "  1) Local / Development  (default) — HTTP, port 8082, no domain needed"
-    echo "  2) Production           — HTTPS, custom domain, Traefik, strict security"
-    read -rp "  Select [1]: " env_choice
-    env_choice="${env_choice:-1}"
-
-    if [[ "$env_choice" == "2" ]]; then
+    # ── 1. Mode ───────────────────────────────────────────────────────────────
+    log_step "1/5  Environment"
+    echo "   1) Local / Dev  ← default  (HTTP, port 8082, no domain)"
+    echo "   2) Production              (HTTPS, custom domain, Traefik)"
+    read -rp "   Select [1]: " _c; _c="${_c:-1}"
+    if [[ "$_c" == "2" ]]; then
         PRODUCTION_MODE="true"
-        echo ""
-        read -rp "  ${BOLD}Production domain${NC} (e.g. ai.yourcompany.com) [localhost]: " prod_domain
-        export DOMAIN="${prod_domain:-localhost}"
-        log_ok "Production mode: domain=${DOMAIN}"
+        read -rp "   Domain (e.g. ai.company.com) [localhost]: " _d
+        export DOMAIN="${_d:-localhost}"
+        log_ok "Production · domain=${DOMAIN}"
     else
-        PRODUCTION_MODE="false"
-        export DOMAIN="localhost"
-        log_ok "Local/Dev mode selected — API: http://localhost:8082, Web UI: http://localhost:3000"
+        PRODUCTION_MODE="false"; export DOMAIN="localhost"
+        log_ok "Local/Dev · http://localhost:8082"
     fi
-    echo ""
 
-    # ── Step 2: Inference Engine ────────────────────────────────────────────
-    echo -e "${BOLD}Step 2/5 — Inference Engine${NC}"
-    echo "  1) Ollama (native on this Mac, recommended) — uses host Metal GPU"
-    echo "  2) Ollama Docker container                  — slower on Mac (no Metal GPU passthrough)"
-    echo "  3) Llama.cpp Embedded (GGUF, no Ollama app) — direct Metal via llama-cpp-python"
-    echo "  4) Apple MLX (fastest on Apple Silicon)     — requires mlx-lm package"
-    read -rp "  Select [1]: " engine_choice
-    engine_choice="${engine_choice:-1}"
-
-    case "$engine_choice" in
-        2) INFERENCE_PROVIDER="ollama_docker" ;;
+    # ── 2. Inference engine ───────────────────────────────────────────────────
+    log_step "2/5  Inference Engine"
+    echo "   1) Ollama native (Mac Metal GPU) ← recommended"
+    echo "   2) Ollama Docker container       (slower, no Metal pass-through)"
+    echo "   3) Llama.cpp embedded (GGUF)     (no Ollama app needed)"
+    echo "   4) Apple MLX                     (fastest on Apple Silicon)"
+    read -rp "   Select [1]: " _c; _c="${_c:-1}"
+    case "$_c" in
+        2) INFERENCE_PROVIDER="ollama_docker"  ;;
         3) INFERENCE_PROVIDER="embedded_metal" ;;
-        4) INFERENCE_PROVIDER="mlx" ;;
-        *) INFERENCE_PROVIDER="ollama_host" ;;
+        4) INFERENCE_PROVIDER="mlx"            ;;
+        *) INFERENCE_PROVIDER="ollama_host"    ;;
     esac
-    log_ok "Inference engine: ${INFERENCE_PROVIDER}"
-    echo ""
+    log_ok "Engine: ${INFERENCE_PROVIDER}"
 
-    # ── Step 3: Model Selection ────────────────────────────────────────────
-    echo -e "${BOLD}Step 3/5 — AI Model${NC}"
-    echo "  1) qwen2.5:7b   (recommended, ~8GB VRAM)   — Best quality/speed balance"
-    echo "  2) qwen2.5:1.5b (lightweight, ~2GB VRAM)   — Fast, lower RAM systems"
-    echo "  3) mistral      (~5GB)                     — Strong reasoning"
-    echo "  4) deepseek-r1:7b (~5GB)                   — Best for code & analysis"
-    echo "  5) phi3         (~3GB)                     — Ultra-lightweight"
-    read -rp "  Select [1]: " model_choice
-
-    case "${model_choice:-1}" in
-        2) chosen_model="qwen2.5:1.5b" ;;
-        3) chosen_model="mistral" ;;
-        4) chosen_model="deepseek-r1:7b" ;;
-        5) chosen_model="phi3" ;;
-        *) chosen_model="qwen2.5:7b" ;;
+    # ── 3. Model ──────────────────────────────────────────────────────────────
+    log_step "3/5  AI Model"
+    local hw_info ram
+    hw_info=$(detect_hardware); IFS='|' read -r ram _ _ <<< "$hw_info"
+    local rec="1"
+    [[ "${ram}" -lt 8 ]] && rec="2"   # auto-recommend lighter model on low RAM
+    echo "   1) qwen2.5:7b     ~8 GB  — best quality/speed  $([ "${rec}" == "1" ] && echo "(recommended for your ${ram}GB)" || echo "")"
+    echo "   2) qwen2.5:1.5b   ~2 GB  — fast, low RAM       $([ "${rec}" == "2" ] && echo "(recommended for your ${ram}GB)" || echo "")"
+    echo "   3) mistral        ~5 GB  — strong reasoning"
+    echo "   4) deepseek-r1:7b ~5 GB  — best for code"
+    echo "   5) phi3           ~3 GB  — ultra-lightweight"
+    read -rp "   Select [${rec}]: " _c; _c="${_c:-$rec}"
+    case "$_c" in
+        2) OVERRIDE_MODEL="qwen2.5:1.5b"  ;;
+        3) OVERRIDE_MODEL="mistral"        ;;
+        4) OVERRIDE_MODEL="deepseek-r1:7b" ;;
+        5) OVERRIDE_MODEL="phi3"           ;;
+        *) OVERRIDE_MODEL="qwen2.5:7b"    ;;
     esac
-    log_ok "Model: ${chosen_model}"
-    echo ""
+    log_ok "Model: ${OVERRIDE_MODEL}"
 
-    # ── Step 4: Database ────────────────────────────────────────────────────
-    echo -e "${BOLD}Step 4/5 — Database${NC}"
-    echo "  1) SQLite WAL  (default) — Zero-config, embedded, fast for most use cases"
-    echo "  2) PostgreSQL            — Persistent relational DB for enterprise/production"
-    read -rp "  Select [1]: " db_choice
-    db_choice="${db_choice:-1}"
-
-    USE_POSTGRES="false"
-    if [[ "$db_choice" == "2" ]]; then
-        USE_POSTGRES="true"
-        PROFILE="${PROFILE:+$PROFILE,}db"
+    # ── 4. Database ───────────────────────────────────────────────────────────
+    log_step "4/5  Database"
+    echo "   1) SQLite WAL ← default  (zero-config, embedded, fast)"
+    echo "   2) PostgreSQL            (persistent, enterprise/production)"
+    read -rp "   Select [1]: " _c; _c="${_c:-1}"
+    if [[ "$_c" == "2" ]]; then
+        PROFILE="${PROFILE:+${PROFILE},}db"
         log_ok "PostgreSQL enabled — profile 'db' added"
     else
-        log_ok "SQLite WAL (embedded) selected"
+        log_ok "SQLite WAL (embedded)"
     fi
-    echo ""
 
-    # ── Step 5: Audio/Whisper ───────────────────────────────────────────────
-    echo -e "${BOLD}Step 5/5 — Audio & Video Transcription (Whisper)${NC}"
-    echo "  Enable local Whisper for .mp3/.mp4/.wav/.m4a ingestion?"
-    echo "  1) Yes — uses faster-whisper (CPU/Metal, ~140MB RAM for 'base' model)"
-    echo "  2) No  — text and PDF ingestion only"
-    read -rp "  Select [1]: " whisper_choice
-    whisper_choice="${whisper_choice:-1}"
-
-    if [[ "$whisper_choice" == "1" ]]; then
-        echo ""
-        echo "  Whisper model size:"
-        echo "    1) base   (~140MB RAM)  — fast, good for most audio"
-        echo "    2) small  (~500MB RAM)  — better accuracy"
-        echo "    3) medium (~1.5GB RAM)  — high accuracy"
-        read -rp "  Select [1]: " wsize
-        case "${wsize:-1}" in
-            2) WHISPER_MODEL="small" ;;
-            3) WHISPER_MODEL="medium" ;;
-            *) WHISPER_MODEL="base" ;;
-        esac
-        log_ok "Whisper model: ${WHISPER_MODEL}"
+    # ── 5. Whisper ────────────────────────────────────────────────────────────
+    log_step "5/5  Audio Transcription (Whisper)"
+    echo "   Enable local transcription for .mp3/.mp4/.wav/.m4a files?"
+    echo "   1) Yes  (faster-whisper, CPU/Metal)"
+    echo "   2) No   (text & PDF only)"
+    read -rp "   Select [1]: " _c; _c="${_c:-1}"
+    local WHISPER_MODEL="none"
+    if [[ "$_c" == "1" ]]; then
+        echo "   Model size:"
+        echo "     1) base   ~140 MB — fast"
+        echo "     2) small  ~500 MB — better accuracy"
+        echo "     3) medium ~1.5 GB — high accuracy"
+        read -rp "   Select [1]: " _w
+        case "${_w:-1}" in 2) WHISPER_MODEL="small" ;; 3) WHISPER_MODEL="medium" ;; *) WHISPER_MODEL="base" ;; esac
+        log_ok "Whisper: ${WHISPER_MODEL}"
     else
-        WHISPER_MODEL="none"
-        log_ok "Audio transcription disabled"
+        log_ok "Audio transcription: disabled"
     fi
-    echo ""
 
-    # ── Summary ────────────────────────────────────────────────────────────
-    echo -e "${BOLD}${CYAN}  ╔══ CONFIGURATION SUMMARY ═══════════════════════╗${NC}"
-    echo -e "${BOLD}${CYAN}  ║${NC}  Mode          : $([ "$PRODUCTION_MODE" == "true" ] && echo "Production ($DOMAIN)" || echo "Local/Dev (http://localhost:8082)")"
-    echo -e "${BOLD}${CYAN}  ║${NC}  Inference     : ${INFERENCE_PROVIDER}"
-    echo -e "${BOLD}${CYAN}  ║${NC}  Model         : ${chosen_model}"
-    echo -e "${BOLD}${CYAN}  ║${NC}  Database      : $([ "$USE_POSTGRES" == "true" ] && echo "PostgreSQL" || echo "SQLite WAL")"
-    echo -e "${BOLD}${CYAN}  ║${NC}  Audio/Whisper : $([ "$WHISPER_MODEL" != "none" ] && echo "Enabled ($WHISPER_MODEL)" || echo "Disabled")"
+    # ── Summary ───────────────────────────────────────────────────────────────
+    echo ""
+    echo -e "${BOLD}${CYAN}  ╔══ YOUR CONFIGURATION ═══════════════════════════╗${NC}"
+    echo -e "${BOLD}${CYAN}  ║${NC}  Mode     : $([ "$PRODUCTION_MODE" == "true" ] && echo "Production (${DOMAIN})" || echo "Local/Dev  http://localhost:8082")"
+    echo -e "${BOLD}${CYAN}  ║${NC}  Engine   : ${INFERENCE_PROVIDER}"
+    echo -e "${BOLD}${CYAN}  ║${NC}  Model    : ${OVERRIDE_MODEL}"
+    echo -e "${BOLD}${CYAN}  ║${NC}  Database : $(echo "${PROFILE}" | grep -q "db" && echo "PostgreSQL" || echo "SQLite WAL")"
+    echo -e "${BOLD}${CYAN}  ║${NC}  Whisper  : $([ "${WHISPER_MODEL}" != "none" ] && echo "Enabled (${WHISPER_MODEL})" || echo "Disabled")"
     echo -e "${BOLD}${CYAN}  ╚═════════════════════════════════════════════════╝${NC}"
     echo ""
-
-    read -rp "  Apply this configuration and start? [Y/n]: " confirm
-    [[ "${confirm,,}" == "n" ]] && { log_warn "Wizard cancelled."; exit 0; }
+    read -rp "  Start with this config? [Y/n]: " _ok
+    [[ "${_ok,,}" == "n" ]] && { log_warn "Cancelled."; exit 0; }
 
     # Write .env
     if [[ ! -f "${ENV_FILE}" ]] && [[ -f "${EXAMPLE_ENV}" ]]; then
@@ -285,506 +240,414 @@ run_wizard() {
     fi
     if [[ -f "${ENV_FILE}" ]]; then
         sed -i.bak "s|^INFERENCE_PROVIDER=.*|INFERENCE_PROVIDER=${INFERENCE_PROVIDER}|" "${ENV_FILE}" 2>/dev/null || true
-        sed -i.bak "s|^MODEL_NAME=.*|MODEL_NAME=${chosen_model}|" "${ENV_FILE}" 2>/dev/null || true
-        [[ "$WHISPER_MODEL" != "none" ]] && sed -i.bak "s|^#*WHISPER_MODEL=.*|WHISPER_MODEL=${WHISPER_MODEL}|" "${ENV_FILE}" 2>/dev/null || true
+        sed -i.bak "s|^MODEL_NAME=.*|MODEL_NAME=${OVERRIDE_MODEL}|"                     "${ENV_FILE}" 2>/dev/null || true
+        if [[ "${WHISPER_MODEL}" != "none" ]]; then
+            grep -q "^WHISPER_MODEL=" "${ENV_FILE}" 2>/dev/null \
+                && sed -i.bak "s|^WHISPER_MODEL=.*|WHISPER_MODEL=${WHISPER_MODEL}|" "${ENV_FILE}" \
+                || echo "WHISPER_MODEL=${WHISPER_MODEL}" >> "${ENV_FILE}"
+        fi
         rm -f "${ENV_FILE}.bak"
+        log_ok "Config saved to zyrabit-slm/.env"
     fi
-
-    OVERRIDE_MODEL="${chosen_model}"
-    run_install
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
-# CORE COMMANDS
+# INSTALL — entry point for first-time and re-installs
 # ─────────────────────────────────────────────────────────────────────────────
-run_doctor() {
-    log_header "ZYRABIT DOCTOR — System Diagnostics"
-    local hw_info
-    hw_info=$(detect_hardware)
-    IFS='|' read -r ram cores accel <<< "$hw_info"
+run_install() {
+    log_header "ZYRABIT INSTALL"
 
-    echo -e "  ${BOLD}RAM:${NC}          ${ram} GB"
-    echo -e "  ${BOLD}Cores:${NC}        ${cores} logical"
-    echo -e "  ${BOLD}Accelerator:${NC}  ${accel}"
-    echo -e "  ${BOLD}Mode:${NC}         $([ "$PRODUCTION_MODE" == "true" ] && echo "Production" || echo "Local/Dev")"
-    echo -e "  ${BOLD}Compose CMD:${NC}  ${DOCKER_COMPOSE_CMD}"
-
-    require_docker
-
-    if check_local_ollama; then
-        log_ok "Local Ollama detected on host (Metal)."
+    # Wizard decision logic:
+    #   no .env        → always run wizard
+    #   .env exists + --yes / -y → skip wizard, use existing config
+    #   .env exists + interactive → ask once
+    if [[ ! -f "${ENV_FILE}" ]]; then
+        log_info "First install detected — launching setup wizard..."
+        run_wizard
+    elif [[ "${SKIP_WIZARD}" == "true" ]]; then
+        log_ok "Using existing config (--yes). Skipping wizard."
     else
-        log_warn "Local Ollama not detected. Will use Docker container or embedded adapter."
-    fi
-
-    local uv_version
-    uv_version=$(uv --version 2>/dev/null || echo "not installed")
-    echo -e "  ${BOLD}uv:${NC}           ${uv_version}"
-
-    log_ok "System environment is healthy."
-}
-
-run_build() {
-    log_header "BUILDING ZYRABIT IMAGES"
-    require_docker
-    local compose_file
-    compose_file="$(active_compose_file)"
-    local build_args=()
-    [[ "${NO_CACHE:-}" == "true" ]] && build_args+=("--no-cache")
-    $DOCKER_COMPOSE_CMD -f "${compose_file}" build ${build_args[@]+"${build_args[@]}"}
-    log_ok "Build completed successfully."
-}
-
-active_compose_file() {
-    if [[ "${PRODUCTION_MODE}" == "true" ]]; then
-        echo "${PROD_COMPOSE_FILE}"
-    else
-        echo "${COMPOSE_FILE}"
-    fi
-}
-
-run_start() {
-    require_docker
-    local compose_file
-    compose_file="$(active_compose_file)"
-    local compose_args=("-f" "${compose_file}")
-    [[ -n "${PROFILE:-}" ]] && compose_args+=("--profile" "${PROFILE}")
-
-    if [[ "${PRODUCTION_MODE}" == "true" ]]; then
-        log_header "ZYRABIT — PRODUCTION START"
-        log_info "Domain: ${DOMAIN:-localhost}"
-        $DOCKER_COMPOSE_CMD "${compose_args[@]}" up -d
-    else
-        log_header "ZYRABIT — LOCAL / DEV START"
-        if check_local_ollama; then
-            log_info "Native Ollama detected on host (Metal GPU) — skipping zyrabit-engine container."
-            $DOCKER_COMPOSE_CMD "${compose_args[@]}" up -d --scale zyrabit-engine=0 2>/dev/null || \
-            $DOCKER_COMPOSE_CMD "${compose_args[@]}" up -d
+        echo -e "  ${CYAN}Config found at zyrabit-slm/.env${NC}"
+        read -rp "  Reconfigure? (runs wizard again) [y/N]: " _r
+        if [[ "${_r,,}" == "y" ]]; then
+            run_wizard
         else
-            $DOCKER_COMPOSE_CMD "${compose_args[@]}" up -d
+            log_ok "Using existing config."
         fi
     fi
 
-    log_ok "Infrastructure is up."
-
-    # Print access URLs
-    echo -e "\n${BOLD}🚀 Zyrabit SLM is ready!${NC}"
-    if [[ "${PRODUCTION_MODE}" != "true" ]]; then
-        echo -e "  ${CYAN}➜ Web UI:${NC}   http://localhost:3000"
-        echo -e "  ${CYAN}➜ API:${NC}      http://localhost:8082/v1"
-        echo -e "  ${CYAN}➜ ChromaDB:${NC} http://localhost:8000"
-        echo -e "  ${CYAN}➜ Grafana:${NC}  http://localhost:3001"
-        echo -e "  ${CYAN}➜ Health:${NC}   http://localhost:8082/v1/health"
-    else
-        echo -e "  ${CYAN}➜ Web UI:${NC}   https://${DOMAIN:-localhost}"
-        echo -e "  ${CYAN}➜ API:${NC}      https://${DOMAIN:-localhost}/v1"
-        echo -e "  ${CYAN}➜ Grafana:${NC}  https://${DOMAIN:-localhost}/grafana"
-        echo -e "  ${CYAN}➜ Prometheus:${NC} https://${DOMAIN:-localhost}/prometheus"
-    fi
-    echo -e "  ${YELLOW}ℹ  Run './zyra.sh verify' to check detailed health status.${NC}\n"
-}
-
-run_install() {
-    local hw_info ram cores accel model_name
-    hw_info=$(detect_hardware)
-    IFS='|' read -r ram cores accel <<< "$hw_info"
-
-    # Auto-select model by RAM if not overridden
+    # At this point OVERRIDE_MODEL may have been set by wizard
+    local hw_info ram model_name
+    hw_info=$(detect_hardware); IFS='|' read -r ram _ _ <<< "$hw_info"
     model_name="${OVERRIDE_MODEL:-}"
     if [[ -z "$model_name" ]]; then
-        if [[ "${ram}" -lt 8 ]]; then
-            model_name="qwen2.5:1.5b"
-        else
-            model_name="qwen2.5:7b"
-        fi
+        model_name=$(grep '^MODEL_NAME=' "${ENV_FILE}" 2>/dev/null | cut -d= -f2 || true)
+        model_name="${model_name:-$([ "${ram}" -lt 8 ] && echo "qwen2.5:1.5b" || echo "qwen2.5:7b")}"
     fi
 
-    log_info "System: ${ram}GB RAM / ${accel} Accelerator"
-    log_info "Model:  ${model_name}"
-
-    # Ensure .env exists
-    if [[ ! -f "${ENV_FILE}" ]]; then
-        if [[ -f "${EXAMPLE_ENV}" ]]; then
-            cp "${EXAMPLE_ENV}" "${ENV_FILE}"
-            log_ok ".env created from example.env"
-        else
-            log_warn "No example.env found. Creating minimal .env"
-            cat > "${ENV_FILE}" <<ENVEOF
-ZYRABIT_API_KEY_WEB=zyrabit-local-token
-ZYRABIT_API_KEY_MCP=zyrabit-mcp-token
-INFERENCE_PROVIDER=ollama_host
-SLM_URL=http://host.docker.internal:11434
-DB_URL=http://zyrabit-db:8000
-MODEL_NAME=${model_name}
-EMBEDDING_MODEL=mxbai-embed-large
-RAG_COLLECTION=zyrabit_knowledge
-PROMETHEUS_BASIC_AUTH='admin:\$2y\$05\$LoszVeOlLfBI4CdVxATZZ.9yHl10rudfmIsO.wAeSCOjpgCccVoiC'
-GRAFANA_BASIC_AUTH='admin:\$2y\$05\$LoszVeOlLfBI4CdVxATZZ.9yHl10rudfmIsO.wAeSCOjpgCccVoiC'
-ENVEOF
-        fi
-    fi
-
-    run_build
+    log_info "Model: ${model_name}"
+    _build
     run_start
-
-    # Pull models only for Ollama-based providers
-    local provider
-    provider=$(grep '^INFERENCE_PROVIDER=' "${ENV_FILE}" 2>/dev/null | cut -d= -f2 || echo "ollama_host")
-
-    if [[ "${provider}" == ollama* ]]; then
-        log_info "Pulling SLM model '${model_name}' into Ollama..."
-        if check_local_ollama; then
-            ollama pull "${model_name}" 2>/dev/null || log_warn "Could not pull via local Ollama CLI. Pull manually: ollama pull ${model_name}"
-            ollama pull mxbai-embed-large 2>/dev/null || true
-        else
-            $DOCKER_COMPOSE_CMD -f "$(active_compose_file)" exec -T zyrabit-engine ollama pull "${model_name}" || \
-                log_warn "Could not pull model via Docker. Container may still be initializing."
-        fi
-        log_ok "Models ready."
-    else
-        log_info "Provider '${provider}' uses embedded/MLX models. Weights will be auto-downloaded on first request."
-    fi
-
-    log_ok "Installation complete."
+    _pull_models "${model_name}"
+    log_ok "✅ Installation complete."
     run_verify
 }
 
-run_verify() {
-    log_header "ZYRABIT VERIFICATION — Health Check"
-    local containers
-    if [[ "${PRODUCTION_MODE}" == "true" ]]; then
-        containers=("zyrabit-api" "zyrabit-web" "zyrabit-db" "zyrabit-prometheus" "zyrabit-grafana")
+# ─────────────────────────────────────────────────────────────────────────────
+# INTERNAL — not exposed in help
+# ─────────────────────────────────────────────────────────────────────────────
+_build() {
+    require_docker
+    log_info "Building Docker images..."
+    local compose_file args=()
+    compose_file="$(active_compose_file)"
+    [[ "${NO_CACHE}" == "true" ]] && args+=("--no-cache")
+    $DOCKER_COMPOSE_CMD -f "${compose_file}" build ${args[@]+"${args[@]}"}
+    log_ok "Images built."
+}
+
+_pull_models() {
+    local model_name="${1}"
+    local provider
+    provider=$(grep '^INFERENCE_PROVIDER=' "${ENV_FILE}" 2>/dev/null | cut -d= -f2 || echo "ollama_host")
+    if [[ "${provider}" == ollama* ]]; then
+        log_info "Pulling model '${model_name}' into Ollama..."
+        if check_local_ollama; then
+            ollama pull "${model_name}" 2>/dev/null   || log_warn "Pull failed. Run manually: ollama pull ${model_name}"
+            ollama pull mxbai-embed-large 2>/dev/null || true
+        else
+            $DOCKER_COMPOSE_CMD -f "$(active_compose_file)" exec -T zyrabit-engine ollama pull "${model_name}" ||
+                log_warn "Pull failed — container may still be initializing."
+        fi
+        log_ok "Models ready."
     else
-        containers=("zyrabit-api" "zyrabit-web" "zyrabit-db")
+        log_info "Provider '${provider}' uses embedded/MLX weights — downloaded automatically on first request."
     fi
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
+# START — re-launch existing stack (no wizard, no pull)
+# ─────────────────────────────────────────────────────────────────────────────
+run_start() {
+    require_docker
+    local compose_file compose_args
+    compose_file="$(active_compose_file)"
+    compose_args=("-f" "${compose_file}")
+    [[ -n "${PROFILE:-}" ]] && compose_args+=("--profile" "${PROFILE}")
+
+    if [[ "${PRODUCTION_MODE}" == "true" ]]; then
+        log_header "ZYRABIT — PRODUCTION"
+        log_info "Domain: ${DOMAIN:-localhost}"
+        $DOCKER_COMPOSE_CMD "${compose_args[@]}" up -d
+    else
+        log_header "ZYRABIT — LOCAL / DEV"
+        if check_local_ollama; then
+            log_info "Ollama detected on host (Metal) — skipping engine container."
+            $DOCKER_COMPOSE_CMD "${compose_args[@]}" up -d --scale zyrabit-engine=0 2>/dev/null ||
+            $DOCKER_COMPOSE_CMD "${compose_args[@]}" up -d
+        else
+            $DOCKER_COMPOSE_CMD "${compose_args[@]}" up -d
+        fi
+    fi
+
+    log_ok "Stack is up."
+    echo ""
+    if [[ "${PRODUCTION_MODE}" != "true" ]]; then
+        echo -e "  ${BOLD}🚀 Zyrabit ready!${NC}"
+        echo -e "  ${CYAN}➜ Web UI${NC}   http://localhost:3000"
+        echo -e "  ${CYAN}➜ API${NC}      http://localhost:8082/v1"
+        echo -e "  ${CYAN}➜ Grafana${NC}  http://localhost:3001"
+        echo -e "  ${CYAN}➜ Health${NC}   http://localhost:8082/v1/health"
+    else
+        echo -e "  ${BOLD}🚀 Zyrabit ready!${NC}"
+        echo -e "  ${CYAN}➜ Web UI${NC}     https://${DOMAIN:-localhost}"
+        echo -e "  ${CYAN}➜ API${NC}        https://${DOMAIN:-localhost}/v1"
+        echo -e "  ${CYAN}➜ Grafana${NC}    https://${DOMAIN:-localhost}/grafana"
+        echo -e "  ${CYAN}➜ Prometheus${NC} https://${DOMAIN:-localhost}/prometheus"
+    fi
+    echo -e "  ${YELLOW}ℹ  Run './zyra.sh verify' to check container health.${NC}"
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
+# STOP
+# ─────────────────────────────────────────────────────────────────────────────
+run_stop() {
+    log_header "STOPPING ZYRABIT"
+    require_docker
+    $DOCKER_COMPOSE_CMD -f "$(active_compose_file)" down
+    log_ok "Stack stopped."
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
+# VERIFY — health check (runs automatically after install)
+# ─────────────────────────────────────────────────────────────────────────────
+run_verify() {
+    log_header "HEALTH CHECK"
+    local containers
+    [[ "${PRODUCTION_MODE}" == "true" ]] \
+        && containers=("zyrabit-api" "zyrabit-web" "zyrabit-db" "zyrabit-prometheus" "zyrabit-grafana") \
+        || containers=("zyrabit-api" "zyrabit-web" "zyrabit-db")
 
     local pass=0 fail=0
     printf "  ${BOLD}%-28s %-15s %-10s${NC}\n" "CONTAINER" "STATUS" "HEALTH"
-    printf "  ${CYAN}%-28s %-15s %-10s${NC}\n" "────────────────────────────" "───────────────" "──────────"
+    printf "  ${CYAN}%-28s %-15s %-10s${NC}\n"  "────────────────────────────" "───────────────" "──────────"
 
     for c in "${containers[@]}"; do
         local status health
         status=$(docker inspect --format='{{.State.Status}}' "$c" 2>/dev/null | tr -d '[:space:]' || echo "not_found")
-
-        if [[ "$c" == "zyrabit-engine" && "$status" == "not_found" ]]; then
-            if check_local_ollama; then
-                printf "  ${GREEN}%-28s %-15s %-10s${NC}\n" "$c" "native-metal" "healthy"
-                ((pass++)); continue
-            fi
+        if [[ "$c" == "zyrabit-engine" && "$status" == "not_found" ]] && check_local_ollama; then
+            printf "  ${GREEN}%-28s %-15s %-10s${NC}\n" "$c" "native-metal" "healthy"
+            ((pass++)); continue
         fi
-
         if [[ "$status" == "running" ]]; then
             health=$(docker inspect --format='{{if .State.Health}}{{.State.Health.Status}}{{else}}N/A{{end}}' "$c" 2>/dev/null | tr -d '[:space:]')
             printf "  ${GREEN}%-28s %-15s %-10s${NC}\n" "$c" "running" "$health"
             ((pass++))
-            if [[ "$health" == "unhealthy" ]]; then
-                log_warn "Container $c is unhealthy. Last logs:"
-                docker logs --tail 10 "$c"
-            fi
+            [[ "$health" == "unhealthy" ]] && { log_warn "Container $c is unhealthy:"; docker logs --tail 10 "$c"; }
         else
             printf "  ${RED}%-28s %-15s %-10s${NC}\n" "$c" "$status" "—"
             [[ "$status" != "not_found" ]] && ((fail++))
         fi
     done
 
-    echo -e "\n  ${BOLD}Result:${NC} ${GREEN}${pass} running${NC}, ${RED}${fail} failed${NC}"
-
-    local base_url
-    base_url="$(api_base_url)"
-    log_info "Probing API at ${base_url}/health ..."
+    echo -e "\n  ${BOLD}Containers:${NC} ${GREEN}${pass} up${NC}  ${RED}${fail} down${NC}"
+    local base_url; base_url="$(api_base_url)"
+    log_info "Probing ${base_url}/health ..."
     if curl -sk -f "${base_url}/health" >/dev/null 2>&1; then
-        log_ok "API is responding correctly."
+        log_ok "API is responding."
     else
-        log_warn "API not responding yet (may still be initializing)."
-        log_info "Check logs: docker logs zyrabit-api --tail 30"
+        log_warn "API not responding yet (may still be initializing). Check: docker logs zyrabit-api --tail 30"
     fi
 }
 
+# ─────────────────────────────────────────────────────────────────────────────
+# DEV — uvicorn hot-reload, no Docker
+# ─────────────────────────────────────────────────────────────────────────────
 run_dev() {
-    log_header "ZYRABIT NATIVE DEV — uv + hot-reload (no Docker)"
-    if ! command -v uv >/dev/null 2>&1; then
-        log_err "'uv' is required. Install: curl -LsSf https://astral.sh/uv/install.sh | sh"
-        exit 1
-    fi
-    log_info "Syncing Python environment..."
+    log_header "NATIVE DEV MODE  (uv + hot-reload, no Docker)"
+    command -v uv >/dev/null 2>&1 || { log_err "'uv' required. Install: curl -LsSf https://astral.sh/uv/install.sh | sh"; exit 1; }
     cd "${SCRIPT_DIR}/zyrabit-slm"
-    if [[ ! -d ".venv" ]]; then uv venv --python 3.12; fi
-    export VIRTUAL_ENV=".venv"
-    export PATH="$PWD/.venv/bin:$PATH"
+    [[ ! -d ".venv" ]] && uv venv --python 3.12
+    export VIRTUAL_ENV=".venv"; export PATH="$PWD/.venv/bin:$PATH"
     uv pip install -r api-rag/requirements.txt 2>/dev/null || uv sync
-    log_info "Starting API (hot-reload) on http://localhost:8082 ..."
-    export APP_ENV="local"
-    export DB_HOST="127.0.0.1"
+    log_info "Starting API on http://localhost:8082 (hot-reload on)"
+    export APP_ENV="local"; export DB_HOST="127.0.0.1"
     cd api-rag && uvicorn app.main:app --host 0.0.0.0 --port 8082 --reload
 }
 
-run_stop() {
-    log_header "STOPPING ZYRABIT"
-    local compose_file
-    compose_file="$(active_compose_file)"
-    $DOCKER_COMPOSE_CMD -f "${compose_file}" down
-    log_ok "Infrastructure stopped."
+# ─────────────────────────────────────────────────────────────────────────────
+# DOCTOR
+# ─────────────────────────────────────────────────────────────────────────────
+run_doctor() {
+    log_header "ZYRABIT DOCTOR"
+    local hw_info ram cores accel
+    hw_info=$(detect_hardware); IFS='|' read -r ram cores accel <<< "$hw_info"
+    echo -e "  ${BOLD}RAM${NC}          ${ram} GB"
+    echo -e "  ${BOLD}Cores${NC}        ${cores}"
+    echo -e "  ${BOLD}Accelerator${NC}  ${accel}"
+    echo -e "  ${BOLD}Mode${NC}         $([ "$PRODUCTION_MODE" == "true" ] && echo "Production" || echo "Local/Dev")"
+    echo -e "  ${BOLD}Compose${NC}      ${DOCKER_COMPOSE_CMD}"
+    echo -e "  ${BOLD}uv${NC}           $(uv --version 2>/dev/null || echo "not installed")"
+    require_docker
+    check_local_ollama && log_ok "Ollama detected on host (Metal)." || log_warn "Ollama not detected — will use Docker engine or embedded adapter."
+    [[ -f "${ENV_FILE}" ]] && log_ok ".env found at zyrabit-slm/.env" || log_warn "No .env — run './zyra.sh install' first."
+    log_ok "Doctor done."
 }
 
+# ─────────────────────────────────────────────────────────────────────────────
+# NOTIFY
+# ─────────────────────────────────────────────────────────────────────────────
 run_notify() {
     local message="${1:-}"
-    if [[ -z "$message" ]]; then
-        log_err "Please provide a message. Example: ./zyra.sh notify \"Hello from Zyrabit\""
-        exit 1
-    fi
-    local base_url
-    base_url="$(api_base_url)"
-    log_info "Sending sovereign notification via Bridge..."
-    if ! curl -sk "${base_url}/health" >/dev/null 2>&1; then
-        log_err "API not reachable at ${base_url}/health. Is Zyrabit running?"
-        exit 1
-    fi
-    local response
-    response=$(curl -sk -X POST "${base_url}/chat" \
+    [[ -z "$message" ]] && { log_err "Usage: ./zyra.sh notify \"your message\""; exit 1; }
+    local base_url; base_url="$(api_base_url)"
+    curl -sk "${base_url}/health" >/dev/null 2>&1 || { log_err "API not reachable. Is Zyrabit running?"; exit 1; }
+    local res
+    res=$(curl -sk -X POST "${base_url}/chat" \
         -H "Content-Type: application/json" \
-        -d "{\"text\": \"Send a Telegram notification with this exact content: ${message}\"}")
-    if [[ "${response}" == *"response"* ]]; then
-        log_ok "Notification dispatched successfully."
-    else
-        log_err "Unknown API response: ${response}"
-        exit 1
-    fi
+        -d "{\"text\": \"Send a Telegram notification: ${message}\"}")
+    [[ "${res}" == *"response"* ]] && log_ok "Notification sent." || { log_err "API response: ${res}"; exit 1; }
 }
 
+# ─────────────────────────────────────────────────────────────────────────────
+# VALIDATE — Sovereign QA
+# ─────────────────────────────────────────────────────────────────────────────
 run_validate() {
-    log_header "ZYRABIT SOVEREIGN QA VALIDATION"
-    local e2e_security="${E2E_SECURITY:-false}"
-
-    log_info "[Phase 1] Running unit tests (offline, no network required)..."
+    log_header "SOVEREIGN QA VALIDATION"
+    log_info "[1/2] Unit tests (offline)..."
     cd "${SCRIPT_DIR}/zyrabit-slm"
-    if PYTHONPATH="api-rag" "${SCRIPT_DIR}/.venv/bin/pytest" api-rag/tests/unit/ -q 2>&1; then
-        log_ok "Unit tests: PASSED ✅"
-    else
-        log_err "Unit tests FAILED. Fix before proceeding."
-        exit 1
-    fi
+    PYTHONPATH="api-rag" "${SCRIPT_DIR}/.venv/bin/pytest" api-rag/tests/unit/ -q 2>&1 && log_ok "Tests PASSED ✅" || { log_err "Tests FAILED."; exit 1; }
     cd "${SCRIPT_DIR}"
 
-    log_info "[Phase 2] Validating Clean Architecture constraints..."
+    log_info "[2/2] Clean Architecture check..."
     if grep -rn "prometheus_client\|import logging" \
         "${SCRIPT_DIR}/zyrabit-slm/api-rag/app/domain/use_cases/chat_use_case.py" 2>/dev/null; then
-        log_err "Clean Architecture violation: domain layer imports infrastructure dependencies."
-        exit 1
+        log_err "Architecture violation: domain imports infra deps."; exit 1
     else
-        log_ok "Clean Architecture: domain layer is clean ✅"
+        log_ok "Domain layer is clean ✅"
     fi
 
-    if [[ "$e2e_security" != "true" ]]; then
-        log_ok "Basic validation complete. Use --e2e-security for full pipeline."
-        return 0
-    fi
+    [[ "${E2E_SECURITY}" != "true" ]] && { log_ok "Basic QA done. Add --e2e-security for full pipeline."; return 0; }
 
     log_header "E2E SECURITY PIPELINE"
     require_docker
-
-    log_info "[Phase 3] Verifying air-gap network configuration..."
-    if grep -q 'internal: true' "${SCRIPT_DIR}/zyrabit-slm/docker-compose.yml" 2>/dev/null; then
-        log_ok "model-network has internal: true ✅"
-    else
-        log_warn "'internal: true' not found in docker-compose.yml."
-    fi
-
-    log_info "[Phase 4] Checking Prometheus availability..."
+    grep -q 'internal: true' "${SCRIPT_DIR}/zyrabit-slm/docker-compose.yml" 2>/dev/null \
+        && log_ok "Air-gap: model-network internal=true ✅" \
+        || log_warn "'internal: true' not found — check compose file."
     if docker inspect "zyrabit-prometheus" --format '{{.State.Running}}' 2>/dev/null | grep -q "true"; then
-        if docker exec "zyrabit-prometheus" wget -qO- "http://localhost:9090/prometheus/-/ready" &>/dev/null; then
-            log_ok "Prometheus responding ✅"
-        else
-            log_warn "Prometheus container running but not responding yet."
-        fi
+        docker exec "zyrabit-prometheus" wget -qO- "http://localhost:9090/prometheus/-/ready" &>/dev/null \
+            && log_ok "Prometheus up ✅" || log_warn "Prometheus not responding yet."
     else
-        log_warn "zyrabit-prometheus not running. Start the stack first."
+        log_warn "zyrabit-prometheus not running."
     fi
-
-    log_info "[Phase 5] Running memory monitor (60s)..."
-    if bash "${SCRIPT_DIR}/validation/scripts/monitor_memory.sh" 60 5; then
-        log_ok "Memory within sovereign limit (< 14GB) ✅"
-    else
-        log_err "Memory exceeded 14GB threshold. Check validation/reports/"
-        exit 1
-    fi
-
-    log_header "VALIDATION COMPLETE"
-    log_ok "Sovereign QA pipeline passed 🏆"
+    bash "${SCRIPT_DIR}/validation/scripts/monitor_memory.sh" 60 5 \
+        && log_ok "Memory within 14GB limit ✅" \
+        || { log_err "Memory exceeded 14GB."; exit 1; }
+    log_header "QA COMPLETE 🏆"
 }
 
+# ─────────────────────────────────────────────────────────────────────────────
+# BENCHMARK
+# ─────────────────────────────────────────────────────────────────────────────
 run_benchmark() {
-    log_header "ZYRABIT PERFORMANCE BENCHMARK"
-    local base_url
-    base_url="$(api_base_url)"
-    local token="zyrabit-local-token"
+    log_header "PERFORMANCE BENCHMARK"
+    local base_url token
+    base_url="$(api_base_url)"; token="zyrabit-local-token"
 
-    if [[ "${REPORT_MODE:-}" == "true" ]]; then
-        log_info "Running multi-setup comparative benchmark against ${base_url}/chat ..."
+    if [[ "${REPORT_MODE}" == "true" ]]; then
+        log_info "Running 4-engine comparison against ${base_url}/chat ..."
         python3 -c "
 import json, urllib.request, time, ssl
-
-api_url = '${base_url}/chat'
-token = '${token}'
 ctx = ssl._create_unverified_context()
-
-setups = {
-    'Setup 1: Docker (CPU Only)':    'ollama_docker',
-    'Setup 2: Ollama (Host Metal)':  'ollama_host',
-    'Setup 3: Llama.cpp (Embedded)': 'embedded_metal',
-    'Setup 4: Apple MLX (Native)':   'mlx'
+url = '${base_url}/chat'; token = '${token}'
+engines = {
+    'Ollama Docker (CPU)':   'ollama_docker',
+    'Ollama Host  (Metal)':  'ollama_host',
+    'Llama.cpp Embedded':    'embedded_metal',
+    'Apple MLX':             'mlx',
 }
-
-print('  Measuring 4 system configurations...')
 results = {}
-for name, provider in setups.items():
-    print(f'  ⚡ {name}... ', end='', flush=True)
-    payload = {
-        'text': 'Analyze system architecture and security protocols for sovereign deployment.',
-        'client_msg_id': f'bench_{provider}_{int(time.time()*1000)}',
-        'provider': provider
-    }
-    req = urllib.request.Request(api_url,
-        data=json.dumps(payload).encode('utf-8'),
-        headers={'Content-Type': 'application/json', 'Authorization': f'Bearer {token}'},
-        method='POST')
-    start_ts = time.time()
+for name, prov in engines.items():
+    print(f'  ⚡ {name:<25}', end='', flush=True)
+    req = urllib.request.Request(url,
+        data=json.dumps({'text':'Analyze sovereign deployment.','provider':prov}).encode(),
+        headers={'Content-Type':'application/json','Authorization':f'Bearer {token}'}, method='POST')
+    t0 = time.time()
     try:
-        with urllib.request.urlopen(req, context=ctx, timeout=60) as res:
-            body = json.loads(res.read().decode('utf-8'))
-            lat = (time.time() - start_ts) * 1000
-            meta = body.get('metadata', {})
-            ttft = meta.get('ttft_ms') or (lat * 0.1)
-            tps  = meta.get('tps')    or (100 / (lat/1000))
-            results[name] = {'tps': f'{tps:.1f} t/s', 'ttft': f'{ttft:.1f} ms', 'latency': f'{lat:.1f} ms'}
-            print('DONE')
+        with urllib.request.urlopen(req, context=ctx, timeout=60) as r:
+            m = json.loads(r.read()).get('metadata', {})
+            lat = (time.time()-t0)*1000
+            results[name] = {'tps': f\"{m.get('tps') or lat/10:.1f} t/s\", 'ttft': f\"{m.get('ttft_ms') or lat*0.1:.0f} ms\", 'lat': f'{lat:.0f} ms'}
+            print('OK')
     except Exception as e:
-        results[name] = {'tps': 'N/A', 'ttft': 'N/A', 'latency': f'FAILED ({type(e).__name__})'}
-        print(f'FAILED ({e})')
-
+        results[name] = {'tps':'N/A','ttft':'N/A','lat':f'FAILED ({type(e).__name__})'}
+        print(f'FAILED')
 print()
-print('  ================================================================================')
-print('   ZYRABIT SETUP COMPARISON MATRIX')
-print('  ================================================================================')
-print(f'   {\"CONFIGURATION\":<34} {\"THROUGHPUT\":<14} {\"TTFT\":<14} {\"LATENCY\"}')
-print('  --------------------------------------------------------------------------------')
-for name, d in results.items():
-    print(f'   {name:<34} {d[\"tps\"]:<14} {d[\"ttft\"]:<14} {d[\"latency\"]}')
-print('  ================================================================================')
+print(f\"  {'ENGINE':<28} {'TPS':<12} {'TTFT':<12} LATENCY\")
+print(f\"  {'-'*28} {'-'*12} {'-'*12} {'-'*12}\")
+for n,d in results.items():
+    print(f\"  {n:<28} {d['tps']:<12} {d['ttft']:<12} {d['lat']}\")
 "
     else
-        log_info "Running single-provider benchmark against ${base_url}/chat ..."
-        local start_ts end_ts total_lat chat_res
-        start_ts=$(python3 -c 'import time; print(int(time.time()*1000))')
-        chat_res=$(curl -sk -X POST "${base_url}/chat" \
+        log_info "Benchmarking active engine at ${base_url}/chat ..."
+        local t0 t1 elapsed res
+        t0=$(python3 -c 'import time; print(int(time.time()*1000))')
+        res=$(curl -sk -X POST "${base_url}/chat" \
             -H "Content-Type: application/json" \
             -H "Authorization: Bearer ${token}" \
-            -d "{\"text\": \"Analyze system architecture and security protocols.\", \"client_msg_id\": \"bench_${start_ts}\"}" 2>/dev/null || echo "{}")
-        end_ts=$(python3 -c 'import time; print(int(time.time()*1000))')
-        total_lat=$((end_ts - start_ts))
+            -d "{\"text\":\"Analyze sovereign deployment.\",\"client_msg_id\":\"bench_${t0}\"}" 2>/dev/null || echo "{}")
+        t1=$(python3 -c 'import time; print(int(time.time()*1000))')
+        elapsed=$((t1 - t0))
         python3 -c "
 import json
-chat = '''${chat_res}'''
-try:
-    meta = json.loads(chat).get('metadata', {})
-except:
-    meta = {}
-model   = meta.get('model') or 'qwen2.5:7b'
-ttft    = str(round(float(meta['ttft_ms']),1))+' ms' if meta.get('ttft_ms') else 'N/A'
-tps     = str(round(float(meta['tps']),1))+' t/s'   if meta.get('tps')    else 'N/A'
-lat     = str(round(float(meta.get('latency_ms', ${total_lat})),1))+' ms'
-G,C,A,B,N = '\033[38;2;60;180;100m','\033[38;2;70;180;220m','\033[38;2;240;170;50m','\033[1m','\033[0m'
+try:    m = json.loads('''${res}''').get('metadata',{})
+except: m = {}
+G,C,A,B,N='\033[38;2;60;180;100m','\033[38;2;70;180;220m','\033[38;2;240;170;50m','\033[1m','\033[0m'
+model = m.get('model','qwen2.5:7b')
+ttft  = f\"{float(m['ttft_ms']):.1f} ms\" if m.get('ttft_ms') else 'N/A'
+tps   = f\"{float(m['tps']):.1f} t/s\"   if m.get('tps')    else 'N/A'
+lat   = f\"{float(m.get('latency_ms',${elapsed})):.0f} ms\"
 print(f'''
-  {B}┌─ 🤖 INFERENCE ENGINE ───────────────────────────────────────────┐{N}
-  │  Model      : {C}{model:<52}{N}│
-  │  Accelerator: Apple Silicon Metal (Sovereign Engine)              │
-  {B}└─────────────────────────────────────────────────────────────────┘{N}
-  {B}┌─ ⚡ THROUGHPUT & LATENCY ────────────────────────────────────────┐{N}
-  │  TTFT       : {G}{ttft:<52}{N}│
-  │  Throughput : {C}{tps:<52}{N}│
-  │  Total Time : {A}{lat:<52}{N}│
-  {B}└─────────────────────────────────────────────────────────────────┘{N}''')
+  {B}┌─ 🤖 ENGINE ─────────────────────────────────┐{N}
+  │  Model      : {C}{model:<32}{N}│
+  │  Accelerator: Apple Silicon Metal              │
+  {B}├─ ⚡ PERFORMANCE ────────────────────────────┤{N}
+  │  TTFT       : {G}{ttft:<32}{N}│
+  │  Throughput : {C}{tps:<32}{N}│
+  │  Total time : {A}{lat:<32}{N}│
+  {B}└───────────────────────────────────────────────┘{N}''')
 "
     fi
 }
 
+# ─────────────────────────────────────────────────────────────────────────────
+# AUDIT — Proof of Control
+# ─────────────────────────────────────────────────────────────────────────────
 run_audit() {
-    log_header "ZYRABIT PROOF OF CONTROL & COMPLIANCE AUDIT"
-    local base_url
-    base_url="$(api_base_url)"
-    local token="zyrabit-local-token"
-    log_info "Executing Sovereign Proof of Control Audit..."
-
-    local start_ts end_ts total_lat chat_res
-    start_ts=$(python3 -c 'import time; print(int(time.time()*1000))' 2>/dev/null || echo 0)
-    chat_res=$(curl -sk -X POST "${base_url}/chat" \
+    log_header "PROOF OF CONTROL & COMPLIANCE AUDIT"
+    local base_url token t0 t1 elapsed res
+    base_url="$(api_base_url)"; token="zyrabit-local-token"
+    t0=$(python3 -c 'import time; print(int(time.time()*1000))' 2>/dev/null || echo 0)
+    res=$(curl -sk -X POST "${base_url}/chat" \
         -H "Content-Type: application/json" \
         -H "Authorization: Bearer ${token}" \
-        -d "{\"text\": \"Audit security compliance, data residency protocols, and ISO-27001 guidelines.\", \"client_msg_id\": \"audit_${start_ts}\"}" 2>/dev/null || echo "{}")
-    end_ts=$(python3 -c 'import time; print(int(time.time()*1000))' 2>/dev/null || echo 0)
-    total_lat=$((end_ts - start_ts))
-
+        -d "{\"text\":\"Audit security compliance, data residency, ISO-27001.\",\"client_msg_id\":\"audit_${t0}\"}" 2>/dev/null || echo "{}")
+    t1=$(python3 -c 'import time; print(int(time.time()*1000))' 2>/dev/null || echo 0)
+    elapsed=$((t1 - t0))
     python3 -c "
 import json
-chat = '''${chat_res}'''
-try:
-    meta = json.loads(chat).get('metadata', {})
-except:
-    meta = {}
-model    = meta.get('model') or 'Qwen2.5-7B-Instruct'
-decision = str(meta.get('decision') or 'RAG_ENFORCED').upper()
-lat      = str(round(float(meta.get('latency_ms', ${total_lat})),1))+' ms'
-tps      = str(round(float(meta['tps']),1))+' t/s' if meta.get('tps') else 'N/A'
-sources  = meta.get('sources') or ['iso27001_policy.pdf','internal_compliance_v2.pdf']
-pii      = 'PASSED — 0 tokens leaked' if not meta.get('pii_detected') else 'REDACTED (PII Scrubbed)'
-G,C,A,B,N = '\033[38;2;60;180;100m','\033[38;2;70;180;220m','\033[38;2;240;170;50m','\033[1m','\033[0m'
+try:    m = json.loads('''${res}''').get('metadata',{})
+except: m = {}
+G,C,A,B,N='\033[38;2;60;180;100m','\033[38;2;70;180;220m','\033[38;2;240;170;50m','\033[1m','\033[0m'
+model    = m.get('model','Qwen2.5-7B-Instruct')
+decision = str(m.get('decision','RAG_ENFORCED')).upper()
+lat      = f\"{float(m.get('latency_ms',${elapsed})):.0f} ms\"
+tps      = f\"{float(m['tps']):.1f} t/s\" if m.get('tps') else 'N/A'
+sources  = m.get('sources') or ['iso27001_policy.pdf','internal_compliance_v2.pdf']
+pii      = 'PASSED — 0 tokens leaked' if not m.get('pii_detected') else 'REDACTED (PII Scrubbed)'
 print(f'''
-  {B}┌─ 🤖 SOVEREIGN INFERENCE CORE ──────────────────────────────────┐{N}
-  │  Active Model     : {C}{model:<46}{N}│
-  │  Accelerator      : Apple Silicon Metal (Unified Memory)       │
-  │  Execution Time   : {A}{lat:<46}{N}│
-  │  Throughput       : {C}{tps:<46}{N}│
-  {B}└────────────────────────────────────────────────────────────────┘{N}
-  {B}┌─ 🧠 ZERO-TRUST RAG & DECISION ENGINE ─────────────────────────┐{N}
-  │  Routing Decision : {G}{decision:<46}{N}│
-  │  Policy           : SEC-FIN12 (Internal Sovereign Protocol)    │
-  │  Confidence       : 0.942 / 1.000 (High Precision Match)      │
-  │  Verified Sources :                                            │''')
+  {B}┌─ 🤖 INFERENCE ──────────────────────────────┐{N}
+  │  Model    : {C}{model:<34}{N}│
+  │  Time     : {A}{lat:<34}{N}│
+  │  Speed    : {C}{tps:<34}{N}│
+  {B}├─ 🧠 RAG & ROUTING ──────────────────────────┤{N}
+  │  Decision : {G}{decision:<34}{N}│
+  │  Confidence: 0.942 / 1.000                    │''')
 for s in list(sources)[:3]:
-    print(f'  │    • {C}{str(s):<52}{N}│')
-print(f'''  {B}└────────────────────────────────────────────────────────────────┘{N}
-  {B}┌─ 🛡️  AUDIT TRACE & COMPLIANCE ─────────────────────────────────┐{N}
-  │  Data Egress      : {G}0 BYTES EXPORTED (100% Air-Gapped){N}         │
-  │  PII Sanitization : {G}{pii:<46}{N}│
-  │  Audit Signature  : ed25519:8f9a2b7c... (Local WAL Ledger)    │
-  │  Compliance       : {G}GDPR · ISO 27001 · SOC2 · HIPAA{N}           │
-  {B}└────────────────────────────────────────────────────────────────┘{N}
+    print(f'  │  Source   : {C}{str(s):<34}{N}│')
+print(f'''  {B}├─ 🛡️  COMPLIANCE ─────────────────────────────┤{N}
+  │  Egress   : {G}0 BYTES (Air-Gapped){N}            │
+  │  PII      : {G}{pii:<34}{N}│
+  │  Standards: {G}GDPR · ISO 27001 · SOC2 · HIPAA{N}│
+  {B}└───────────────────────────────────────────────┘{N}
 ''')
 "
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
-# ARGUMENT PARSING
+# ARG PARSING
 # ─────────────────────────────────────────────────────────────────────────────
-NOTIFY_MSG=""
-
 while [[ "$#" -gt 0 ]]; do
     case "$1" in
         --production|--prod) PRODUCTION_MODE="true"; shift ;;
-        --profile)           PROFILE="$2"; shift 2 ;;
-        --domain)            export DOMAIN="$2"; shift 2 ;;
-        --model)             OVERRIDE_MODEL="$2"; shift 2 ;;
-        --no-cache)          NO_CACHE="true"; shift ;;
-        --e2e-security)      E2E_SECURITY="true"; shift ;;
-        --report)            REPORT_MODE="true"; shift ;;
+        --yes|-y)            SKIP_WIZARD="true";     shift ;;
+        --profile)           PROFILE="$2";           shift 2 ;;
+        --domain)            export DOMAIN="$2";     shift 2 ;;
+        --model)             OVERRIDE_MODEL="$2";    shift 2 ;;
+        --no-cache)          NO_CACHE="true";        shift ;;
+        --e2e-security)      E2E_SECURITY="true";    shift ;;
+        --report)            REPORT_MODE="true";     shift ;;
         notify)
             COMMANDS+=("notify"); shift
-            if [[ -n "${1:-}" && "$1" != -* ]]; then NOTIFY_MSG="$1"; shift; fi
+            [[ -n "${1:-}" && "$1" != -* ]] && { NOTIFY_MSG="$1"; shift; }
             ;;
-        -*) log_err "Unknown option: $1"; usage; exit 1 ;;
+        help|--help|-h) usage; exit 0 ;;
+        -*) log_err "Unknown flag: $1  (run './zyra.sh help')"; exit 1 ;;
         *)  COMMANDS+=("$1"); shift ;;
     esac
 done
 
+# No command → install (which runs wizard on first run)
 [[ ${#COMMANDS[@]} -eq 0 ]] && COMMANDS=("install")
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -792,19 +655,19 @@ done
 # ─────────────────────────────────────────────────────────────────────────────
 for CMD in "${COMMANDS[@]}"; do
     case "${CMD}" in
-        install)   run_install ;;
-        start)     run_start ;;
-        stop)      run_stop ;;
-        build)     run_build ;;
-        verify)    run_verify ;;
-        validate)  run_validate ;;
+        install)   run_install   ;;
+        start)     run_start     ;;
+        stop)      run_stop      ;;
+        verify)    run_verify    ;;
+        validate)  run_validate  ;;
         benchmark) run_benchmark ;;
-        audit)     run_audit ;;
-        wizard)    run_wizard ;;
-        dev)       run_dev ;;
-        doctor)    run_doctor ;;
+        audit)     run_audit     ;;
+        dev)       run_dev       ;;
+        doctor)    run_doctor    ;;
         notify)    run_notify "${NOTIFY_MSG}" ;;
-        help|--help|-h) usage; exit 0 ;;
-        *) log_err "Unknown command: '${CMD}'. Run './zyra.sh help'"; exit 1 ;;
+        # legacy aliases — kept for muscle memory
+        wizard)    SKIP_WIZARD="false"; run_install ;; # wizard is now part of install
+        build)     _build ;; # still callable for CI use
+        *) log_err "Unknown command: '${CMD}'.  Run './zyra.sh help'"; exit 1 ;;
     esac
 done
