@@ -2,7 +2,7 @@
 
 To execute your first Retrieval-Augmented Generation (RAG) query, follow these steps:
 
-1. **Start the stack:** Run `./zyra-up.sh`.
+1. **Start the stack:** Run `./zyra.sh`.
 2. **Ingest documents:** Upload files via the `/v1/ingest` endpoint.
 3. **Submit a query:** Send a POST request to the `/v1/chat` endpoint.
 

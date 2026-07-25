@@ -85,18 +85,19 @@ cd zyrabit-SLM
 uv sync --dev
 source .venv/bin/activate
 
-# 2. Configure environment
-cp zyrabit-slm/example.env zyrabit-slm/.env
-# Edit .env: set SLM_URL, MODEL_NAME, DOCS_DIR
+# 2. Start in local/dev mode (default — no flags needed)
+./zyra.sh install
 
-# 3. Start the full stack
-./zyra-up.sh
-
-# 4. Test it
-curl -X POST http://localhost:8080/query \
+# 3. Test it
+curl -X POST http://localhost:8082/v1/chat \
   -H "Content-Type: application/json" \
-  -d '{"query": "Summarize our Q3 compliance report", "session_id": "user-001"}'
+  -H "Authorization: Bearer zyrabit-local-token" \
+  -d '{"text": "Summarize our Q3 compliance report"}'
 ```
+
+> **First time?** Run `./zyra.sh wizard` for an interactive setup covering model selection, inference engine, database, and audio transcription.
+
+> **Going to production?** Run `./zyra.sh install --production` — triggers the domain, HTTPS, and PostgreSQL configuration wizard.
 
 ---
 
@@ -122,13 +123,15 @@ zyrabit-slm/
 ├── web-ui/               # Browser interface for local interaction
 ├── grafana/              # Dashboards — latency, throughput, model health
 ├── prometheus/           # Metrics collection and alerting rules
-├── traefik/              # Reverse proxy, TLS, routing
+├── traefik/              # Reverse proxy, TLS, routing (production only)
 ├── scripts/              # Operational helpers
-└── docker-compose.yml
+├── docker-compose.yml    # Production stack
+└── docker-compose.local.yml  # Local/Dev stack (default)
 mcp/                      # Model Context Protocol server (controlled tool access)
 internal/                 # Hardware-specific integrations (edge/constrained clusters)
 validation/               # Validation scripts and compliance artifacts
-zyra-up.sh                # Full lifecycle operator (start, stop, reset, upgrade)
+zyra.sh                   # Unified CLI: install · start · stop · wizard · benchmark
+zyra-up.sh                # Legacy shim → delegates to zyra.sh
 ```
 
 ---
@@ -136,11 +139,14 @@ zyra-up.sh                # Full lifecycle operator (start, stop, reset, upgrade
 ## 🧪 Testing
 
 ```bash
-# Full test suite
+# All unit tests
 pytest -q zyrabit-slm/api-rag/tests
 
-# Unit tests only
+# Unit tests only (offline, no network)
 pytest -q zyrabit-slm/api-rag/tests/unit
+
+# Sovereign QA validation (PII + architecture + air-gap)
+./zyra.sh validate --e2e-security
 ```
 
 > **Rule**: if a test reaches the network, it's a bug. The entire test suite runs offline.

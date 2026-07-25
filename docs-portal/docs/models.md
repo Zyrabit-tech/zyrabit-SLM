@@ -14,7 +14,7 @@ The stack selects a default model based on detected system resources during init
 Users can specify an alternative model during installation using the `--model` flag:
 
 ```bash
-./zyra-up.sh install --model mistral
+./zyra.sh install --model mistral
 ```
 
 Alternatively, the `MODEL_NAME` environment variable can be set in the `.env` file:

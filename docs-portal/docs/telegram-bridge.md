@@ -45,7 +45,7 @@ Una vez configurado, puedes probar la conexión desde la terminal de Zyrabit:
 
 ```bash
 # Ejecuta la prueba de notificación vía MCP
-./zyra-up.sh notify "🛡️ Conexión Soberana Exitosa. Hola, Kai."
+./zyra.sh notify "🛡️ Conexión Soberana Exitosa. Hola, Kai."
 ```
 
 ## 🩺 Sovereign Health Check

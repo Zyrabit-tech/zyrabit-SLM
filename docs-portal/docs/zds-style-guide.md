@@ -18,7 +18,7 @@ El estándar para ejemplos técnicos es vital para la reproducibilidad.
 ### Terminal (Interacción)
 Usa el lenguaje `bash`. Si es un comando que el usuario debe ejecutar, usa el prefijo `$`.
 ```bash
-$ ./zyra-up.sh start
+$ ./zyra.sh start
 ```
 
 ### Logs o Salidas
