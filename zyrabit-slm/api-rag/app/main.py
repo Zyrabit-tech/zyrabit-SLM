@@ -82,8 +82,13 @@ async def lifespan(app: FastAPI):
         
         # 2. Vector Store (Connecting to remote Chroma Server)
         import chromadb
-        # Use HttpClient to connect to the zyrabit-db container
-        chroma_client = chromadb.HttpClient(host=DB_HOST, port=DB_PORT)
+
+        try:
+            chroma_client = chromadb.HttpClient(host=DB_HOST, port=DB_PORT)
+        except Exception as e:
+            logger.warning(f"⚠️ Chroma HttpClient connection warning: {e}")
+            # Fallback to direct client instantiation
+            chroma_client = chromadb.Client()
         
         lc_chroma = Chroma(
             client=chroma_client,
@@ -109,8 +114,9 @@ async def lifespan(app: FastAPI):
         except Exception as e:
             logger.error(f"⚠️ Failed to load existing documents for BM25: {e}")
         
-        # 4. Inference Provider
-        app.state.inference_provider = InferenceProviderFactory.create_sync_provider("ollama")
+        # 4. Inference Provider (Dynamic from environment)
+        provider_name = os.getenv("INFERENCE_PROVIDER", "ollama")
+        app.state.inference_provider = InferenceProviderFactory.create_sync_provider(provider_name)
         app.state.streaming_provider = InferenceProviderFactory.create_stream_provider("ollama")
         
         # 5. Use Cases (Singletons for the session)

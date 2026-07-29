@@ -10,18 +10,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [2.2.0-beta] - 2026-06-30
 
 ### Added
+
 - **Dynamic PII Detection**: Integrated SpaCy NER model (`es_core_news_sm` / `en_core_web_sm`) in `pii_pipeline.py` to dynamically detect and mask names (PER), organizations (ORG), and locations (LOC), replacing the hardcoded list of names.
 - **Asynchronous Streaming Port**: Implemented `StreamingInferencePort` and refactored `OllamaStreamAdapter` to conform to Hexagonal Architecture principles, providing decoupled and robust streaming.
 - **Inference Provider Factory**: Created `InferenceProviderFactory` to dynamically instantiate both synchronous and asynchronous inference providers based on configuration.
 - **MCP Client Port**: Defined `McpClientPort` and implemented `InternalMcpClientAdapter` to allow `ChatUseCase` to discover and invoke tools from the embedded FastMCP instance securely.
 
 ### Changed
+
 - **Zero-Trust Security**: Applied `get_current_user` dependency globally to all main routers in `main.py` (`/v1/chat`, `/v1/documents`, `/v1/integrations`), ensuring uniform token-based authentication across all critical API endpoints.
 - **Tool-Enabled LLM Generation**: Injected MCP tools dynamically into the system prompt during `ChatUseCase.stream_response()` to enable the LLM to request tool executions using JSON blocks.
 
 ## [2.1.0] - 2026-06-09
 
 ### Added
+
 - **Advanced RAG (Cross-Encoder Re-Ranker)**: Integrated a lightweight token-intersection term-overlap scorer (`BGEReRankerAdapter`) to re-rank the top 10 search results and filter out chunks with a relevance score below `0.6` (max 3 chunks), preventing context pollution.
 - **Strict Sliding Window Memory**: Implemented sliding window memory (`SlidingWindowMemoryAdapter`) to limit active conversation history to the last 4 turns (8 messages) to prevent context collapse and reduce latency.
 - **Telegram Configuration Modal**: Added an instruction modal guide on how to configure Telegram bot token and chat ID in the local `.env` file, bound to the sidebar connectivity section.
@@ -29,6 +32,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Automated Dependency Checker Task**: Added a weekly GitHub Actions workflow (`dependency-checker.yml`) that scans Python and Node dependencies and automatically opens or updates a GitHub Issue task with vulnerabilities and outdated versions.
 
 ### Changed
+
 - **Exquisite Input Bar Design**: Redesigned the chat input container, removing the redundant paperclip attachment button in favor of a sleek, minimalist style (attaching files remains accessible via the sidebar Vault panel).
 - **Clean UI Header Layout**: Removed the redundant `K Z` badges and consolidated system status/model indicators in the header.
 - **Persistent Vault Storage**: Configured `zyrabit-api` to store document uploads under `/app/document_source` (persisted on host), preventing vault resets upon container recreations.
@@ -36,11 +40,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Removed Dependabot**: Deleted `.github/dependabot.yml` to disable automatic Dependabot pull requests entirely, preventing configuration parser errors and PR policy violations on the `main` branch.
 
 ### Fixed
+
 - **CI Dependency Audit**: Upgraded vulnerable dependencies (`aiohttp`, `idna`, `pyjwt`, `starlette`, `pip`) in `uv.lock`. Ignored the unpatched and isolated ChromaDB vulnerability (`CVE-2026-45829`) in the `pip-audit` step of the security workflows to restore CI checks to green.
 
 ## [2.0.0] - 2026-05-15
 
 ### Added
+
 - **Sovereign Persistence**: Migrated from memory-only state to SQLite WAL (`SovereignStateManager`) for persistent conversations and vault indexing.
 - **FastMCP SDK Integration**: Full migration to the official MCP v1.0 SDK, replacing legacy JSON-RPC handlers.
 - **Personalized Onboarding**: Added a profile management system that learns user goals and roles to tailor AI responses.
@@ -49,32 +55,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Security Shield**: Added executable script scanning for `import_to_vault` and automated security audits (Trivy + CodeQL).
 
 ### Changed
+
 - Refactored `ChatUseCase` to use the new `ContextManager` and `SovereignStateManager`.
 - Updated `main.py` to initialize the sovereign database lifespan.
 - Standardized file ingestion using SHA-256 hashing to avoid redundant processing.
 
 ### Fixed
+
 - Resolved `ImportError` on startup caused by legacy MCP RPC handlers.
 - Fixed database concurrency issues by enabling WAL mode for all SQLite operations.
 
 ## [1.7.5] - 2026-05-15
 
 ### Security
+
 - Hardened MCP file reading by strictly validating paths against allowed roots, preventing directory traversal attacks.
 - Updated `_resolve_file_uri` to canonicalize paths and use `os.path.commonpath` for robust path containment checks.
 
 ### Changed
+
 - Updated `zyra-up.sh verify` to use `uv run pytest -q` for running MCP security tests.
-    
+
 ## [1.5.0] - 2026-04-08
 
 ### Added
+
 - **Sovereign Agent Governance**: Established `AGENTS.md` with strict rules for AI Agent operations (no silent deletions).
 - **Hexagonal Architecture Realignment**: Deep structural refactor into `domain`, `ports`, `adapters`, `api`, and `core` layers.
 - **Gatekeeper Isolation**: Centralized SLM routing and security policy decision logic in `domain/services/gatekeeper.py`.
 - **Architectural Documentation**: Added `HEXAGONAL_ARCHITECTURE.md` to document the tiered structure.
 
 ### Changed
+
 - Refactored `main.py` into a lean entry point.
 - Moved API endpoints to `api/v1/endpoints/`.
 - Moved all external adapters to `infrastructure/`.
@@ -82,13 +94,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Updated `zyra-up.sh` with `--local`, `--model` flags and production cleanup.
 
 ### Fixed
+
 - Improved health check to detect if the SLM model is currently loaded in RAM.
 - Handled `=` syntax for the `--model` flag in the setup script.
 
 ## [1.2.0] - 2026-04-06
 
-
 ### Added
+
 - `zyrabit-slm/README_EN.md` as the English mirror for backend documentation.
 - Setup script role notes in root docs to clarify `install.sh` and `zyra-up.sh` responsibilities.
 - n8n integration adapter and automation port in `api-rag` (`app/adapters/n8n_adapter.py`, `app/ports/automation_port.py`).
@@ -97,6 +110,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `api-rag/app/adapters/make_adapter_blueprint.py` as a reusable blueprint for Make.com integration.
 
 ### Changed
+
 - Updated `README.md` and `README_EN.md` to document the official setup flow.
 - Updated `zyrabit-slm/README.md` with a link to the English version and setup script roles.
 - Updated `llms-full.md` to describe bootstrap flow (`install.sh` -> `zyra-up.sh install`).
@@ -110,12 +124,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Expanded docs (root/backend/docs-portal) with Air-Gapped deployment, observability auth routes, Make adapter bootstrap, and local super-fine-tuning next steps.
 
 ### Fixed
+
 - Removed fixed `DOCKER_API_VERSION=1.41` from `traefik` in `zyrabit-slm/docker-compose.yml` to avoid Docker API compatibility errors with newer Docker engines.
 
 ### Removed
+
 - Removed legacy `setup_slm.sh` to eliminate duplicate setup paths and reduce operational drift.
 
 ## [1.0.0] - 2026-02-23
 
 ### Added
+
 - Initial stable release.

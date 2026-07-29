@@ -90,43 +90,36 @@ fi
 # ─────────────────────────────────────────────────────────────────────────────
 usage() {
     print_banner
-    cat <<EOF
-${BOLD}Zyrabit SLM — Sovereign AI Runtime${NC}
-
-
-${BOLD}Usage:${NC}  ./zyra.sh [command] [flags]
-
-${BOLD}Commands:${NC}
-  install      Setup & launch  (runs wizard on first install, smart on re-runs)
-  start        Re-launch existing stack without wizard or model pull
-  stop         Tear down all containers
-  verify       Health check: container status + API probe
-  validate     Sovereign QA: unit tests, PII, air-gap, architecture
-  benchmark    Live performance metrics  (--report for 4-engine matrix)
-  audit        Proof-of-Control: compliance & 0-egress report
-  dev          Native hot-reload mode via uv (no Docker required)
-  doctor       Diagnose hardware, RAM, GPU, Docker, and uv
-  notify       Send notification via MCP bridge
-
-${BOLD}Flags:${NC}
-  --production     Production mode (HTTPS, Traefik, custom domain)
-  --yes / -y       Skip wizard prompts — use existing .env as-is
-  --profile <n>    Add Docker Compose profile  (db, automation, observability-extra)
-  --model <name>   Override AI model (e.g. mistral, llama3, phi3)
-  --no-cache       Force Docker build without cache
-  --report         With benchmark: run 4-engine comparison matrix
-  --e2e-security   With validate: run full PII + air-gap + memory pipeline
-
-${BOLD}Examples:${NC}
-  ./zyra.sh                      # First run → wizard → launch
-  ./zyra.sh install              # Same: wizard if no .env, smart re-run if .env exists
-  ./zyra.sh install -y           # Re-install silently with current config
-  ./zyra.sh install --production # Production wizard → Traefik + HTTPS + PostgreSQL
-  ./zyra.sh start                # Re-launch without setup (stack already configured)
-  ./zyra.sh start --profile db   # Launch with PostgreSQL enabled
-  ./zyra.sh benchmark --report   # 4-engine performance comparison
-  ./zyra.sh notify "Hello Zyra"  # Send notification via MCP
-EOF
+    echo -e "${BOLD}Zyrabit SLM — Sovereign AI Runtime${NC}\n"
+    echo -e "${BOLD}Usage:${NC}  ./zyra.sh [command] [flags]\n"
+    echo -e "${BOLD}Commands:${NC}"
+    echo -e "  install      Setup & launch  (runs wizard on first install, smart on re-runs)"
+    echo -e "  start        Re-launch existing stack without wizard or model pull"
+    echo -e "  stop         Tear down all containers"
+    echo -e "  verify       Health check: container status + API probe"
+    echo -e "  validate     Sovereign QA: unit tests, PII, air-gap, architecture"
+    echo -e "  benchmark    Live performance metrics  (--report for 4-engine matrix)"
+    echo -e "  audit        Proof-of-Control: compliance & 0-egress report"
+    echo -e "  dev          Native hot-reload mode via uv (no Docker required)"
+    echo -e "  doctor       Diagnose hardware, RAM, GPU, Docker, and uv"
+    echo -e "  notify       Send notification via MCP bridge\n"
+    echo -e "${BOLD}Flags:${NC}"
+    echo -e "  --production     Production mode (HTTPS, Traefik, custom domain)"
+    echo -e "  --yes / -y       Skip wizard prompts — use existing .env as-is"
+    echo -e "  --profile <n>    Add Docker Compose profile  (db, automation, observability-extra)"
+    echo -e "  --model <name>   Override AI model (e.g. mistral, llama3, phi3)"
+    echo -e "  --no-cache       Force Docker build without cache"
+    echo -e "  --report         With benchmark: run 4-engine comparison matrix"
+    echo -e "  --e2e-security   With validate: run full PII + air-gap + memory pipeline\n"
+    echo -e "${BOLD}Examples:${NC}"
+    echo -e "  ./zyra.sh                      # First run → wizard → launch"
+    echo -e "  ./zyra.sh install              # Same: wizard if no .env, smart re-run if .env exists"
+    echo -e "  ./zyra.sh install -y           # Re-install silently with current config"
+    echo -e "  ./zyra.sh install --production # Production wizard → Traefik + HTTPS + PostgreSQL"
+    echo -e "  ./zyra.sh start                # Re-launch without setup (stack already configured)"
+    echo -e "  ./zyra.sh start --profile db   # Launch with PostgreSQL enabled"
+    echo -e "  ./zyra.sh benchmark --report   # 4-engine performance comparison"
+    echo -e "  ./zyra.sh notify \"Hello Zyra\"  # Send notification via MCP\n"
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -378,11 +371,19 @@ run_start() {
         $DOCKER_COMPOSE_CMD "${compose_args[@]}" up -d
     else
         log_header "ZYRABIT — LOCAL / DEV"
-        if check_local_ollama; then
-            log_info "Ollama detected on host (Metal) — skipping engine container."
+        local current_provider
+        current_provider=$(grep '^INFERENCE_PROVIDER=' "${ENV_FILE}" 2>/dev/null | cut -d= -f2 || echo "ollama_host")
+
+        if [[ "${current_provider}" == "embedded_metal" || "${current_provider}" == "mlx" ]]; then
+            log_info "Provider is '${current_provider}' (Native Metal) — skipping zyrabit-engine container."
+            $DOCKER_COMPOSE_CMD "${compose_args[@]}" up -d --scale zyrabit-engine=0 2>/dev/null ||
+            $DOCKER_COMPOSE_CMD "${compose_args[@]}" up -d
+        elif check_local_ollama && [[ "${current_provider}" != "ollama_docker" && "${current_provider}" != "ollama" ]]; then
+            log_info "Ollama detected on host (Metal) — skipping zyrabit-engine container."
             $DOCKER_COMPOSE_CMD "${compose_args[@]}" up -d --scale zyrabit-engine=0 2>/dev/null ||
             $DOCKER_COMPOSE_CMD "${compose_args[@]}" up -d
         else
+            log_info "Starting infrastructure with zyrabit-engine container..."
             $DOCKER_COMPOSE_CMD "${compose_args[@]}" up -d
         fi
     fi
@@ -429,12 +430,20 @@ run_verify() {
     printf "  ${BOLD}%-28s %-15s %-10s${NC}\n" "CONTAINER" "STATUS" "HEALTH"
     printf "  ${CYAN}%-28s %-15s %-10s${NC}\n"  "────────────────────────────" "───────────────" "──────────"
 
+    local current_provider
+    current_provider=$(grep '^INFERENCE_PROVIDER=' "${ENV_FILE}" 2>/dev/null | cut -d= -f2 || echo "ollama_host")
+
     for c in "${containers[@]}"; do
         local status health
         status=$(docker inspect --format='{{.State.Status}}' "$c" 2>/dev/null | tr -d '[:space:]' || echo "not_found")
-        if [[ "$c" == "zyrabit-engine" && "$status" == "not_found" ]] && check_local_ollama; then
-            printf "  ${GREEN}%-28s %-15s %-10s${NC}\n" "$c" "native-metal" "healthy"
-            ((pass++)); continue
+        if [[ "$c" == "zyrabit-engine" && "$status" == "not_found" ]]; then
+            if [[ "${current_provider}" == "embedded_metal" || "${current_provider}" == "mlx" ]]; then
+                printf "  ${GREEN}%-28s %-15s %-10s${NC}\n" "$c" "native-metal" "healthy"
+                ((pass++)); continue
+            elif check_local_ollama; then
+                printf "  ${GREEN}%-28s %-15s %-10s${NC}\n" "$c" "native-metal" "healthy"
+                ((pass++)); continue
+            fi
         fi
         if [[ "$status" == "running" ]]; then
             health=$(docker inspect --format='{{if .State.Health}}{{.State.Health.Status}}{{else}}N/A{{end}}' "$c" 2>/dev/null | tr -d '[:space:]')
@@ -574,11 +583,13 @@ for name, prov in engines.items():
         with urllib.request.urlopen(req, context=ctx, timeout=60) as r:
             m = json.loads(r.read()).get('metadata', {})
             lat = (time.time()-t0)*1000
-            results[name] = {'tps': f\"{m.get('tps') or lat/10:.1f} t/s\", 'ttft': f\"{m.get('ttft_ms') or lat*0.1:.0f} ms\", 'lat': f'{lat:.0f} ms'}
+            tps_str = f\"{float(m['tps']):.1f} t/s\" if m.get('tps') else \"N/A\"
+            ttft_str = f\"{float(m['ttft_ms']):.0f} ms\" if m.get('ttft_ms') else \"N/A\"
+            results[name] = {'tps': tps_str, 'ttft': ttft_str, 'lat': f\"{lat:.0f} ms\"}
             print('OK')
     except Exception as e:
         results[name] = {'tps':'N/A','ttft':'N/A','lat':f'FAILED ({type(e).__name__})'}
-        print(f'FAILED')
+        print('FAILED')
 print()
 print(f\"  {'ENGINE':<28} {'TPS':<12} {'TTFT':<12} LATENCY\")
 print(f\"  {'-'*28} {'-'*12} {'-'*12} {'-'*12}\")
@@ -636,11 +647,11 @@ import json
 try:    m = json.loads('''${res}''').get('metadata',{})
 except: m = {}
 G,C,A,B,N='\033[38;2;60;180;100m','\033[38;2;70;180;220m','\033[38;2;240;170;50m','\033[1m','\033[0m'
-model    = m.get('model','Qwen2.5-7B-Instruct')
-decision = str(m.get('decision','RAG_ENFORCED')).upper()
-lat      = f\"{float(m.get('latency_ms',${elapsed})):.0f} ms\"
+model    = m.get('model', 'Offline / Not Loaded')
+decision = str(m.get('decision', 'DIRECT')).upper()
+lat      = f\"{float(m.get('latency_ms', ${elapsed})):.0f} ms\"
 tps      = f\"{float(m['tps']):.1f} t/s\" if m.get('tps') else 'N/A'
-sources  = m.get('sources') or ['iso27001_policy.pdf','internal_compliance_v2.pdf']
+sources  = m.get('sources') or []
 pii      = 'PASSED — 0 tokens leaked' if not m.get('pii_detected') else 'REDACTED (PII Scrubbed)'
 print(f'''
   {B}┌─ 🤖 INFERENCE ──────────────────────────────┐{N}
@@ -649,13 +660,12 @@ print(f'''
   │  Speed    : {C}{tps:<34}{N}│
   {B}├─ 🧠 RAG & ROUTING ──────────────────────────┤{N}
   │  Decision : {G}{decision:<34}{N}│
-  │  Confidence: 0.942 / 1.000                    │''')
+  │  Sources  : {C}{len(sources)} documents retrieved{N}         │''')
 for s in list(sources)[:3]:
     print(f'  │  Source   : {C}{str(s):<34}{N}│')
 print(f'''  {B}├─ 🛡️  COMPLIANCE ─────────────────────────────┤{N}
   │  Egress   : {G}0 BYTES (Air-Gapped){N}            │
   │  PII      : {G}{pii:<34}{N}│
-  │  Standards: {G}GDPR · ISO 27001 · SOC2 · HIPAA{N}│
   {B}└───────────────────────────────────────────────┘{N}
 ''')
 "
