@@ -232,7 +232,8 @@ run_wizard() {
     echo -e "${BOLD}${CYAN}  ╚═════════════════════════════════════════════════╝${NC}"
     echo ""
     read -rp "  Start with this config? [Y/n]: " _ok
-    [[ "${_ok,,}" == "n" ]] && { log_warn "Cancelled."; exit 0; }
+    _ok_lower=$(echo "${_ok:-y}" | tr '[:upper:]' '[:lower:]')
+    [[ "${_ok_lower}" == "n" ]] && { log_warn "Cancelled."; exit 0; }
 
     # Write .env
     if [[ ! -f "${ENV_FILE}" ]] && [[ -f "${EXAMPLE_ENV}" ]]; then
@@ -269,7 +270,8 @@ run_install() {
     else
         echo -e "  ${CYAN}Config found at zyrabit-slm/.env${NC}"
         read -rp "  Reconfigure? (runs wizard again) [y/N]: " _r
-        if [[ "${_r,,}" == "y" ]]; then
+        _r_lower=$(echo "${_r:-n}" | tr '[:upper:]' '[:lower:]')
+        if [[ "${_r_lower}" == "y" ]]; then
             run_wizard
         else
             log_ok "Using existing config."
