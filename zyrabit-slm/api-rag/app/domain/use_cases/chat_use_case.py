@@ -1,8 +1,6 @@
 import time
-import logging
 from typing import Optional, Dict, Any
 
-logger = logging.getLogger(__name__)
 from app.domain.ports.telemetry_port import TelemetryPort
 from app.infrastructure.shared.config import MODEL_NAME
 from app.infrastructure.shared.state_tracker import SovereignStateManager
