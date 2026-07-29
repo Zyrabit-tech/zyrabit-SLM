@@ -8,41 +8,52 @@
 
 set -euo pipefail
 
-# ─── ZYRABIT CYBERPUNK COLOR SYSTEM ─────────────────────────────────────────
-GREEN='\033[38;2;60;207;142m'   # #3CF18E - Zyrabit Neon Emerald
-CYAN='\033[38;2;0;210;255m'    # #00D2FF - Zyrabit Electric Cyan
-YELLOW='\033[38;2;255;170;0m'  # #FFAA00 - Amber Warning
-RED='\033[38;2;255;75;75m'     # #FF4B4B - Coral Red
-PURPLE='\033[38;2;168;85;247m'  # #A855F7 - Sovereign Purple
-BLUE='\033[38;2;59;130;246m'   # #3B82F6 - Deep Tech Blue
+# ─── ZYRABIT BRAND PALETTE & COLOR SYSTEM ────────────────────────────────────
+BRAND_SLATE='\033[38;2;63;90;109m'     # #3F5A6D Slate
+BRAND_ICE='\033[38;2;96;144;180m'      # #6090B4 Ice Blue
+BRAND_LIGHT='\033[38;2;226;236;244m'   # #E2ECF4 Soft Light
+BRAND_AMBER='\033[38;2;245;176;65m'    # #F5B041 Zyrabit Bee Yellow
+BRAND_DARK='\033[38;2;40;40;40m'       # Bee Black Stripes
+GREEN='\033[38;2;60;207;142m'          # #3CF18E Neon Emerald
+CYAN='\033[38;2;0;210;255m'           # #00D2FF Electric Cyan
+YELLOW='\033[38;2;255;170;0m'         # Amber Warning
+RED='\033[38;2;255;75;75m'            # Coral Red
+PURPLE='\033[38;2;168;85;247m'         # Sovereign Purple
+BLUE='\033[38;2;59;130;246m'          # Deep Tech Blue
 DIM='\033[2m'
 BOLD='\033[1m'
 NC='\033[0m'
 
 print_banner() {
-    echo -e "${CYAN}"
-    cat << "EOF"
-  ███████╗██╗██╗██████╗  █████╗ ██████╗ ██╗████████╗
-  ╚══███╔╝██║██║██╔══██╗██╔══██╗██╔══██╗██║╚══██╔══╝
-    ███╔╝ ██║██║██████╔╝███████║██████╔╝██║   ██║   
-   ███╔╝  ██║██║██╔══██╗██╔══██╗██╔══██╗██║   ██║   
-  ███████╗██║██║██║  ██║██║  ██║██████╔╝██║   ██║   
-  ╚══════╝╚═╝╚═╝╚═╝  ╚═╝╚═╝  ╚═╝╚═════╝ ╚═╝   ╚═╝   
-EOF
-    echo -e "${PURPLE}       🐝 SOVEREIGN SLM PLATFORM · INTEL & HARDWARE CORE${NC}\n"
+    echo -e "        ${BRAND_LIGHT}_${NC}"
+    echo -e "       ${BRAND_LIGHT}/_/_      .'''.${NC}"
+    echo -e "    ${BRAND_DARK}=${BRAND_AMBER}O${BRAND_DARK}(${BRAND_AMBER}_${BRAND_DARK}))${BRAND_AMBER}))${NC} ${BRAND_LIGHT}...'     \`${NC}"
+    echo -e "       ${BRAND_LIGHT}\\\\_\\\\            \`.    .'''.${NC}"
+    echo -e "                        ${BRAND_LIGHT}\`..'${NC}"
+    echo -e "${BRAND_ICE}"
+    echo '  ███████╗██╗   ██╗██████╗  █████╗ ██████╗ ██╗████████╗'
+    echo '  ╚══███╔╝╚██╗ ██╔╝██╔══██╗██╔══██╗██╔══██╗██║╚══██╔══╝'
+    echo '    ███╔╝  ╚████╔╝ ██████╔╝███████║██████╔╝██║   ██║   '
+    echo '   ███╔╝    ╚██╔╝  ██╔══██╗██╔══██║██╔══██╗██║   ██║   '
+    echo '  ███████╗   ██║   ██║  ██║██║  ██║██████╔╝██║   ██║   '
+    echo '  ╚══════╝   ╚═╝   ╚═╝  ╚═╝╚═╝  ╚═╝╚═════╝ ╚═╝   ╚═╝   '
+    echo -e "${NC}"
+    echo -e "${BOLD}${BRAND_SLATE}   🐝 ZYRABIT SLM — Sovereign AI Runtime${NC}"
+    echo -e "${BRAND_ICE}════════════════════════════════════════════════════════════${NC}\n"
 }
 
 log_info() { echo -e "${BLUE}ℹ${NC} $1"; }
 log_ok()   { echo -e "${GREEN}✔${NC} $1"; }
 log_warn() { echo -e "${YELLOW}⚠${NC} $1"; }
 log_err()  { echo -e "${RED}✖${NC} $1" >&2; }
-log_step() { echo -e "\n${BOLD}${PURPLE}▶ $1${NC}"; }
+log_step() { echo -e "\n${BOLD}${BRAND_AMBER}▶ $1${NC}"; }
 log_header() {
     print_banner
-    echo -e "${BOLD}${CYAN}═════════════════════════════════════════════════════════════════${NC}"
+    echo -e "${BOLD}${BRAND_ICE}═════════════════════════════════════════════════════════════════${NC}"
     echo -e "${BOLD}${GREEN}   $1${NC}"
-    echo -e "${BOLD}${CYAN}═════════════════════════════════════════════════════════════════${NC}\n"
+    echo -e "${BOLD}${BRAND_ICE}═════════════════════════════════════════════════════════════════${NC}\n"
 }
+
 
 
 # ─── Paths ────────────────────────────────────────────────────────────────────
