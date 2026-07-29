@@ -8,20 +8,42 @@
 
 set -euo pipefail
 
-# ─── UI ───────────────────────────────────────────────────────────────────────
-GREEN='\033[0;32m'; YELLOW='\033[1;33m'; BLUE='\033[0;34m'
-RED='\033[0;31m';   CYAN='\033[0;36m';   BOLD='\033[1m'; NC='\033[0m'
+# ─── ZYRABIT CYBERPUNK COLOR SYSTEM ─────────────────────────────────────────
+GREEN='\033[38;2;60;207;142m'   # #3CF18E - Zyrabit Neon Emerald
+CYAN='\033[38;2;0;210;255m'    # #00D2FF - Zyrabit Electric Cyan
+YELLOW='\033[38;2;255;170;0m'  # #FFAA00 - Amber Warning
+RED='\033[38;2;255;75;75m'     # #FF4B4B - Coral Red
+PURPLE='\033[38;2;168;85;247m'  # #A855F7 - Sovereign Purple
+BLUE='\033[38;2;59;130;246m'   # #3B82F6 - Deep Tech Blue
+DIM='\033[2m'
+BOLD='\033[1m'
+NC='\033[0m'
+
+print_banner() {
+    echo -e "${CYAN}"
+    cat << "EOF"
+  ███████╗██╗██╗██████╗  █████╗ ██████╗ ██╗████████╗
+  ╚══███╔╝██║██║██╔══██╗██╔══██╗██╔══██╗██║╚══██╔══╝
+    ███╔╝ ██║██║██████╔╝███████║██████╔╝██║   ██║   
+   ███╔╝  ██║██║██╔══██╗██╔══██╗██╔══██╗██║   ██║   
+  ███████╗██║██║██║  ██║██║  ██║██████╔╝██║   ██║   
+  ╚══════╝╚═╝╚═╝╚═╝  ╚═╝╚═╝  ╚═╝╚═════╝ ╚═╝   ╚═╝   
+EOF
+    echo -e "${PURPLE}       🐝 SOVEREIGN SLM PLATFORM · INTEL & HARDWARE CORE${NC}\n"
+}
 
 log_info() { echo -e "${BLUE}ℹ${NC} $1"; }
 log_ok()   { echo -e "${GREEN}✔${NC} $1"; }
 log_warn() { echo -e "${YELLOW}⚠${NC} $1"; }
 log_err()  { echo -e "${RED}✖${NC} $1" >&2; }
-log_step() { echo -e "\n${BOLD}${CYAN}▶ $1${NC}"; }
+log_step() { echo -e "\n${BOLD}${PURPLE}▶ $1${NC}"; }
 log_header() {
-    echo -e "\n${BOLD}${BLUE}══════════════════════════════════════════════════${NC}"
-    echo -e "${BOLD}${CYAN}   $1${NC}"
-    echo -e "${BOLD}${BLUE}══════════════════════════════════════════════════${NC}\n"
+    print_banner
+    echo -e "${BOLD}${CYAN}═════════════════════════════════════════════════════════════════${NC}"
+    echo -e "${BOLD}${GREEN}   $1${NC}"
+    echo -e "${BOLD}${CYAN}═════════════════════════════════════════════════════════════════${NC}\n"
 }
+
 
 # ─── Paths ────────────────────────────────────────────────────────────────────
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -56,8 +78,10 @@ fi
 # HELP
 # ─────────────────────────────────────────────────────────────────────────────
 usage() {
+    print_banner
     cat <<EOF
 ${BOLD}Zyrabit SLM — Sovereign AI Runtime${NC}
+
 
 ${BOLD}Usage:${NC}  ./zyra.sh [command] [flags]
 
