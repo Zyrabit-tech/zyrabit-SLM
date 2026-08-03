@@ -71,10 +71,10 @@ ENV PYTHONPATH="/app/.venv/lib/python3.12/site-packages:/app" \
 # Copy document_source directory
 COPY --from=builder /app/document_source /app/document_source
 
-# Create non-root group and user, and set ownership
+# Create non-root group and user with home directory, and set ownership
 RUN groupadd -g 10001 nonroot && \
-    useradd -r -u 10001 -g nonroot nonroot && \
-    chown -R nonroot:nonroot /app
+    useradd -m -d /home/nonroot -r -u 10001 -g nonroot nonroot && \
+    chown -R nonroot:nonroot /app /home/nonroot
 
 USER nonroot
 

@@ -83,12 +83,22 @@ async def lifespan(app: FastAPI):
         # 2. Vector Store (Connecting to remote Chroma Server)
         import chromadb
 
-        try:
-            chroma_client = chromadb.HttpClient(host=DB_HOST, port=DB_PORT)
-        except Exception as e:
-            logger.warning(f"⚠️ Chroma HttpClient connection warning: {e}")
-            # Fallback to direct client instantiation
-            chroma_client = chromadb.Client()
+        chroma_client = None
+        for attempt in range(1, 4):
+            try:
+                client_candidate = chromadb.HttpClient(host=DB_HOST, port=DB_PORT)
+                # Quick check to ensure the client is operational
+                client_candidate.heartbeat()
+                chroma_client = client_candidate
+                logger.info(f"✅ Connected to ChromaDB at {DB_HOST}:{DB_PORT}")
+                break
+            except Exception as err:
+                logger.warning(f"⚠️ Waiting for ChromaDB at {DB_HOST}:{DB_PORT} (attempt {attempt}/3): {err}")
+                await asyncio.sleep(1)
+
+        if not chroma_client:
+            logger.info("ℹ️ Using EphemeralClient for ChromaDB (local/standalone mode).")
+            chroma_client = chromadb.EphemeralClient()
         
         lc_chroma = Chroma(
             client=chroma_client,
@@ -161,7 +171,7 @@ async def lifespan(app: FastAPI):
         logger.info("✅ Infrastructure initialized successfully.")
 
     except Exception as e:
-        logger.error(f"❌ Failed to initialize infrastructure: {e}")
+        logger.exception(f"❌ Failed to initialize infrastructure: {e}")
 
 
     yield

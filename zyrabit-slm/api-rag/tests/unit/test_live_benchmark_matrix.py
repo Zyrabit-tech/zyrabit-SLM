@@ -53,7 +53,7 @@ def run_live_benchmark():
     req_direct = urllib.request.Request(
         f"{BASE_URL}/chat",
         data=json.dumps({
-            "text": "What is the capital of France?",
+            "text": "Hola",
             "client_msg_id": f"live_direct_{int(time.time())}"
         }).encode(),
         headers={
@@ -69,7 +69,7 @@ def run_live_benchmark():
         with urllib.request.urlopen(req_direct, context=ctx, timeout=60) as resp:
             direct_res = json.loads(resp.read().decode())
     except Exception as e:
-        print(f"    ⚠️ Direct Query failed or API offline: {e}")
+        print(f"    ⚠️ Direct Query error: {e}")
 
     direct_lat = (time.time() - t0) * 1000
     direct_meta = direct_res.get("metadata", {})
@@ -79,7 +79,7 @@ def run_live_benchmark():
     req_rag = urllib.request.Request(
         f"{BASE_URL}/chat",
         data=json.dumps({
-            "text": "Analyze system architecture and security protocols for sovereign deployment.",
+            "text": "Resumen de la arquitectura zyrabit y protocolos de seguridad.",
             "client_msg_id": f"live_rag_{int(time.time())}"
         }).encode(),
         headers={
