@@ -184,15 +184,19 @@ run_wizard() {
 
     # ── 2. Inference engine ───────────────────────────────────────────────────
     log_step "2/5  Inference Engine"
-    echo "   1) Ollama native (Mac Metal GPU) ← recommended"
+    echo "   1) Ollama native (Mac Metal GPU) ← recommended for Mac"
     echo "   2) Ollama Docker container       (slower, no Metal pass-through)"
     echo "   3) Llama.cpp embedded (GGUF)     (no Ollama app needed)"
     echo "   4) Apple MLX                     (fastest on Apple Silicon)"
+    echo "   5) Tenstorrent"
     read -rp "   Select [1]: " _c; _c="${_c:-1}"
     case "$_c" in
         2) INFERENCE_PROVIDER="ollama_docker"  ;;
         3) INFERENCE_PROVIDER="embedded_metal" ;;
         4) INFERENCE_PROVIDER="mlx"            ;;
+        5) INFERENCE_PROVIDER="tenstorrent"
+           PROFILE="${PROFILE:+${PROFILE},}tenstorrent"
+           ;;
         *) INFERENCE_PROVIDER="ollama_host"    ;;
     esac
     log_ok "Engine: ${INFERENCE_PROVIDER}"
