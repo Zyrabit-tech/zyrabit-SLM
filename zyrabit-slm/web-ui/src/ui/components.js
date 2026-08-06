@@ -164,56 +164,55 @@ class ZyraChatMessage extends HTMLElement {
 
         this.shadowRoot.innerHTML = `
             <style>
-                :host { display: block; width: 100%; margin-bottom: 0.75rem; animation: slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1); }
-                @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+                :host { display: block; width: 100%; margin-bottom: 1.25rem; animation: slideUp .28s ease-out; }
+                @keyframes slideUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
                 
                 .wrapper { 
                     display: flex; 
                     flex-direction: column;
-                    max-width: 80%; 
+                    max-width: min(100%, 720px);
                     ${isUser ? 'margin-left: auto; align-items: flex-end;' : 'align-items: flex-start;'} 
                 }
                 
                 .bubble { 
-                    padding: 12px 16px; 
-                    border-radius: 1.25rem; 
-                    font-size: 14.5px; 
-                    line-height: 1.45; 
+                    padding: 2px 0;
+                    border-radius: 0;
+                    font-size: 15px;
+                    line-height: 1.62;
                     word-break: break-word;
-                    box-shadow: 0 2px 8px rgba(0,0,0,0.04);
                     position: relative;
                 }
 
                 .user { 
-                    background: #3f5a6d; 
+                    background: #3f5a6d;
                     color: white; 
-                    border-top-right-radius: 4px;
-                    box-shadow: 0 4px 15px rgba(63, 90, 109, 0.15);
+                    border-radius: 14px 14px 3px 14px;
+                    padding: 11px 15px;
+                    line-height: 1.5;
+                    max-width: 560px;
                 }
 
                 .assistant { 
-                    background: white; 
-                    color: #323439; 
-                    border: 1px solid rgba(0,0,0,0.03);
-                    border-top-left-radius: 4px;
+                    background: transparent;
+                    color: #25313a;
                 }
 
                 /* Markdown Styling overrides */
                 .bubble p {
-                    margin: 8px 0;
+                    margin: 10px 0;
                 }
                 .bubble p:first-child { margin-top: 0; }
                 .bubble p:last-child { margin-bottom: 0; }
                 .bubble ul, .bubble ol {
-                    margin: 8px 0;
-                    padding-left: 20px;
+                    margin: 10px 0;
+                    padding-left: 22px;
                 }
                 .bubble li {
                     margin-bottom: 4px;
                 }
                 .bubble h1, .bubble h2, .bubble h3 {
                     font-weight: 700;
-                    margin-top: 14px;
+                    margin-top: 18px;
                     margin-bottom: 6px;
                 }
                 .assistant h1, .assistant h2, .assistant h3 { color: #1e293b; }
@@ -234,7 +233,7 @@ class ZyraChatMessage extends HTMLElement {
                     font-weight: 500;
                 }
                 .assistant code {
-                    background-color: rgba(63, 90, 109, 0.08);
+                    background-color: #edf2f3;
                     color: #3f5a6d;
                 }
                 .user code {
@@ -246,13 +245,13 @@ class ZyraChatMessage extends HTMLElement {
                     font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
                     font-size: 12.5px;
                     border-radius: 8px;
-                    padding: 12px;
+                    padding: 13px;
                     overflow-x: auto;
                     margin: 10px 0;
                 }
                 .assistant pre {
-                    background: #f8fafc;
-                    border: 1px solid rgba(0, 0, 0, 0.05);
+                    background: #f5f7f7;
+                    border: 1px solid #e3e8e8;
                 }
                 .user pre {
                     background: rgba(255, 255, 255, 0.1);
@@ -268,7 +267,7 @@ class ZyraChatMessage extends HTMLElement {
                 .user pre code { color: white; }
 
                 .source-tag {
-                    font-size: 8px;
+                    font-size: 9px;
                     font-weight: bold;
                     text-transform: uppercase;
                     letter-spacing: 0.1em;
@@ -279,35 +278,33 @@ class ZyraChatMessage extends HTMLElement {
 
                 .timestamp {
                     font-size: 9px;
-                    margin-top: 4px;
-                    opacity: 0.5;
-                    font-weight: 700;
-                    letter-spacing: 0.02em;
-                    ${isUser ? 'text-align: right; color: rgba(255,255,255,0.8);' : 'text-align: left; color: #3f5a6d;'}
+                    margin-top: 5px;
+                    padding: 0 2px;
+                    opacity: .58;
+                    font-weight: 600;
+                    letter-spacing: .02em;
+                    ${isUser ? 'text-align: right; color: rgba(255,255,255,.82);' : 'text-align: left; color: #65737d;'}
                 }
 
                 .meta { 
-                    font-size: 9px; 
-                    margin-top: 8px; 
-                    padding-top: 8px;
-                    border-top: 1px solid rgba(0,0,0,0.05);
-                    opacity: 0.6; 
-                    font-family: monospace; 
-                    display: flex; 
-                    flex-direction: column; 
-                    gap: 4px; 
+                    font-size: 11px;
+                    margin-top: 13px;
+                    color: #65737d;
+                    font-family: inherit;
                 }
                 
-                .sources { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
-                .source-pill { background: rgba(63, 90, 109, 0.05); padding: 2px 4px; border-radius: 4px; font-size: 8px; border: 1px solid rgba(63, 90, 109, 0.1); }
+                .meta summary { cursor: pointer; font-weight: 650; color: #3f5a6d; list-style: none; }
+                .meta summary::-webkit-details-marker { display: none; }
+                .sources { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px; }
+                .source-pill { background: #f2f5f5; padding: 3px 7px; border-radius: 999px; font-size: 10px; border: 1px solid #e0e7e7; color: #45545e; }
             </style>
             <div class="wrapper">
                 ${isTelegram ? `<div class="source-tag">✈️ Telegram</div>` : ''}
                 <div class="bubble ${isUser ? 'user' : 'assistant'}">
                     <div id="content"></div>
                     ${this.renderMetadata()}
-                    <div class="timestamp">${this._timestamp}</div>
                 </div>
+                <div class="timestamp">${this._timestamp}</div>
             </div>
         `;
         this.shadowRoot.getElementById('content').innerHTML = parseMarkdown(this._text);
@@ -318,13 +315,11 @@ class ZyraChatMessage extends HTMLElement {
     renderMetadata() {
         if (!this._metadata) return '';
         const m = this._metadata;
-        const sources = m.sources ? [...new Set(m.sources)].map(s => `<span class="source-pill">${s}</span>`).join('') : '';
+        const escapeHtml = (value) => String(value).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\"/g, '&quot;').replace(/'/g, '&#039;');
+        const sources = m.sources ? [...new Set(m.sources)].map(s => `<span class="source-pill">${escapeHtml(s)}</span>`).join('') : '';
 
         return `
-            <div class="meta">
-                <span>${(m.decision || 'direct').toUpperCase()} | ${m.latency_ms || 0}ms | HITS: ${m.rag_hits || 0}</span>
-                ${sources ? `<div class="sources"><strong>SOURCES:</strong> ${sources}</div>` : ''}
-            </div>
+            ${sources ? `<details class="meta"><summary>Sources · ${m.rag_hits || 0} passages</summary><div class="sources">${sources}</div></details>` : ''}
         `;
     }
 }

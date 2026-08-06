@@ -57,6 +57,16 @@ class ZyrabitApp {
         }
 
         this.loadVault();
+
+        const shell = document.getElementById('app-shell');
+        const collapse = document.getElementById('collapse-library');
+        const open = document.getElementById('open-library');
+        if (shell && Storage.load('library_collapsed')) shell.classList.add('library-collapsed');
+        if (collapse && shell) collapse.onclick = () => {
+            shell.classList.toggle('library-collapsed');
+            Storage.save('library_collapsed', shell.classList.contains('library-collapsed'));
+        };
+        if (open && shell) open.onclick = () => shell.classList.toggle('library-open');
     }
 
     async checkOnboarding() {
@@ -177,7 +187,7 @@ class ZyrabitApp {
         getSafeElement('close-docs').onclick = () => this.togglePanel(null);
         getSafeElement('close-settings').onclick = () => this.togglePanel(null);
 
-        document.querySelectorAll('.prompt-chip').forEach((button) => {
+        document.querySelectorAll('.prompt-chip, .starter[data-prompt]').forEach((button) => {
             button.onclick = () => {
                 const input = getSafeElement(IDS.CHAT_INPUT);
                 input.value = button.dataset.prompt || '';
@@ -290,7 +300,7 @@ class ZyrabitApp {
                 const statusPill = document.getElementById("status-pill");
                 if (statusPill) {
                     statusPill.className = "flex items-center gap-2 px-4 py-2 bg-green-500/10 border border-green-500/20 rounded-full animate-none";
-                    const dot = statusPill.querySelector("div");
+                    const dot = statusPill.querySelector("i");
                     if (dot) dot.className = "w-2 h-2 rounded-full bg-green-500 shadow-sm";
                     const text = statusPill.querySelector("span");
                     if (text) text.textContent = "SYSTEM READY";
@@ -312,7 +322,7 @@ class ZyrabitApp {
                 const statusPill = document.getElementById("status-pill");
                 if (statusPill) {
                     statusPill.className = "flex items-center gap-2 px-4 py-2 bg-red-500/10 border border-red-500/20 rounded-full";
-                    const dot = statusPill.querySelector("div");
+                    const dot = statusPill.querySelector("i");
                     if (dot) dot.className = "w-2 h-2 rounded-full bg-red-500 shadow-sm animate-pulse";
                     const text = statusPill.querySelector("span");
                     if (text) text.textContent = "OFFLINE";
@@ -364,15 +374,15 @@ class ZyrabitApp {
             const logs = getSafeElement(IDS.GDPR_LOGS);
             const time = new Date().toLocaleTimeString();
             const div = document.createElement('div');
-            div.className = 'border-b border-gray-100 pb-2 mb-2 animate-in slide-in-from-right-4 duration-300';
+            div.className = 'activity-event';
 
             // Using a safer approach for the inner content
             div.innerHTML = `
-                <div class="flex justify-between items-center mb-1">
-                    <span class="font-bold text-zyrabit-primary">[${type}]</span>
-                    <span class="text-[8px] opacity-40">${time}</span>
+                <div class="activity-event-head">
+                    <span>${type}</span>
+                    <time>${time}</time>
                 </div>
-                <div class="text-gray-600 event-content"></div>
+                <div class="event-content"></div>
             `;
             div.querySelector('.event-content').textContent = event;
             logs.prepend(div);
@@ -509,11 +519,37 @@ class ZyrabitApp {
         const description = document.getElementById('active-document-description');
         if (title) title.textContent = filename;
         if (description) description.textContent = 'Ask a question about this document or compare it with the rest of your library.';
+        this.setActiveDocument(filename);
         const input = document.getElementById(IDS.CHAT_INPUT);
         if (input) {
             input.placeholder = `Ask about ${filename}…`;
             input.focus();
         }
+    }
+
+    setActiveDocument(filename) {
+        const chip = document.getElementById('active-context-chip');
+        const name = document.getElementById('active-context-name');
+        if (!chip || !name) return;
+        if (!filename) {
+            chip.classList.add('hidden');
+            return;
+        }
+        name.textContent = filename;
+        chip.classList.remove('hidden');
+        const clear = document.getElementById('clear-active-document');
+        if (clear) clear.onclick = () => this.clearActiveDocument();
+    }
+
+    clearActiveDocument() {
+        document.querySelectorAll('.document-row.active').forEach((item) => item.classList.remove('active'));
+        const title = document.getElementById('active-document-title');
+        const description = document.getElementById('active-document-description');
+        if (title) title.textContent = 'All documents';
+        if (description) description.textContent = 'Your local workspace';
+        this.setActiveDocument(null);
+        const input = document.getElementById(IDS.CHAT_INPUT);
+        if (input) input.placeholder = 'Ask about your documents…';
     }
 
     renderSources(sources) {
@@ -587,6 +623,7 @@ class ZyrabitApp {
                 const description = document.getElementById('active-document-description');
                 if (title) title.textContent = file.name;
                 if (description) description.textContent = 'Document added. Indexing continues in the background; you can start asking questions now.';
+                this.setActiveDocument(file.name);
                 this.addGdprLog("INGEST", `SUCCESS_${file.name.toUpperCase()}`);
                 this.showNotification(`File uploaded: ${file.name}`, "success");
             } catch (e) {

@@ -1,91 +1,69 @@
-<!DOCTYPE html>
-<html lang="en" class="light">
+<!doctype html>
+<html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <link rel="icon" type="image/png" href="/img/favicon.png">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Zyrabit · Document workspace</title>
+  <link rel="icon" type="image/png" href="/img/favicon.png">
   <script type="module" src="/runtime-config.js"></script>
   <link rel="stylesheet" href="/src/input.css">
+  <style>.guide{height:calc(100% - 76px);overflow:auto;padding:18px 2px 8px;color:#52616a;font-size:13px;line-height:1.55}.guide p{display:block;margin:0}.guide-intro{padding-bottom:18px;border-bottom:1px solid var(--line);color:#68777e}.guide-section{padding:18px 0;border-bottom:1px solid var(--line)}.guide-label{margin-bottom:11px!important;color:#8a989d;font-size:10px;font-weight:750;letter-spacing:.12em}.guide-steps{display:grid;gap:15px;margin:0;padding:0;list-style:none}.guide-steps li{display:grid;grid-template-columns:25px 1fr;gap:10px}.guide-steps li>span{display:grid;width:22px;height:22px;place-items:center;border-radius:50%;background:#e9f1f5;color:var(--slate);font-size:10px;font-weight:750}.guide-steps b{display:block;width:auto;height:auto;background:none;color:#263740;font-size:13px}.guide-steps p{margin-top:3px;color:#718087;font-size:12px}.guide em{color:#3f5a6d;font-style:normal;font-weight:650}.guide-tip{padding:14px 15px;margin-top:18px;border:1px solid #dfe9eb;border-radius:10px;background:#f7faf9}.guide-tip .guide-label{margin-bottom:6px!important}.guide-prompts{display:grid;gap:7px}.guide-prompts .starter{justify-content:flex-start;padding:9px 10px;border:1px solid #e1e8e8;border-radius:8px;background:#fff;color:#44545c;font-size:12px;text-align:left}.guide-prompts .starter:hover{border-color:#9eafb4;background:#f7faf9}.guide-footer{padding:16px 0 4px;color:#819095;font-size:11px}.guide kbd{padding:2px 5px;border:1px solid #dce4e4;border-radius:4px;background:#f6f8f8;color:#596870;font:10px ui-monospace,monospace}.activity-summary{display:flex;gap:10px;margin:16px 0 12px;padding:12px;border:1px solid #dfe9eb;border-radius:10px;background:#f7faf9}.activity-summary b{display:block;color:#34454d;font-size:12px}.activity-summary p{margin:2px 0 0;color:#77868c;font-size:11px;line-height:1.35}.activity-pulse{width:8px;height:8px;flex:0 0 auto;margin-top:5px;border-radius:50%;background:#4e856f;box-shadow:0 0 0 4px #e2f0e9}.activity-log{height:calc(100% - 153px);padding:2px 0!important}.activity-empty{display:grid;place-content:center;height:100%;min-height:190px;text-align:center;color:#849197}.activity-empty span{font-size:24px;color:#b4c0c4}.activity-empty p{margin:8px 0 2px;font-weight:650;color:#5e6e75}.activity-empty small{font-size:11px}.activity-event{padding:12px 0;border-bottom:1px solid #edf0f0;animation:activity-in .25s ease-out}.activity-event-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px}.activity-event-head span{color:#3f5a6d;font-size:10px;font-weight:750;letter-spacing:.08em;text-transform:uppercase}.activity-event-head time{color:#9aa7ab;font-size:10px}.event-content{color:#596970;font-size:12px;line-height:1.45}.instruction-note{padding:12px;border:1px solid #dfe9eb;border-radius:10px;background:#f7faf9}.instruction-note b{display:block;color:#34454d;font-size:12px}.instruction-note p{margin:3px 0 0;color:#77868c;font-size:11px;line-height:1.4}@keyframes activity-in{from{opacity:0;transform:translateX(7px)}to{opacity:1;transform:translateX(0)}}</style>
 </head>
-<body class="h-screen overflow-hidden">
-  <main class="document-workspace">
-    <aside class="library-panel" aria-label="Document library">
-      <div class="brand-lockup">
-        <img src="/img/logo_zyrabit.png" alt="Zyrabit" class="brand-mark">
-        <div><p class="eyebrow">ZYRABIT</p><p class="brand-subtitle">Document workspace</p></div>
+<body>
+  <main class="app-shell" id="app-shell">
+    <aside class="library" aria-label="Document library">
+      <div class="library-top">
+        <a class="brand" href="/" aria-label="Zyrabit home"><img src="/img/logo_zyrabit.png" alt=""><span>ZYRABIT</span></a>
+        <button id="collapse-library" class="icon-button desktop-only" aria-label="Collapse library">‹</button>
       </div>
-
-      <button id="toggle-ingest" class="import-button" type="button">
-        <span aria-hidden="true">＋</span> Import documents
-      </button>
-      <input id="file-input" type="file" multiple class="hidden" accept=".pdf,.docx,.txt,.md,.wav,.mp3,.m4a,.mp4,.webm,.ogg,.flac">
-
-      <div id="drop-zone" class="drop-target" role="button" tabindex="0" aria-label="Choose documents to upload">
-        <div id="drop-zone-content"><span aria-hidden="true">↓</span> Drop files here or browse</div>
-        <div id="drop-zone-loader" class="hidden">Adding document…</div>
+      <button id="toggle-ingest" class="primary-action" type="button"><span>+</span><b>Import</b><em>documents</em></button>
+      <input id="file-input" class="hidden" type="file" multiple accept=".pdf,.docx,.txt,.md,.wav,.mp3,.m4a,.mp4,.webm,.ogg,.flac">
+      <div id="drop-zone" class="drop-zone" role="button" tabindex="0" aria-label="Import documents by choosing files">
+        <div id="drop-zone-content"><span>↓</span> Drop files or browse</div><div id="drop-zone-loader" class="hidden">Preparing document…</div>
       </div>
-
-      <div class="library-heading"><span>Library</span><span id="document-count">0</span></div>
+      <div class="library-label"><span>Documents</span><span id="document-count">0</span></div>
       <div id="vault-list" class="document-list" aria-live="polite"></div>
-
-      <div class="library-footer">
-        <button id="toggle-settings" type="button">Settings</button>
-        <button id="toggle-gdpr" type="button">Activity</button>
-        <span id="status-pill" class="status-pill"><i></i><span>Connecting</span></span>
+      <div class="library-bottom">
+        <button id="toggle-settings" type="button">Instructions</button><button id="toggle-gdpr" type="button">Activity</button>
       </div>
     </aside>
 
-    <section class="conversation-panel">
-      <header class="workspace-header">
-        <div>
-          <p class="eyebrow">WORKSPACE</p>
-          <h1 id="active-document-title">Ask across your documents</h1>
-          <p id="active-document-description">Import a document to make it available as context.</p>
-        </div>
-        <button id="toggle-docs" class="quiet-button" type="button">How it works</button>
+    <section class="workspace">
+      <header class="topbar">
+        <button id="open-library" class="icon-button mobile-only" aria-label="Open documents">☰</button>
+        <div class="document-context"><span class="context-dot"></span><span id="active-document-title">All documents</span><span id="active-document-description">Your local workspace</span></div>
+        <div class="topbar-actions"><span id="status-pill" class="connection-status"><i></i><span>Connecting</span></span><button id="toggle-docs" class="icon-button" aria-label="Help">?</button></div>
       </header>
 
-      <div id="chat-container" class="conversation-stream" aria-live="polite">
-        <section id="floating-suggestions" class="empty-state">
-          <div class="empty-mark"><img src="/img/logo_zyrabit.png" alt=""></div>
-          <p class="eyebrow">LOCAL DOCUMENT ANALYSIS</p>
-          <h2>Start with a document.</h2>
-          <p>Upload PDFs, Word files, notes, or audio. Then ask a question in plain language.</p>
-          <div class="prompt-grid">
-            <button class="prompt-chip" type="button" data-prompt="Summarize the most important points.">Summarize this</button>
-            <button class="prompt-chip" type="button" data-prompt="What decisions, risks, and next steps are in these documents?">Find decisions</button>
-            <button class="prompt-chip" type="button" data-prompt="Compare the information across the uploaded documents.">Compare documents</button>
+      <div id="chat-container" class="chat-scroll" aria-live="polite">
+        <section id="floating-suggestions" class="welcome">
+          <p class="kicker">LOCAL DOCUMENT ANALYSIS</p>
+          <h1>Think with your documents.</h1>
+          <p class="welcome-copy">Import a file, choose a starting point, or ask a question. Answers stay grounded in your local library.</p>
+          <div class="starter-actions">
+            <button class="starter" type="button" data-prompt="Give me a concise summary of the key points."><span>01</span> Summarize a document</button>
+            <button class="starter" type="button" data-prompt="Find the decisions, open questions, and next steps."><span>02</span> Find decisions and next steps</button>
+            <button class="starter" type="button" data-prompt="Compare the arguments and differences across my documents."><span>03</span> Compare documents</button>
           </div>
         </section>
       </div>
 
-      <div class="composer-wrap">
+      <div class="composer-area">
+        <div id="active-context-chip" class="context-chip hidden"><span>⌑</span><span id="active-context-name"></span><button id="clear-active-document" type="button" aria-label="Clear active document">×</button></div>
         <form id="chat-form" class="composer">
-          <textarea id="chat-input" rows="1" placeholder="Ask about your documents…" aria-label="Ask about documents"></textarea>
-          <button id="chat-submit" type="submit" aria-label="Send message"><span class="button-text">↑</span><span class="loader-ios hidden"></span></button>
+          <textarea id="chat-input" rows="1" aria-label="Ask about your documents" placeholder="Ask about your documents…"></textarea>
+          <button id="chat-submit" type="submit" aria-label="Send"><span class="button-text">↑</span><span class="loader-ios hidden"></span></button>
         </form>
-        <p class="composer-hint">Enter to send · Documents stay on this local workspace</p>
+        <p>Enter to send <span>·</span> sources appear below each answer</p>
       </div>
     </section>
-
-    <aside class="context-panel" aria-label="Answer context">
-      <div class="context-header"><div><p class="eyebrow">CONTEXT</p><h2>Sources</h2></div><button id="clear-sources" class="quiet-icon" type="button" aria-label="Clear sources">×</button></div>
-      <div id="sources-list" class="sources-list">
-        <div class="context-empty"><span aria-hidden="true">⌁</span><p>Sources used in an answer will appear here.</p></div>
-      </div>
-      <div class="context-divider"></div>
-      <p class="eyebrow">SYSTEM</p>
-      <div class="system-summary"><div><span>API</span><zyra-status-dot id="health-api-dot" status="offline"></zyra-status-dot></div><div><span>Model</span><zyra-status-dot id="health-slm-dot" status="offline"></zyra-status-dot></div><div><span>Index</span><zyra-status-dot id="health-db-dot" status="offline"></zyra-status-dot></div><div class="hidden"><zyra-status-dot id="health-mcp-dot" status="offline"></zyra-status-dot></div></div>
-    </aside>
   </main>
 
-  <div id="gdpr-panel" class="side-panel compact-panel"><div class="panel-title"><h2>Activity</h2><button id="close-gdpr" type="button">×</button></div><div id="gdpr-logs" class="activity-log"><p>Waiting for activity…</p></div></div>
-  <div id="settings-panel" class="side-panel compact-panel"><div class="panel-title"><h2>Assistant settings</h2><button id="close-settings" type="button">×</button></div><form id="settings-form"><label for="settings-system-prompt">System instructions</label><textarea id="settings-system-prompt" placeholder="You are a helpful document assistant."></textarea><button type="submit" class="import-button">Save changes</button></form></div>
-  <div id="docs-panel" class="side-panel compact-panel"><div class="panel-title"><h2>How it works</h2><button id="close-docs" type="button">×</button></div><ol class="help-list"><li>Import one or more documents.</li><li>Wait until they appear in the library.</li><li>Ask a question. The answer lists the document sources used.</li></ol></div>
+  <div id="gdpr-panel" class="side-panel"><div class="panel-header"><div><p class="kicker">SESSION</p><h2>Activity</h2></div><button id="close-gdpr" class="icon-button" type="button">×</button></div><div class="activity-summary"><span class="activity-pulse"></span><div><b>Live workspace events</b><p>Imports, searches, and replies from this session.</p></div></div><div id="gdpr-logs" class="activity-log"><div class="activity-empty"><span>○</span><p>No activity yet</p><small>Your session events will appear here.</small></div></div></div>
+  <div id="settings-panel" class="side-panel"><div class="panel-header"><div><p class="kicker">BEHAVIOR</p><h2>Response instructions</h2></div><button id="close-settings" class="icon-button" type="button">×</button></div><form id="settings-form" class="settings-form"><div class="instruction-note"><b>Set the assistant’s working style</b><p>These instructions are applied to new replies in this workspace.</p></div><label for="settings-system-prompt">Base instruction</label><textarea id="settings-system-prompt" placeholder="For example: answer concisely, use bullet points, and identify uncertainty."></textarea><button type="submit" class="primary-action">Save instructions</button></form></div>
+  <div id="docs-panel" class="side-panel"><div class="panel-header"><div><p class="kicker">GUIDE</p><h2>How it works</h2></div><button id="close-docs" class="icon-button" type="button">×</button></div><div class="guide"><p class="guide-intro">A focused workflow for reading, comparing, and retrieving knowledge from your local document library.</p><section class="guide-section"><p class="guide-label">START HERE</p><ol class="guide-steps"><li><span>1</span><div><b>Add material</b><p>Use <em>Import documents</em> or drop files into the library. Text, PDF, Word, and common audio formats are supported.</p></div></li><li><span>2</span><div><b>Set the scope</b><p>Select a document when you want a focused conversation, or keep <em>All documents</em> to compare the whole library.</p></div></li><li><span>3</span><div><b>Ask naturally</b><p>Request a summary, locate a decision, compare viewpoints, or ask for an explanation in your preferred format.</p></div></li></ol></section><section class="guide-section guide-tip"><p class="guide-label">READING ANSWERS</p><p>Open <b>Sources</b> beneath an answer to see the passages used to ground it. A result without sources is a direct response, not a document retrieval.</p></section><section class="guide-section"><p class="guide-label">USEFUL PROMPTS</p><div class="guide-prompts"><button class="starter" type="button" data-prompt="Give me a concise summary of the key points.">Summarize the key points</button><button class="starter" type="button" data-prompt="Find the decisions, open questions, and next steps.">Find decisions and next steps</button><button class="starter" type="button" data-prompt="What is missing, unclear, or contradictory in these documents?">Find gaps and contradictions</button></div></section><p class="guide-footer">Tip: press <kbd>⌘</kbd> <kbd>Enter</kbd> to send a longer question.</p></div></div>
   <div id="snackbar-container" class="fixed top-6 left-1/2 -translate-x-1/2 z-[100] flex flex-col gap-3 pointer-events-none w-full max-w-sm"></div>
-
-  <script type="module" src="/src/ui/components.js"></script>
-  <script type="module" src="/src/main.js"></script>
+  <zyra-status-dot id="health-api-dot" status="offline" class="hidden"></zyra-status-dot><zyra-status-dot id="health-slm-dot" status="offline" class="hidden"></zyra-status-dot><zyra-status-dot id="health-db-dot" status="offline" class="hidden"></zyra-status-dot><zyra-status-dot id="health-mcp-dot" status="offline" class="hidden"></zyra-status-dot>
+  <script type="module" src="/src/ui/components.js"></script><script type="module" src="/src/main.js"></script>
 </body>
 </html>
