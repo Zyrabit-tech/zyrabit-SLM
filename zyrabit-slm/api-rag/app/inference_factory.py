@@ -14,5 +14,6 @@ def create_inference_provider():
     """
     provider_type = os.getenv("INFERENCE_PROVIDER", "ollama").lower()
     api_key = os.getenv("GEMINI_API_KEY")
-    return InferenceProviderFactory.create_sync_provider(provider_type, api_key=api_key)
+    model_name = os.getenv("MODEL_NAME")
+    return InferenceProviderFactory.create_sync_provider(provider_type, api_key=api_key, model_name=model_name)
 

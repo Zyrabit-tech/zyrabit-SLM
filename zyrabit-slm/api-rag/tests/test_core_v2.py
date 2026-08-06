@@ -19,17 +19,20 @@ from app.infrastructure.shared.state_tracker import SovereignStateManager
 from app.domain.services.context_manager import ContextManager
 import logging
 
-logger = logging.getLogger("zyrabit.test")
+import os
+import tempfile
 
 @pytest.fixture(autouse=True)
 def setup_db():
-    # Use an in-memory or temporary DB for tests
-    TEST_DB = "/tmp/test_sovereign.db"
-    SovereignStateManager.init_db(db_path=TEST_DB)
+    temp_dir = tempfile.mkdtemp()
+    test_db = os.path.join(temp_dir, "test_sovereign.db")
+    SovereignStateManager.init_db(db_path=test_db)
     yield
-    import os
-    if os.path.exists(TEST_DB):
-        os.remove(TEST_DB)
+    if os.path.exists(test_db):
+        try:
+            os.remove(test_db)
+        except OSError:
+            pass
 
 @pytest.mark.asyncio
 async def test_full_sovereign_cycle():
@@ -105,6 +108,8 @@ def test_gatekeeper_pii_redaction():
     assert "USER_EMAIL" in clean_text or "anonymized" in clean_text
     logger.info("✅ Gatekeeper Unit Test passed: PII correctly redacted.")
 
+logger = logging.getLogger("zyrabit.test")
+
 @pytest.mark.asyncio
 async def test_mcp_security_import():
     """
@@ -112,17 +117,19 @@ async def test_mcp_security_import():
     """
     from app.domain.services.mcp_service import import_to_vault
     
-    # Create a "malicious" file
-    malicious_path = "/tmp/hack.sh"
+    temp_dir = tempfile.mkdtemp()
+    malicious_path = os.path.join(temp_dir, "hack.sh")
     with open(malicious_path, "w") as f:
         f.write("#!/bin/bash\necho 'hacked'\nos.system('rm -rf /')")
         
     result = await import_to_vault(malicious_path, "vault_hack.sh")
     assert "Security Alert" in result
     
-    import os
     if os.path.exists(malicious_path):
-        os.remove(malicious_path)
+        try:
+            os.remove(malicious_path)
+        except OSError:
+            pass
 
 @pytest.mark.asyncio
 async def test_context_budgeting_trimming():

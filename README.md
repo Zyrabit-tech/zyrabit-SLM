@@ -4,38 +4,47 @@
 
 # Zyrabit SLM
 
-**Sovereign AI infrastructure for regulated environments.**
-Run language models entirely on your infrastructure — no external APIs, no data leakage, full audit trail.
+**Local-first AI runtime for evaluating sovereign document retrieval & inference workflows.**
 
 [![CI](https://github.com/Zyrabit-tech/zyrabit-SLM/actions/workflows/ci.yml/badge.svg)](https://github.com/Zyrabit-tech/zyrabit-SLM/actions/workflows/ci.yml)
 [![Security](https://github.com/Zyrabit-tech/zyrabit-SLM/actions/workflows/security.yml/badge.svg)](https://github.com/Zyrabit-tech/zyrabit-SLM/actions/workflows/security.yml)
-[![Version](https://img.shields.io/badge/v2.2.3-Sovereign-3f5a6d?style=flat-square&labelColor=e2ecf4)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/v3.0.0--rc.1-Beta-3f5a6d?style=flat-square&labelColor=e2ecf4)](CHANGELOG.md)
 [![License: MIT](https://img.shields.io/badge/License-MIT-6090b4?style=flat-square)](LICENSE)
 [![Python 3.12](https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white&style=flat-square)](https://python.org)
-[![FastAPI](https://img.shields.io/badge/FastAPI-0.115-009688?logo=fastapi&style=flat-square)](https://fastapi.tiangolo.com)
-[![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker&logoColor=white&style=flat-square)](https://docs.docker.com/compose/)
-[![Ollama](https://img.shields.io/badge/Ollama-compatible-3f5a6d?style=flat-square)](https://ollama.com)
-[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-6090b4?style=flat-square)](CONTRIBUTING.md)
 
-[Quickstart](#-quickstart) · [Architecture](#-architecture) · [Contributing](CONTRIBUTING.md) · [Security](SECURITY.md)
+[Quickstart](#-quickstart) · [Architecture](#-architecture) · [Capability Matrix](#-capability-matrix) · [Security](SECURITY.md)
 
 </div>
 
 ---
 
-## What Zyrabit SLM actually is
+## 📌 Scope & Status Notice
 
-Zyrabit SLM is a **local-first AI runtime** built for teams that cannot send data to the cloud — healthcare, finance, legal, government, and defense. It gives you:
+Zyrabit SLM is a **beta local-first runtime** for teams evaluating private document retrieval and language-model workflows. It can run on customer-controlled infrastructure and supports an offline deployment profile (`docker-compose.airgapped.yml`) after images, model weights, and dependencies are prepared locally.
 
-- A **FastAPI inference API** with PII masking before the model ever sees a prompt
-- **RAG (Retrieval-Augmented Generation)** over your own documents, combining keyword and vector search
-- **MCP (Model Context Protocol)** for controlled, auditable tool access — the model only accesses what you explicitly allow
-- **SQLite state store** in WAL mode for session memory, audit logs, and conversation history
-- **Grafana + Prometheus observability** stack — latency, throughput, model health in real time
-- **Traefik reverse proxy** with routing and TLS termination for production on-prem deployments
-- **Air-gap capable**: once dependencies are present, zero internet access required
+> **Notice**: It is not a compliance certification (GDPR/HIPAA/ISO), a guarantee against data exposure, or a substitute for an organization's security review. Review the threat model and deployment guide before using sensitive production data.
 
-> Think of it as your own private ChatGPT backend — minus the telemetry, plus compliance.
+---
+
+## 📊 Capability Matrix
+
+| Capability | Status | Evidence / Verification | Limitations |
+| --- | --- | --- | --- |
+| **Inference Engine** | `Beta` | FastAPI + Ollama API integration test | Performance dependent on host GPU/RAM |
+| **Document Retrieval (RAG)** | `Beta` | Hybrid search & Chroma DB unit tests | Single-node SQLite / Chroma state |
+| **PII Sanitization** | `Beta` | Regex & Luhn algorithm test suite | May miss novel formats/multilingual PII |
+| **Air-gapped Execution** | `Validated` | `docker-compose.airgapped.yml` isolated network | Weights must be pre-loaded locally |
+| **Enterprise RBAC** | `Roadmap` | Planned for v3.1 | Currently single-tenant / basic auth |
+
+---
+
+## What Zyrabit SLM offers
+
+- **FastAPI inference API** with PII sanitization controls before prompt processing
+- **RAG (Retrieval-Augmented Generation)** over local documents
+- **MCP (Model Context Protocol)** for controlled tool access
+- **Air-gap capable profile**: zero public DNS / egress dependencies when using `docker-compose.airgapped.yml`
+- **Grafana + Prometheus observability** stack
 
 ---
 

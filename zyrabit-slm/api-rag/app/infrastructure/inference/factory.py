@@ -31,11 +31,16 @@ class InferenceProviderFactory:
             return VllmInferenceAdapter(endpoint=endpoint)
         elif provider_lower == "gemini":
             api_key = kwargs.get("api_key")
+            model_name = kwargs.get("model_name")
             if not api_key:
                 raise ValueError("API key required for Gemini inference provider.")
-            return GeminiInferenceAdapter(api_key=api_key)
+            adapter_kwargs = {"api_key": api_key}
+            if model_name:
+                adapter_kwargs["model"] = model_name
+            return GeminiInferenceAdapter(**adapter_kwargs)
         else:
-            raise ValueError(f"Unsupported inference provider: {provider_name}")
+            from app.ports.inference_port import InferenceProviderError
+            raise InferenceProviderError(f"Unsupported inference provider: {provider_name}")
 
     @staticmethod
     def create_stream_provider(provider_name: str = "ollama", **kwargs) -> StreamingInferencePort:

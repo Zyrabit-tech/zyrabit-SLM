@@ -5,12 +5,12 @@ def test_zyra_up_defaults_to_qwen_family():
     script_path = os.path.abspath(
         os.path.join(
             os.path.dirname(__file__),
-            "../../../zyra-up.sh"))
+            "../../../zyra.sh"))
 
     if not os.path.exists(script_path):
-        script_path = os.path.abspath("zyra-up.sh")
+        script_path = os.path.abspath("zyra.sh")
 
-    assert os.path.exists(script_path), f"zyra-up.sh not found in {script_path}"
+    assert os.path.exists(script_path), f"zyra.sh not found in {script_path}"
 
     with open(script_path, "r", encoding="utf-8") as file:
         content = file.read()
