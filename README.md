@@ -18,21 +18,6 @@
 
 ---
 
-<<<<<<< HEAD
-## What Zyrabit SLM actually is
-
-Zyrabit SLM is a **local-first AI runtime** built for teams that cannot send data to the cloud — healthcare, finance, legal, government, and defense. It gives you:
-
-- A **FastAPI inference API** with PII masking before the model ever sees a prompt
-- **RAG (Retrieval-Augmented Generation)** over your own documents, combining keyword and vector search
-- **MCP (Model Context Protocol)** for controlled, auditable tool access — the model only accesses what you explicitly allow
-- **SQLite state store** in WAL mode for session memory, audit logs, and conversation history
-- **Grafana + Prometheus observability** stack — latency, throughput, model health in real time
-- **Traefik reverse proxy** with routing and TLS termination for production on-prem deployments
-- **Air-gap capable**: once dependencies are present, zero internet access required
-
-> Think of it as your own private ChatGPT backend — minus the telemetry, plus compliance.
-=======
 ## 📌 Scope & Status Notice
 
 Zyrabit SLM is a **beta local-first runtime** for teams evaluating private document retrieval and language-model workflows. It can run on customer-controlled infrastructure and supports an offline deployment profile (`docker-compose.airgapped.yml`) after images, model weights, and dependencies are prepared locally.
@@ -60,7 +45,6 @@ Zyrabit SLM is a **beta local-first runtime** for teams evaluating private docum
 - **MCP (Model Context Protocol)** for controlled tool access
 - **Air-gap capable profile**: zero public DNS / egress dependencies when using `docker-compose.airgapped.yml`
 - **Grafana + Prometheus observability** stack
->>>>>>> feat/embedded-metal-whisper-beta2.3
 
 ---
 
@@ -107,27 +91,14 @@ All traffic is local. State never leaves your trust boundary.
 # 1. Clone and install
 git clone https://github.com/Zyrabit-tech/zyrabit-SLM.git
 cd zyrabit-SLM
-uv sync --dev
+uv sync --all-groups
 source .venv/bin/activate
 
-<<<<<<< HEAD
-# 2. Configure environment
-cp zyrabit-slm/example.env zyrabit-slm/.env
-# Edit .env: set SLM_URL, MODEL_NAME, DOCS_DIR
-
-# 3. Start the full stack
-./zyra-up.sh
-
-# 4. Test it
-curl -X POST http://localhost:8080/query \
-  -H "Content-Type: application/json" \
-  -d '{"query": "Summarize our Q3 compliance report", "session_id": "user-001"}'
-=======
 # 2. Start in local/dev mode (default — no flags needed)
 ./zyra.sh install
 
 # 3. Test it
-curl -X POST http://localhost:8082/v1/chat \
+curl -X POST http://localhost:8080/v1/chat \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer zyrabit-local-token" \
   -d '{"text": "Summarize our Q3 compliance report"}'
@@ -144,7 +115,7 @@ curl -X POST http://localhost:8082/v1/chat \
 | Scenario | What Zyrabit SLM does |
 |---|---|
 | **Legal firm** asks AI to review contracts | Documents stay on firm servers; PII masked before inference |
-| **Hospital** needs RAG over patient records | Air-gapped, HIPAA-aligned; no record ever leaves the datacenter |
+| **Hospital** needs RAG over patient records | Air-gapped deployment profile; no record ever leaves the datacenter |
 | **Bank** runs internal compliance Q&A | Audit log of every query, model response, and retrieved chunk |
 | **Government agency** deploys on classified infra | Fully offline after initial setup; Ollama + local model weights |
 | **Enterprise IT** builds internal knowledge bot | Grafana dashboard shows latency, model load, and query volume |
@@ -170,54 +141,10 @@ internal/                 # Hardware-specific integrations (edge/constrained clu
 validation/               # Validation scripts and compliance artifacts
 zyra.sh                   # Unified CLI: install · start · stop · wizard · benchmark
 zyra-up.sh                # Legacy shim → delegates to zyra.sh
->>>>>>> feat/embedded-metal-whisper-beta2.3
 ```
 
 ---
 
-<<<<<<< HEAD
-## 🔍 Real-world use cases
-
-| Scenario | What Zyrabit SLM does |
-|---|---|
-| **Legal firm** asks AI to review contracts | Documents stay on firm servers; PII masked before inference |
-| **Hospital** needs RAG over patient records | Air-gapped, HIPAA-aligned; no record ever leaves the datacenter |
-| **Bank** runs internal compliance Q&A | Audit log of every query, model response, and retrieved chunk |
-| **Government agency** deploys on classified infra | Fully offline after initial setup; Ollama + local model weights |
-| **Enterprise IT** builds internal knowledge bot | Grafana dashboard shows latency, model load, and query volume |
-
----
-
-## 📦 Stack components
-
-```text
-zyrabit-slm/
-├── api-rag/              # FastAPI app — inference, RAG, PII pipeline, audit
-├── config/               # Environment-specific configuration
-├── prompts/              # Versioned system prompts (auditable artifacts)
-├── web-ui/               # Browser interface for local interaction
-├── grafana/              # Dashboards — latency, throughput, model health
-├── prometheus/           # Metrics collection and alerting rules
-├── traefik/              # Reverse proxy, TLS, routing
-├── scripts/              # Operational helpers
-└── docker-compose.yml
-mcp/                      # Model Context Protocol server (controlled tool access)
-internal/                 # Hardware-specific integrations (edge/constrained clusters)
-validation/               # Validation scripts and compliance artifacts
-zyra-up.sh                # Full lifecycle operator (start, stop, reset, upgrade)
-```
-
----
-
-## 🧪 Testing
-
-```bash
-# Full test suite
-pytest -q zyrabit-slm/api-rag/tests
-
-# Unit tests only
-pytest -q zyrabit-slm/api-rag/tests/unit
-=======
 ## 🧪 Testing
 
 ```bash
@@ -229,34 +156,9 @@ pytest -q zyrabit-slm/api-rag/tests/unit
 
 # Sovereign QA validation (PII + architecture + air-gap)
 ./zyra.sh validate --e2e-security
->>>>>>> feat/embedded-metal-whisper-beta2.3
 ```
 
 > **Rule**: if a test reaches the network, it's a bug. The entire test suite runs offline.
-
----
-
-## 🎯 Challenges & Community Contributions
-
-We grow through community challenges. Pick one and open a PR:
-
-### 🟢 Good First Issues
-
-- [ ] **Add a new PII pattern** — extend the masking pipeline to detect CURP (Mexico) or NHS numbers (UK)
-- [ ] **Write a new Grafana panel** — visualize average tokens per query over time
-- [ ] **Add a model switcher endpoint** — `POST /model` to hot-swap the inference target without restart
-
-### 🟡 Intermediate
-
-- [ ] **Build a document connector** — ingest from Notion, Google Drive, or SharePoint into the RAG store
-- [ ] **Implement session expiry** — auto-purge SQLite sessions older than N days via cron or background task
-- [ ] **Add RBAC to the API** — role-based access where different API keys get different tool permissions
-
-### 🔴 Advanced
-
-- [ ] **MCP adapter for a new tool** — implement a sandboxed SQL query tool with explicit allow/deny policies
-- [ ] **Benchmark harness** — measure RAG retrieval quality vs. chunk size and embedding model across 3+ models
-- [ ] **Edge deployment guide** — document and test running the stack on a Raspberry Pi 5 or Jetson Orin Nano
 
 ---
 
@@ -267,18 +169,6 @@ We grow through community challenges. Pick one and open a PR:
 - **Secrets** stay on-premise: never in prompts, logs, or exported artifacts
 - **Production deployments** must define explicit allowlists for origins, tokens, and integrations
 - See [SECURITY.md](SECURITY.md) for vulnerability reporting
-
----
-
-## 📋 Compliance alignment
-
-| Standard | Relevant capability |
-|---|---|
-| **GDPR** | PII masking, data residency, right-to-erasure via session purge |
-| **DORA** | Audit log, deterministic fallbacks, explicit state |
-| **HIPAA** | Air-gap capable, no PHI leaves infrastructure |
-| **FedRAMP** | On-prem deployment, no third-party API dependencies |
-| **ISO 27001** | Access control via RBAC (roadmap), audit trail |
 
 ---
 
