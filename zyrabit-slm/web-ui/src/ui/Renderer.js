@@ -53,6 +53,10 @@ export class Renderer {
         msg.data = { role: effectiveRole, text, metadata, timestamp: timeStr };
         
         this.container.appendChild(msg);
+
+        if (metadata?.sources) {
+            window.dispatchEvent(new CustomEvent('zyra:sources', { detail: metadata.sources }));
+        }
         
         // Auto-scroll to bottom
         requestAnimationFrame(() => {
@@ -160,13 +164,10 @@ export class Renderer {
 
             // Premium UX: Cycle through descriptive tasks so the user knows exactly what the sovereign engine is doing
             const legends = [
-                "Buscando en documentos del Vault...",
-                "Consultando base de datos soberana...",
-                "Aplicando escudo de privacidad (Gatekeeper)...",
-                "Ejecutando búsqueda híbrida (FTS5 + Vectorial)...",
-                "Sintetizando respuestas con el SLM local...",
-                "Analizando contexto y dependencias...",
-                "Preparando memoria y nota reflexiva..."
+                "Searching your document library…",
+                "Finding relevant passages…",
+                "Preparing answer context…",
+                "Writing a response locally…"
             ];
             let legendIdx = 0;
             const textEl = newLoader.querySelector('.thinking-text');
@@ -202,4 +203,3 @@ export class Renderer {
         }
     }
 }
-

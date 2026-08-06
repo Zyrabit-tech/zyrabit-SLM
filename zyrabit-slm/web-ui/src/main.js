@@ -43,7 +43,6 @@ class ZyrabitApp {
         this.setupUIListeners();
         this.socket.connect();
         this.startHealthChecks();
-        this.checkOnboarding();
         this.chat.recover(); // Recover Shadow State
 
         // Restore visual history
@@ -58,8 +57,6 @@ class ZyrabitApp {
         }
 
         this.loadVault();
-        this.loadTools();
-
     }
 
     async checkOnboarding() {
@@ -172,13 +169,25 @@ class ZyrabitApp {
 
         // 3. Navigation & Panels
         bind(IDS.TOGGLE_GDPR, 'onclick', () => this.togglePanel(IDS.GDPR_PANEL));
-        getSafeElement('toggle-ingest').onclick = () => this.togglePanel(IDS.INGEST_PANEL);
+        getSafeElement('toggle-ingest').onclick = () => getSafeElement(IDS.FILE_INPUT).click();
         getSafeElement('toggle-docs').onclick = () => this.togglePanel(IDS.DOCS_PANEL);
         getSafeElement('toggle-settings').onclick = () => this.togglePanel('settings-panel');
         getSafeElement('close-gdpr').onclick = () => this.togglePanel(null);
-        getSafeElement('close-ingest').onclick = () => this.togglePanel(null);
+        bind('close-ingest', 'onclick', () => this.togglePanel(null));
         getSafeElement('close-docs').onclick = () => this.togglePanel(null);
         getSafeElement('close-settings').onclick = () => this.togglePanel(null);
+
+        document.querySelectorAll('.prompt-chip').forEach((button) => {
+            button.onclick = () => {
+                const input = getSafeElement(IDS.CHAT_INPUT);
+                input.value = button.dataset.prompt || '';
+                input.focus();
+            };
+        });
+
+        const clearSources = document.getElementById('clear-sources');
+        if (clearSources) clearSources.onclick = () => this.renderSources([]);
+        window.addEventListener('zyra:sources', (event) => this.renderSources(event.detail || []));
 
         // Telegram modal bindings
         const triggerTelegram = document.getElementById('trigger-telegram');
@@ -460,25 +469,28 @@ class ZyrabitApp {
 
             list.innerHTML = '';
 
+            const count = document.getElementById('document-count');
+            if (count) count.textContent = String(data.documents?.length || 0);
+
             if (!data.documents || data.documents.length === 0) {
-                list.innerHTML = '<div class="text-xs text-center text-black/40 mt-4">No documents in vault</div>';
+                list.innerHTML = '<div class="empty-library">No documents yet. Import one to start asking questions.</div>';
                 return;
             }
 
             data.documents.forEach(doc => {
-                const div = document.createElement('div');
-                div.className = 'flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-100 group';
+                const div = document.createElement('button');
+                div.type = 'button';
+                div.className = 'document-row';
                 div.innerHTML = `
-                    <div class="flex items-center gap-2 overflow-hidden">
-                        <span class="text-lg">📄</span>
-                        <div class="overflow-hidden">
-                            <div class="text-[10px] font-bold truncate doc-name"></div>
-                            <div class="text-[8px] opacity-40 doc-size"></div>
+                    <span class="document-glyph">⌑</span>
+                    <div class="overflow-hidden">
+                        <div class="document-name"></div>
+                        <div class="document-size"></div>
                         </div>
-                    </div>
                 `;
-                div.querySelector('.doc-name').textContent = doc.filename;
-                div.querySelector('.doc-size').textContent = `${(doc.size_bytes / 1024).toFixed(1)} KB`;
+                div.querySelector('.document-name').textContent = doc.filename;
+                div.querySelector('.document-size').textContent = `${(doc.size_bytes / 1024).toFixed(1)} KB`;
+                div.onclick = () => this.selectDocument(doc.filename, div);
                 list.appendChild(div);
             });
         } catch (e) {
@@ -488,6 +500,41 @@ class ZyrabitApp {
                 list.innerHTML = '<div class="text-xs text-center text-red-500 mt-4">Failed to load documents</div>';
             }
         }
+    }
+
+    selectDocument(filename, row) {
+        document.querySelectorAll('.document-row.active').forEach((item) => item.classList.remove('active'));
+        row.classList.add('active');
+        const title = document.getElementById('active-document-title');
+        const description = document.getElementById('active-document-description');
+        if (title) title.textContent = filename;
+        if (description) description.textContent = 'Ask a question about this document or compare it with the rest of your library.';
+        const input = document.getElementById(IDS.CHAT_INPUT);
+        if (input) {
+            input.placeholder = `Ask about ${filename}…`;
+            input.focus();
+        }
+    }
+
+    renderSources(sources) {
+        const list = document.getElementById('sources-list');
+        if (!list) return;
+        list.innerHTML = '';
+        const uniqueSources = [...new Set(sources || [])];
+        if (uniqueSources.length === 0) {
+            list.innerHTML = '<div class="context-empty"><span aria-hidden="true">⌁</span><p>Sources used in an answer will appear here.</p></div>';
+            return;
+        }
+        uniqueSources.forEach((source) => {
+            const card = document.createElement('div');
+            card.className = 'source-card';
+            const name = document.createElement('strong');
+            name.textContent = source;
+            const note = document.createElement('span');
+            note.textContent = 'Used as answer context';
+            card.append(name, note);
+            list.appendChild(card);
+        });
     }
 
     async loadTools() {
@@ -536,6 +583,10 @@ class ZyrabitApp {
                 const res = await fetch('/v1/ingest', { method: 'POST', body: formData });
                 if (!res.ok) throw new Error(`HTTP_${res.status}`);
                 await this.loadVault();
+                const title = document.getElementById('active-document-title');
+                const description = document.getElementById('active-document-description');
+                if (title) title.textContent = file.name;
+                if (description) description.textContent = 'Document added. Indexing continues in the background; you can start asking questions now.';
                 this.addGdprLog("INGEST", `SUCCESS_${file.name.toUpperCase()}`);
                 this.showNotification(`File uploaded: ${file.name}`, "success");
             } catch (e) {
