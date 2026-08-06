@@ -2,9 +2,24 @@ name: CI
 
 on:
   pull_request:
-    branches: [beta, main]
+    branches:
+      - main
+      - beta
+      - 'beta-*'       # e.g. beta-2.3.0, beta-3.0.0
+      - 'feat/**'      # feature branches
+      - 'feature/**'   # legacy feature branches
+      - 'fix/**'       # bug fix branches
+      - 'chore/**'     # maintenance branches
+      - 'docs/**'      # documentation branches
   push:
-    branches: [beta]
+    branches:
+      - beta
+      - 'beta-*'
+      - 'feat/**'
+      - 'feature/**'
+      - 'fix/**'
+      - 'chore/**'
+      - 'docs/**'
   workflow_dispatch:
 
 permissions:
@@ -25,18 +40,37 @@ jobs:
       - name: Validate PR base branch policy
         if: github.event_name == 'pull_request'
         run: |
-          echo "PR: ${{ github.head_ref }} → ${{ github.base_ref }}"
-          if [ "${{ github.base_ref }}" = "main" ] && [ "${{ github.head_ref }}" != "beta" ]; then
-            echo "❌ ERROR: Only 'beta' can merge into 'main'."
-            echo "   Your branch '${{ github.head_ref }}' must target 'beta' first."
+          BASE="${{ github.base_ref }}"
+          HEAD="${{ github.head_ref }}"
+          echo "PR: ${HEAD} → ${BASE}"
+
+          # main: only beta can merge into it
+          if [ "${BASE}" = "main" ] && [ "${HEAD}" != "beta" ]; then
+            echo "❌ Only 'beta' can merge into 'main'. Got: '${HEAD}'"
             exit 1
           fi
-          if [ "${{ github.base_ref }}" != "beta" ] && [ "${{ github.base_ref }}" != "main" ]; then
-            echo "❌ ERROR: Pull requests must target 'beta' or 'main'."
-            exit 1
+
+          # beta-x.y.z branches: only feat/* or fix/* branches can target them
+          if echo "${BASE}" | grep -qE '^beta-[0-9]+\.[0-9]+\.[0-9]+$'; then
+            if ! echo "${HEAD}" | grep -qE '^(feat|fix|chore|docs)/'; then
+              echo "❌ Only feat/*, fix/*, chore/*, docs/* branches can target '${BASE}'. Got: '${HEAD}'"
+              exit 1
+            fi
+            echo "✅ Feature branch targeting beta version branch: OK"
+            exit 0
           fi
+
+          # beta: feat/* can target it, or any branch following gitflow
+          if [ "${BASE}" = "beta" ]; then
+            echo "✅ Targeting staging (beta) branch: OK"
+            exit 0
+          fi
+
+          echo "❌ Pull requests must target 'beta', 'beta-x.y.z', or 'main'. Got base: '${BASE}'"
+          exit 1
+
       - name: Policy check summary
-        run: echo "Contribution policy check passed."
+        run: echo "✅ Contribution policy check passed."
 
   tests:
     name: Python Tests
@@ -70,11 +104,47 @@ jobs:
       - name: Run API tests
         run: uv run pytest
 
+  frontend-tests:
+    name: Frontend Build & Typecheck
+    runs-on: ubuntu-latest
+    needs: contribution-policy
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node & pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'pnpm'
+          cache-dependency-path: zyrabit-slm/web-ui/pnpm-lock.yaml
+
+      - name: Install Frontend Dependencies
+        run: |
+          cd zyrabit-slm/web-ui
+          pnpm install --frozen-lockfile
+
+      - name: Frontend Build Verification
+        run: |
+          cd zyrabit-slm/web-ui
+          pnpm build
+
   production-build-gate:
     name: Production Build Gate
     runs-on: ubuntu-latest
-    needs: tests
-    if: github.base_ref == 'main' || github.base_ref == 'beta'
+    needs: [tests, frontend-tests]
+    # Run gate when PR targets main, beta, or any beta-x.y.z branch
+    if: >
+      github.event_name == 'pull_request' && (
+        github.base_ref == 'main' ||
+        github.base_ref == 'beta' ||
+        startsWith(github.base_ref, 'beta-')
+      )
     steps:
       - name: Checkout
         uses: actions/checkout@v4

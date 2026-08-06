@@ -10,6 +10,7 @@ class ChatQuery(BaseModel):
     text: str
     client_msg_id: Optional[str] = None
     history: Optional[list] = []
+    provider: Optional[str] = None
 
 class ChatResponse(BaseModel):
     response: str
@@ -28,7 +29,8 @@ async def chat_router(
         result = await chat_use_case.execute(
             text=query.text, 
             client_msg_id=query.client_msg_id,
-            history=query.history
+            history=query.history,
+            provider=query.provider
         )
         return ChatResponse(**result)
     except Exception as e:

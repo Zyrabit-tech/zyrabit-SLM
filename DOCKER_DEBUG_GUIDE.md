@@ -50,9 +50,9 @@ docker exec -it zyrabit-api /bin/bash
 
 ---
 
-## 🏗️ Understanding `zyra-up.sh` & Profiles
+## 🏗️ Understanding `zyra.sh` & Profiles
 
-The `zyra-up.sh` script is a wrapper around `docker compose` that handles hardware detection and profile management.
+The `zyra.sh` script is a wrapper around `docker compose` that handles hardware detection and profile management.
 
 ### How it works:
 1.  **Detection:** It checks if you are on a Mac (Apple Silicon), Linux with NVIDIA, or a low-resource machine.
@@ -86,16 +86,16 @@ Profiles are defined directly in the `docker-compose.yml` (or `docker-compose.lo
     ```
 3.  Run it using the CLI:
     ```bash
-    ./zyra-up.sh start --profile my-profile
+    ./zyra.sh start --profile my-profile
     ```
 
-### To modify `zyra-up.sh` logic:
-If you want to add a new hardware-based auto-profile, search for the `detect_hardware` function in `zyra-up.sh` and add your logic there.
+### To modify `zyra.sh` logic:
+If you want to add a new hardware-based auto-profile, search for the `detect_hardware` function in `zyra.sh` and add your logic there.
 
 ---
 
 ## 🚀 Pro-Tips for Developers
 
 - **Clean start:** If things get messy, use `docker system prune -f` to clean up unused layers and containers.
-- **Port Conflicts:** If port 80 or 443 is busy, use the `--local` flag in `zyra-up.sh` to run the API directly on port 8080.
+- **Port Conflicts:** If port 80 or 443 is busy, use the `--local` flag in `zyra.sh` to run the API directly on port 8080.
 - **Dependency Sync:** Remember that `zyrabit-api` uses the root `pyproject.toml`. If you add a library, you **must** rebuild the image.

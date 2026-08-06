@@ -82,8 +82,23 @@ async def lifespan(app: FastAPI):
         
         # 2. Vector Store (Connecting to remote Chroma Server)
         import chromadb
-        # Use HttpClient to connect to the zyrabit-db container
-        chroma_client = chromadb.HttpClient(host=DB_HOST, port=DB_PORT)
+
+        chroma_client = None
+        for attempt in range(1, 4):
+            try:
+                client_candidate = chromadb.HttpClient(host=DB_HOST, port=DB_PORT)
+                # Quick check to ensure the client is operational
+                client_candidate.heartbeat()
+                chroma_client = client_candidate
+                logger.info(f"✅ Connected to ChromaDB at {DB_HOST}:{DB_PORT}")
+                break
+            except Exception as err:
+                logger.warning(f"⚠️ Waiting for ChromaDB at {DB_HOST}:{DB_PORT} (attempt {attempt}/3): {err}")
+                await asyncio.sleep(1)
+
+        if not chroma_client:
+            logger.info("ℹ️ Using EphemeralClient for ChromaDB (local/standalone mode).")
+            chroma_client = chromadb.EphemeralClient()
         
         lc_chroma = Chroma(
             client=chroma_client,
@@ -109,8 +124,9 @@ async def lifespan(app: FastAPI):
         except Exception as e:
             logger.error(f"⚠️ Failed to load existing documents for BM25: {e}")
         
-        # 4. Inference Provider
-        app.state.inference_provider = InferenceProviderFactory.create_sync_provider("ollama")
+        # 4. Inference Provider (Dynamic from environment)
+        provider_name = os.getenv("INFERENCE_PROVIDER", "ollama")
+        app.state.inference_provider = InferenceProviderFactory.create_sync_provider(provider_name)
         app.state.streaming_provider = InferenceProviderFactory.create_stream_provider("ollama")
         
         # 5. Use Cases (Singletons for the session)
@@ -155,7 +171,7 @@ async def lifespan(app: FastAPI):
         logger.info("✅ Infrastructure initialized successfully.")
 
     except Exception as e:
-        logger.error(f"❌ Failed to initialize infrastructure: {e}")
+        logger.exception(f"❌ Failed to initialize infrastructure: {e}")
 
 
     yield

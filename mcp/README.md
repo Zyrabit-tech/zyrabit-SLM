@@ -42,7 +42,7 @@ Add to your `claude_desktop_config.json`:
 }
 ```
 
-> Make sure the `zyrabit-mcp` container is running (`./zyra-up.sh start`).
+> Make sure the `zyrabit-mcp` container is running (`./zyra.sh start`).
 
 ### Cursor IDE
 

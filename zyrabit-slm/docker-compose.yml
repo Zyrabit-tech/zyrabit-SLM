@@ -270,6 +270,25 @@ services:
     networks:
       - zyrabit-sovereign-net
 
+  # 7. THE LEDGER: PostgreSQL (Production mode only - profile: db)
+  zyrabit-postgres:
+    image: postgres:16-alpine
+    container_name: zyrabit-postgres
+    profiles: [ "db" ]
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB:-zyrabit_db}
+      - POSTGRES_USER=${POSTGRES_USER:-zyrabit}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-zyrabit_secret}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - zyrabit-sovereign-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-zyrabit} -d ${POSTGRES_DB:-zyrabit_db}"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
 networks:
   zyrabit-sovereign-net:
     driver: bridge
@@ -280,3 +299,4 @@ networks:
 volumes:
   prometheus-data:
   grafana-data:
+  postgres-data:

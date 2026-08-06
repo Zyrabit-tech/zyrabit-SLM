@@ -5,9 +5,20 @@ from unittest.mock import AsyncMock, patch
 from app.infrastructure.shared.state_tracker import SovereignStateManager
 from app.infrastructure.shared.config import N8N_SERVICE_TOKEN
 
+import tempfile
+import os
+
 @pytest.fixture(autouse=True)
 def setup_db():
-    SovereignStateManager.init_db("/tmp/test_sovereign.db")
+    temp_dir = tempfile.mkdtemp()
+    db_path = os.path.join(temp_dir, "test_sovereign.db")
+    SovereignStateManager.init_db(db_path)
+    yield
+    if os.path.exists(db_path):
+        try:
+            os.remove(db_path)
+        except OSError:
+            pass
 
 @pytest.mark.asyncio
 async def test_ag_ui_endpoint_success(client):

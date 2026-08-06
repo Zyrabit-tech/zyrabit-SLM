@@ -28,7 +28,7 @@ class IngestionValidator:
             return f"File too large ({file_size / (1024*1024):.2f}MB). Limit is {MAX_FILE_SIZE_MB}MB."
             
         # 3. Check extension
-        allowed_extensions = [".pdf", ".md", ".docx"]
+        allowed_extensions = [".pdf", ".md", ".docx", ".txt"]
         ext = os.path.splitext(file_path)[1].lower()
         if ext not in allowed_extensions:
             return f"Unsupported file type ({ext}). Allowed: {', '.join(allowed_extensions)}"
