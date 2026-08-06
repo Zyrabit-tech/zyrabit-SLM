@@ -19,8 +19,8 @@ class PDFProcessor:
         try:
             ext = os.path.splitext(file_path)[1].lower()
             
-            if ext == ".md":
-                logger.info(f"📝 Reading native Markdown: {file_path}")
+            if ext in (".md", ".txt"):
+                logger.info(f"📝 Reading native text/markdown: {file_path}")
                 with open(file_path, "r", encoding="utf-8") as f:
                     md_text = f.read()
             elif ext == ".pdf":

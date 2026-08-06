@@ -14,9 +14,16 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
+    g++ \
+    cmake \
+    git \
     build-essential \
     curl \
     && rm -rf /var/lib/apt/lists/*
+
+ENV CFLAGS="-Wno-stringop-overflow -Wno-array-bounds -O2"
+ENV CXXFLAGS="-Wno-stringop-overflow -Wno-array-bounds -O2"
+ENV CMAKE_ARGS="-DGGML_NATIVE=OFF -DGGML_AVX=OFF -DGGML_AVX2=OFF -DCMAKE_C_FLAGS='-Wno-stringop-overflow' -DCMAKE_CXX_FLAGS='-Wno-stringop-overflow'"
 
 # Install uv (fast Python package manager)
 RUN curl -LsSf https://astral.sh/uv/install.sh | sh
@@ -42,6 +49,13 @@ FROM python:3.12-slim-bookworm
 
 WORKDIR /app
 
+# Install runtime C libraries for OpenMP / llama.cpp
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libgomp1 \
+    libcurl4 \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
 # Copy the pre-built virtual environment from builder
 COPY --from=builder /app/.venv /app/.venv
 
@@ -57,10 +71,10 @@ ENV PYTHONPATH="/app/.venv/lib/python3.12/site-packages:/app" \
 # Copy document_source directory
 COPY --from=builder /app/document_source /app/document_source
 
-# Create non-root group and user, and set ownership
+# Create non-root group and user with home directory, and set ownership
 RUN groupadd -g 10001 nonroot && \
-    useradd -r -u 10001 -g nonroot nonroot && \
-    chown -R nonroot:nonroot /app
+    useradd -m -d /home/nonroot -r -u 10001 -g nonroot nonroot && \
+    chown -R nonroot:nonroot /app /home/nonroot
 
 USER nonroot
 

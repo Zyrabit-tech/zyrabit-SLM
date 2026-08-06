@@ -31,6 +31,7 @@ jobs:
 
       - name: Enforce Odd/Even versioning policy
         run: |
+          CURRENT_BRANCH="${{ github.head_ref || github.ref_name }}"
           CURRENT_VERSION=$(cat VERSION | tr -d '\n' | xargs)
           # Extract the minor version (the Y in X.Y.Z)
           MINOR_VERSION=$(echo $CURRENT_VERSION | cut -d. -f2)

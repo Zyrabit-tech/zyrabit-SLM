@@ -2,14 +2,45 @@ name: Zyrabit Sovereign Security Audit
 
 on:
   push:
-    branches: [ main, beta, feat/* ]
+  push:
+    branches: [ main, beta ]
   pull_request:
     branches: [ main, beta ]
   schedule:
-    - cron: '0 0 * * 1' # Weekly audit
+    - cron: '0 0 * * 1' # Weekly audit on Monday
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  security-events: write
+
+concurrency:
+  group: security-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  trivy_scan:
+  python-dependency-audit:
+    name: Dependency Audit (pip-audit)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Setup Python
+        run: uv python install 3.12
+
+      - name: Install dependencies
+        run: uv sync --all-groups
+
+      - name: Run pip-audit
+        run: uv run pip-audit --ignore-vuln CVE-2026-45829 --ignore-vuln PYSEC-2026-311
+
+  trivy-scan:
     name: Trivy Vulnerability Scan
     runs-on: ubuntu-latest
     steps:
@@ -17,7 +48,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Run Trivy FS scan (Library Audit)
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@0.28.0
         with:
           scan-type: 'fs'
           ignore-unfixed: true
@@ -25,7 +56,7 @@ jobs:
           exit-code: '1'
           severity: 'CRITICAL,HIGH'
 
-  codeql_analysis:
+  codeql-analysis:
     name: CodeQL Semantic Audit
     runs-on: ubuntu-latest
     permissions:

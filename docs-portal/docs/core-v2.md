@@ -24,7 +24,7 @@ We've migrated from custom JSON-RPC handlers to the official **FastMCP SDK**.
 
 ## ⚙️ Hardware-Aware Orchestration
 
-The `zyra-up.sh` engine now performs deep hardware inspection on startup:
+The `zyra.sh` engine now performs deep hardware inspection on startup:
 - **Metal (Mac)**: Automatically routes to `host.docker.internal` for native Apple Silicon acceleration.
 - **CUDA (Nvidia)**: Detects NVIDIA drivers and enables GPU passthrough via `nvidia-smi` mocks in validation.
 - **Tenstorrent**: Ready-to-go bridge for Grayskull and Wormhole hardware.

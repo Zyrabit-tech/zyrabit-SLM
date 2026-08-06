@@ -98,7 +98,7 @@ uv run pytest
 python secure_agent.py "My email is test@example.com and SSN is 123-45-6789"
 
 # Build and verify all containers
-./zyra-up.sh verify
+./zyra.sh verify
 ```
 
 Extended checklist: [`validation/pr-checklist.md`](validation/pr-checklist.md)

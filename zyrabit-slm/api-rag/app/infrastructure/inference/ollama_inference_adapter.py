@@ -129,8 +129,8 @@ class OllamaInferenceAdapter(InferenceProviderPort):
                 "model_loaded": is_loaded,
                 "status": "READY" if is_loaded else "WARMING_UP"
             }
-        except requests.exceptions.RequestException:
-            logger.exception("Ollama health check failed.")
+        except requests.exceptions.RequestException as e:
+            logger.warning(f"Ollama health check unreachable: {e}")
             return {
                 "provider": self.provider_name,
                 "ok": False,

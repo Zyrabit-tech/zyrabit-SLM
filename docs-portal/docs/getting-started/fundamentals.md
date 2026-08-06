@@ -89,21 +89,61 @@ uv pip install -r requirements.txt
 
 ## 3. Launching the Stack
 
-Once the environment is initialized, you can start the core infrastructure.
+Zyrabit uses a unified CLI script (`zyra.sh`) that automatically chooses the best configuration for your hardware. **Local/Dev mode is the default — no extra flags required.**
 
-### Start the Base Services
-This command launches the API, Vector Database, and Inference Engine in the background.
+### First-Time Installation (Local / Dev Mode)
 
 ```bash
-docker compose up -d
+./zyra.sh install
 ```
 
-### Monitor Service Health
-Verify that the inference engine has initialized and is ready to accept requests.
+This single command:
+1. Detects your hardware (RAM, GPU, Apple Silicon Metal)
+2. Creates `.env` from `example.env` if it doesn't exist
+3. Builds Docker images for the API, Web UI, MCP, and ChromaDB
+4. Starts all containers on local ports (`8082` API · `3000` Web UI · `3001` Grafana)
+5. Pulls the best-fit SLM model based on your available RAM
+
+### Interactive Setup Wizard
+
+For a guided configuration (model selection, inference engine, PostgreSQL, Whisper audio):
 
 ```bash
-docker compose logs -f zyrabit-engine
+./zyra.sh wizard
+```
+
+### Access Your Services
+
+| Service | URL |
+|---|---|
+| **Web UI** | http://localhost:3000 |
+| **API** | http://localhost:8082/v1 |
+| **Health** | http://localhost:8082/v1/health |
+| **Grafana** | http://localhost:3001 |
+| **ChromaDB** | http://localhost:8000 |
+
+### Verify Health
+
+```bash
+./zyra.sh verify
 ```
 
 > [!TIP]
-> On the first run, the system will download approximately 3GB of container images and the foundational SLM model. A successful startup is confirmed by the log: `[INFO] Server running on port 11434`.
+> On the first run, the system will download approximately 3GB of container images and the foundational SLM model. Once running, test with: `curl http://localhost:8082/v1/health`
+
+---
+
+## 4. Going to Production
+
+When ready to deploy with a domain, HTTPS, and PostgreSQL:
+
+```bash
+./zyra.sh install --production
+```
+
+This activates:
+- **Traefik** reverse proxy with automatic TLS certificates
+- **Custom domain** configuration
+- **PostgreSQL** as a persistent relational database (via `--profile db`)
+- Strict rate limiting and security headers
+

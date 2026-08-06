@@ -10,7 +10,7 @@ This folder contains reproducible stress and security validation artifacts for:
 ## Requirements
 
 - k6 installed for load tests.
-- Running stack (`./zyra-up.sh start` or `./zyra-up.sh install`).
+- Running stack (`./zyra.sh start` or `./zyra.sh install`).
 - Local endpoint available on `https://localhost`.
 
 ## Stress tests
