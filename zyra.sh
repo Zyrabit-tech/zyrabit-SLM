@@ -62,6 +62,9 @@ COMPOSE_FILE="${SCRIPT_DIR}/zyrabit-slm/docker-compose.local.yml"
 PROD_COMPOSE_FILE="${SCRIPT_DIR}/zyrabit-slm/docker-compose.yml"
 ENV_FILE="${SCRIPT_DIR}/zyrabit-slm/.env"
 EXAMPLE_ENV="${SCRIPT_DIR}/zyrabit-slm/example.env"
+LLAMA_MODEL_PATH="${SCRIPT_DIR}/zyrabit-slm/models/qwen2.5-1.5b-instruct-q4_k_m.gguf"
+LLAMA_SERVER_PORT="8081"
+LLAMA_SERVER_PID_FILE="${SCRIPT_DIR}/zyrabit-slm/.llama-server.pid"
 
 # ─── State (defaults) ─────────────────────────────────────────────────────────
 PRODUCTION_MODE="false"
@@ -190,13 +193,13 @@ run_wizard() {
     log_step "2/5  Inference Engine"
     echo "   1) Ollama native (Mac Metal GPU) ← recommended for Mac"
     echo "   2) Ollama Docker container       (slower, no Metal pass-through)"
-    echo "   3) Llama.cpp embedded (GGUF)     (no Ollama app needed)"
+    echo "   3) Llama.cpp native Metal (GGUF) (no Ollama app needed)"
     echo "   4) Apple MLX                     (fastest on Apple Silicon)"
     echo "   5) Tenstorrent"
     read -rp "   Select [1]: " _c; _c="${_c:-1}"
     case "$_c" in
         2) INFERENCE_PROVIDER="ollama_docker"  ;;
-        3) INFERENCE_PROVIDER="embedded_metal" ;;
+        3) INFERENCE_PROVIDER="llama_cpp_server" ;;
         4) INFERENCE_PROVIDER="mlx"            ;;
         5) INFERENCE_PROVIDER="tenstorrent"
            PROFILE="${PROFILE:+${PROFILE},}tenstorrent"
@@ -224,6 +227,10 @@ run_wizard() {
         5) OVERRIDE_MODEL="phi3"           ;;
         *) OVERRIDE_MODEL="qwen2.5:7b"    ;;
     esac
+    if [[ "${INFERENCE_PROVIDER}" == "llama_cpp_server" ]]; then
+        OVERRIDE_MODEL="qwen2.5-1.5b-instruct-q4_k_m.gguf"
+        log_info "Llama.cpp Metal uses the bundled GGUF model identifier."
+    fi
     log_ok "Model: ${OVERRIDE_MODEL}"
 
     # ── 4. Database ───────────────────────────────────────────────────────────
@@ -278,6 +285,9 @@ run_wizard() {
     if [[ -f "${ENV_FILE}" ]]; then
         sed -i.bak "s|^INFERENCE_PROVIDER=.*|INFERENCE_PROVIDER=${INFERENCE_PROVIDER}|" "${ENV_FILE}" 2>/dev/null || true
         sed -i.bak "s|^MODEL_NAME=.*|MODEL_NAME=${OVERRIDE_MODEL}|"                     "${ENV_FILE}" 2>/dev/null || true
+        if [[ "${INFERENCE_PROVIDER}" == "llama_cpp_server" ]]; then
+            grep -q "^SLM_URL=" "${ENV_FILE}" && sed -i.bak "s|^SLM_URL=.*|SLM_URL=http://host.docker.internal:${LLAMA_SERVER_PORT}|" "${ENV_FILE}" || echo "SLM_URL=http://host.docker.internal:${LLAMA_SERVER_PORT}" >> "${ENV_FILE}"
+        fi
         if [[ "${WHISPER_MODEL}" != "none" ]]; then
             grep -q "^WHISPER_MODEL=" "${ENV_FILE}" 2>/dev/null \
                 && sed -i.bak "s|^WHISPER_MODEL=.*|WHISPER_MODEL=${WHISPER_MODEL}|" "${ENV_FILE}" \
@@ -367,7 +377,10 @@ _pull_models() {
     local model_name="${1}"
     local provider
     provider=$(grep '^INFERENCE_PROVIDER=' "${ENV_FILE}" 2>/dev/null | cut -d= -f2 || echo "ollama_host")
-    if [[ "${provider}" == ollama* ]]; then
+    if [[ "${provider}" == "llama_cpp_server" ]]; then
+        [[ -f "${LLAMA_MODEL_PATH}" ]] || { log_err "Missing GGUF model: ${LLAMA_MODEL_PATH}"; return 1; }
+        log_ok "GGUF model ready for llama.cpp Metal."
+    elif [[ "${provider}" == ollama* ]]; then
         log_info "Pulling model '${model_name}' into Ollama..."
         if check_local_ollama; then
             ollama pull "${model_name}" 2>/dev/null   || log_warn "Pull failed. Run manually: ollama pull ${model_name}"
@@ -401,7 +414,14 @@ run_start() {
         local current_provider
         current_provider=$(grep '^INFERENCE_PROVIDER=' "${ENV_FILE}" 2>/dev/null | cut -d= -f2 || echo "ollama_host")
 
-        if [[ "${current_provider}" == "embedded_metal" || "${current_provider}" == "mlx" ]]; then
+        if [[ "${current_provider}" == "llama_cpp_server" ]]; then
+            if [[ ! -f "${LLAMA_MODEL_PATH}" ]]; then log_err "GGUF model missing. Run setup again after downloading it."; exit 1; fi
+            if ! kill -0 "$(cat "${LLAMA_SERVER_PID_FILE}" 2>/dev/null)" 2>/dev/null; then
+                log_info "Starting llama.cpp native Metal server on port ${LLAMA_SERVER_PORT}..."
+                nohup llama-server --model "${LLAMA_MODEL_PATH}" --host 0.0.0.0 --port "${LLAMA_SERVER_PORT}" --n-gpu-layers 99 --ctx-size 4096 > "${SCRIPT_DIR}/zyrabit-slm/.llama-server.log" 2>&1 & echo $! > "${LLAMA_SERVER_PID_FILE}"
+            fi
+            $DOCKER_COMPOSE_CMD "${compose_args[@]}" up -d --scale zyrabit-engine=0 2>/dev/null || $DOCKER_COMPOSE_CMD "${compose_args[@]}" up -d
+        elif [[ "${current_provider}" == "embedded_metal" || "${current_provider}" == "mlx" ]]; then
             log_info "Provider is '${current_provider}' (Native Metal) — skipping zyrabit-engine container."
             $DOCKER_COMPOSE_CMD "${compose_args[@]}" up -d --scale zyrabit-engine=0 2>/dev/null ||
             $DOCKER_COMPOSE_CMD "${compose_args[@]}" up -d

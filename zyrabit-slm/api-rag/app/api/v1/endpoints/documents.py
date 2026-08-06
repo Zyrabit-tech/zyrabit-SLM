@@ -100,12 +100,11 @@ async def background_ingestion_task(file_path: str, filename: str, ingest_use_ca
 @router.post("/ingest")
 async def ingest_document(
     request: Request,
-    background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
     ingest_use_case: IngestUseCase = Depends(get_ingest_use_case)
 ):
     """
-    Uploads and schedules ingestion in the background.
+    Uploads and indexes a document before reporting it as available.
     """
     os.makedirs(DOCS_DIR, exist_ok=True)
     file_path = os.path.join(DOCS_DIR, file.filename)
@@ -115,15 +114,11 @@ async def ingest_document(
         with open(file_path, "wb") as f:
             f.write(await file.read())
         
-        # 2. Schedule background processing with proactive notification
-        sio = getattr(request.app.state, 'sio', None)
-        background_tasks.add_task(background_ingestion_task, file_path, file.filename, ingest_use_case, sio)
-        
-        return {
-            "status": "accepted", 
-            "message": f"File {file.filename} uploaded and scheduled for ingestion.",
-            "filename": file.filename
-        }
+        # 2. Do not expose the document to chat until it is searchable.
+        result = await ingest_use_case.execute(file_path)
+        if result.get("status") not in {"success", "skipped"}:
+            raise HTTPException(status_code=422, detail=result.get("message", "Document could not be indexed."))
+        return {"status": "ready", "message": f"File {file.filename} is indexed and ready for retrieval.", "filename": file.filename}
     except Exception as e:
         logger.error(f"Failed to initiate ingestion for {file.filename}: {e}")
         raise HTTPException(status_code=500, detail="Internal server error.")

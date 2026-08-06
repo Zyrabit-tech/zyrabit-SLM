@@ -57,6 +57,7 @@ class ZyrabitApp {
         }
 
         this.loadVault();
+        this.checkOnboarding();
 
         const shell = document.getElementById('app-shell');
         const collapse = document.getElementById('collapse-library');
@@ -168,7 +169,7 @@ class ZyrabitApp {
             }
 
             input.onkeydown = (e) => {
-                if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+                if (e.key === 'Enter' && !e.shiftKey) {
                     e.preventDefault();
                     form.requestSubmit();
                 }
@@ -181,6 +182,13 @@ class ZyrabitApp {
         bind(IDS.TOGGLE_GDPR, 'onclick', () => this.togglePanel(IDS.GDPR_PANEL));
         getSafeElement('toggle-ingest').onclick = () => getSafeElement(IDS.FILE_INPUT).click();
         getSafeElement('toggle-docs').onclick = () => this.togglePanel(IDS.DOCS_PANEL);
+        bind('clear-conversation', 'onclick', () => {
+            this.history = [];
+            Storage.remove('chat_history');
+            Storage.remove('pending_messages');
+            bus.emit('UI:CLEAR_CHAT');
+            this.showNotification('Conversation cleared.', 'success');
+        });
         getSafeElement('toggle-settings').onclick = () => this.togglePanel('settings-panel');
         getSafeElement('close-gdpr').onclick = () => this.togglePanel(null);
         bind('close-ingest', 'onclick', () => this.togglePanel(null));
@@ -295,15 +303,15 @@ class ZyrabitApp {
                 const submitBtn = getSafeElement(IDS.CHAT_SUBMIT);
                 input.disabled = false;
                 submitBtn.disabled = false;
-                input.placeholder = "Type your command...";
+                input.placeholder = "Ask about your documents…";
 
                 const statusPill = document.getElementById("status-pill");
                 if (statusPill) {
-                    statusPill.className = "flex items-center gap-2 px-4 py-2 bg-green-500/10 border border-green-500/20 rounded-full animate-none";
+                    statusPill.className = "connection-status connected";
                     const dot = statusPill.querySelector("i");
                     if (dot) dot.className = "w-2 h-2 rounded-full bg-green-500 shadow-sm";
                     const text = statusPill.querySelector("span");
-                    if (text) text.textContent = "SYSTEM READY";
+                    if (text) text.textContent = "Local workspace";
                 }
             } catch (e) {
                 console.warn("⚠️ Failed to update UI elements on gateway connect:", e);
@@ -321,11 +329,11 @@ class ZyrabitApp {
 
                 const statusPill = document.getElementById("status-pill");
                 if (statusPill) {
-                    statusPill.className = "flex items-center gap-2 px-4 py-2 bg-red-500/10 border border-red-500/20 rounded-full";
+                    statusPill.className = "connection-status disconnected";
                     const dot = statusPill.querySelector("i");
                     if (dot) dot.className = "w-2 h-2 rounded-full bg-red-500 shadow-sm animate-pulse";
                     const text = statusPill.querySelector("span");
-                    if (text) text.textContent = "OFFLINE";
+                    if (text) text.textContent = "Reconnecting";
                 }
             } catch (e) {
                 console.warn("⚠️ Failed to update UI elements on gateway disconnect:", e);
@@ -622,7 +630,7 @@ class ZyrabitApp {
                 const title = document.getElementById('active-document-title');
                 const description = document.getElementById('active-document-description');
                 if (title) title.textContent = file.name;
-                if (description) description.textContent = 'Document added. Indexing continues in the background; you can start asking questions now.';
+                if (description) description.textContent = 'Indexed and ready for questions.';
                 this.setActiveDocument(file.name);
                 this.addGdprLog("INGEST", `SUCCESS_${file.name.toUpperCase()}`);
                 this.showNotification(`File uploaded: ${file.name}`, "success");

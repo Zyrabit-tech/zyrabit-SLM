@@ -128,3 +128,6 @@ ops-private/
 zyrabit-slm/hf-cache/
 zyrabit-slm/db_data/*
 validation/reports/
+zyrabit-slm/models/qwen2.5-1.5b-instruct-q4_k_m.gguf
+zyrabit-slm/.llama-server.pid
+zyrabit-context/demo-brief.txt

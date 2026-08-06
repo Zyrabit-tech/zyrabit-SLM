@@ -26,9 +26,9 @@ class InferenceProviderFactory:
             return LlamaCppEmbeddedAdapter()
         elif provider_lower == "mlx":
             return MlxInferenceAdapter()
-        elif provider_lower == "vllm":
+        elif provider_lower in ("vllm", "llama_cpp_server"):
             endpoint = kwargs.get("endpoint", f"{SLM_URL}/v1/chat/completions")
-            return VllmInferenceAdapter(endpoint=endpoint)
+            return VllmInferenceAdapter(endpoint=endpoint, provider_name=provider_lower)
         elif provider_lower == "gemini":
             api_key = kwargs.get("api_key")
             model_name = kwargs.get("model_name")

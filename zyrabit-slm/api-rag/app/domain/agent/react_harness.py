@@ -314,8 +314,6 @@ class ReactHarness:
             "¿Podrías replantear tu pregunta o darme instrucciones más específicas?"
         )
         if steps_log:
-            last_thought = steps_log[-1].get("thought", "")
-            if last_thought:
-                fallback_msg = f"{fallback_msg}\n\n*Último pensamiento interno:* {last_thought}"
+            # Reasoning traces are operational telemetry only; never expose them to users.
                 
         return fallback_msg, steps_log

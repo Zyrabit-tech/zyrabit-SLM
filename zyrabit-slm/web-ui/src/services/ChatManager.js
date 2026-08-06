@@ -64,8 +64,12 @@ export class ChatManager {
         bus.emit(EVENTS.UI.THINKING, true);
 
         const message = this.queue[0];
+        const activeDocument = document.getElementById('active-context-name')?.textContent?.trim();
+        const contextualText = activeDocument
+            ? `Use the selected document "${activeDocument}" as the primary source. ${message.text}`
+            : message.text;
         bus.emit(EVENTS.SOCKET.EMIT, {
-            text: message.text,
+            text: contextualText,
             history: message.history,
             client_msg_id: message.id,
             thread_id: this.sessionId

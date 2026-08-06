@@ -45,7 +45,7 @@ services:
       retries: 3
 
   zyrabit-db:
-    image: chromadb/chroma:0.5.3
+    image: chromadb/chroma:1.5.9
     container_name: zyrabit-db
     environment:
       ANONYMIZED_TELEMETRY: "False"
