@@ -140,7 +140,11 @@ check_local_ollama() {
 }
 
 api_base_url() {
-    [[ "${PRODUCTION_MODE}" == "true" ]] && echo "https://${DOMAIN:-localhost}/v1" || echo "http://localhost:8082/v1"
+    [[ "${PRODUCTION_MODE}" == "true" ]] && echo "https://${DOMAIN:-localhost}/v1" || echo "http://localhost:${ZYRABIT_LOCAL_PORT:-8080}/v1"
+}
+
+web_api_key() {
+    grep '^ZYRABIT_API_KEY_WEB=' "${ENV_FILE}" 2>/dev/null | cut -d= -f2-
 }
 
 detect_hardware() {
@@ -169,7 +173,7 @@ run_wizard() {
 
     # ── 1. Mode ───────────────────────────────────────────────────────────────
     log_step "1/5  Environment"
-    echo "   1) Local / Dev  ← default  (HTTP, port 8082, no domain)"
+        echo "   1) Local / Dev  ← default  (one local URL, no domain)"
     echo "   2) Production              (HTTPS, custom domain, Traefik)"
     read -rp "   Select [1]: " _c; _c="${_c:-1}"
     if [[ "$_c" == "2" ]]; then
@@ -179,7 +183,7 @@ run_wizard() {
         log_ok "Production · domain=${DOMAIN}"
     else
         PRODUCTION_MODE="false"; export DOMAIN="localhost"
-        log_ok "Local/Dev · http://localhost:8082"
+        log_ok "Local/Dev · http://localhost:8080"
     fi
 
     # ── 2. Inference engine ───────────────────────────────────────────────────
@@ -256,7 +260,7 @@ run_wizard() {
     # ── Summary ───────────────────────────────────────────────────────────────
     echo ""
     echo -e "${BOLD}${CYAN}  ╔══ YOUR CONFIGURATION ═══════════════════════════╗${NC}"
-    echo -e "${BOLD}${CYAN}  ║${NC}  Mode     : $([ "$PRODUCTION_MODE" == "true" ] && echo "Production (${DOMAIN})" || echo "Local/Dev  http://localhost:8082")"
+    echo -e "${BOLD}${CYAN}  ║${NC}  Mode     : $([ "$PRODUCTION_MODE" == "true" ] && echo "Production (${DOMAIN})" || echo "Local/Dev  http://localhost:8080")"
     echo -e "${BOLD}${CYAN}  ║${NC}  Engine   : ${INFERENCE_PROVIDER}"
     echo -e "${BOLD}${CYAN}  ║${NC}  Model    : ${OVERRIDE_MODEL}"
     echo -e "${BOLD}${CYAN}  ║${NC}  Database : $(echo "${PROFILE}" | grep -q "db" && echo "PostgreSQL" || echo "SQLite WAL")"
@@ -310,6 +314,8 @@ run_install() {
         fi
     fi
 
+    ensure_local_secrets
+
     # At this point OVERRIDE_MODEL may have been set by wizard
     local hw_info ram model_name
     hw_info=$(detect_hardware); IFS='|' read -r ram _ _ <<< "$hw_info"
@@ -325,6 +331,23 @@ run_install() {
     _pull_models "${model_name}"
     log_ok "✅ Installation complete."
     run_verify
+}
+
+ensure_local_secrets() {
+    [[ -f "${ENV_FILE}" ]] || { log_err "Missing ${ENV_FILE}; run the setup wizard again."; exit 1; }
+
+    local key generated=0 value
+    for key in ZYRABIT_API_KEY_WEB ZYRABIT_API_KEY_MCP; do
+        value=$(grep "^${key}=" "${ENV_FILE}" 2>/dev/null | cut -d= -f2- || true)
+        if [[ -z "${value}" || "${value}" == replace-with-* || "${value}" == zyrabit-*-token ]]; then
+            command -v openssl >/dev/null 2>&1 || { log_err "openssl is required to generate local API keys."; exit 1; }
+            value=$(openssl rand -hex 32)
+            sed -i.bak "s|^${key}=.*|${key}=${value}|" "${ENV_FILE}"
+            generated=1
+        fi
+    done
+    rm -f "${ENV_FILE}.bak"
+    [[ "${generated}" == "1" ]] && log_ok "Generated distinct local API keys in zyrabit-slm/.env"
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -396,10 +419,10 @@ run_start() {
     echo ""
     if [[ "${PRODUCTION_MODE}" != "true" ]]; then
         echo -e "  ${BOLD}🚀 Zyrabit ready!${NC}"
-        echo -e "  ${CYAN}➜ Web UI${NC}   http://localhost:3000"
-        echo -e "  ${CYAN}➜ API${NC}      http://localhost:8082/v1"
-        echo -e "  ${CYAN}➜ Grafana${NC}  http://localhost:3001"
-        echo -e "  ${CYAN}➜ Health${NC}   http://localhost:8082/v1/health"
+        local local_port="${ZYRABIT_LOCAL_PORT:-8080}"
+        echo -e "  ${CYAN}➜ Workspace${NC} http://localhost:${local_port}"
+        echo -e "  ${CYAN}➜ API${NC}       http://localhost:${local_port}/v1"
+        echo -e "  ${CYAN}➜ Health${NC}    http://localhost:${local_port}/v1/health"
     else
         echo -e "  ${BOLD}🚀 Zyrabit ready!${NC}"
         echo -e "  ${CYAN}➜ Web UI${NC}     https://${DOMAIN:-localhost}"
@@ -562,7 +585,8 @@ run_validate() {
 run_benchmark() {
     log_header "PERFORMANCE BENCHMARK"
     local base_url token
-    base_url="$(api_base_url)"; token="zyrabit-local-token"
+    base_url="$(api_base_url)"; token="$(web_api_key)"
+    [[ -n "${token}" ]] || { log_err "ZYRABIT_API_KEY_WEB is not configured in .env"; exit 1; }
 
     if [[ "${REPORT_MODE}" == "true" ]]; then
         log_info "Running 4-engine comparison against ${base_url}/chat ..."
@@ -580,7 +604,7 @@ results = {}
 for name, prov in engines.items():
     print(f'  ⚡ {name:<25}', end='', flush=True)
     req = urllib.request.Request(url,
-        data=json.dumps({'text':'Analyze sovereign deployment.','provider':prov}).encode(),
+        data=json.dumps({'text':'Summarize the indexed documents.','provider':prov}).encode(),
         headers={'Content-Type':'application/json','Authorization':f'Bearer {token}'}, method='POST')
     t0 = time.time()
     try:
@@ -607,7 +631,7 @@ for n,d in results.items():
         res=$(curl -sk -X POST "${base_url}/chat" \
             -H "Content-Type: application/json" \
             -H "Authorization: Bearer ${token}" \
-            -d "{\"text\":\"Analyze sovereign deployment.\",\"client_msg_id\":\"bench_${t0}\"}" 2>/dev/null || echo "{}")
+            -d "{\"text\":\"Summarize the indexed documents.\",\"client_msg_id\":\"bench_${t0}\"}" 2>/dev/null || echo "{}")
         t1=$(python3 -c 'import time; print(int(time.time()*1000))')
         elapsed=$((t1 - t0))
         python3 -c "
@@ -636,14 +660,15 @@ print(f'''
 # AUDIT — Proof of Control
 # ─────────────────────────────────────────────────────────────────────────────
 run_audit() {
-    log_header "PROOF OF CONTROL & COMPLIANCE AUDIT"
+    log_header "SYSTEM DIAGNOSTIC REPORT"
     local base_url token t0 t1 elapsed res
-    base_url="$(api_base_url)"; token="zyrabit-local-token"
+    base_url="$(api_base_url)"; token="$(web_api_key)"
+    [[ -n "${token}" ]] || { log_err "ZYRABIT_API_KEY_WEB is not configured in .env"; exit 1; }
     t0=$(python3 -c 'import time; print(int(time.time()*1000))' 2>/dev/null || echo 0)
     res=$(curl -sk -X POST "${base_url}/chat" \
         -H "Content-Type: application/json" \
         -H "Authorization: Bearer ${token}" \
-        -d "{\"text\":\"Audit security compliance, data residency, ISO-27001.\",\"client_msg_id\":\"audit_${t0}\"}" 2>/dev/null || echo "{}")
+        -d "{\"text\":\"Describe the current indexed document collection.\",\"client_msg_id\":\"audit_${t0}\"}" 2>/dev/null || echo "{}")
     t1=$(python3 -c 'import time; print(int(time.time()*1000))' 2>/dev/null || echo 0)
     elapsed=$((t1 - t0))
     python3 -c "

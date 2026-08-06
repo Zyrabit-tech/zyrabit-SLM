@@ -9,7 +9,7 @@ import { Storage } from "./adapters/Storage";
 
 /**
  * Auth Interceptor
- * Automatically injects the local service token into API requests
+ * Injects the token provided to the local container at startup.
  */
 const originalFetch = window.fetch;
 window.fetch = async function (resource, init) {
@@ -17,7 +17,7 @@ window.fetch = async function (resource, init) {
     if (typeof resource === 'string' && resource.startsWith('/v1')) {
         init.headers = {
             ...init.headers,
-            'Authorization': 'Bearer zyrabit-local-token'
+            'Authorization': `Bearer ${window.ZYRABIT_RUNTIME_CONFIG?.apiToken || ''}`
         };
     }
     return originalFetch(resource, init);
