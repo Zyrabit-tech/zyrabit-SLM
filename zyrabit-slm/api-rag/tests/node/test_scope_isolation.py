@@ -21,7 +21,10 @@ from tests.node.fakes import InMemoryVectorIndex
 class CitingInference:
     def health(self): return True, "test"
     def answer(self, prompt):
-        evidence_id = re.search(r"id=([0-9a-f-]{36})", prompt).group(1)
+        match = re.search(r"id=([0-9a-f-]{36})", prompt)
+        if not match:
+            return "Respuesta del modelo sin evidencia documental local.", {"provider": "contract-test"}
+        evidence_id = match.group(1)
         return f"Respuesta basada únicamente en el documento seleccionado. [EVIDENCE:{evidence_id}]", {"provider": "contract-test"}
 
 
@@ -52,8 +55,8 @@ async def test_selected_document_never_returns_other_document_sources(tmp_path: 
 
 
 @pytest.mark.asyncio
-async def test_unready_selected_document_fails_without_falling_back_to_library(tmp_path: Path):
+async def test_unready_selected_document_uses_model_without_falling_back_to_library(tmp_path: Path):
     service = NodeService(SQLiteNodeStore(str(tmp_path / "node.db")), LocalSourceStore(str(tmp_path / "sources")), LocalDocumentParser(), CitingInference(), vector_index=InMemoryVectorIndex())
     result = await service.query("anything", "scope-test", "missing-document")
-    assert result["metadata"]["decision"] == "selected-document-unavailable"
+    assert result["metadata"]["decision"] == "model-knowledge"
     assert result["metadata"]["sources"] == []

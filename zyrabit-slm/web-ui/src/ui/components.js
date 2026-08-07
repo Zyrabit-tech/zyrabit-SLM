@@ -332,7 +332,10 @@ class ZyraChatMessage extends HTMLElement {
             </div>
         `;
         const content = this.shadowRoot.getElementById('content');
-        const cleanText = (this._text || '').replace(/\n?\[EVIDENCE:[0-9a-fA-F-]{36}\]/g, '').trim();
+        const cleanText = (this._text || '')
+            .replace(/\n?\[EVIDENCE:[0-9a-fA-F-]{36}\]/g, '')
+            .replace(/\n{0,2}(?:evidencia|evidence|fuente|source):\s*$/i, '')
+            .trim();
         if (this._metadata?.decision === 'evidence-extractive-fallback') {
             content.innerHTML = `<p class="evidence-intro">No pude validar una redacción del modelo. Te dejo el pasaje recuperado para que lo revises directamente.</p><details class="evidence-excerpt"><summary>Ver pasaje verificable</summary><div class="excerpt-body">${parseMarkdown(cleanText.replace(/^No puedo verificar[\s\S]*?documento seleccionado:\s*/i, ''))}</div></details>`;
         } else {
@@ -343,7 +346,7 @@ class ZyraChatMessage extends HTMLElement {
 
     assistantLabel() {
         const decision = this._metadata?.decision;
-        if (decision === 'conversation-greeting' || decision === 'conversation-acknowledgement' || decision === 'profile-welcome') return 'Zyra · contigo';
+        if (decision === 'conversation-greeting' || decision === 'conversation-acknowledgement' || decision === 'conversation-clarification' || decision === 'profile-welcome') return 'Zyra · contigo';
         if (this._metadata?.sources?.length) return 'Zyra · evidencia local';
         return 'Zyra';
     }
@@ -367,7 +370,9 @@ class ZyraChatMessage extends HTMLElement {
             'profile-welcome': 'Espacio configurado',
             'conversation-greeting': 'Conversación local',
             'conversation-acknowledgement': 'Conversación local',
+            'conversation-clarification': 'Conversación local',
             'model-knowledge': 'Consultado con el modelo local',
+            'model-with-evidence': 'Modelo local + documentos consultados',
             'evidence-not-found': 'Sin evidencia para esta pregunta',
             'selected-document-unavailable': 'Documento no disponible',
             'evidence-query': 'Respuesta basada en evidencia',

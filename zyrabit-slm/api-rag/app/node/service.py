@@ -106,8 +106,10 @@ class NodeService:
             self.metadata.append_message(session_id, "user", question)
             self.metadata.append_message(session_id, "assistant", conversational["response"])
             return conversational
-        if self._requires_model_knowledge(question):
-            return await self._model_knowledge_response(question, session_id)
+
+        # The model is the response engine for every non-conversational turn.
+        # Retrieval is an optional, bounded evidence attachment—not an
+        # alternative response path and never a raw excerpt shown as an answer.
         if document_id:
             document = self.metadata.get_document(document_id)
             replacement = self.metadata.latest_ready_document_for(document_id) if document else None
@@ -117,42 +119,19 @@ class NodeService:
                 # they neither fail nor accidentally escape to the full corpus.
                 document_id = replacement["id"]
             elif not document or document["status"] != "ready":
-                return {"response": "El documento seleccionado aún no está listo. En la biblioteca verás **Indexed and ready** cuando pueda responder con fuentes; si falló, vuelve a indexarlo desde su detalle.",
-                        "metadata": {"sources": [], "rag_hits": 0, "decision": "selected-document-unavailable"}}
-        lexical = self.metadata.search_lexical(question, document_id=document_id)
-        # A vector-only hit is not enough to claim a document answered a
-        # question. Small local models otherwise retrieve arbitrary passages
-        # for arithmetic and other non-document questions.
-        if not lexical:
-            return await self._model_knowledge_response(question, session_id)
+                # A pending document must not block a normal model answer or
+                # silently broaden the query to the full library.
+                document_id = None
+        # General technical questions are answered by the local model. A
+        # selected file is not consent to attach an unrelated project page just
+        # because it happens to share a generic term such as "generation".
+        lexical = [] if self._is_general_knowledge_question(question) else self.metadata.search_lexical(question, document_id=document_id)
         vector: list[EvidenceUnit] = []
-        if self.retrieval_mode == "hybrid" and self.vector_index:
+        if lexical and self.retrieval_mode == "hybrid" and self.vector_index:
             try: vector = await asyncio.to_thread(self.vector_index.search, question, 8, document_id)
             except Exception: vector = []
-        evidence: dict[str, EvidenceUnit] = {item.id: item for item in lexical}
-        # A vector adapter is not trusted to enforce filtering on our behalf.
-        evidence.update({item.id: item for item in vector if not document_id or item.document_id == document_id})
-        selected = list(evidence.values())[:6]
-        if not selected:
-            return await self._model_knowledge_response(question, session_id)
-        context = "\n\n".join(self._render_evidence(item) for item in selected)
-        history = self.metadata.get_history(session_id)
-        prompt = self._prompt(question, context, history)
-        try:
-            answer, metrics = await asyncio.to_thread(self.inference.answer, prompt)
-        except Exception as exc:
-            return {"response": "El motor local no está disponible. Revisa el estado de inferencia y vuelve a intentarlo.", "metadata": {"sources": self._sources(selected), "rag_hits": len(selected), "decision": "inference-unavailable", "error": str(exc)}}
-        grounded, cited = self._validate_grounding(answer, selected)
-        if not grounded:
-            # Fail closed. A fluent answer without references is not a document
-            # answer, even if the model happened to receive correct context.
-            answer = self._extractive_fallback(selected)
-            cited = selected[:1]
-            decision = "evidence-extractive-fallback"
-        else:
-            decision = "evidence-query" if self.retrieval_mode == "hybrid" else "evidence-query-lexical"
-        self.metadata.append_message(session_id, "user", question); self.metadata.append_message(session_id, "assistant", answer)
-        return {"response": answer, "metadata": {"sources": self._sources(cited), "rag_hits": len(cited), "decision": decision, **metrics}}
+        selected = self._select_relevant_evidence(question, lexical, vector, document_id)
+        return await self._model_response(question, session_id, selected)
 
     @staticmethod
     def _requires_model_knowledge(question: str) -> bool:
@@ -166,21 +145,23 @@ class NodeService:
         return bool(re.search(r"(?<!\w)\d+(?:\.\d+)?\s*(?:\+|\-|\*|x|×|/|÷)\s*\d+(?:\.\d+)?(?!\w)", normalized))
 
     async def _model_knowledge_response(self, question: str, session_id: str) -> dict:
-        """Answer outside the corpus without laundering it as a document claim."""
-        identity = self._identity()
-        prompt = f"""You are {identity['assistant_name']}, a local assistant. Answer the user's question in its language using your own local model knowledge.
-Do not claim that the answer comes from uploaded documents. Be concise, helpful and direct. Do not reveal internal reasoning.
-Use clean Markdown: a short direct answer first, then at most three bullets only when they improve clarity. Never output internal tags or source identifiers.
+        """Compatibility wrapper for callers outside the Node query pipeline."""
+        return await self._model_response(question, session_id, [])
 
-Question: {question}
-"""
+    async def _model_response(self, question: str, session_id: str, evidence: list[EvidenceUnit]) -> dict:
+        """Generate one answer from model knowledge plus bounded local evidence."""
+        identity = self._identity()
+        context = self._bounded_context(evidence)
+        history = self.metadata.get_history(session_id)
+        prompt = self._prompt(question, context, history)
         try:
             answer, metrics = await asyncio.to_thread(self.inference.answer, prompt)
         except Exception:
             return self._no_evidence_response(question)
         self.metadata.append_message(session_id, "user", question)
         self.metadata.append_message(session_id, "assistant", answer)
-        return {"response": answer, "metadata": {"sources": [], "rag_hits": 0, "decision": "model-knowledge", **metrics}}
+        decision = "model-with-evidence" if evidence else "model-knowledge"
+        return {"response": answer, "metadata": {"sources": self._sources(evidence), "rag_hits": len(evidence), "decision": decision, **metrics}}
 
     def _conversational_response(self, question: str, has_active_document: bool) -> dict | None:
         """Handle short human turns before retrieval; never turn a greeting into a citation."""
@@ -192,10 +173,37 @@ Question: {question}
         assistant = identity["assistant_name"]
         metadata = {"sources": [], "rag_hits": 0, "decision": "conversation-greeting"}
 
-        greeting = r"(?:hola|buenas|hello|hi|hey)(?: amigo| amiga)?(?: como estas| como va| que tal)?"
-        if re.fullmatch(greeting, normalized) or re.fullmatch(r"como estas", normalized):
+        # Short social turns must never enter retrieval.  A document can easily
+        # contain common words such as "hola" or "otra", which used to make a
+        # natural greeting look like a document question.
+        greeting = r"(?:hola|buenas|hello|hi|hey)(?: (?:amigo|amiga|man|bro|hermano|papa|vato|compa))?(?: (?:como estas|como va|que tal))?"
+        assistant_token = unicodedata.normalize("NFKD", assistant).encode("ascii", "ignore").decode().lower()
+        addressed_greeting = re.fullmatch(rf"(?:hola|buenas|hello|hi|hey) {re.escape(assistant_token)}", normalized)
+        if re.fullmatch(greeting, normalized) or addressed_greeting or re.fullmatch(r"como estas", normalized):
             focus = "El documento activo sigue seleccionado; dime qué quieres revisar y lo buscamos con sus páginas fuente." if has_active_document else "Cuando quieras, sube o selecciona un documento y lo revisamos con fuentes verificables."
             return {"response": f"Todo en orden{user}. Soy {assistant}, listo para trabajar contigo. {focus}", "metadata": metadata}
+
+        is_short_clarification = (
+            re.fullmatch(r"(?:otra vez|como|como asi|que onda|que paso|una pregunta)", normalized)
+            or (normalized.startswith("como una pregunta") and len(normalized.split()) <= 8)
+        )
+        if is_short_clarification:
+            return {
+                "response": "Tienes razón. Eso no era una consulta documental y no debí buscar un pasaje. Háblame normal: para conversar no necesito fuentes; cuando me preguntes por un archivo, entonces sí te responderé con sus páginas.",
+                "metadata": {**metadata, "decision": "conversation-clarification"},
+            }
+
+        if re.fullmatch(r"(?:chingado|chale|rayos|carajo|no manches)", normalized):
+            return {
+                "response": "Sí, estuvo mal. Ya no voy a convertir una conversación en una búsqueda de documentos. Dime la pregunta y te respondo directo; si el archivo aporta algo, lo sumaré con sus fuentes.",
+                "metadata": {**metadata, "decision": "conversation-clarification"},
+            }
+
+        if re.fullmatch(r"(?:tu dime|tu que dices|que me dices)", normalized):
+            return {
+                "response": "Tú marcas el rumbo. Podemos platicar normal, revisar un documento específico o comparar varios; cuando haya evidencia útil, te diré de dónde salió sin interrumpir la conversación.",
+                "metadata": {**metadata, "decision": "conversation-clarification"},
+            }
 
         if re.fullmatch(r"(gracias|muchas gracias|perfecto|ok|vale|va)", normalized):
             return {"response": f"Claro{user}. Seguimos cuando quieras; si hacemos una consulta documental, te diré exactamente de qué archivo y página sale.", "metadata": {**metadata, "decision": "conversation-acknowledgement"}}
@@ -257,6 +265,63 @@ Question: {question}
         return f"No puedo verificar una respuesta redactada por el modelo con evidencia trazable. Este es el fragmento recuperado del documento seleccionado:\n\n{excerpt}\n\n[EVIDENCE:{item.id}]"
 
     @staticmethod
+    def _query_terms(question: str) -> set[str]:
+        """Keep only meaningful terms for a conservative local relevance gate."""
+        stop_words = {
+            "a", "al", "algo", "con", "como", "cual", "cuando", "de", "del", "dame", "el", "en", "es", "esta", "este",
+            "la", "las", "lo", "los", "me", "mi", "para", "por", "que", "quiero", "se", "sobre", "su", "un", "una", "y",
+            "and", "are", "do", "for", "how", "is", "of", "the", "to", "what", "which", "with",
+        }
+        normalized = unicodedata.normalize("NFKD", question).encode("ascii", "ignore").decode().lower()
+        return {token.rstrip("s") for token in re.findall(r"[a-z0-9]{3,}", normalized) if token not in stop_words}
+
+    @staticmethod
+    def _is_general_knowledge_question(question: str) -> bool:
+        normalized = unicodedata.normalize("NFKD", question).encode("ascii", "ignore").decode().lower()
+        asks_for_document = bool(re.search(r"\b(documento|archivo|pdf|pagina|pagina|clausula|contrato|playbook|propuesta|manual|este doc)\b", normalized))
+        technical_topic = bool(re.search(r"\b(transformer|token(?:es)?|internet|ia|inteligencia artificial|programacion|python|algoritmo)\b", normalized))
+        return technical_topic and not asks_for_document
+
+    def _select_relevant_evidence(self, question: str, lexical: list[EvidenceUnit], vector: list[EvidenceUnit], document_id: str | None) -> list[EvidenceUnit]:
+        """Attach only evidence with lexical support and retain a strict context budget."""
+        terms = self._query_terms(question)
+        # OR-based FTS recall is useful, but one or two incidental common terms
+        # must not turn a general question into a fake document consultation.
+        required_matches = min(3, max(1, (len(terms) + 1) // 2))
+
+        def relevant(item: EvidenceUnit) -> bool:
+            text = unicodedata.normalize("NFKD", item.content).encode("ascii", "ignore").decode().lower()
+            return sum(term in text for term in terms) >= required_matches
+
+        candidates: list[EvidenceUnit] = []
+        seen: set[str] = set()
+        for item in [*lexical, *vector]:
+            if item.id in seen or (document_id and item.document_id != document_id) or not relevant(item):
+                continue
+            seen.add(item.id)
+            candidates.append(item)
+            if len(candidates) == 4:
+                break
+        return candidates
+
+    def _bounded_context(self, evidence: list[EvidenceUnit]) -> str:
+        """Prevent documents or history from filling the inference context window."""
+        remaining = 5_400
+        blocks: list[str] = []
+        for item in evidence:
+            content = re.sub(r"\s+", " ", item.content).strip()
+            block = self._render_evidence(item).replace(item.content, content)
+            if len(block) > remaining:
+                block = f"{block[:remaining - 1].rstrip()}…"
+            if not block:
+                break
+            blocks.append(block)
+            remaining -= len(block)
+            if remaining <= 0:
+                break
+        return "\n\n".join(blocks)
+
+    @staticmethod
     def _render_evidence(item: EvidenceUnit) -> str:
         location = ", ".join(f"{key}={value}" for key, value in item.locator.items() if value not in (None, False)) or "document"
         return f"[EVIDENCE id={item.id}; {item.metadata.get('filename', 'document')}; {location}]\n{item.content}"
@@ -276,19 +341,19 @@ Question: {question}
         }
 
     def _prompt(self, question: str, evidence: str, history: list[dict]) -> str:
-        recent = "\n".join(f"{item['role']}: {item['content']}" for item in history[-4:])
+        recent = "\n".join(f"{item['role']}: {str(item['content'])[:450]}" for item in history[-3:])
         identity = self._identity()
-        return f"""Responde en el idioma de la pregunta usando exclusivamente la evidencia proporcionada.
-No reveles razonamiento interno, conocimiento general, promesas de cumplimiento ni datos no contenidos en la evidencia.
-Cada oración declarativa debe terminar con uno o más identificadores exactamente en este formato: [EVIDENCE:uuid].
-Usa únicamente IDs incluidos abajo. Si la evidencia no alcanza, responde exactamente: "No encontré evidencia suficiente en el documento seleccionado." seguido de los IDs que sí revisaste.
-Eres {identity['assistant_name']}, un {identity['persona']} con tono {identity['tone']}: sé directo, humano y breve. La voz nunca sustituye evidencia ni menciona una fuente que no esté abajo.
-Usa Markdown limpio: una respuesta breve primero y listas sólo cuando aclaren pasos o hechos. No uses caracteres de control ni identificadores fuera de las citas requeridas.
+        evidence_rule = """Hay evidencia local recuperada abajo. Úsala sólo si responde o mejora la pregunta. Si usas un hecho de ella, añade al final de ese párrafo el identificador [EVIDENCE:uuid] correspondiente. No inventes contenido ni atribuyas al documento lo que no dice.""" if evidence else """No hay evidencia local relevante para esta pregunta. Responde con conocimiento del modelo sin afirmar que proviene de un documento."""
+        return f"""Eres {identity['assistant_name']}, un {identity['persona']} local con tono {identity['tone']}.
+La última pregunta del usuario es la instrucción prioritaria: respóndela directamente. No saludes ni repitas una respuesta previa salvo que la última pregunta sea un saludo. Usa tu conocimiento para ser útil y combina, cuando aplique, la evidencia local recuperada. Nunca digas que no puedes responder sólo porque no haya evidencia local; en ese caso responde con conocimiento del modelo. No reveles razonamiento interno.
+{evidence_rule}
+Para preguntas técnicas, define los conceptos con precisión y evita analogías vagas o marketing. Por ejemplo, un Transformer procesa representaciones de tokens mediante capas de atención y redes neuronales; no es una colección de nodos que procesa partes separadas de los datos.
+Usa Markdown limpio: una respuesta directa primero y hasta tres viñetas sólo cuando aclaren algo. No crees una sección llamada "Evidencia"; si corresponde una cita, añádela directamente al final del párrafo. No muestres IDs internos salvo las citas EVIDENCE solicitadas.
 
 Conversación reciente:
 {recent}
 
-Evidencia:
+Evidencia local (puede estar vacía):
 {evidence}
 
 Pregunta: {question}

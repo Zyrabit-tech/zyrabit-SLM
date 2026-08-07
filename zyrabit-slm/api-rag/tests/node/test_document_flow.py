@@ -29,6 +29,11 @@ class GeneralKnowledgeInference(OfflineInference):
         return super().answer(prompt)
 
 
+class DirectKnowledgeInference(OfflineInference):
+    def answer(self, prompt):
+        return "Respuesta técnica del modelo local.", {"provider": "offline-test", "latency_seconds": 0.01}
+
+
 def test_ingestion_etl_normalizes_extractor_artifacts():
     dirty = "\ufeffTítulo\u00a0con\u200b ruido\u00ad\n\n\nTexto\x00 final"
     assert LocalDocumentParser._clean_text(dirty) == "Título con ruido\n\nTexto final"
@@ -53,12 +58,12 @@ async def test_real_cio_review_pdf_is_durable_and_searchable(tmp_path: Path):
     hits = service.metadata.search_lexical("Air-Gapped operation", document_id=accepted["document_id"])
     assert hits and hits[0].locator.get("page") == 2
     result = await service.query("What operation is crucial?", "test-session", accepted["document_id"])
-    assert result["metadata"]["decision"] == "evidence-query"
+    assert result["metadata"]["decision"] == "model-with-evidence"
     assert result["metadata"]["sources"][0]["document_id"] == accepted["document_id"]
 
 
 @pytest.mark.asyncio
-async def test_query_fails_closed_when_model_does_not_cite_evidence(tmp_path: Path):
+async def test_query_keeps_model_answer_and_exposes_consulted_evidence(tmp_path: Path):
     class UngroundedInference(OfflineInference):
         def answer(self, prompt): return "A fluent answer without a source.", {"provider": "offline-test"}
     source_pdf = Path(__file__).parents[2] / "docs" / "zyrabit-cioreview-en.pdf"
@@ -66,8 +71,9 @@ async def test_query_fails_closed_when_model_does_not_cite_evidence(tmp_path: Pa
     accepted = await service.import_file(source_pdf.name, str(source_pdf))
     while (job := service.job(accepted["job_id"]))["status"] not in {"ready", "failed"}: await asyncio.sleep(0.05)
     result = await service.query("What is Air-Gapped operation?", "test-session", accepted["document_id"])
-    assert result["metadata"]["decision"] == "evidence-extractive-fallback"
-    assert "fragmento recuperado" in result["response"]
+    assert result["metadata"]["decision"] == "model-with-evidence"
+    assert result["response"] == "A fluent answer without a source."
+    assert result["metadata"]["sources"]
 
 
 @pytest.mark.asyncio
@@ -113,7 +119,7 @@ async def test_explicit_lexical_mode_remains_honest_when_embeddings_are_absent(t
     assert job["status"] == "ready", job
     assert job["metrics"]["retrieval_mode"] == "lexical"
     result = await service.query("What operation is crucial?", "lexical-session", accepted["document_id"])
-    assert result["metadata"]["decision"] == "evidence-query-lexical"
+    assert result["metadata"]["decision"] == "model-with-evidence"
 
 
 @pytest.mark.asyncio
@@ -144,6 +150,27 @@ async def test_greeting_never_runs_retrieval_when_a_document_is_selected(tmp_pat
 
 
 @pytest.mark.asyncio
+async def test_informal_short_turns_never_run_retrieval_or_inference(tmp_path: Path):
+    service = NodeService(SQLiteNodeStore(str(tmp_path / "node.db")), LocalSourceStore(str(tmp_path / "sources")),
+                          LocalDocumentParser(), OfflineInference(), vector_index=InMemoryVectorIndex())
+    greeting = await service.query("Hola man", "small-talk", document_id="any-selected-id")
+    assert greeting["metadata"]["decision"] == "conversation-greeting"
+    assert greeting["metadata"]["sources"] == []
+
+    addressed = await service.query("Hola Zyra!", "small-talk", document_id="any-selected-id")
+    assert addressed["metadata"]["decision"] == "conversation-greeting"
+    assert addressed["metadata"]["sources"] == []
+
+    clarification = await service.query("Como una pregunta man una pregunta papa", "small-talk", document_id="any-selected-id")
+    assert clarification["metadata"]["decision"] == "conversation-clarification"
+    assert clarification["metadata"]["sources"] == []
+
+    frustration = await service.query("Chingado", "small-talk", document_id="any-selected-id")
+    assert frustration["metadata"]["decision"] == "conversation-clarification"
+    assert frustration["metadata"]["sources"] == []
+
+
+@pytest.mark.asyncio
 async def test_non_document_question_uses_local_model_not_an_arbitrary_document_chunk(tmp_path: Path):
     service = NodeService(SQLiteNodeStore(str(tmp_path / "node.db")), LocalSourceStore(str(tmp_path / "sources")),
                           LocalDocumentParser(), GeneralKnowledgeInference(), vector_index=InMemoryVectorIndex())
@@ -152,3 +179,12 @@ async def test_non_document_question_uses_local_model_not_an_arbitrary_document_
     assert response["metadata"]["decision"] == "model-knowledge"
     assert response["metadata"]["sources"] == []
     assert service._requires_model_knowledge("Dame la respuesta de 2 * 2")
+
+
+@pytest.mark.asyncio
+async def test_general_technical_question_does_not_attach_accidental_document_matches(tmp_path: Path):
+    service = NodeService(SQLiteNodeStore(str(tmp_path / "node.db")), LocalSourceStore(str(tmp_path / "sources")),
+                          LocalDocumentParser(), DirectKnowledgeInference(), vector_index=InMemoryVectorIndex())
+    response = await service.query("Como funciona un transformer y los tokens de IA?", "technical-knowledge", document_id="any-selected-id")
+    assert response["metadata"]["decision"] == "model-knowledge"
+    assert response["metadata"]["sources"] == []
