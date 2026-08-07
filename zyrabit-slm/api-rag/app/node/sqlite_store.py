@@ -51,6 +51,15 @@ class SQLiteNodeStore:
                   content TEXT NOT NULL, created_at TEXT NOT NULL
                 );
                 CREATE INDEX IF NOT EXISTS idx_node_sessions ON node_sessions(session_id, id);
+                CREATE TABLE IF NOT EXISTS node_session_context (
+                  session_id TEXT PRIMARY KEY,
+                  active_document_id TEXT,
+                  active_source_id TEXT,
+                  last_evidence_json TEXT NOT NULL DEFAULT '[]',
+                  last_user_intent TEXT NOT NULL DEFAULT '',
+                  conversation_summary TEXT NOT NULL DEFAULT '',
+                  updated_at TEXT NOT NULL
+                );
                 CREATE TABLE IF NOT EXISTS node_audit_events (
                   id TEXT PRIMARY KEY, event_type TEXT NOT NULL, subject_id TEXT NOT NULL,
                   payload_json TEXT NOT NULL, created_at TEXT NOT NULL
@@ -59,6 +68,14 @@ class SQLiteNodeStore:
                   name TEXT PRIMARY KEY, status TEXT NOT NULL, detail TEXT NOT NULL, checked_at TEXT NOT NULL
                 );
             """)
+            self._ensure_column(conn, "node_sessions", "metadata_json", "TEXT NOT NULL DEFAULT '{}'")
+            self._ensure_column(conn, "node_sessions", "document_id", "TEXT")
+
+    @staticmethod
+    def _ensure_column(conn, table: str, column: str, definition: str) -> None:
+        columns = {row["name"] for row in conn.execute(f"PRAGMA table_info({table})").fetchall()}
+        if column not in columns:
+            conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {definition}")
 
     def create_source(self, source: Source) -> None:
         with self._connect() as conn:
@@ -156,22 +173,75 @@ class SQLiteNodeStore:
         return [EvidenceUnit(id=row["id"], document_id=row["document_id"], content=row["content"], ordinal=row["ordinal"],
                 locator=json.loads(row["locator_json"]), metadata={**json.loads(row["metadata_json"]), "score": row["score"]}) for row in rows]
 
-    def append_message(self, session_id: str, role: str, content: str) -> None:
+    def append_message(self, session_id: str, role: str, content: str, metadata: dict | None = None, document_id: str | None = None) -> None:
         with self._connect() as conn:
-            conn.execute("INSERT INTO node_sessions (session_id, role, content, created_at) VALUES (?, ?, ?, ?)", (session_id, role, content, utcnow()))
+            conn.execute(
+                "INSERT INTO node_sessions (session_id, role, content, created_at, metadata_json, document_id) VALUES (?, ?, ?, ?, ?, ?)",
+                (session_id, role, content, utcnow(), json.dumps(metadata or {}), document_id),
+            )
 
     def get_history(self, session_id: str, limit: int = 8) -> list[dict]:
         with self._connect() as conn:
-            rows = conn.execute("SELECT role, content, created_at FROM node_sessions WHERE session_id=? ORDER BY id DESC LIMIT ?", (session_id, limit)).fetchall()
-        return [dict(row) for row in reversed(rows)]
+            rows = conn.execute("SELECT role, content, created_at, metadata_json, document_id FROM node_sessions WHERE session_id=? ORDER BY id DESC LIMIT ?", (session_id, limit)).fetchall()
+        return [self._message(row) for row in reversed(rows)]
 
     def session_history(self, session_id: str, limit: int = 100) -> list[dict]:
         with self._connect() as conn:
-            rows = conn.execute("SELECT role, content, created_at FROM node_sessions WHERE session_id=? ORDER BY id ASC LIMIT ?", (session_id, limit)).fetchall()
-        return [dict(row) for row in rows]
+            rows = conn.execute("SELECT role, content, created_at, metadata_json, document_id FROM node_sessions WHERE session_id=? ORDER BY id ASC LIMIT ?", (session_id, limit)).fetchall()
+        return [self._message(row) for row in rows]
+
+    @staticmethod
+    def _message(row) -> dict:
+        result = dict(row)
+        result["metadata"] = json.loads(result.pop("metadata_json") or "{}")
+        return result
+
+    def get_session_context(self, session_id: str) -> dict:
+        with self._connect() as conn:
+            row = conn.execute("SELECT * FROM node_session_context WHERE session_id=?", (session_id,)).fetchone()
+        if not row:
+            return {"session_id": session_id, "active_document_id": None, "active_source_id": None, "last_evidence_ids": [], "last_user_intent": "", "conversation_summary": ""}
+        result = dict(row)
+        result["last_evidence_ids"] = json.loads(result.pop("last_evidence_json") or "[]")
+        return result
+
+    def upsert_session_context(self, session_id: str, **updates) -> dict:
+        current = self.get_session_context(session_id)
+        next_context = {
+            "active_document_id": updates.get("active_document_id", current.get("active_document_id")),
+            "active_source_id": updates.get("active_source_id", current.get("active_source_id")),
+            "last_evidence_ids": updates.get("last_evidence_ids", current.get("last_evidence_ids", [])),
+            "last_user_intent": updates.get("last_user_intent", current.get("last_user_intent", "")),
+            "conversation_summary": updates.get("conversation_summary", current.get("conversation_summary", "")),
+        }
+        with self._connect() as conn:
+            conn.execute(
+                """INSERT INTO node_session_context
+                   (session_id, active_document_id, active_source_id, last_evidence_json, last_user_intent, conversation_summary, updated_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?)
+                   ON CONFLICT(session_id) DO UPDATE SET
+                     active_document_id=excluded.active_document_id,
+                     active_source_id=excluded.active_source_id,
+                     last_evidence_json=excluded.last_evidence_json,
+                     last_user_intent=excluded.last_user_intent,
+                     conversation_summary=excluded.conversation_summary,
+                     updated_at=excluded.updated_at""",
+                (
+                    session_id,
+                    next_context["active_document_id"],
+                    next_context["active_source_id"],
+                    json.dumps(next_context["last_evidence_ids"]),
+                    next_context["last_user_intent"],
+                    next_context["conversation_summary"],
+                    utcnow(),
+                ),
+            )
+        return self.get_session_context(session_id)
 
     def clear_history(self, session_id: str) -> None:
-        with self._connect() as conn: conn.execute("DELETE FROM node_sessions WHERE session_id=?", (session_id,))
+        with self._connect() as conn:
+            conn.execute("DELETE FROM node_sessions WHERE session_id=?", (session_id,))
+            conn.execute("DELETE FROM node_session_context WHERE session_id=?", (session_id,))
 
     def capability(self, name: str, status: str, detail: str = "") -> None:
         with self._connect() as conn:

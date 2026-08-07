@@ -86,7 +86,16 @@ class NodeService:
     def document(self, document_id: str) -> dict | None: return self.metadata.get_document(document_id)
     def documents(self) -> list[dict]: return self.metadata.list_documents()
     def clear_session(self, session_id: str) -> None: self.metadata.clear_history(session_id)
-    def session_history(self, session_id: str) -> list[dict]: return self.metadata.session_history(session_id)
+    def session(self, session_id: str) -> dict:
+        return {"messages": self.metadata.session_history(session_id), "context": self.metadata.get_session_context(session_id)}
+    def session_history(self, session_id: str) -> list[dict]: return self.session(session_id)["messages"]
+    def update_session_context(self, session_id: str, active_document_id: str | None = None) -> dict:
+        document_id = self._resolve_document_scope(active_document_id)
+        source_id = None
+        if document_id:
+            document = self.metadata.get_document(document_id)
+            source_id = document.get("source_id") if document else None
+        return self.metadata.upsert_session_context(session_id, active_document_id=document_id, active_source_id=source_id)
 
     def capabilities(self) -> list[dict]:
         checks = [("storage", True, "local content store"), ("lexical-index", True, "SQLite FTS5"), ("retrieval-mode", True, self.retrieval_mode)]
@@ -103,14 +112,18 @@ class NodeService:
         return self.metadata.capabilities()
 
     async def query(self, question: str, session_id: str, document_id: str | None = None) -> dict:
-        document_id = self._resolve_document_scope(document_id)
-        lexical = self.metadata.search_lexical(question, limit=16, document_id=document_id)
+        session_context = self.metadata.get_session_context(session_id)
+        document_id = self._resolve_document_scope(document_id or session_context.get("active_document_id"))
+        if document_id != session_context.get("active_document_id"):
+            session_context = self.update_session_context(session_id, document_id)
+        effective_question = self._effective_question(question, session_context)
+        lexical = self.metadata.search_lexical(effective_question, limit=16, document_id=document_id)
         vector: list[EvidenceUnit] = []
         if self.retrieval_mode == "hybrid" and self.vector_index:
-            try: vector = await asyncio.to_thread(self.vector_index.search, question, 16, document_id)
+            try: vector = await asyncio.to_thread(self.vector_index.search, effective_question, 16, document_id)
             except Exception: vector = []
-        selected = self._select_relevant_evidence(question, lexical, vector, document_id)
-        return await self._model_response(question, session_id, selected)
+        selected = self._select_relevant_evidence(effective_question, lexical, vector, document_id)
+        return await self._model_response(question, session_id, selected, document_id, session_context)
 
     def _resolve_document_scope(self, document_id: str | None) -> str | None:
         if not document_id:
@@ -138,21 +151,24 @@ class NodeService:
         """Compatibility wrapper for callers outside the Node query pipeline."""
         return await self._model_response(question, session_id, [])
 
-    async def _model_response(self, question: str, session_id: str, evidence: list[EvidenceUnit]) -> dict:
+    async def _model_response(self, question: str, session_id: str, evidence: list[EvidenceUnit], document_id: str | None = None, session_context: dict | None = None) -> dict:
         """Generate one answer from model knowledge plus bounded local evidence."""
         identity = self._identity()
         context = self._bounded_context(evidence)
         history = self.metadata.get_history(session_id)
-        prompt = self._prompt(question, context, history)
+        session_context = session_context or self.metadata.get_session_context(session_id)
+        prompt = self._prompt(question, context, history, session_context)
         try:
             answer, metrics = await asyncio.to_thread(self.inference.answer, prompt)
         except Exception:
             return self._no_evidence_response(question)
-        self.metadata.append_message(session_id, "user", question)
-        self.metadata.append_message(session_id, "assistant", answer)
         grounded, cited = self._validate_grounding(answer, evidence)
         decision = "model-with-evidence" if grounded else "model-knowledge"
-        return {"response": answer, "metadata": {"sources": self._sources(cited), "rag_hits": len(cited), "context_hits": len(evidence), "decision": decision, **metrics}}
+        metadata = {"sources": self._sources(cited), "rag_hits": len(cited), "context_hits": len(evidence), "decision": decision, **metrics}
+        self.metadata.append_message(session_id, "user", question, document_id=document_id)
+        self.metadata.append_message(session_id, "assistant", answer, metadata=metadata, document_id=document_id)
+        self._remember_turn(session_id, question, answer, cited, document_id, session_context)
+        return {"response": answer, "metadata": metadata}
 
     def _conversational_response(self, question: str, has_active_document: bool) -> dict | None:
         """Handle short human turns before retrieval; never turn a greeting into a citation."""
@@ -263,6 +279,7 @@ class NodeService:
             "la", "las", "lo", "los", "me", "mi", "para", "por", "que", "quiero", "se", "sobre", "su", "un", "una", "y",
             "hola", "buenas", "hello", "hey", "gracias", "amigo", "amiga", "man", "bro", "papa", "vato", "compa",
             "otra", "vez", "chingado", "chale", "rayos", "carajo", "dime", "zyra",
+            "explain", "better", "more", "that", "this", "again", "continue",
             "and", "are", "do", "for", "how", "is", "of", "the", "to", "what", "which", "with",
         }
         normalized = unicodedata.normalize("NFKD", question).encode("ascii", "ignore").decode().lower()
@@ -307,6 +324,51 @@ class NodeService:
                 break
         return candidates
 
+    def _effective_question(self, question: str, session_context: dict) -> str:
+        if not self._is_followup(question):
+            return question
+        prior = session_context.get("last_user_intent") or session_context.get("conversation_summary") or ""
+        if not prior:
+            return question
+        return f"{prior}\nFollow-up actual: {question}"
+
+    @staticmethod
+    def _is_followup(question: str) -> bool:
+        normalized = unicodedata.normalize("NFKD", question).encode("ascii", "ignore").decode().lower().strip()
+        normalized = re.sub(r"[^a-z0-9 ]+", " ", normalized)
+        normalized = re.sub(r"\s+", " ", normalized).strip()
+        if len(normalized.split()) <= 4 and re.search(r"\b(eso|esto|como|porque|dame mas|mas|explica|explain|better|more|that|this|again|sigue|continua|continue|otra vez)\b", normalized):
+            return True
+        return bool(re.fullmatch(r"(?:como|como asi|por que|porque|dame mas|explicalo|explain that better|tell me more|sigue|continua|continue|y eso|eso)", normalized))
+
+    def _remember_turn(self, session_id: str, question: str, answer: str, evidence: list[EvidenceUnit], document_id: str | None, session_context: dict) -> None:
+        current_summary = session_context.get("conversation_summary") or ""
+        next_summary = self._compact_summary(current_summary, question, answer, document_id)
+        active_source_id = session_context.get("active_source_id")
+        if document_id:
+            document = self.metadata.get_document(document_id)
+            active_source_id = document.get("source_id") if document else active_source_id
+        self.metadata.upsert_session_context(
+            session_id,
+            active_document_id=document_id or session_context.get("active_document_id"),
+            active_source_id=active_source_id,
+            last_evidence_ids=[item.id for item in evidence],
+            last_user_intent=question,
+            conversation_summary=next_summary,
+        )
+
+    @staticmethod
+    def _compact_summary(current: str, question: str, answer: str, document_id: str | None) -> str:
+        clean_question = re.sub(r"\s+", " ", question).strip()
+        clean_answer = re.sub(r"\s+", " ", re.sub(r"\[EVIDENCE:[0-9a-fA-F-]{36}\]", "", answer)).strip()
+        if len(clean_answer) > 220:
+            clean_answer = f"{clean_answer[:217].rstrip()}..."
+        entry = f"Usuario: {clean_question}. Respuesta: {clean_answer}"
+        if document_id:
+            entry = f"Documento activo {document_id}. {entry}"
+        combined = f"{current}\n{entry}".strip() if current else entry
+        return combined[-1_200:]
+
     def _bounded_context(self, evidence: list[EvidenceUnit]) -> str:
         """Prevent documents or history from filling the inference context window."""
         remaining = 5_400
@@ -343,15 +405,22 @@ class NodeService:
             "persona": profile.get("persona") or "document analyst",
         }
 
-    def _prompt(self, question: str, evidence: str, history: list[dict]) -> str:
+    def _prompt(self, question: str, evidence: str, history: list[dict], session_context: dict | None = None) -> str:
         recent = "\n".join(f"{item['role']}: {str(item['content'])[:450]}" for item in history[-3:])
         identity = self._identity()
+        session_context = session_context or {}
+        context_pack = f"""Documento activo: {session_context.get('active_document_id') or 'ninguno'}
+Ultima intencion del usuario: {session_context.get('last_user_intent') or 'ninguna'}
+Resumen operativo: {session_context.get('conversation_summary') or 'sin resumen'}"""
         evidence_rule = """Hay evidencia local recuperada abajo. Úsala sólo si responde o mejora la pregunta original. Si una afirmación depende de esa evidencia, añade al final del párrafo el identificador [EVIDENCE:uuid] correspondiente. Si la evidencia no sirve, ignórala y responde con conocimiento del modelo. No inventes contenido ni atribuyas al documento lo que no dice.""" if evidence else """No hay evidencia local relevante para esta pregunta. Responde con conocimiento del modelo sin afirmar que proviene de un documento."""
         return f"""Eres {identity['assistant_name']}, un {identity['persona']} local con tono {identity['tone']}.
-La última pregunta del usuario es la instrucción prioritaria: respóndela directamente. No saludes ni repitas una respuesta previa salvo que la última pregunta sea un saludo. Usa tu conocimiento para ser útil y combina, cuando aplique, la evidencia local recuperada. Nunca digas que no puedes responder sólo porque no haya evidencia local; en ese caso responde con conocimiento del modelo. No reveles razonamiento interno.
+La última pregunta del usuario es la instrucción prioritaria: respóndela directamente. Si es una continuación corta ("eso", "como", "dame más", "explícalo"), resuélvela usando el contexto operativo de sesión. No saludes ni repitas una respuesta previa salvo que la última pregunta sea un saludo. Usa tu conocimiento para ser útil y combina, cuando aplique, la evidencia local recuperada. Nunca digas que no puedes responder sólo porque no haya evidencia local; en ese caso responde con conocimiento del modelo. No reveles razonamiento interno.
 {evidence_rule}
 Para preguntas técnicas, define los conceptos con precisión y evita analogías vagas o marketing. Por ejemplo, un Transformer procesa representaciones de tokens mediante capas de atención y redes neuronales; no es una colección de nodos que procesa partes separadas de los datos.
 Usa Markdown limpio: una respuesta directa primero y hasta tres viñetas sólo cuando aclaren algo. No crees una sección llamada "Evidencia"; si corresponde una cita, añádela directamente al final del párrafo. No muestres IDs internos salvo las citas EVIDENCE solicitadas.
+
+Contexto operativo de sesión:
+{context_pack}
 
 Conversación reciente:
 {recent}

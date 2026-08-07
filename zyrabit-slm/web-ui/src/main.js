@@ -80,11 +80,16 @@ class ZyrabitApp {
             if (!res.ok) throw new Error(`HTTP_${res.status}`);
             const payload = await res.json();
             const messages = payload.messages || [];
+            this.sessionContext = payload.context || null;
+            if (this.sessionContext?.active_document_id && !this.activeDocument) {
+                this.activeDocument = { id: this.sessionContext.active_document_id, filename: '' };
+                Storage.save('active_document', this.activeDocument);
+            }
             if (messages.length === 0) return;
             this.history = messages.map((message) => ({
                 role: message.role,
                 content: message.content,
-                metadata: message.role === 'assistant' ? { decision: 'session-restored', sources: [] } : undefined,
+                metadata: message.role === 'assistant' ? (message.metadata || { decision: 'session-restored', sources: [] }) : undefined,
                 timestamp: message.created_at ? new Date(message.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : undefined
             }));
             Storage.save('chat_history', this.history);
@@ -223,7 +228,7 @@ class ZyrabitApp {
         getSafeElement('close-docs').onclick = () => this.togglePanel(null);
         getSafeElement('close-settings').onclick = () => this.togglePanel(null);
 
-        document.querySelectorAll('.prompt-chip, .starter[data-prompt]').forEach((button) => {
+        document.querySelectorAll('.prompt-chip, .starter[data-prompt], .guide-prompt[data-prompt]').forEach((button) => {
             button.onclick = () => {
                 const input = getSafeElement(IDS.CHAT_INPUT);
                 input.value = button.dataset.prompt || '';
@@ -561,6 +566,7 @@ class ZyrabitApp {
         if (title) title.textContent = filename;
         if (description) description.textContent = 'Ask a question about this document or compare it with the rest of your library.';
         this.setActiveDocument(filename, doc.id);
+        this.syncSessionContext(doc.id);
         const input = document.getElementById(IDS.CHAT_INPUT);
         if (input) {
             input.placeholder = `Ask about ${filename}…`;
@@ -577,6 +583,7 @@ class ZyrabitApp {
             delete chip.dataset.documentId;
             this.activeDocument = null;
             Storage.remove('active_document');
+            this.syncSessionContext(null);
             return;
         }
         name.textContent = filename;
@@ -599,6 +606,22 @@ class ZyrabitApp {
         this.setActiveDocument(null);
         const input = document.getElementById(IDS.CHAT_INPUT);
         if (input) input.placeholder = 'Ask about your documents…';
+    }
+
+    async syncSessionContext(documentId) {
+        try {
+            const res = await fetch(`/v1/sessions/${this.chat.sessionId}/context`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ active_document_id: documentId })
+            });
+            if (res.ok) {
+                const payload = await res.json();
+                this.sessionContext = payload.context || null;
+            }
+        } catch (_) {
+            // The chat request still carries the active document id as a fallback.
+        }
     }
 
     renderSources(sources) {

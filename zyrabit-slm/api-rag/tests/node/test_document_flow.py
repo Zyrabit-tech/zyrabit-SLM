@@ -34,6 +34,15 @@ class DirectKnowledgeInference(OfflineInference):
         return "Respuesta técnica del modelo local.", {"provider": "offline-test", "latency_seconds": 0.01}
 
 
+class CapturingInference(OfflineInference):
+    def __init__(self):
+        self.prompts = []
+
+    def answer(self, prompt):
+        self.prompts.append(prompt)
+        return super().answer(prompt)
+
+
 def test_ingestion_etl_normalizes_extractor_artifacts():
     dirty = "\ufeffTítulo\u00a0con\u200b ruido\u00ad\n\n\nTexto\x00 final"
     assert LocalDocumentParser._clean_text(dirty) == "Título con ruido\n\nTexto final"
@@ -188,3 +197,26 @@ async def test_general_technical_question_does_not_attach_accidental_document_ma
     response = await service.query("Como funciona un transformer y los tokens de IA?", "technical-knowledge", document_id="any-selected-id")
     assert response["metadata"]["decision"] == "model-knowledge"
     assert response["metadata"]["sources"] == []
+
+
+@pytest.mark.asyncio
+async def test_followup_keeps_backend_session_context_without_frontend_document_id(tmp_path: Path):
+    source_pdf = Path(__file__).parents[2] / "docs" / "zyrabit-cioreview-en.pdf"
+    inference = CapturingInference()
+    service = NodeService(SQLiteNodeStore(str(tmp_path / "node.db")), LocalSourceStore(str(tmp_path / "sources")),
+                          LocalDocumentParser(), inference, vector_index=InMemoryVectorIndex())
+    accepted = await service.import_file(source_pdf.name, str(source_pdf))
+    while (job := service.job(accepted["job_id"]))["status"] not in {"ready", "failed"}:
+        await asyncio.sleep(0.05)
+    assert job["status"] == "ready", job
+
+    first = await service.query("What operation is crucial?", "memory-session", accepted["document_id"])
+    assert first["metadata"]["sources"]
+    context = service.session("memory-session")["context"]
+    assert context["active_document_id"] == accepted["document_id"]
+    assert context["last_evidence_ids"]
+
+    followup = await service.query("Explain that better", "memory-session")
+    assert followup["metadata"]["sources"]
+    assert {source["document_id"] for source in followup["metadata"]["sources"]} == {accepted["document_id"]}
+    assert "What operation is crucial?" in inference.prompts[-1]

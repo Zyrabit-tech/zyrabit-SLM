@@ -20,6 +20,10 @@ class QueryRequest(BaseModel):
     document_id: str | None = None
 
 
+class SessionContextRequest(BaseModel):
+    active_document_id: str | None = None
+
+
 @router.post("/sources/import", status_code=202)
 async def import_source(file: UploadFile = File(...), service=Depends(get_node_service)):
     if not file.filename:
@@ -73,7 +77,12 @@ async def capabilities(service=Depends(get_node_service)):
 
 @router.get("/sessions/{session_id}")
 async def get_session(session_id: str, service=Depends(get_node_service)):
-    return {"session_id": session_id, "messages": service.session_history(session_id)}
+    return {"session_id": session_id, **service.session(session_id)}
+
+
+@router.patch("/sessions/{session_id}/context")
+async def update_session_context(session_id: str, payload: SessionContextRequest, service=Depends(get_node_service)):
+    return {"session_id": session_id, "context": service.update_session_context(session_id, payload.active_document_id)}
 
 
 @router.delete("/sessions/{session_id}", status_code=204)
