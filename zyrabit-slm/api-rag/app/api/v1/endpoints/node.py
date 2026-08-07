@@ -71,6 +71,11 @@ async def capabilities(service=Depends(get_node_service)):
     return {"capabilities": service.capabilities()}
 
 
+@router.get("/sessions/{session_id}")
+async def get_session(session_id: str, service=Depends(get_node_service)):
+    return {"session_id": session_id, "messages": service.session_history(session_id)}
+
+
 @router.delete("/sessions/{session_id}", status_code=204)
 async def clear_session(session_id: str, service=Depends(get_node_service)):
     service.clear_session(session_id)

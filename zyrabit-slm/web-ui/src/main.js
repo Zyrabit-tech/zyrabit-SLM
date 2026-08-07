@@ -40,15 +40,16 @@ class ZyrabitApp {
         this.init();
     }
 
-    init() {
+    async init() {
         this.setupUIListeners();
         this.socket.connect();
         this.startHealthChecks();
-        this.chat.recover(); // Recover Shadow State
+
+        await this.restoreConversation();
 
         // Restore visual history
         this.history.forEach(msg => {
-            this.renderer.renderMessage(msg.role, msg.content, msg.metadata);
+            this.renderer.renderMessage(msg.role, msg.content, msg.metadata, msg.timestamp);
         });
 
         // Hide floating suggestions if history exists
@@ -56,6 +57,8 @@ class ZyrabitApp {
             const suggestions = document.getElementById('floating-suggestions');
             if (suggestions) suggestions.style.display = 'none';
         }
+
+        this.chat.recover(); // Recover Shadow State
 
         this.loadVault();
         this.checkOnboarding();
@@ -69,6 +72,25 @@ class ZyrabitApp {
             Storage.save('library_collapsed', shell.classList.contains('library-collapsed'));
         };
         if (open && shell) open.onclick = () => shell.classList.toggle('library-open');
+    }
+
+    async restoreConversation() {
+        try {
+            const res = await fetch(`/v1/sessions/${this.chat.sessionId}`, { cache: 'no-store' });
+            if (!res.ok) throw new Error(`HTTP_${res.status}`);
+            const payload = await res.json();
+            const messages = payload.messages || [];
+            if (messages.length === 0) return;
+            this.history = messages.map((message) => ({
+                role: message.role,
+                content: message.content,
+                metadata: message.role === 'assistant' ? { decision: 'session-restored', sources: [] } : undefined,
+                timestamp: message.created_at ? new Date(message.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : undefined
+            }));
+            Storage.save('chat_history', this.history);
+        } catch (e) {
+            this.history = Storage.load('chat_history') || [];
+        }
     }
 
     async checkOnboarding() {

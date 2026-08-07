@@ -45,3 +45,8 @@ def test_import_job_query_and_sources_over_http(node_api):
     assert payload["metadata"]["sources"]
     assert {item["document_id"] for item in payload["metadata"]["sources"]} == {accepted["document_id"]}
     assert payload["metadata"]["sources"][0]["locator"]["page"] == 2
+    session = node_api.get("/v1/sessions/api-test")
+    assert session.status_code == 200
+    messages = session.json()["messages"]
+    assert [message["role"] for message in messages] == ["user", "assistant"]
+    assert "What operation is crucial" in messages[0]["content"]

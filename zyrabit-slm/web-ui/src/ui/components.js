@@ -368,6 +368,7 @@ class ZyraChatMessage extends HTMLElement {
             'library-empty-guidance': 'Biblioteca vacía · siguiente paso',
             'library-indexing-guidance': 'Documento en preparación',
             'profile-welcome': 'Espacio configurado',
+            'session-restored': 'Conversación restaurada',
             'conversation-greeting': 'Conversación local',
             'conversation-acknowledgement': 'Conversación local',
             'conversation-clarification': 'Conversación local',

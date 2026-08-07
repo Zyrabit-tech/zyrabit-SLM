@@ -162,8 +162,13 @@ class SQLiteNodeStore:
 
     def get_history(self, session_id: str, limit: int = 8) -> list[dict]:
         with self._connect() as conn:
-            rows = conn.execute("SELECT role, content FROM node_sessions WHERE session_id=? ORDER BY id DESC LIMIT ?", (session_id, limit)).fetchall()
+            rows = conn.execute("SELECT role, content, created_at FROM node_sessions WHERE session_id=? ORDER BY id DESC LIMIT ?", (session_id, limit)).fetchall()
         return [dict(row) for row in reversed(rows)]
+
+    def session_history(self, session_id: str, limit: int = 100) -> list[dict]:
+        with self._connect() as conn:
+            rows = conn.execute("SELECT role, content, created_at FROM node_sessions WHERE session_id=? ORDER BY id ASC LIMIT ?", (session_id, limit)).fetchall()
+        return [dict(row) for row in rows]
 
     def clear_history(self, session_id: str) -> None:
         with self._connect() as conn: conn.execute("DELETE FROM node_sessions WHERE session_id=?", (session_id,))

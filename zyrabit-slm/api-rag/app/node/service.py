@@ -7,6 +7,7 @@ import shutil
 import time
 import unicodedata
 import uuid
+from dataclasses import replace
 from pathlib import Path
 
 from app.node.domain import EvidenceUnit, IngestionJob
@@ -85,6 +86,7 @@ class NodeService:
     def document(self, document_id: str) -> dict | None: return self.metadata.get_document(document_id)
     def documents(self) -> list[dict]: return self.metadata.list_documents()
     def clear_session(self, session_id: str) -> None: self.metadata.clear_history(session_id)
+    def session_history(self, session_id: str) -> list[dict]: return self.metadata.session_history(session_id)
 
     def capabilities(self) -> list[dict]:
         checks = [("storage", True, "local content store"), ("lexical-index", True, "SQLite FTS5"), ("retrieval-mode", True, self.retrieval_mode)]
@@ -101,37 +103,25 @@ class NodeService:
         return self.metadata.capabilities()
 
     async def query(self, question: str, session_id: str, document_id: str | None = None) -> dict:
-        conversational = self._conversational_response(question, bool(document_id))
-        if conversational:
-            self.metadata.append_message(session_id, "user", question)
-            self.metadata.append_message(session_id, "assistant", conversational["response"])
-            return conversational
-
-        # The model is the response engine for every non-conversational turn.
-        # Retrieval is an optional, bounded evidence attachment—not an
-        # alternative response path and never a raw excerpt shown as an answer.
-        if document_id:
-            document = self.metadata.get_document(document_id)
-            replacement = self.metadata.latest_ready_document_for(document_id) if document else None
-            if replacement:
-                # A reindex creates immutable versions. Existing UI sessions
-                # always follow the newest ready version of the same source so
-                # they neither fail nor accidentally escape to the full corpus.
-                document_id = replacement["id"]
-            elif not document or document["status"] != "ready":
-                # A pending document must not block a normal model answer or
-                # silently broaden the query to the full library.
-                document_id = None
-        # General technical questions are answered by the local model. A
-        # selected file is not consent to attach an unrelated project page just
-        # because it happens to share a generic term such as "generation".
-        lexical = [] if self._is_general_knowledge_question(question) else self.metadata.search_lexical(question, document_id=document_id)
+        document_id = self._resolve_document_scope(document_id)
+        lexical = self.metadata.search_lexical(question, limit=16, document_id=document_id)
         vector: list[EvidenceUnit] = []
-        if lexical and self.retrieval_mode == "hybrid" and self.vector_index:
-            try: vector = await asyncio.to_thread(self.vector_index.search, question, 8, document_id)
+        if self.retrieval_mode == "hybrid" and self.vector_index:
+            try: vector = await asyncio.to_thread(self.vector_index.search, question, 16, document_id)
             except Exception: vector = []
         selected = self._select_relevant_evidence(question, lexical, vector, document_id)
         return await self._model_response(question, session_id, selected)
+
+    def _resolve_document_scope(self, document_id: str | None) -> str | None:
+        if not document_id:
+            return None
+        document = self.metadata.get_document(document_id)
+        replacement = self.metadata.latest_ready_document_for(document_id) if document else None
+        if replacement:
+            return replacement["id"]
+        if not document or document["status"] != "ready":
+            return None
+        return document_id
 
     @staticmethod
     def _requires_model_knowledge(question: str) -> bool:
@@ -160,8 +150,9 @@ class NodeService:
             return self._no_evidence_response(question)
         self.metadata.append_message(session_id, "user", question)
         self.metadata.append_message(session_id, "assistant", answer)
-        decision = "model-with-evidence" if evidence else "model-knowledge"
-        return {"response": answer, "metadata": {"sources": self._sources(evidence), "rag_hits": len(evidence), "decision": decision, **metrics}}
+        grounded, cited = self._validate_grounding(answer, evidence)
+        decision = "model-with-evidence" if grounded else "model-knowledge"
+        return {"response": answer, "metadata": {"sources": self._sources(cited), "rag_hits": len(cited), "context_hits": len(evidence), "decision": decision, **metrics}}
 
     def _conversational_response(self, question: str, has_active_document: bool) -> dict | None:
         """Handle short human turns before retrieval; never turn a greeting into a citation."""
@@ -270,6 +261,8 @@ class NodeService:
         stop_words = {
             "a", "al", "algo", "con", "como", "cual", "cuando", "de", "del", "dame", "el", "en", "es", "esta", "este",
             "la", "las", "lo", "los", "me", "mi", "para", "por", "que", "quiero", "se", "sobre", "su", "un", "una", "y",
+            "hola", "buenas", "hello", "hey", "gracias", "amigo", "amiga", "man", "bro", "papa", "vato", "compa",
+            "otra", "vez", "chingado", "chale", "rayos", "carajo", "dime", "zyra",
             "and", "are", "do", "for", "how", "is", "of", "the", "to", "what", "which", "with",
         }
         normalized = unicodedata.normalize("NFKD", question).encode("ascii", "ignore").decode().lower()
@@ -283,23 +276,33 @@ class NodeService:
         return technical_topic and not asks_for_document
 
     def _select_relevant_evidence(self, question: str, lexical: list[EvidenceUnit], vector: list[EvidenceUnit], document_id: str | None) -> list[EvidenceUnit]:
-        """Attach only evidence with lexical support and retain a strict context budget."""
+        """Rank retrieved candidates and keep only evidence with textual support."""
         terms = self._query_terms(question)
-        # OR-based FTS recall is useful, but one or two incidental common terms
-        # must not turn a general question into a fake document consultation.
+        if not terms:
+            return []
         required_matches = min(3, max(1, (len(terms) + 1) // 2))
+        if len(terms) == 1 and not document_id:
+            required_matches = 2
 
-        def relevant(item: EvidenceUnit) -> bool:
+        def match_count(item: EvidenceUnit) -> int:
             text = unicodedata.normalize("NFKD", item.content).encode("ascii", "ignore").decode().lower()
-            return sum(term in text for term in terms) >= required_matches
+            return sum(term in text for term in terms)
 
+        fused: dict[str, tuple[EvidenceUnit, float]] = {}
+        for rank, item in enumerate(lexical, start=1):
+            fused[item.id] = (item, fused.get(item.id, (item, 0.0))[1] + 1 / (60 + rank))
+        for rank, item in enumerate(vector, start=1):
+            fused[item.id] = (item, fused.get(item.id, (item, 0.0))[1] + 1 / (60 + rank))
+
+        ranked = sorted(fused.values(), key=lambda pair: (match_count(pair[0]), pair[1]), reverse=True)
         candidates: list[EvidenceUnit] = []
-        seen: set[str] = set()
-        for item in [*lexical, *vector]:
-            if item.id in seen or (document_id and item.document_id != document_id) or not relevant(item):
+        for item, score in ranked:
+            if document_id and item.document_id != document_id:
                 continue
-            seen.add(item.id)
-            candidates.append(item)
+            matches = match_count(item)
+            if matches < required_matches:
+                continue
+            candidates.append(replace(item, metadata={**item.metadata, "score": item.metadata.get("score", score), "matches": matches}))
             if len(candidates) == 4:
                 break
         return candidates
@@ -343,7 +346,7 @@ class NodeService:
     def _prompt(self, question: str, evidence: str, history: list[dict]) -> str:
         recent = "\n".join(f"{item['role']}: {str(item['content'])[:450]}" for item in history[-3:])
         identity = self._identity()
-        evidence_rule = """Hay evidencia local recuperada abajo. Úsala sólo si responde o mejora la pregunta. Si usas un hecho de ella, añade al final de ese párrafo el identificador [EVIDENCE:uuid] correspondiente. No inventes contenido ni atribuyas al documento lo que no dice.""" if evidence else """No hay evidencia local relevante para esta pregunta. Responde con conocimiento del modelo sin afirmar que proviene de un documento."""
+        evidence_rule = """Hay evidencia local recuperada abajo. Úsala sólo si responde o mejora la pregunta original. Si una afirmación depende de esa evidencia, añade al final del párrafo el identificador [EVIDENCE:uuid] correspondiente. Si la evidencia no sirve, ignórala y responde con conocimiento del modelo. No inventes contenido ni atribuyas al documento lo que no dice.""" if evidence else """No hay evidencia local relevante para esta pregunta. Responde con conocimiento del modelo sin afirmar que proviene de un documento."""
         return f"""Eres {identity['assistant_name']}, un {identity['persona']} local con tono {identity['tone']}.
 La última pregunta del usuario es la instrucción prioritaria: respóndela directamente. No saludes ni repitas una respuesta previa salvo que la última pregunta sea un saludo. Usa tu conocimiento para ser útil y combina, cuando aplique, la evidencia local recuperada. Nunca digas que no puedes responder sólo porque no haya evidencia local; en ese caso responde con conocimiento del modelo. No reveles razonamiento interno.
 {evidence_rule}

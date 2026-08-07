@@ -71,9 +71,10 @@ async def test_query_keeps_model_answer_and_exposes_consulted_evidence(tmp_path:
     accepted = await service.import_file(source_pdf.name, str(source_pdf))
     while (job := service.job(accepted["job_id"]))["status"] not in {"ready", "failed"}: await asyncio.sleep(0.05)
     result = await service.query("What is Air-Gapped operation?", "test-session", accepted["document_id"])
-    assert result["metadata"]["decision"] == "model-with-evidence"
+    assert result["metadata"]["decision"] == "model-knowledge"
     assert result["response"] == "A fluent answer without a source."
-    assert result["metadata"]["sources"]
+    assert result["metadata"]["context_hits"]
+    assert result["metadata"]["sources"] == []
 
 
 @pytest.mark.asyncio
@@ -130,7 +131,7 @@ async def test_empty_library_has_a_conversational_start_without_fabricating_evid
     service = NodeService(SQLiteNodeStore(str(tmp_path / "node.db")), LocalSourceStore(str(tmp_path / "sources")),
                           LocalDocumentParser(), OfflineInference(), vector_index=InMemoryVectorIndex(), identity=Profile())
     greeting = await service.query("Hola!", "new-session")
-    assert greeting["metadata"]["decision"] == "conversation-greeting"
+    assert greeting["metadata"]["decision"] == "library-empty-greeting"
     assert "Abraham" in greeting["response"]
     assert "Nora" in greeting["response"]
 
@@ -140,33 +141,32 @@ async def test_empty_library_has_a_conversational_start_without_fabricating_evid
 
 
 @pytest.mark.asyncio
-async def test_greeting_never_runs_retrieval_when_a_document_is_selected(tmp_path: Path):
+async def test_greeting_uses_the_same_model_pipeline_when_a_document_is_selected(tmp_path: Path):
     service = NodeService(SQLiteNodeStore(str(tmp_path / "node.db")), LocalSourceStore(str(tmp_path / "sources")),
-                          LocalDocumentParser(), OfflineInference(), vector_index=InMemoryVectorIndex())
+                          LocalDocumentParser(), DirectKnowledgeInference(), vector_index=InMemoryVectorIndex())
     response = await service.query("Hola amigo, ¿cómo estás?", "small-talk", document_id="any-selected-id")
-    assert response["metadata"]["decision"] == "conversation-greeting"
+    assert response["metadata"]["decision"] == "model-knowledge"
     assert response["metadata"]["sources"] == []
-    assert "documento activo sigue seleccionado" in response["response"]
 
 
 @pytest.mark.asyncio
-async def test_informal_short_turns_never_run_retrieval_or_inference(tmp_path: Path):
+async def test_informal_short_turns_do_not_attach_document_sources(tmp_path: Path):
     service = NodeService(SQLiteNodeStore(str(tmp_path / "node.db")), LocalSourceStore(str(tmp_path / "sources")),
-                          LocalDocumentParser(), OfflineInference(), vector_index=InMemoryVectorIndex())
+                          LocalDocumentParser(), DirectKnowledgeInference(), vector_index=InMemoryVectorIndex())
     greeting = await service.query("Hola man", "small-talk", document_id="any-selected-id")
-    assert greeting["metadata"]["decision"] == "conversation-greeting"
+    assert greeting["metadata"]["decision"] == "model-knowledge"
     assert greeting["metadata"]["sources"] == []
 
     addressed = await service.query("Hola Zyra!", "small-talk", document_id="any-selected-id")
-    assert addressed["metadata"]["decision"] == "conversation-greeting"
+    assert addressed["metadata"]["decision"] == "model-knowledge"
     assert addressed["metadata"]["sources"] == []
 
     clarification = await service.query("Como una pregunta man una pregunta papa", "small-talk", document_id="any-selected-id")
-    assert clarification["metadata"]["decision"] == "conversation-clarification"
+    assert clarification["metadata"]["decision"] == "model-knowledge"
     assert clarification["metadata"]["sources"] == []
 
     frustration = await service.query("Chingado", "small-talk", document_id="any-selected-id")
-    assert frustration["metadata"]["decision"] == "conversation-clarification"
+    assert frustration["metadata"]["decision"] == "model-knowledge"
     assert frustration["metadata"]["sources"] == []
 
 

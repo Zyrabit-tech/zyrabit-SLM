@@ -15,7 +15,7 @@ export class Renderer {
 
 
     setupListeners() {
-        bus.on(EVENTS.UI.MSG_ADDED, (data) => this.renderMessage(data.role, data.text, data.metadata));
+        bus.on(EVENTS.UI.MSG_ADDED, (data) => this.renderMessage(data.role, data.text, data.metadata, data.timestamp));
         bus.on(EVENTS.UI.THINKING, (state) => this.toggleThinking(state));
         bus.on('UI:CLEAR_CHAT', () => {
             this.container.innerHTML = '';
@@ -29,9 +29,9 @@ export class Renderer {
     }
 
 
-    renderMessage(role, text, metadata = null) {
+    renderMessage(role, text, metadata = null, timestamp = null) {
         const now = new Date();
-        const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        const timeStr = timestamp || now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
         // User requested Telegram incoming messages to look like user messages
         let effectiveRole = role;
