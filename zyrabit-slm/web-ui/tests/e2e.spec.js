@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 
 const baseURL = process.env.ZYRABIT_E2E_URL || 'http://localhost:8080';
 const fixturePath = process.env.ZYRABIT_E2E_FIXTURE
-    || '/workspace/zyrabit-slm/api-rag/sample_docs/zyrabit_project_overview.txt';
+    || '/workspace/zyrabit-slm/api-rag/docs/zyrabit-cioreview-en.pdf';
 
 test.describe('Document workspace', () => {
     test.beforeEach(async ({ page }) => {
@@ -12,13 +12,11 @@ test.describe('Document workspace', () => {
     });
 
     test('shows the document-first workspace and opens the file chooser', async ({ page }) => {
-        await expect(page.getByText('Drop files or browse')).toBeVisible();
-
         const fileChooser = page.waitForEvent('filechooser');
         await page.getByRole('button', { name: /Import documents/i }).click();
         await (await fileChooser).setFiles(fixturePath);
 
-        await expect(page.getByText('zyrabit_project_overview.txt')).toBeVisible({ timeout: 30_000 });
+        await expect(page.getByText('zyrabit-cioreview-en.pdf')).toBeVisible({ timeout: 30_000 });
     });
 
     test('prefills a contextual question from an empty-state action', async ({ page }) => {

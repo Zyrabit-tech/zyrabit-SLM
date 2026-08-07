@@ -2,8 +2,10 @@
 from __future__ import annotations
 
 import os
+import re
 import subprocess
 import tempfile
+import unicodedata
 import uuid
 from pathlib import Path
 from typing import Iterable, Sequence
@@ -44,8 +46,19 @@ class LocalDocumentParser:
         raise ValueError(f"Unsupported document type: {extension}")
 
     def _unit(self, document_id: str, text: str, ordinal: int, locator: dict, source: Source) -> EvidenceUnit:
-        return EvidenceUnit(id=str(uuid.uuid4()), document_id=document_id, content=text, ordinal=ordinal,
+        return EvidenceUnit(id=str(uuid.uuid4()), document_id=document_id, content=self._clean_text(text), ordinal=ordinal,
             locator=locator, metadata={"filename": source.filename, "sha256": source.sha256, "format": Path(source.filename).suffix.lower().lstrip(".")})
+
+    @staticmethod
+    def _clean_text(text: str) -> str:
+        """Preserve document structure while removing extractor artifacts."""
+        text = unicodedata.normalize("NFKC", text)
+        text = text.replace("\u00a0", " ").replace("\u00ad", "")
+        text = re.sub(r"[\u200b-\u200d\ufeff]", "", text)
+        text = re.sub(r"[\x00-\x08\x0b\x0c\x0e-\x1f]", "", text)
+        text = re.sub(r"[ \t]+\n", "\n", text)
+        text = re.sub(r"\n{3,}", "\n\n", text)
+        return text.strip()
 
     def _pdf(self, source: Source, document_id: str) -> Iterable[EvidenceUnit]:
         import fitz

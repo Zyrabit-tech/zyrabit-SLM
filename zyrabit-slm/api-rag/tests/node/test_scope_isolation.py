@@ -15,6 +15,7 @@ from app.node.parsers import LocalDocumentParser
 from app.node.service import NodeService
 from app.node.sqlite_store import SQLiteNodeStore
 from app.node.storage import LocalSourceStore
+from tests.node.fakes import InMemoryVectorIndex
 
 
 class CitingInference:
@@ -39,7 +40,7 @@ async def test_selected_document_never_returns_other_document_sources(tmp_path: 
     cio = root / "api-rag/docs/zyrabit-cioreview-en.pdf"
     prospeo = root / "document_source/- Playbook plataforma Prospeo.docx.pdf"
     assert cio.exists() and prospeo.exists(), "Acceptance documents must remain available"
-    service = NodeService(SQLiteNodeStore(str(tmp_path / "node.db")), LocalSourceStore(str(tmp_path / "sources")), LocalDocumentParser(), CitingInference())
+    service = NodeService(SQLiteNodeStore(str(tmp_path / "node.db")), LocalSourceStore(str(tmp_path / "sources")), LocalDocumentParser(), CitingInference(), vector_index=InMemoryVectorIndex())
     cio_import = await service.import_file(cio.name, str(cio))
     prospeo_import = await service.import_file(prospeo.name, str(prospeo))
     await _ready(service, cio_import["job_id"]); await _ready(service, prospeo_import["job_id"])
@@ -52,7 +53,7 @@ async def test_selected_document_never_returns_other_document_sources(tmp_path: 
 
 @pytest.mark.asyncio
 async def test_unready_selected_document_fails_without_falling_back_to_library(tmp_path: Path):
-    service = NodeService(SQLiteNodeStore(str(tmp_path / "node.db")), LocalSourceStore(str(tmp_path / "sources")), LocalDocumentParser(), CitingInference())
+    service = NodeService(SQLiteNodeStore(str(tmp_path / "node.db")), LocalSourceStore(str(tmp_path / "sources")), LocalDocumentParser(), CitingInference(), vector_index=InMemoryVectorIndex())
     result = await service.query("anything", "scope-test", "missing-document")
     assert result["metadata"]["decision"] == "selected-document-unavailable"
     assert result["metadata"]["sources"] == []

@@ -2,7 +2,6 @@ name: Zyrabit Sovereign Security Audit
 
 on:
   push:
-  push:
     branches: [ main, beta ]
   pull_request:
     branches: [ main, beta ]
@@ -37,8 +36,14 @@ jobs:
       - name: Install dependencies
         run: uv sync --all-groups
 
-      - name: Run pip-audit
-        run: uv run pip-audit --ignore-vuln CVE-2026-45829 --ignore-vuln PYSEC-2026-311
+      - name: Run pip-audit and require a visible risk record
+        run: |
+          set +e
+          uv run pip-audit --format json --output pip-audit.json
+          audit_exit=$?
+          set -e
+          python validation/scripts/verify_dependency_risks.py pip-audit.json docs/security/DEPENDENCY_RISKS.md
+          exit "$audit_exit"
 
   trivy-scan:
     name: Trivy Vulnerability Scan

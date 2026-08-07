@@ -16,14 +16,25 @@ from app.infrastructure.inference.model_downloader import ModelDownloader
 
 logger = logging.getLogger("zyrabit.inference")
 
-try:
-    import mlx.core as mx
-    from mlx_lm import load, generate
-except ImportError:
-    mx = None
-    load = None
-    generate = None
-    logger.warning("mlx-lm or mlx not installed. MLX inference will not be available.")
+# MLX initialises native Metal components. Keep that side effect behind the
+# selected provider so imports, Ollama deployments and CPU CI remain portable.
+mx = None
+load = None
+generate = None
+
+
+def _load_mlx_runtime() -> bool:
+    global mx, load, generate
+    if load is not None and generate is not None:
+        return True
+    try:
+        import mlx.core as mlx_core
+        from mlx_lm import generate as mlx_generate, load as mlx_load
+        mx, load, generate = mlx_core, mlx_load, mlx_generate
+        return True
+    except ImportError:
+        logger.warning("mlx-lm or mlx not installed. MLX inference will not be available.")
+        return False
 
 
 class MlxInferenceAdapter(InferenceProviderPort):
@@ -35,7 +46,7 @@ class MlxInferenceAdapter(InferenceProviderPort):
         self._loaded_models: Dict[str, tuple[Any, Any]] = {} # (model, tokenizer)
 
     def _get_or_load_model(self, model_name: str) -> tuple[Any, Any]:
-        if load is None:
+        if load is None and not _load_mlx_runtime():
             raise InferenceProviderError("mlx-lm/mlx is not installed on this system.")
 
         if model_name in self._loaded_models:
@@ -97,7 +108,7 @@ class MlxInferenceAdapter(InferenceProviderPort):
             raise InferenceProviderError(f"MLX generation failed: {exc}") from exc
 
     def health(self) -> Dict[str, Any]:
-        if mx is None:
+        if mx is None and not _load_mlx_runtime():
             return {
                 "provider": self.provider_name,
                 "ok": False,

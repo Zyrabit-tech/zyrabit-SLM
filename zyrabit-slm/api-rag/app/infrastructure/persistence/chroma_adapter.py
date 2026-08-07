@@ -51,6 +51,22 @@ class DirectOllamaEmbeddings(Embeddings):
     def embed_query(self, text: str) -> List[float]:
         return self._embed([text])[0]
 
+    def health(self) -> tuple[bool, str]:
+        """Check the dedicated embedding endpoint without producing vectors."""
+        try:
+            response = requests.get(f"{self.base_url}/api/tags", timeout=2.0)
+            response.raise_for_status()
+            models = response.json().get("models", [])
+            names = {item.get("name") for item in models if isinstance(item, dict)}
+            # Ollama exposes the default tag as `model:latest`, while its API
+            # accepts both that name and the convenient tagless alias.
+            configured_names = {self.model, f"{self.model}:latest"}
+            if names and not configured_names.intersection(names):
+                return False, f"embedding model '{self.model}' is not installed"
+            return True, f"{self.model} available"
+        except Exception as exc:
+            return False, f"embedding endpoint unavailable at {self.base_url}: {exc}"
+
 class ChromaAdapter(VectorStorePort):
     """
     Bridge between our VectorStorePort and LangChain's Chroma.

@@ -11,6 +11,7 @@ from app.node.parsers import LocalDocumentParser
 from app.node.service import NodeService
 from app.node.sqlite_store import SQLiteNodeStore
 from app.node.storage import LocalSourceStore
+from tests.node.fakes import InMemoryVectorIndex
 
 
 class CitingInference:
@@ -23,7 +24,7 @@ class CitingInference:
 @pytest.fixture
 def node_api(client, tmp_path):
     from app.main import app
-    app.state.node_service = NodeService(SQLiteNodeStore(str(tmp_path / "node.db")), LocalSourceStore(str(tmp_path / "sources")), LocalDocumentParser(), CitingInference())
+    app.state.node_service = NodeService(SQLiteNodeStore(str(tmp_path / "node.db")), LocalSourceStore(str(tmp_path / "sources")), LocalDocumentParser(), CitingInference(), vector_index=InMemoryVectorIndex())
     return client
 
 

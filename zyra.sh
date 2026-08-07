@@ -587,12 +587,12 @@ run_notify() {
 # ─────────────────────────────────────────────────────────────────────────────
 run_validate() {
     log_header "SOVEREIGN QA VALIDATION"
-    log_info "[1/2] Unit tests (offline)..."
+    log_info "[1/3] Contract, integration and Node tests (offline)..."
     cd "${SCRIPT_DIR}/zyrabit-slm"
-    PYTHONPATH="api-rag" "${SCRIPT_DIR}/.venv/bin/pytest" api-rag/tests/unit/ -q 2>&1 && log_ok "Tests PASSED ✅" || { log_err "Tests FAILED."; exit 1; }
+    PYTHONPATH="api-rag" "${SCRIPT_DIR}/.venv/bin/pytest" api-rag/tests/ -q 2>&1 && log_ok "Tests PASSED ✅" || { log_err "Tests FAILED."; exit 1; }
     cd "${SCRIPT_DIR}"
 
-    log_info "[2/2] Clean Architecture check..."
+    log_info "[2/3] Evidence-bound architecture check..."
     if grep -rn "prometheus_client\|import logging" \
         "${SCRIPT_DIR}/zyrabit-slm/api-rag/app/domain/use_cases/chat_use_case.py" 2>/dev/null; then
         log_err "Architecture violation: domain imports infra deps."; exit 1
@@ -600,7 +600,14 @@ run_validate() {
         log_ok "Domain layer is clean ✅"
     fi
 
-    [[ "${E2E_SECURITY}" != "true" ]] && { log_ok "Basic QA done. Add --e2e-security for full pipeline."; return 0; }
+    [[ -f "${SCRIPT_DIR}/docs/engineering/EVIDENCE_BOUNDARY_HARDENING.md" ]] \
+        && log_ok "Evidence boundary contract present ✅" \
+        || { log_err "Evidence boundary contract missing."; exit 1; }
+    [[ -f "${SCRIPT_DIR}/docs/security/DEPENDENCY_RISKS.md" ]] \
+        && log_ok "Dependency risk register present ✅" \
+        || { log_err "Dependency risk register missing."; exit 1; }
+
+    [[ "${E2E_SECURITY}" != "true" ]] && { log_ok "Basic QA done. Add --e2e-security for the real PDF smoke test and full pipeline."; return 0; }
 
     log_header "E2E SECURITY PIPELINE"
     require_docker
@@ -616,6 +623,10 @@ run_validate() {
     bash "${SCRIPT_DIR}/validation/scripts/monitor_memory.sh" 60 5 \
         && log_ok "Memory within 14GB limit ✅" \
         || { log_err "Memory exceeded 14GB."; exit 1; }
+    log_info "[3/3] Real document acceptance (configured local inference)..."
+    bash "${SCRIPT_DIR}/validation/scripts/smoke_node_real.sh" \
+        && log_ok "Real document acceptance PASSED ✅" \
+        || { log_err "Real document acceptance FAILED. Check /v1/health capabilities."; exit 1; }
     log_header "QA COMPLETE 🏆"
 }
 

@@ -25,6 +25,12 @@ services:
       zyrabit-db:
         condition: service_healthy
     networks: [runtime]
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/v1/health >/dev/null || exit 1"]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+      start_period: 45s
 
   zyrabit-web:
     build:
@@ -39,7 +45,9 @@ services:
     depends_on: [zyrabit-api]
     networks: [runtime]
     healthcheck:
-      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://localhost/"]
+      # Alpine wget resolves localhost to IPv6 first while this nginx image
+      # listens on IPv4, so use the loopback address explicitly.
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1/ || exit 1"]
       interval: 30s
       timeout: 5s
       retries: 3

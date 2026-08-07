@@ -55,3 +55,16 @@ class DisabledCapability:
     def __init__(self, detail: str = "not configured"):
         self.detail = detail
     def health(self) -> tuple[bool, str]: return False, self.detail
+
+
+class SovereignProfileIdentity:
+    """Reads the local profile at response time so settings take effect immediately."""
+    def current(self) -> dict:
+        from app.infrastructure.shared.state_tracker import SovereignStateManager
+        profile = SovereignStateManager.get_user_profile() or {}
+        return {
+            "assistant_name": str(profile.get("assistant_name") or "Zyra").strip()[:48],
+            "user_name": str(profile.get("name") or "").strip()[:80],
+            "tone": str(profile.get("tone") or "clear").strip().lower(),
+            "persona": str(profile.get("persona") or "document analyst").strip().lower(),
+        }

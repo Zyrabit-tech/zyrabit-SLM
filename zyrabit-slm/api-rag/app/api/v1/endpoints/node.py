@@ -48,6 +48,14 @@ async def get_document(document_id: str, service=Depends(get_node_service)):
     return result
 
 
+@router.post("/documents/{document_id}/reindex", status_code=202)
+async def reindex_document(document_id: str, service=Depends(get_node_service)):
+    try:
+        return await service.reindex_document(document_id)
+    except ValueError:
+        raise HTTPException(status_code=404, detail="Document not found")
+
+
 @router.get("/node/documents")
 async def list_node_documents(service=Depends(get_node_service)):
     return {"documents": service.documents()}

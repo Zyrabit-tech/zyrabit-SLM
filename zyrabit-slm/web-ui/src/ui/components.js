@@ -51,6 +51,12 @@ class ZyraStatusDot extends HTMLElement {
  */
 function parseMarkdown(text) {
     if (!text) return "";
+    text = text
+        .normalize('NFKC')
+        .replace(/[\u200B-\u200D\uFEFF\u00AD]/g, '')
+        .replace(/\u00A0/g, ' ')
+        .replace(/[ \t]+\n/g, '\n')
+        .replace(/\n{3,}/g, '\n\n');
     
     // 1. Escape HTML special characters for XSS prevention
     let html = text
@@ -197,6 +203,23 @@ class ZyraChatMessage extends HTMLElement {
                     color: #25313a;
                 }
 
+                .assistant-label {
+                    display: inline-flex;
+                    align-items: center;
+                    gap: 6px;
+                    margin-bottom: 8px;
+                    color: #607785;
+                    font-size: 10px;
+                    font-weight: 720;
+                    letter-spacing: .06em;
+                    text-transform: uppercase;
+                }
+                .assistant-label::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: #86aebe; }
+                .evidence-intro { margin: 0 0 10px; color: #526773; }
+                .evidence-excerpt { border: 1px solid #e0e9ea; background: #f7faf9; border-radius: 10px; padding: 0 12px; }
+                .evidence-excerpt summary { cursor: pointer; padding: 10px 0; color: #3f5a6d; font-size: 12px; font-weight: 650; }
+                .evidence-excerpt .excerpt-body { max-height: 280px; overflow: auto; padding: 0 0 12px; color: #41515a; font-size: 13px; line-height: 1.58; }
+
                 /* Markdown Styling overrides */
                 .bubble p {
                     margin: 10px 0;
@@ -301,13 +324,28 @@ class ZyraChatMessage extends HTMLElement {
             <div class="wrapper">
                 ${isTelegram ? `<div class="source-tag">✈️ Telegram</div>` : ''}
                 <div class="bubble ${isUser ? 'user' : 'assistant'}">
+                    ${!isUser ? `<div class="assistant-label">${this.assistantLabel()}</div>` : ''}
                     <div id="content"></div>
                     ${this.renderMetadata()}
                 </div>
                 <div class="timestamp">${this._timestamp}</div>
             </div>
         `;
-        this.shadowRoot.getElementById('content').innerHTML = parseMarkdown(this._text);
+        const content = this.shadowRoot.getElementById('content');
+        const cleanText = (this._text || '').replace(/\n?\[EVIDENCE:[0-9a-fA-F-]{36}\]/g, '').trim();
+        if (this._metadata?.decision === 'evidence-extractive-fallback') {
+            content.innerHTML = `<p class="evidence-intro">No pude validar una redacción del modelo. Te dejo el pasaje recuperado para que lo revises directamente.</p><details class="evidence-excerpt"><summary>Ver pasaje verificable</summary><div class="excerpt-body">${parseMarkdown(cleanText.replace(/^No puedo verificar[\s\S]*?documento seleccionado:\s*/i, ''))}</div></details>`;
+        } else {
+            content.innerHTML = parseMarkdown(cleanText);
+        }
+    }
+
+
+    assistantLabel() {
+        const decision = this._metadata?.decision;
+        if (decision === 'conversation-greeting' || decision === 'conversation-acknowledgement' || decision === 'profile-welcome') return 'Zyra · contigo';
+        if (this._metadata?.sources?.length) return 'Zyra · evidencia local';
+        return 'Zyra';
     }
 
 
@@ -316,9 +354,31 @@ class ZyraChatMessage extends HTMLElement {
         if (!this._metadata) return '';
         const m = this._metadata;
         const escapeHtml = (value) => String(value).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\"/g, '&quot;').replace(/'/g, '&#039;');
-        const sources = m.sources ? [...new Set(m.sources)].map(s => `<span class="source-pill">${escapeHtml(s)}</span>`).join('') : '';
+        const sources = m.sources ? m.sources.map(source => {
+            if (typeof source === 'string') return `<span class="source-pill">${escapeHtml(source)}</span>`;
+            const location = source.locator?.page ? `p. ${source.locator.page}` : source.locator?.sheet ? `${source.locator.sheet} ${source.locator.range || ''}` : source.locator?.slide ? `slide ${source.locator.slide}` : 'evidence';
+            return `<span class="source-pill" title="${escapeHtml(source.excerpt || '')}">${escapeHtml(source.filename || 'document')} · ${escapeHtml(location)}</span>`;
+        }).join('') : '';
+        const latency = m.latency_seconds != null ? ` · ${(Number(m.latency_seconds) * 1000).toFixed(0)} ms` : '';
+        const decisionLabels = {
+            'library-empty-greeting': 'Biblioteca vacía · bienvenida',
+            'library-empty-guidance': 'Biblioteca vacía · siguiente paso',
+            'library-indexing-guidance': 'Documento en preparación',
+            'profile-welcome': 'Espacio configurado',
+            'conversation-greeting': 'Conversación local',
+            'conversation-acknowledgement': 'Conversación local',
+            'model-knowledge': 'Consultado con el modelo local',
+            'evidence-not-found': 'Sin evidencia para esta pregunta',
+            'selected-document-unavailable': 'Documento no disponible',
+            'evidence-query': 'Respuesta basada en evidencia',
+            'evidence-query-lexical': 'Respuesta basada en evidencia léxica',
+            'evidence-extractive-fallback': 'Fragmento verificable',
+            'inference-unavailable': 'Motor local no disponible',
+        };
+        const decision = escapeHtml(decisionLabels[m.decision] || 'Estado de consulta no especificado');
 
         return `
+            <div class="meta">${decision}${latency}</div>
             ${sources ? `<details class="meta"><summary>Sources · ${m.rag_hits || 0} passages</summary><div class="sources">${sources}</div></details>` : ''}
         `;
     }

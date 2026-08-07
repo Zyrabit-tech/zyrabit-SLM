@@ -15,7 +15,7 @@ from prometheus_fastapi_instrumentator import Instrumentator
 from app.infrastructure.shared.config import (
     PROJECT_NAME, API_V1_STR, SLM_URL, 
     RAG_COLLECTION, EMBEDDING_MODEL, EMBEDDING_URL, NODE_DATA_DIR, NODE_ENABLE_OCR,
-    ENABLE_LEGACY_EXTENSIONS, DB_HOST, DB_PORT, MODEL_NAME
+    ENABLE_LEGACY_EXTENSIONS, DB_HOST, DB_PORT, MODEL_NAME, NODE_RETRIEVAL_MODE
 )
 from app.infrastructure.shared.logger import setup_logging
 from app.infrastructure.shared.state_tracker import SovereignStateManager
@@ -94,24 +94,24 @@ async def lifespan(app: FastAPI):
                 logger.warning(f"⚠️ Waiting for ChromaDB at {DB_HOST}:{DB_PORT} (attempt {attempt}/3): {err}")
                 await asyncio.sleep(1)
 
-        if not chroma_client:
-            logger.info("ℹ️ Using EphemeralClient for ChromaDB (local/standalone mode).")
-            chroma_client = chromadb.EphemeralClient()
-        
-        lc_chroma = Chroma(
-            client=chroma_client,
-            collection_name=RAG_COLLECTION,
-            embedding_function=embeddings
-        )
-        app.state.vector_store = ChromaAdapter(lc_chroma)
-        
-        # 3. Hybrid Retriever
-        app.state.retriever_service = HybridRetrieverService(lc_chroma)
+        lc_chroma = None
+        app.state.vector_store = None
+        app.state.retriever_service = None
+        if chroma_client:
+            lc_chroma = Chroma(
+                client=chroma_client,
+                collection_name=RAG_COLLECTION,
+                embedding_function=embeddings
+            )
+            app.state.vector_store = ChromaAdapter(lc_chroma)
+            app.state.retriever_service = HybridRetrieverService(lc_chroma)
+        else:
+            logger.error("ChromaDB is unavailable. Vector indexing is disabled; no ephemeral fallback will be used.")
         
         # Initialize BM25 on startup with existing documents from Vector DB
         try:
             from langchain_core.documents import Document
-            db_docs = lc_chroma.get()
+            db_docs = lc_chroma.get() if lc_chroma else None
             if db_docs and db_docs.get("documents"):
                 documents = []
                 for text, metadata in zip(db_docs["documents"], db_docs["metadatas"]):
@@ -129,7 +129,7 @@ async def lifespan(app: FastAPI):
         
         # Evidence-first Node composition root. Domain services do not depend on
         # FastAPI, LangChain or Chroma; these adapters are assembled here only.
-        from app.node.adapters import ChromaEvidenceIndex, ExistingInferenceAdapter
+        from app.node.adapters import ChromaEvidenceIndex, ExistingInferenceAdapter, SovereignProfileIdentity
         from app.node.parsers import LocalDocumentParser, TesseractOcrAdapter
         from app.node.service import NodeService
         from app.node.sqlite_store import SQLiteNodeStore
@@ -141,7 +141,10 @@ async def lifespan(app: FastAPI):
             source_store=LocalSourceStore(os.path.join(NODE_DATA_DIR, "sources")),
             parser=LocalDocumentParser(TesseractOcrAdapter() if NODE_ENABLE_OCR else None),
             inference=ExistingInferenceAdapter(app.state.inference_provider, MODEL_NAME),
-            vector_index=ChromaEvidenceIndex(app.state.vector_store),
+            vector_index=ChromaEvidenceIndex(app.state.vector_store) if app.state.vector_store else None,
+            embedding=embeddings,
+            retrieval_mode=NODE_RETRIEVAL_MODE,
+            identity=SovereignProfileIdentity(),
         )
         
         # 6. MCP is self-contained in FastMCP

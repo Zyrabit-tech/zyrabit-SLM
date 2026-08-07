@@ -25,6 +25,7 @@ EMBEDDING_MODEL: str = os.getenv("EMBEDDING_MODEL", "mxbai-embed-large")
 EMBEDDING_URL: str = os.getenv("EMBEDDING_URL", "http://host.docker.internal:11434").rstrip("/")
 NODE_DATA_DIR: str = os.getenv("NODE_DATA_DIR", "/app/db_data/node")
 NODE_ENABLE_OCR: bool = os.getenv("NODE_ENABLE_OCR", "false").lower() == "true"
+NODE_RETRIEVAL_MODE: str = os.getenv("NODE_RETRIEVAL_MODE", "hybrid").strip().lower()
 ENABLE_LEGACY_EXTENSIONS: bool = os.getenv("ENABLE_LEGACY_EXTENSIONS", "false").lower() == "true"
 
 # Security

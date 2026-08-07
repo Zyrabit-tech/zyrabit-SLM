@@ -35,6 +35,7 @@ class ZyrabitApp {
 
         // Recover Conversation memory from Storage
         this.history = Storage.load('chat_history') || [];
+        this.activeDocument = Storage.load('active_document') || null;
 
         this.init();
     }
@@ -120,11 +121,15 @@ class ZyrabitApp {
                         body: JSON.stringify(profile)
                     });
                     getSafeElement('onboarding-modal').classList.add('hidden');
-                    this.showNotification(`System Initialized: Welcome, ${profile.name}`, "success");
-                    bus.emit(EVENTS.CHAT.SEND, {
-                        text: `System initialization complete. Identity: ${profile.name}. Role: ${profile.role}. Persona Active: ${profile.persona}. Tone: ${profile.tone}. Await commands.`,
-                        history: []
+                    this.showNotification(`Listo, ${profile.name || 'bienvenido'}.`, "success");
+                    const welcome = `Hola${profile.name ? ` ${profile.name.split(' ')[0]}` : ''}. Soy ${profile.assistant_name}. Ya dejé tu espacio listo. Cuando quieras, importa el primer documento y lo revisamos juntos con fuentes verificables.`;
+                    bus.emit(EVENTS.UI.MSG_ADDED, {
+                        role: 'assistant',
+                        text: welcome,
+                        metadata: { decision: 'profile-welcome', sources: [] }
                     });
+                    this.history.push({ role: 'assistant', content: welcome });
+                    Storage.save('chat_history', this.history);
                 } catch (e) {
                     this.showNotification("Error guardando perfil", "error");
                 }
@@ -480,7 +485,9 @@ class ZyrabitApp {
 
     async loadVault() {
         try {
-            const res = await fetch('/v1/documents');
+            // Version changes (for example a reindex after a failed attempt)
+            // must be reflected immediately; never reuse a stale library list.
+            const res = await fetch('/v1/documents', { cache: 'no-store' });
             if (!res.ok) throw new Error(`HTTP Error: ${res.status}`);
             const data = await res.json();
             const list = document.getElementById('vault-list');
@@ -508,9 +515,11 @@ class ZyrabitApp {
                         </div>
                 `;
                 div.querySelector('.document-name').textContent = doc.filename;
-                div.querySelector('.document-size').textContent = `${(doc.size_bytes / 1024).toFixed(1)} KB`;
+                const statusLabel = doc.status === 'ready' ? 'Indexed and ready' : doc.status === 'processing' || doc.status === 'queued' ? 'Indexing…' : 'Needs attention';
+                div.querySelector('.document-size').textContent = `${statusLabel} · ${(doc.size_bytes / 1024).toFixed(1)} KB`;
                 div.onclick = () => this.selectDocument(doc, div);
                 list.appendChild(div);
+                if (this.activeDocument?.id === doc.id) this.selectDocument(doc, div);
             });
         } catch (e) {
             console.error("Failed to load documents:", e);
@@ -544,10 +553,16 @@ class ZyrabitApp {
         if (!filename) {
             chip.classList.add('hidden');
             delete chip.dataset.documentId;
+            this.activeDocument = null;
+            Storage.remove('active_document');
             return;
         }
         name.textContent = filename;
-        if (documentId) chip.dataset.documentId = documentId;
+        if (documentId) {
+            chip.dataset.documentId = documentId;
+            this.activeDocument = { id: documentId, filename };
+            Storage.save('active_document', this.activeDocument);
+        }
         chip.classList.remove('hidden');
         const clear = document.getElementById('clear-active-document');
         if (clear) clear.onclick = () => this.clearActiveDocument();
@@ -633,8 +648,11 @@ class ZyrabitApp {
             }
 
             try {
-                const res = await fetch('/v1/ingest', { method: 'POST', body: formData });
-                if (!res.ok) throw new Error(`HTTP_${res.status}`);
+                const res = await fetch('/v1/sources/import', { method: 'POST', body: formData });
+                if (!res.ok) {
+                    const payload = await res.json().catch(() => ({}));
+                    throw new Error(payload.detail || `The import request was rejected (HTTP ${res.status}).`);
+                }
                 const accepted = await res.json();
                 if (accepted.job_id) await this.waitForJob(accepted.job_id);
                 await this.loadVault();
@@ -644,10 +662,11 @@ class ZyrabitApp {
                 if (description) description.textContent = 'Indexed and ready for questions.';
                 this.setActiveDocument(file.name, accepted.document_id);
                 this.addGdprLog("INGEST", `SUCCESS_${file.name.toUpperCase()}`);
-                this.showNotification(`File uploaded: ${file.name}`, "success");
+                this.showNotification(`${file.name} is indexed and ready.`, "success");
             } catch (e) {
                 this.addGdprLog("INGEST", `FAILED_${file.name.toUpperCase()}`);
-                this.showNotification(`Upload failed: ${file.name}`, "error");
+                const reason = e?.message || 'The import could not be completed.';
+                this.showNotification(`${file.name}: ${reason}`, "error");
             } finally {
                 const dropZone = document.getElementById('drop-zone-content');
                 const loader = document.getElementById('drop-zone-loader');

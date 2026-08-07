@@ -72,8 +72,9 @@ class SQLiteNodeStore:
 
     def create_document(self, document_id: str, source_id: str, parser: str) -> None:
         with self._connect() as conn:
-            conn.execute("INSERT INTO node_documents (id, source_id, parser, status, created_at) VALUES (?, ?, ?, 'queued', ?)",
-                         (document_id, source_id, parser, utcnow()))
+            conn.execute("""INSERT INTO node_documents (id, source_id, version, parser, status, created_at)
+                VALUES (?, ?, COALESCE((SELECT MAX(version) + 1 FROM node_documents WHERE source_id = ?), 1), ?, 'queued', ?)""",
+                         (document_id, source_id, source_id, parser, utcnow()))
 
     def set_document_status(self, document_id: str, status: str, error: str | None = None) -> None:
         with self._connect() as conn:
@@ -114,9 +115,31 @@ class SQLiteNodeStore:
 
     def list_documents(self) -> list[dict]:
         with self._connect() as conn:
-            rows = conn.execute("""SELECT d.id, d.status, d.created_at, s.filename, s.size_bytes, s.media_type
-                FROM node_documents d JOIN node_sources s ON s.id=d.source_id ORDER BY d.created_at DESC""").fetchall()
+            # The library represents sources, not every failed/reindexed attempt.
+            # Keep only the newest version per source and expose its state.
+            rows = conn.execute("""SELECT d.id, d.version, d.status, d.error, d.created_at,
+                s.filename, s.size_bytes, s.media_type
+                FROM node_documents d JOIN node_sources s ON s.id=d.source_id
+                WHERE d.version = (SELECT MAX(candidate.version) FROM node_documents candidate WHERE candidate.source_id=d.source_id)
+                ORDER BY d.created_at DESC""").fetchall()
         return [dict(row) for row in rows]
+
+    def latest_ready_document_for(self, document_id: str) -> dict | None:
+        """Resolve an old document-version selection to the ready version of its source."""
+        with self._connect() as conn:
+            row = conn.execute("""SELECT d.*, s.filename, s.media_type, s.size_bytes, s.sha256
+                FROM node_documents selected
+                JOIN node_documents d ON d.source_id=selected.source_id
+                JOIN node_sources s ON s.id=d.source_id
+                WHERE selected.id=? AND d.status='ready'
+                ORDER BY d.version DESC LIMIT 1""", (document_id,)).fetchone()
+        return dict(row) if row else None
+
+    def source_for_document(self, document_id: str) -> dict | None:
+        with self._connect() as conn:
+            row = conn.execute("""SELECT s.* FROM node_documents d
+                JOIN node_sources s ON s.id=d.source_id WHERE d.id=?""", (document_id,)).fetchone()
+        return dict(row) if row else None
 
     def search_lexical(self, query: str, limit: int = 8, document_id: str | None = None) -> list[EvidenceUnit]:
         tokens = [token.replace('"', '') for token in query.split() if len(token) > 2]
