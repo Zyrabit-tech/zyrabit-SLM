@@ -54,6 +54,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libgomp1 \
     libcurl4 \
     curl \
+    tesseract-ocr \
+    tesseract-ocr-eng \
+    tesseract-ocr-spa \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy the pre-built virtual environment from builder

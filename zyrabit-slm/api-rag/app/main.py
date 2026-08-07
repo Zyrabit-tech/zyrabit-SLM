@@ -14,7 +14,8 @@ from prometheus_fastapi_instrumentator import Instrumentator
 # Infrastructure / Shared
 from app.infrastructure.shared.config import (
     PROJECT_NAME, API_V1_STR, SLM_URL, 
-    RAG_COLLECTION, EMBEDDING_MODEL, DB_HOST, DB_PORT
+    RAG_COLLECTION, EMBEDDING_MODEL, EMBEDDING_URL, NODE_DATA_DIR, NODE_ENABLE_OCR,
+    ENABLE_LEGACY_EXTENSIONS, DB_HOST, DB_PORT, MODEL_NAME
 )
 from app.infrastructure.shared.logger import setup_logging
 from app.infrastructure.shared.state_tracker import SovereignStateManager
@@ -22,9 +23,6 @@ from app.infrastructure.shared.cache import global_cache
 
 # Domain Layer
 from app.domain.services.gatekeeper import Gatekeeper
-from app.domain.use_cases.chat_use_case import ChatUseCase
-from app.domain.use_cases.ingest_use_case import IngestUseCase
-from app.domain.services.command_router import CommandRouter
 
 
 # Infrastructure Adapters
@@ -78,7 +76,7 @@ async def lifespan(app: FastAPI):
 
     try:
         # 1. Direct Embeddings
-        embeddings = DirectOllamaEmbeddings(model=EMBEDDING_MODEL, base_url=SLM_URL)
+        embeddings = DirectOllamaEmbeddings(model=EMBEDDING_MODEL, base_url=EMBEDDING_URL)
         
         # 2. Vector Store (Connecting to remote Chroma Server)
         import chromadb
@@ -129,44 +127,46 @@ async def lifespan(app: FastAPI):
         app.state.inference_provider = InferenceProviderFactory.create_sync_provider(provider_name)
         app.state.streaming_provider = InferenceProviderFactory.create_stream_provider(provider_name)
         
-        # 5. Use Cases (Singletons for the session)
-        from app.infrastructure.adapters.bge_reranker_adapter import BGEReRankerAdapter
-        from app.infrastructure.adapters.sliding_window_memory_adapter import SlidingWindowMemoryAdapter
-        from app.infrastructure.adapters.mcp_client_adapter import InternalMcpClientAdapter
-        
-        reranker = BGEReRankerAdapter()
-        memory_manager = SlidingWindowMemoryAdapter()
-        mcp_client = InternalMcpClientAdapter()
-        
-        telemetry_adapter = PrometheusTelemetryAdapter()
-        app.state.chat_use_case = ChatUseCase(
-            inference_provider=app.state.inference_provider,
-            retriever_service=app.state.retriever_service,
-            gatekeeper=Gatekeeper,
-            cache=global_cache,
-            telemetry=telemetry_adapter,
-            reranker=reranker,
-            memory_manager=memory_manager,
-            streaming_provider=app.state.streaming_provider,
-            mcp_client=mcp_client
+        # Evidence-first Node composition root. Domain services do not depend on
+        # FastAPI, LangChain or Chroma; these adapters are assembled here only.
+        from app.node.adapters import ChromaEvidenceIndex, ExistingInferenceAdapter
+        from app.node.parsers import LocalDocumentParser, TesseractOcrAdapter
+        from app.node.service import NodeService
+        from app.node.sqlite_store import SQLiteNodeStore
+        from app.node.storage import LocalSourceStore
+        node_store = SQLiteNodeStore(os.path.join(NODE_DATA_DIR, "node.db"))
+        app.state.node_store = node_store
+        app.state.node_service = NodeService(
+            metadata=node_store,
+            source_store=LocalSourceStore(os.path.join(NODE_DATA_DIR, "sources")),
+            parser=LocalDocumentParser(TesseractOcrAdapter() if NODE_ENABLE_OCR else None),
+            inference=ExistingInferenceAdapter(app.state.inference_provider, MODEL_NAME),
+            vector_index=ChromaEvidenceIndex(app.state.vector_store),
         )
-        app.state.ingest_use_case = IngestUseCase(vector_store=app.state.vector_store)
         
         # 6. MCP is self-contained in FastMCP
         
-        # 7. Auto-Ingest
-        from app.auto_ingest import run_auto_ingest
-        await run_auto_ingest(app.state.vector_store, app.state.retriever_service)
-        
-        # 8. Start Telegram Bridge (Background Task)
-        from app.domain.services.telegram_worker import TelegramBridgeWorker
-        app.state.tg_worker = TelegramBridgeWorker(app.state.chat_use_case, sio=sio)
-
-        asyncio.create_task(app.state.tg_worker.start())
-        
-        # 9. Start Obsidian AutoLearner Background Task (Every 10 minutes)
-        from app.domain.services.obsidian_service import ObsidianService
-        asyncio.create_task(ObsidianService.start_auto_learner_loop(app.state.inference_provider, interval_seconds=600))
+        # Legacy integrations are preserved but never become an implicit runtime
+        # dependency of the document node. Whisper remains available by endpoint.
+        if ENABLE_LEGACY_EXTENSIONS:
+            from app.domain.use_cases.chat_use_case import ChatUseCase
+            from app.domain.use_cases.ingest_use_case import IngestUseCase
+            from app.infrastructure.adapters.bge_reranker_adapter import BGEReRankerAdapter
+            from app.infrastructure.adapters.sliding_window_memory_adapter import SlidingWindowMemoryAdapter
+            from app.infrastructure.adapters.mcp_client_adapter import InternalMcpClientAdapter
+            from app.auto_ingest import run_auto_ingest
+            from app.domain.services.telegram_worker import TelegramBridgeWorker
+            from app.domain.services.obsidian_service import ObsidianService
+            app.state.chat_use_case = ChatUseCase(
+                inference_provider=app.state.inference_provider, retriever_service=app.state.retriever_service,
+                gatekeeper=Gatekeeper, cache=global_cache, telemetry=PrometheusTelemetryAdapter(),
+                reranker=BGEReRankerAdapter(), memory_manager=SlidingWindowMemoryAdapter(),
+                streaming_provider=app.state.streaming_provider, mcp_client=InternalMcpClientAdapter())
+            app.state.ingest_use_case = IngestUseCase(vector_store=app.state.vector_store)
+            await run_auto_ingest(app.state.vector_store, app.state.retriever_service)
+            app.state.tg_worker = TelegramBridgeWorker(app.state.chat_use_case, sio=sio)
+            asyncio.create_task(app.state.tg_worker.start())
+            asyncio.create_task(ObsidianService.start_auto_learner_loop(app.state.inference_provider, interval_seconds=600))
         
         logger.info("✅ Infrastructure initialized successfully.")
 
@@ -198,7 +198,7 @@ async def chat_message(sid, data):
     """
     Real-Time Chat Bridge: Directly calls the RAG Brain.
     """
-    if not _global_app or not hasattr(_global_app.state, 'chat_use_case'):
+    if not _global_app or not hasattr(_global_app.state, 'node_service'):
         await sio.emit("chat_response", {"response": "System initializing..."}, to=sid)
         return
 
@@ -210,27 +210,7 @@ async def chat_message(sid, data):
     logger.info(f"💬 Socket RAG Query from {sid}: {text[:30]}...")
 
     try:
-        # 1. COMMAND INTERCEPTION (Zero-Lag)
-        command_res = await CommandRouter.handle(text, source="WEB", session_id=thread_id)
-        if command_res:
-            await sio.emit("chat_response", command_res, to=sid)
-            return
-
-        # 2. Recover history for this session (Sovereign Memory)
-        from app.infrastructure.shared.state_tracker import SovereignStateManager
-        history = SovereignStateManager.get_history(thread_id)
-
-        # 3. RAG BRAIN EXECUTION with history context
-        result = await _global_app.state.chat_use_case.execute(
-            text=text,
-            client_msg_id=msg_id,
-            history=history,
-        )
-
-        # 4. Record TTFT via telemetry (socket path uses execute(), not stream_response())
-        latency_ms = result.get("metadata", {}).get("latency_ms", 0)
-        if latency_ms and hasattr(_global_app.state, 'chat_use_case'):
-            _global_app.state.chat_use_case.telemetry.record_ttft(latency_ms)
+        result = await _global_app.state.node_service.query(text, thread_id, data.get("document_id"))
 
         await sio.emit("chat_response", result, to=sid)
     except Exception as e:
@@ -256,13 +236,18 @@ Instrumentator().instrument(app).expose(app)
 
 # Register Routers
 from app.core.security import get_current_user
-from app.api.v1.endpoints import chat, health, mcp as mcp_router, documents, integrations, ag_ui
+from app.api.v1.endpoints import chat, health, documents, ag_ui, node
 app.include_router(chat.router, prefix=API_V1_STR, tags=["Chat"], dependencies=[Depends(get_current_user)])
 app.include_router(health.router, prefix=API_V1_STR, tags=["Monitoring"])
-app.include_router(mcp_router.router, prefix="/mcp", tags=["MCP"])
+if ENABLE_LEGACY_EXTENSIONS:
+    from app.api.v1.endpoints import mcp as mcp_router
+    app.include_router(mcp_router.router, prefix="/mcp", tags=["MCP"])
 app.include_router(documents.router, prefix=API_V1_STR, tags=["Documents"], dependencies=[Depends(get_current_user)])
-app.include_router(integrations.router, prefix=API_V1_STR, tags=["Integrations"], dependencies=[Depends(get_current_user)])
+if ENABLE_LEGACY_EXTENSIONS:
+    from app.api.v1.endpoints import integrations
+    app.include_router(integrations.router, prefix=API_V1_STR, tags=["Integrations"], dependencies=[Depends(get_current_user)])
 app.include_router(ag_ui.router, prefix="/ag-ui", tags=["AG-UI"])
+app.include_router(node.router, prefix=API_V1_STR, tags=["Node"], dependencies=[Depends(get_current_user)])
 
 @app.get("/", include_in_schema=False)
 async def root():

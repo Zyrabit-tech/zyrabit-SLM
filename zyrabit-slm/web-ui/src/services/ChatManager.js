@@ -52,7 +52,7 @@ export class ChatManager {
         }
     }
 
-    processNext() {
+    async processNext() {
         if (this.queue.length === 0) {
             this.isProcessing = false;
             this.clearPendingTimeout();
@@ -64,19 +64,18 @@ export class ChatManager {
         bus.emit(EVENTS.UI.THINKING, true);
 
         const message = this.queue[0];
-        const activeDocument = document.getElementById('active-context-name')?.textContent?.trim();
-        const contextualText = activeDocument
-            ? `Use the selected document "${activeDocument}" as the primary source. ${message.text}`
-            : message.text;
-        bus.emit(EVENTS.SOCKET.EMIT, {
-            text: contextualText,
-            history: message.history,
-            client_msg_id: message.id,
-            thread_id: this.sessionId
-        });
-
-        // Event-driven loader: We rely exclusively on onResponse or onGatewayDisconnected
-        // to stop the thinking indicator. No hardcoded timeouts.
+        const chip = document.getElementById('active-context-chip');
+        const documentId = chip?.dataset?.documentId || null;
+        try {
+            const response = await fetch('/v1/query', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ text: message.text, session_id: this.sessionId, document_id: documentId })
+            });
+            if (!response.ok) throw new Error(`HTTP_${response.status}`);
+            this.onResponse(await response.json());
+        } catch (error) {
+            this.onResponse({ response: 'No pude completar la consulta local. Revisa que el nodo y el motor de inferencia estén listos.', metadata: { decision: 'request-failed', sources: [] } });
+        }
     }
 
     handleRequestTimeout() {
@@ -147,6 +146,12 @@ export class ChatManager {
             return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
         }
         throw new Error('Secure random number generator is unavailable for session ID generation.');
+    }
+
+    async resetSession() {
+        try { await fetch(`/v1/sessions/${this.sessionId}`, { method: 'DELETE' }); } catch (_) { /* local reset still works */ }
+        this.sessionId = this.generateSessionId();
+        Storage.save('session_id', this.sessionId);
     }
 
     persist() {

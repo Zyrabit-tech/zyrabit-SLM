@@ -287,6 +287,9 @@ run_wizard() {
         sed -i.bak "s|^MODEL_NAME=.*|MODEL_NAME=${OVERRIDE_MODEL}|"                     "${ENV_FILE}" 2>/dev/null || true
         if [[ "${INFERENCE_PROVIDER}" == "llama_cpp_server" ]]; then
             grep -q "^SLM_URL=" "${ENV_FILE}" && sed -i.bak "s|^SLM_URL=.*|SLM_URL=http://host.docker.internal:${LLAMA_SERVER_PORT}|" "${ENV_FILE}" || echo "SLM_URL=http://host.docker.internal:${LLAMA_SERVER_PORT}" >> "${ENV_FILE}"
+            # llama.cpp serves generation; embeddings must have their own local endpoint.
+            grep -q "^EMBEDDING_URL=" "${ENV_FILE}" || echo "EMBEDDING_URL=http://host.docker.internal:11434" >> "${ENV_FILE}"
+            log_info "llama.cpp generation uses a separate local EMBEDDING_URL."
         fi
         if [[ "${WHISPER_MODEL}" != "none" ]]; then
             grep -q "^WHISPER_MODEL=" "${ENV_FILE}" 2>/dev/null \

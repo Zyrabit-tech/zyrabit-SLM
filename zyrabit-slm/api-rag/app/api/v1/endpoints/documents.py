@@ -1,30 +1,19 @@
 # pyrefly: ignore [missing-import]
 from fastapi import APIRouter, UploadFile, File, HTTPException, Depends, BackgroundTasks, Request
+from app.api.v1.dependencies import get_node_service
+from app.domain.use_cases.ingest_use_case import IngestUseCase
 import os
 import logging
 from app.infrastructure.shared.config import DOCS_DIR
-from app.api.v1.dependencies import get_ingest_use_case
-from app.domain.use_cases.ingest_use_case import IngestUseCase
 from app.domain.services.whisper_transcription_service import WhisperTranscriptionService
 
 logger = logging.getLogger("uvicorn.error")
 router = APIRouter()
 
 @router.get("/documents")
-async def list_documents():
-    """Lists all files in the document source directory."""
-    if not os.path.exists(DOCS_DIR):
-        return {"documents": []}
-    
-    files = []
-    for f in os.listdir(DOCS_DIR):
-        if os.path.isfile(os.path.join(DOCS_DIR, f)):
-            stats = os.stat(os.path.join(DOCS_DIR, f))
-            files.append({
-                "filename": f,
-                "size_bytes": stats.st_size
-            })
-    return {"documents": files}
+async def list_documents(node_service = Depends(get_node_service)):
+    """Compatibility listing backed by durable Node metadata."""
+    return {"documents": node_service.documents()}
 
 async def background_ingestion_task(file_path: str, filename: str, ingest_use_case: IngestUseCase, sio):
     """
@@ -101,27 +90,26 @@ async def background_ingestion_task(file_path: str, filename: str, ingest_use_ca
 async def ingest_document(
     request: Request,
     file: UploadFile = File(...),
-    ingest_use_case: IngestUseCase = Depends(get_ingest_use_case)
+    node_service = Depends(get_node_service),
 ):
     """
-    Uploads and indexes a document before reporting it as available.
+    Compatibility endpoint. It now queues a durable Node import instead of
+    claiming availability before retrieval is ready.
     """
-    os.makedirs(DOCS_DIR, exist_ok=True)
-    file_path = os.path.join(DOCS_DIR, file.filename)
-    
+    import tempfile
+    from pathlib import Path
+    suffix = Path(file.filename or "upload").suffix
+    fd, staged = tempfile.mkstemp(prefix="zyrabit-import-", suffix=suffix)
     try:
-        # 1. Save file locally
-        with open(file_path, "wb") as f:
-            f.write(await file.read())
-        
-        # 2. Do not expose the document to chat until it is searchable.
-        result = await ingest_use_case.execute(file_path)
-        if result.get("status") not in {"success", "skipped"}:
-            raise HTTPException(status_code=422, detail=result.get("message", "Document could not be indexed."))
-        return {"status": "ready", "message": f"File {file.filename} is indexed and ready for retrieval.", "filename": file.filename}
+        with os.fdopen(fd, "wb") as output:
+            while chunk := await file.read(1024 * 1024): output.write(chunk)
+        result = await node_service.import_file(Path(file.filename or "upload").name, staged)
+        return {**result, "filename": file.filename, "message": "File accepted. Poll the job until it is indexed and ready for retrieval."}
     except Exception as e:
         logger.error(f"Failed to initiate ingestion for {file.filename}: {e}")
         raise HTTPException(status_code=500, detail="Internal server error.")
+    finally:
+        if os.path.exists(staged): os.unlink(staged)
 
 @router.post("/audio/transcriptions")
 async def transcribe_audio(

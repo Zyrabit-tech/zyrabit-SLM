@@ -6,7 +6,6 @@ from datetime import datetime
 from fastapi import APIRouter, Depends, Request
 from app.infrastructure.shared.config import MODEL_NAME, PROJECT_NAME, SLM_URL
 from app.api.v1.dependencies import get_vector_store, get_inference_provider
-from app.domain.services.mcp_service import mcp
 from app.core.security import get_current_user
 
 logger = logging.getLogger("zyrabit.api")
@@ -92,12 +91,6 @@ async def health_check(
                 "mode": "Local Host (Mac)" if is_local_host else "Container",
                 "details": slm_metadata
             },
-            {
-                "id": "mcp-bridge",
-                "name": "Sovereign Bridge (MCP)",
-                "status": "ONLINE" if mcp else "OFFLINE",
-                "type": "Connectivity"
-            }
         ]
     }
 
@@ -186,4 +179,3 @@ async def list_mcp_tools(_user=Depends(get_current_user)):
                 {"name": "secure_query", "description": "Query the sovereign SLM directly via the secure RAG pipeline."}
             ]
         }
-

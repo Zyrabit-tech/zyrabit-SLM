@@ -36,11 +36,12 @@ class DirectOllamaEmbeddings(Embeddings):
                 response.raise_for_status()
                 all_embeddings.extend(response.json()["embeddings"])
             except Exception as e:
-                logger.warning(f"⚠️ Ollama Embedding endpoint ({self.base_url}) unreachable. Using zero-vector embeddings fallback.")
-                # Return deterministic pseudo/zero embeddings (dimension 1024 for mxbai-embed-large)
-                pseudo_dim = 1024
-                for _ in batch:
-                    all_embeddings.append([0.0] * pseudo_dim)
+                # Never create false-positive indexes: zero vectors make a document
+                # appear indexed while semantic retrieval is unusable.
+                raise RuntimeError(
+                    f"Embedding provider unavailable at {self.base_url}; document was not indexed. "
+                    "Configure EMBEDDING_URL independently from SLM_URL."
+                ) from e
         
         return all_embeddings
 

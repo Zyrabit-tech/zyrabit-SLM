@@ -186,6 +186,7 @@ class ZyrabitApp {
             this.history = [];
             Storage.remove('chat_history');
             Storage.remove('pending_messages');
+            this.chat.resetSession();
             bus.emit('UI:CLEAR_CHAT');
             this.showNotification('Conversation cleared.', 'success');
         });
@@ -508,7 +509,7 @@ class ZyrabitApp {
                 `;
                 div.querySelector('.document-name').textContent = doc.filename;
                 div.querySelector('.document-size').textContent = `${(doc.size_bytes / 1024).toFixed(1)} KB`;
-                div.onclick = () => this.selectDocument(doc.filename, div);
+                div.onclick = () => this.selectDocument(doc, div);
                 list.appendChild(div);
             });
         } catch (e) {
@@ -520,14 +521,15 @@ class ZyrabitApp {
         }
     }
 
-    selectDocument(filename, row) {
+    selectDocument(doc, row) {
+        const filename = doc.filename;
         document.querySelectorAll('.document-row.active').forEach((item) => item.classList.remove('active'));
         row.classList.add('active');
         const title = document.getElementById('active-document-title');
         const description = document.getElementById('active-document-description');
         if (title) title.textContent = filename;
         if (description) description.textContent = 'Ask a question about this document or compare it with the rest of your library.';
-        this.setActiveDocument(filename);
+        this.setActiveDocument(filename, doc.id);
         const input = document.getElementById(IDS.CHAT_INPUT);
         if (input) {
             input.placeholder = `Ask about ${filename}…`;
@@ -535,15 +537,17 @@ class ZyrabitApp {
         }
     }
 
-    setActiveDocument(filename) {
+    setActiveDocument(filename, documentId = null) {
         const chip = document.getElementById('active-context-chip');
         const name = document.getElementById('active-context-name');
         if (!chip || !name) return;
         if (!filename) {
             chip.classList.add('hidden');
+            delete chip.dataset.documentId;
             return;
         }
         name.textContent = filename;
+        if (documentId) chip.dataset.documentId = documentId;
         chip.classList.remove('hidden');
         const clear = document.getElementById('clear-active-document');
         if (clear) clear.onclick = () => this.clearActiveDocument();
@@ -564,7 +568,7 @@ class ZyrabitApp {
         const list = document.getElementById('sources-list');
         if (!list) return;
         list.innerHTML = '';
-        const uniqueSources = [...new Set(sources || [])];
+        const uniqueSources = sources || [];
         if (uniqueSources.length === 0) {
             list.innerHTML = '<div class="context-empty"><span aria-hidden="true">⌁</span><p>Sources used in an answer will appear here.</p></div>';
             return;
@@ -573,9 +577,14 @@ class ZyrabitApp {
             const card = document.createElement('div');
             card.className = 'source-card';
             const name = document.createElement('strong');
-            name.textContent = source;
+            name.textContent = typeof source === 'string' ? source : source.filename;
             const note = document.createElement('span');
-            note.textContent = 'Used as answer context';
+            if (typeof source === 'string') note.textContent = 'Used as answer context';
+            else {
+                const locator = source.locator || {};
+                const location = locator.page ? `Page ${locator.page}` : locator.sheet ? `${locator.sheet} ${locator.range || ''}` : locator.slide ? `Slide ${locator.slide}` : 'Document evidence';
+                note.textContent = source.excerpt ? `${location} · ${source.excerpt}` : location;
+            }
             card.append(name, note);
             list.appendChild(card);
         });
@@ -626,12 +635,14 @@ class ZyrabitApp {
             try {
                 const res = await fetch('/v1/ingest', { method: 'POST', body: formData });
                 if (!res.ok) throw new Error(`HTTP_${res.status}`);
+                const accepted = await res.json();
+                if (accepted.job_id) await this.waitForJob(accepted.job_id);
                 await this.loadVault();
                 const title = document.getElementById('active-document-title');
                 const description = document.getElementById('active-document-description');
                 if (title) title.textContent = file.name;
                 if (description) description.textContent = 'Indexed and ready for questions.';
-                this.setActiveDocument(file.name);
+                this.setActiveDocument(file.name, accepted.document_id);
                 this.addGdprLog("INGEST", `SUCCESS_${file.name.toUpperCase()}`);
                 this.showNotification(`File uploaded: ${file.name}`, "success");
             } catch (e) {
@@ -646,6 +657,19 @@ class ZyrabitApp {
                 }
             }
         }
+    }
+
+    async waitForJob(jobId) {
+        const deadline = Date.now() + 120000;
+        while (Date.now() < deadline) {
+            const res = await fetch(`/v1/jobs/${jobId}`);
+            if (!res.ok) throw new Error('Job status unavailable');
+            const job = await res.json();
+            if (job.status === 'ready') return job;
+            if (job.status === 'failed') throw new Error(job.error || 'Indexing failed');
+            await new Promise(resolve => setTimeout(resolve, 700));
+        }
+        throw new Error('Indexing timed out');
     }
 
     showNotification(message, type = 'info') {
