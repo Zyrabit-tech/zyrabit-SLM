@@ -20,7 +20,9 @@ class ContextManager:
     SYSTEM_RESERVE = 1000 # Increased slightly for profile
     MEMORY_RESERVE = 1000
     TOOLS_RESERVE = 600
-    RAG_RESERVE = TOTAL_BUDGET - (SYSTEM_RESERVE + MEMORY_RESERVE + TOOLS_RESERVE)
+    # A document answer must retain complete evidence passages. The previous
+    # 1.5k-token allowance could drop the numeric conclusion on later pages.
+    RAG_RESERVE = 2400
 
     # ReAct-specific budgets (separated from direct inference path)
     REACT_SYSTEM_BUDGET = 800   # Identity + compact ReAct instructions
@@ -197,6 +199,11 @@ IMPORTANTE: Si el usuario te pide enviar una notificación, alertar o usar Teleg
 ### CONOCIMIENTO RELEVANTE (RAG):
 {trimmed_rag if trimmed_rag else "No se encontraron documentos relevantes en el Vault."}
 
+### REGLAS DE EVIDENCIA:
+Cuando exista conocimiento RAG, responde solo con afirmaciones explícitas en ese contexto.
+Para cifras, fechas y condiciones, copia el valor exacto del documento; no lo estimes ni lo sustituyas.
+Si el dato no aparece en el contexto, indícalo con claridad en lugar de inferirlo.
+
 ### HISTORIAL DE CONVERSACIÓN:
 {trimmed_history if trimmed_history else "No hay historial previo."}
 
@@ -204,4 +211,3 @@ IMPORTANTE: Si el usuario te pide enviar una notificación, alertar o usar Teleg
 {user_query}
 """
         return final_prompt
-

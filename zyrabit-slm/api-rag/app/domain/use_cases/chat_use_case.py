@@ -1,3 +1,6 @@
+import logging
+import os
+import re
 import time
 from typing import Optional, Dict, Any
 
@@ -6,6 +9,15 @@ from app.infrastructure.shared.config import MODEL_NAME
 from app.infrastructure.shared.state_tracker import SovereignStateManager
 from app.domain.services.context_manager import ContextManager
 from app.ports.inference_port import InferenceRequest
+
+logger = logging.getLogger("zyrabit.api")
+
+
+def _citation_label(metadata: dict) -> str:
+    """Return a user-facing source label without leaking local paths."""
+    filename = os.path.basename(str(metadata.get("source", "unknown")))
+    page = metadata.get("page")
+    return f"{filename} · p. {page}" if page else filename
 
 class ChatUseCase:
     """
@@ -72,16 +84,36 @@ class ChatUseCase:
                 else:
                     try:
                         results = await self.retriever_service.search(sanitized_text)
+                        # The UI injects the selected filename into the question.
+                        # Preserve that scope so unrelated documents cannot pollute
+                        # an answer that is meant to be grounded in one file.
+                        referenced_files = re.findall(
+                            r"[\w.-]+\.(?:pdf|docx|md|txt)", sanitized_text,
+                            flags=re.IGNORECASE,
+                        )
+                        if referenced_files:
+                            selected_filename = os.path.basename(referenced_files[-1]).lower()
+                            scoped_results = [
+                                doc for doc in results
+                                if os.path.basename(str(doc.metadata.get("source", ""))).lower() == selected_filename
+                            ]
+                            if scoped_results:
+                                results = scoped_results
                         if results:
                             if self.reranker:
                                 # Advanced RAG: Re-Rank candidates and filter
                                 ranked_docs = self.reranker.rerank(sanitized_text, results)
-                                results = [doc for doc, score in ranked_docs if score >= 0.6][:3]
+                                reranked_results = [doc for doc, score in ranked_docs if score >= 0.6][:3]
+                                # A missing local reranker model or a conservative score
+                                # must not erase valid retrieval evidence.
+                                results = reranked_results or results[:3]
                             else:
                                 results = results[:3]
                                 
                             if results:
-                                sources = list(set([r.metadata.get("source", "unknown") for r in results]))
+                                sources = list(dict.fromkeys(
+                                    _citation_label(r.metadata) for r in results
+                                ))
                     except Exception as e:
                         self.telemetry.log_security_audit(f"RAG search failed: {e}")
                         decision = "direct (fallback)"
@@ -111,7 +143,10 @@ class ChatUseCase:
             else:
                 inf_provider = self.inference_provider
 
-            if self.mcp_client:
+            # Questions grounded in retrieved documents should answer directly from
+            # the evidence. Invoking the agent/tool loop here makes a simple RAG
+            # answer depend on optional tool schemas and can discard the context.
+            if self.mcp_client and decision != "rag":
                 # Run the ReAct agentic loop with lean component passing
                 from app.domain.agent.tool_registry import ToolRegistry
                 from app.domain.agent.react_harness import ReactHarness
@@ -183,6 +218,7 @@ class ChatUseCase:
             return final_response
 
         except Exception as e:
+            logger.exception("Chat execution failed")
             self.telemetry.log_security_audit(f"CRITICAL ERROR: {e}")
             return {"response": "Critical Error", "metadata": {"decision": "error"}}
 
@@ -279,4 +315,3 @@ class ChatUseCase:
         """Sovereign DB persistence - completely decoupled from HTTP transport."""
         SovereignStateManager.store_message(thread_id, "user", clean_query)
         SovereignStateManager.store_message(thread_id, "assistant", response_text)
-

@@ -127,7 +127,7 @@ async def lifespan(app: FastAPI):
         # 4. Inference Provider (Dynamic from environment)
         provider_name = os.getenv("INFERENCE_PROVIDER", "ollama")
         app.state.inference_provider = InferenceProviderFactory.create_sync_provider(provider_name)
-        app.state.streaming_provider = InferenceProviderFactory.create_stream_provider("ollama")
+        app.state.streaming_provider = InferenceProviderFactory.create_stream_provider(provider_name)
         
         # 5. Use Cases (Singletons for the session)
         from app.infrastructure.adapters.bge_reranker_adapter import BGEReRankerAdapter

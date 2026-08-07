@@ -25,7 +25,26 @@ class PDFProcessor:
                     md_text = f.read()
             elif ext == ".pdf":
                 logger.info(f"📑 Converting PDF to Markdown: {file_path}")
-                md_text = pymupdf4llm.to_markdown(file_path)
+                # Keep page boundaries as first-class metadata. Retrieval can then
+                # cite the exact page instead of only naming the whole file.
+                import fitz
+
+                pdf = fitz.open(file_path)
+                documents = []
+                for page_index, page in enumerate(pdf):
+                    page_text = page.get_text("text").strip()
+                    if page_text:
+                        documents.append(Document(
+                            page_content=page_text,
+                            metadata={
+                                "source": file_path,
+                                "format": "pdf",
+                                "page": page_index + 1,
+                            },
+                        ))
+                if not documents:
+                    raise ValueError("Document contains no extractable text. This file may be scanned, image-only, or empty. Please use an OCR tool first.")
+                return documents
             elif ext == ".docx":
                 logger.info(f"📑 Extracting DOCX text: {file_path}")
                 md_text = PDFProcessor.extract_docx_text(file_path)

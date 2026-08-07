@@ -49,7 +49,7 @@ class InferenceProviderFactory:
         if provider_lower in ("ollama", "ollama_host", "ollama_docker"):
             endpoint = kwargs.get("endpoint", f"{SLM_URL}/api/generate")
             return OllamaStreamAdapter(endpoint=endpoint)
-        elif provider_lower == "vllm":
+        elif provider_lower in ("vllm", "llama_cpp_server"):
             endpoint = kwargs.get("endpoint", f"{SLM_URL}/v1/chat/completions")
             return VllmStreamAdapter(endpoint=endpoint)
         # TODO: Add Gemini stream adapter when needed

@@ -313,7 +313,5 @@ class ReactHarness:
             "Parece que me he enredado un poco procesando tanta información. "
             "¿Podrías replantear tu pregunta o darme instrucciones más específicas?"
         )
-        if steps_log:
-            # Reasoning traces are operational telemetry only; never expose them to users.
-                
+        # Reasoning traces remain operational telemetry only; never expose them to users.
         return fallback_msg, steps_log

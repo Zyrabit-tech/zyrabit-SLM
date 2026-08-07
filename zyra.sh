@@ -416,9 +416,26 @@ run_start() {
 
         if [[ "${current_provider}" == "llama_cpp_server" ]]; then
             if [[ ! -f "${LLAMA_MODEL_PATH}" ]]; then log_err "GGUF model missing. Run setup again after downloading it."; exit 1; fi
-            if ! kill -0 "$(cat "${LLAMA_SERVER_PID_FILE}" 2>/dev/null)" 2>/dev/null; then
+            if ! curl -fsS --max-time 2 "http://127.0.0.1:${LLAMA_SERVER_PORT}/v1/models" >/dev/null 2>&1; then
                 log_info "Starting llama.cpp native Metal server on port ${LLAMA_SERVER_PORT}..."
-                nohup llama-server --model "${LLAMA_MODEL_PATH}" --host 0.0.0.0 --port "${LLAMA_SERVER_PORT}" --n-gpu-layers 99 --ctx-size 4096 > "${SCRIPT_DIR}/zyrabit-slm/.llama-server.log" 2>&1 & echo $! > "${LLAMA_SERVER_PID_FILE}"
+                local llama_label="com.zyrabit.llama"
+                if launchctl print "gui/$(id -u)/${llama_label}" >/dev/null 2>&1; then
+                    launchctl kickstart -k "gui/$(id -u)/${llama_label}"
+                else
+                    launchctl submit -l "${llama_label}" \
+                        -o "${SCRIPT_DIR}/zyrabit-slm/.llama-server.log" \
+                        -e "${SCRIPT_DIR}/zyrabit-slm/.llama-server.log" -- \
+                        llama-server --model "${LLAMA_MODEL_PATH}" --host 0.0.0.0 \
+                        --port "${LLAMA_SERVER_PORT}" --n-gpu-layers 99 --ctx-size 4096 --no-warmup
+                fi
+                for _ in {1..15}; do
+                    curl -fsS --max-time 2 "http://127.0.0.1:${LLAMA_SERVER_PORT}/v1/models" >/dev/null 2>&1 && break
+                    sleep 1
+                done
+                curl -fsS --max-time 2 "http://127.0.0.1:${LLAMA_SERVER_PORT}/v1/models" >/dev/null 2>&1 || {
+                    log_err "llama.cpp did not become ready. Check zyrabit-slm/.llama-server.log"
+                    exit 1
+                }
             fi
             $DOCKER_COMPOSE_CMD "${compose_args[@]}" up -d --scale zyrabit-engine=0 2>/dev/null || $DOCKER_COMPOSE_CMD "${compose_args[@]}" up -d
         elif [[ "${current_provider}" == "embedded_metal" || "${current_provider}" == "mlx" ]]; then
