@@ -1,6 +1,23 @@
+---
+sidebar_position: 1
+title: Introduction
+description: "Zyrabit SLM — A production-grade local AI orchestration stack with pluggable hexagonal architecture for sovereign, offline-capable document analysis and inference."
+slug: /
+---
+
 # Zyrabit SLM
 
 Zyrabit SLM is a production-grade Small Language Model (SLM) orchestration stack designed for on-premise and private cloud environments. It provides a containerized architecture to deploy, manage, and scale local AI capabilities while maintaining strict data privacy and network isolation.
+
+## 🎥 See it in Action: True Sovereign AI
+
+Curious about what this looks like in practice? We've recorded a hands-on demo showcasing Zyrabit Platform running 100% offline.
+
+Watch the system process voice commands and capture images in real-time without relying on a single external API or internet connection. This is what true local intelligence looks like.
+
+[👉 Watch the Offline Demo Here](https://assets.zyrabit.com/streaming/zyrabit_ocrtex_bot.mp4)
+
+> ℹ️ **Note:** The video audio is in Spanish.
 
 ## Architecture & Design Principles
 

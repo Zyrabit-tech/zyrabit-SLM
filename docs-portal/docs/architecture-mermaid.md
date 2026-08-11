@@ -1,3 +1,9 @@
+---
+sidebar_position: 3
+title: System Overview
+description: "Visual overview of the Zyrabit SLM infrastructure — network topology, containers, and data flow."
+---
+
 # Architecture Overview
 
 ```mermaid

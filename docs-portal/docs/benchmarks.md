@@ -1,3 +1,9 @@
+---
+sidebar_position: 4
+title: 'Performance Benchmarks'
+description: 'Real-world inference benchmarks across different hardware configurations'
+---
+
 # Zyrabit Live E2E Benchmark Execution Report
 
 *Generated dynamically on 2026-07-29 02:56:14 UTC*
@@ -16,3 +22,7 @@
 ## 🛡️ Security Audit & PII Check
 *   **PII Sanitization:** PASSED (0 leaks)
 *   **Network Air-Gap:** 100% Local (0 External Network Egress Requests)
+
+## Related Documentation
+- [Models](./models.md)
+- [Swap Hardware](./guides/swap-hardware.md)

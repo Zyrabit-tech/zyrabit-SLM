@@ -2,6 +2,16 @@
 
 Local document-analysis workspace. It indexes files into a Chroma collection, retrieves relevant chunks for each prompt, and calls a configurable inference provider. The browser UI, API, vector store, and document volume run on the same Docker network.
 
+## 🎥 See it in Action: True Sovereign AI
+
+Curious about what this looks like in practice? We've recorded a hands-on demo showcasing Zyrabit Platform running 100% offline.
+
+Watch the system process voice commands and capture images in real-time without relying on a single external API or internet connection. This is what true local intelligence looks like.
+
+[👉 Watch the Offline Demo Here](https://assets.zyrabit.com/streaming/zyrabit_ocrtex_bot.mp4)
+
+> ℹ️ **Note:** The video audio is in Spanish.
+
 ## Local run
 
 Requirements: Docker Desktop and a local inference provider. The default provider is Ollama at `http://localhost:11434`.

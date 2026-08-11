@@ -1,3 +1,9 @@
+---
+sidebar_position: 4
+title: Model Configuration
+description: "Supported inference providers, model selection by hardware, and embedding configuration."
+---
+
 # Model Configuration
 
 Zyrabit SLM utilizes **Ollama** as the core inference engine, enabling the local execution of Small Language Models (SLMs) with high performance and low latency.

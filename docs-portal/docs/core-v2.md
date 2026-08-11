@@ -1,3 +1,9 @@
+---
+sidebar_position: 4
+title: "Core v2.0: The Sovereign Blueprint"
+description: "Technical rationale for the v2.0 transition to sovereign persistence, adaptive identity, and hybrid retrieval."
+---
+
 # Zyrabit Core v2.0: The Sovereign Blueprint
 
 Zyrabit Core v2.0 marks the transition from a stateless retrieval engine to a **Sovereign Operating System for SLMs**. This document explains the technical rationale and architecture of the new core.

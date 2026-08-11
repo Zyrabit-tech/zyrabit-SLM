@@ -1,3 +1,9 @@
+---
+sidebar_position: 2
+title: Pluggable Components
+description: "How ports and adapters enable swapping databases, inference providers, and hardware without touching core logic."
+---
+
 # Pluggable Architecture: Swapping Components
 
 Zyrabit SLM is built on a **Hexagonal Architecture** (Ports and Adapters). This design pattern ensures that the core logic—the `api-rag`—is completely decoupled from infrastructure dependencies. 
