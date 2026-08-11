@@ -73,7 +73,6 @@ const config = {
     },
 
     navbar: {
-      title: "Zyrabit",
       logo: {
         alt: "Zyrabit Logo",
         src: "https://assets.zyrabit.com/logos/zyrabit_black.png",
