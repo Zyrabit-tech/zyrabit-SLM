@@ -16,7 +16,17 @@ class ExistingInferenceAdapter:
 
     def answer(self, prompt: str) -> tuple[str, dict]:
         result = self.provider.generate(InferenceRequest(model=self.model, prompt=prompt, options={"temperature": 0.1, "max_tokens": 700}))
-        return result.text, {"provider": result.provider, "latency_seconds": result.latency_seconds, "raw": result.raw_payload}
+        zyrabit = (result.raw_payload or {}).get("zyrabit") or {}
+        return result.text, {
+            "provider": result.provider,
+            "latency_seconds": result.latency_seconds,
+            "tps": zyrabit.get("tps"),
+            "ttft_ms": zyrabit.get("ttft_ms"),
+            "engine": zyrabit.get("engine"),
+            "mode": zyrabit.get("mode"),
+            "model": (result.raw_payload or {}).get("model"),
+            "raw": result.raw_payload,
+        }
 
     def health(self) -> tuple[bool, str]:
         data = self.provider.health(); return bool(data.get("ok")), str(data.get("reason") or data.get("status", "unknown"))

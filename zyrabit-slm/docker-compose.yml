@@ -35,6 +35,8 @@ services:
       context: ..
       dockerfile: zyrabit-slm/api-rag/Dockerfile
     container_name: zyrabit-api
+    ports:
+      - "8080:8080"
     env_file:
       - .env
     environment:
@@ -125,7 +127,7 @@ services:
     profiles: [ "tenstorrent-sim" ]
     environment:
       - ZYRABIT_TT_MODE=${ZYRABIT_TT_MODE:-mock}
-      - ZYRABIT_TT_MODEL_ID=${ZYRABIT_TT_MODEL_ID:-Qwen/Qwen2.5-1.5B-Instruct}
+      - ZYRABIT_TT_MODEL_ID=${ZYRABIT_TT_MODEL_ID:-Qwen/Qwen2.5-3B-Instruct}
       - ZYRABIT_TT_MIN_RAM_GB=${ZYRABIT_TT_MIN_RAM_GB:-24}
       - ZYRABIT_TT_ALLOW_REMOTE_MODEL=${ZYRABIT_TT_ALLOW_REMOTE_MODEL:-false}
     ports:
@@ -145,9 +147,43 @@ services:
     <<: *tt-base
     container_name: zyrabit-tt-metal
     profiles: [ "tenstorrent" ]
+    environment:
+      - ZYRABIT_TT_MODE=${ZYRABIT_TT_MODE:-metal}
+      - ZYRABIT_TT_UPSTREAM_URL=${ZYRABIT_TT_UPSTREAM_URL:-http://zyrabit-vllm-tt:8000}
+      - ZYRABIT_TT_UPSTREAM_MODEL=${ZYRABIT_TT_UPSTREAM_MODEL:-Qwen/Qwen2.5-3B-Instruct}
+    networks:
+      - model-network
+      - zyrabit-sovereign-net
+    depends_on:
+      zyrabit-vllm-tt:
+        condition: service_started
+
+  # 2.7 THE SILICON ENGINE: vLLM-TT serving on the Blackhole p150
+  zyrabit-vllm-tt:
+    image: ghcr.io/tenstorrent/tt-inference-server/vllm-tt-metal-src-release-ubuntu-22.04-amd64:0.8.0-55fd115-aa4ae1e
+    container_name: zyrabit-vllm-tt
+    profiles: [ "tenstorrent" ]
+    command: [ "/bin/bash", "/run-qwen.sh" ]
     devices:
       - /dev/tenstorrent:/dev/tenstorrent
     ipc: host
+    environment:
+      - CACHE_ROOT=/home/container_app_user/cache_root
+      - HF_HOME=/hf-cache
+      - HF_HUB_OFFLINE=1
+      - MESH_DEVICE=${MESH_DEVICE:-P150}
+      - TT_METAL_ARCH_NAME=blackhole
+      - VLLM_RPC_TIMEOUT=100000
+    volumes:
+      - tt-cache-root:/home/container_app_user/cache_root
+      - ${ZYRABIT_HF_CACHE_DIR:-./hf-cache}:/hf-cache
+      - /dev/hugepages-1G:/dev/hugepages-1G
+      - ../internal/engine/tenstorrent/model_spec_qwen25_3b_p150.json:/model_spec.json:ro
+      - ../internal/engine/tenstorrent/run-qwen.sh:/run-qwen.sh:ro
+    ports:
+      - "8000:8000"
+    networks:
+      - model-network
 
   # 3. THE MEMORY: Vector DB
   zyrabit-db:
@@ -300,3 +336,4 @@ volumes:
   prometheus-data:
   grafana-data:
   postgres-data:
+  tt-cache-root:

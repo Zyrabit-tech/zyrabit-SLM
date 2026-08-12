@@ -159,7 +159,7 @@ class ChatUseCase:
                 raw_response_text, steps = await harness.execute(
                     user_query=sanitized_text,
                     system_prompt=system_prompt,
-                    history=history,
+                    history=history or [],
                     rag_docs=results if decision == "rag" else [],
                     user_profile=user_profile,
                     source=source,
@@ -174,6 +174,7 @@ class ChatUseCase:
                 # Restore PII on the response returned to the user
                 response_text = deanonymize_text(raw_response_text, entities)
                 latency_ms = (time.time() - start_inference_time) * 1000
+                response_obj = None
             else:
                 # Classic direct / RAG flow
                 prompt = self.context_manager.build_final_prompt(
@@ -198,11 +199,16 @@ class ChatUseCase:
                 SovereignStateManager.store_message(client_msg_id or "default", "assistant", response_text)
 
             pii_masked = [k for k in entities.keys()] if isinstance(entities, dict) else []
+            zyrabit_metrics = (getattr(response_obj, "raw_payload", None) or {}).get("zyrabit") or {}
             final_response = {
                 "response": response_text,
                 "metadata": {
                     "decision": decision,
                     "latency_ms": round(latency_ms, 2),
+                    "tps": zyrabit_metrics.get("tps"),
+                    "ttft_ms": zyrabit_metrics.get("ttft_ms"),
+                    "engine": zyrabit_metrics.get("source"),
+                    "mode": zyrabit_metrics.get("mode"),
                     "sources": sources,
                     "rag_hits": len(sources) if (decision == "rag" and sources) else 0,
                     "pii_detected": any(entities.values()),

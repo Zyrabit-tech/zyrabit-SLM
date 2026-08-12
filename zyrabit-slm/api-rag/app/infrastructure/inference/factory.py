@@ -29,7 +29,7 @@ class InferenceProviderFactory:
         elif provider_lower == "mlx":
             from app.infrastructure.inference.mlx_inference_adapter import MlxInferenceAdapter
             return MlxInferenceAdapter()
-        elif provider_lower in ("vllm", "llama_cpp_server"):
+        elif provider_lower in ("vllm", "llama_cpp_server", "tenstorrent"):
             endpoint = kwargs.get("endpoint", f"{SLM_URL}/v1/chat/completions")
             return VllmInferenceAdapter(endpoint=endpoint, provider_name=provider_lower)
         elif provider_lower == "gemini":
@@ -52,7 +52,7 @@ class InferenceProviderFactory:
         if provider_lower in ("ollama", "ollama_host", "ollama_docker"):
             endpoint = kwargs.get("endpoint", f"{SLM_URL}/api/generate")
             return OllamaStreamAdapter(endpoint=endpoint)
-        elif provider_lower in ("vllm", "llama_cpp_server"):
+        elif provider_lower in ("vllm", "llama_cpp_server", "tenstorrent"):
             endpoint = kwargs.get("endpoint", f"{SLM_URL}/v1/chat/completions")
             return VllmStreamAdapter(endpoint=endpoint)
         # TODO: Add Gemini stream adapter when needed

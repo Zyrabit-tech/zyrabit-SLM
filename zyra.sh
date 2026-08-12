@@ -160,7 +160,7 @@ detect_hardware() {
         cores="$(nproc 2>/dev/null || echo 4)"
     fi
     if   command -v nvidia-smi >/dev/null 2>&1;                                 then accelerator="nvidia"
-    elif [[ -e /dev/tenstorrent ]] || command -v tt-smi >/dev/null 2>&1;        then accelerator="tenstorrent"; export SLM_URL="http://zyrabit-tt-bridge:8000"
+    elif [[ -e /dev/tenstorrent ]] || command -v tt-smi >/dev/null 2>&1;        then accelerator="tenstorrent"; export SLM_URL="http://zyrabit-tt-metal:8090"
     elif [[ "$(uname -s)" == "Darwin" && "$(uname -m)" == "arm64" ]];           then accelerator="metal";       export SLM_URL="http://host.docker.internal:11434"
     else                                                                              accelerator="cpu"
     fi
