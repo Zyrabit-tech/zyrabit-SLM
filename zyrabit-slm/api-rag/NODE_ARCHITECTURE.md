@@ -1,39 +1,39 @@
-# Zyrabit Node: arquitectura técnica
+# Zyrabit Node: Technical Architecture
 
-## Objetivo
+## Purpose
 
-Un nodo local recibe documentos, conserva su original, genera unidades de evidencia y responde sólo con evidencia indexada. El núcleo no arranca conectores externos ni agentes.
+A local node ingests documents, preserves originals, generates evidence units, and responds strictly based on indexed evidence. The core engine does not spawn external connectors or unvetted agents.
 
-## Flujo
+## Flow
 
 ```
 POST /v1/sources/import
-  → almacenamiento local por SHA-256
-  → job SQLite (queued → extracting → persisting_evidence → indexing_vectors → ready)
-  → parser local → evidence units + FTS5 + índice vectorial opcional
+  → local storage by SHA-256
+  → SQLite job (queued → extracting → persisting_evidence → indexing_vectors → ready)
+  → local parser → evidence units + FTS5 + optional vector index
 POST /v1/query
-  → FTS5 + vector search opcional → evidencia → proveedor local → respuesta + fuentes
+  → FTS5 + optional vector search → evidence → local provider → response + sources
 ```
 
-SQLite conserva fuentes, versiones documentales, trabajos, evidencia, FTS, sesiones, capacidades y eventos. Los archivos se almacenan por hash bajo `NODE_DATA_DIR/sources`; no se sobrescriben por nombre.
+SQLite stores source metadata, document versions, jobs, evidence chunks, FTS indices, sessions, capabilities, and audit events. Files are stored by SHA-256 hash under `NODE_DATA_DIR/sources` to prevent filename collisions or overwrites.
 
-## Puertos
+## Ports & Adapters
 
-El dominio `app/node` define contratos para origen, parser, OCR, metadatos, vector index, embeddings, reranking e inferencia. Los adaptadores actuales son almacenamiento local, SQLite/FTS5, parser local, Chroma y las familias de inferencia existentes. Ollama y llama.cpp se configuran por ambiente; `SLM_URL` y `EMBEDDING_URL` son rutas separadas.
+The domain in `app/node` defines ports for source, parser, OCR, metadata, vector index, embeddings, reranking, and inference. Current adapters include local file storage, SQLite/FTS5, native local parsers, Chroma, and existing inference engine adapters. Ollama and llama.cpp are configured via environment variables; `SLM_URL` and `EMBEDDING_URL` are managed as separate network endpoints.
 
-## Formatos
+## Supported Formats
 
-PDF conserva página; DOCX párrafos y tablas; CSV/XLSX hoja y rango; PPTX diapositiva y notas. OCR con Tesseract se habilita sólo con `NODE_ENABLE_OCR=true` y sólo cuando una página PDF no tiene texto nativo.
+PDF retains exact page numbers; DOCX tracks paragraphs and tables; CSV/XLSX tracks worksheets and ranges; PPTX tracks slides and notes. Tesseract OCR is enabled only when `NODE_ENABLE_OCR=true` and only when a PDF page lacks selectable native text.
 
-## Extensiones
+## Extensions
 
-MCP, Telegram, Obsidian, AutoLearner y auto-ingesta se preservan. Sólo arrancan al definir `ENABLE_LEGACY_EXTENSIONS=true`. Whisper permanece disponible como herramienta opcional de transcripción en su endpoint existente.
+MCP, Telegram, Obsidian, AutoLearner, and auto-ingest components are preserved and loaded only when `ENABLE_LEGACY_EXTENSIONS=true`. Whisper transcription remains accessible via its dedicated endpoint.
 
-## Operación local
+## Local Operation
 
-1. Configurar `INFERENCE_PROVIDER`, `SLM_URL`, `EMBEDDING_URL`, `MODEL_NAME` y `EMBEDDING_MODEL` en `zyrabit-slm/.env`.
-2. Ejecutar `./zyra.sh install` o `./zyra.sh start`.
-3. Consultar `GET /v1/health/capabilities`.
-4. Importar a `POST /v1/sources/import` y esperar `GET /v1/jobs/{job_id}` con estado `ready`.
+1. Configure `INFERENCE_PROVIDER`, `SLM_URL`, `EMBEDDING_URL`, `MODEL_NAME`, and `EMBEDDING_MODEL` in `zyrabit-slm/.env`.
+2. Run `./zyra.sh install` or `./zyra.sh start`.
+3. Query `GET /v1/health/capabilities`.
+4. Import documents via `POST /v1/sources/import` and await `ready` state from `GET /v1/jobs/{job_id}`.
 
-El endpoint legado `POST /v1/ingest` queda soportado, pero ahora devuelve un trabajo durable y no afirma que un documento está listo antes de indexarse.
+The legacy `POST /v1/ingest` endpoint is maintained for backwards compatibility, returning a durable job status rather than reporting immediate ingestion before completion.

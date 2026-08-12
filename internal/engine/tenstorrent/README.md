@@ -1,16 +1,12 @@
 # Zyrabit-TT-Bridge
 
-Bridge OpenAI-compatible para inferencia en Tenstorrent Blackhole (p150), con
-fallback deterministico (`mock`) para entornos sin hardware.
+OpenAI-compatible bridge for inference on Tenstorrent Blackhole (p150), featuring a deterministic fallback (`mock`) for environments without physical hardware.
 
-## Modos
+## Modes
 
-- `ZYRABIT_TT_MODE=mock` (default): responde con el modelo simulado, sin hardware.
-- `ZYRABIT_TT_MODE=metal`: proxy hacia un upstream vLLM-TT (imagen
-  `tt-inference-server`), midiendo `ttft_ms` real (stream forzado) y calculando
-  `tps` contando los tokens streameados (el upstream vLLM-TT 0.8.0 devuelve
-  `usage` en ceros; se usa como fallback si no es cero).
-- `ZYRABIT_TT_MODE=auto`: detecta GPU via `nvidia-smi` y elige `mock` si no hay.
+- `ZYRABIT_TT_MODE=mock` (default): Responds with a simulated model, requiring no hardware.
+- `ZYRABIT_TT_MODE=metal`: Proxies to an upstream vLLM-TT engine (`tt-inference-server` image), measuring real `ttft_ms` (forced stream) and calculating `tps` by counting streamed tokens (upstream vLLM-TT 0.8.0 returns `usage` as zeros; used as fallback if non-zero).
+- `ZYRABIT_TT_MODE=auto`: Detects GPU via `nvidia-smi` and defaults to `mock` if unavailable.
 
 ## Variables
 
@@ -18,22 +14,21 @@ fallback deterministico (`mock`) para entornos sin hardware.
 - `ZYRABIT_TT_MODEL_ID=Qwen/Qwen2.5-3B-Instruct`
 - `ZYRABIT_TT_MIN_RAM_GB=24`
 - `ZYRABIT_TT_ALLOW_REMOTE_MODEL=false`
-- `ZYRABIT_TT_UPSTREAM_URL=http://zyrabit-vllm-tt:8000` (modo `metal`)
+- `ZYRABIT_TT_UPSTREAM_URL=http://zyrabit-vllm-tt:8000` (`metal` mode)
 - `ZYRABIT_TT_UPSTREAM_MODEL=Qwen/Qwen2.5-3B-Instruct`
-- `ZYRABIT_TT_UPSTREAM_API_KEY` (opcional)
+- `ZYRABIT_TT_UPSTREAM_API_KEY` (optional)
 
 ## Endpoints
 
 - `GET /v1/health`
 - `GET /v1/models`
-- `POST /v1/chat/completions` (OpenAI, con SSE streaming passthrough)
+- `POST /v1/chat/completions` (OpenAI, with SSE streaming passthrough)
 - `POST /v1/completions` (OpenAI)
 - `POST /v1/generate` (legacy)
 
-Las respuestas de chat/completions incluyen el bloque `zyrabit` con
-`mode`, `source`, `engine`, `arch`, `ttft_ms`, `tps` y `total_ms`.
+Chat completions responses include a `zyrabit` block containing `mode`, `source`, `engine`, `arch`, `ttft_ms`, `tps`, and `total_ms`.
 
-## Docker local
+## Local Docker
 
 ```bash
 docker build -t zyrabit-tt-bridge:latest internal/engine/tenstorrent
@@ -44,46 +39,29 @@ docker run --rm -p 8090:8090 zyrabit-tt-bridge:latest
 curl -fsS http://localhost:8090/v1/health
 curl -fsS -X POST http://localhost:8090/v1/chat/completions \
   -H 'Content-Type: application/json' \
-  -d '{"model":"qwen2.5:3b","messages":[{"role":"user","content":"Hola"}]}'
+  -d '{"model":"qwen2.5:3b","messages":[{"role":"user","content":"Hello"}]}'
 ```
 
-## Docker Compose (stack real)
+## Docker Compose (Physical Stack)
 
 ```bash
 docker compose -f zyrabit-slm/docker-compose.yml --profile tenstorrent up --build
 ```
 
-El servicio `zyrabit-tt-metal` corre el bridge en modo `metal` contra
-`zyrabit-vllm-tt` (vLLM-TT con `MESH_DEVICE=P150`). Requiere hugepages 1G
-montados en `/dev/hugepages-1G` y `/dev/tenstorrent` en el host.
+The `zyrabit-tt-metal` service runs the bridge in `metal` mode against `zyrabit-vllm-tt` (vLLM-TT with `MESH_DEVICE=P150`). Requires 1G hugepages mounted at `/dev/hugepages-1G` and `/dev/tenstorrent` on the host.
 
-## Tenstorrent real (validado en Blackhole p150)
+## Physical Tenstorrent (Validated on Blackhole p150)
 
-1. Hugepages 1G: `sudo sysctl -w vm.nr_overcommit_hugepages=64` y mount
-   `none /dev/hugepages-1G hugetlbfs pagesize=1G`.
-2. Imagen del motor: `ghcr.io/tenstorrent/tt-inference-server/vllm-tt-metal-src-release-ubuntu-22.04-amd64:0.8.0-55fd115-aa4ae1e`.
-3. `docker compose --profile tenstorrent up zyrabit-vllm-tt` y luego el bridge
-   en modo `metal` contra `http://zyrabit-vllm-tt:8000`.
+1. **1G Hugepages**: `sudo sysctl -w vm.nr_overcommit_hugepages=64` and mount `none /dev/hugepages-1G hugetlbfs pagesize=1G`.
+2. **Engine Image**: `ghcr.io/tenstorrent/tt-inference-server/vllm-tt-metal-src-release-ubuntu-22.04-amd64:0.8.0-55fd115-aa4ae1e`.
+3. `docker compose --profile tenstorrent up zyrabit-vllm-tt` and then launch the bridge in `metal` mode against `http://zyrabit-vllm-tt:8000`.
 
-### Hallazgos del stack real
+### Physical Stack Findings
 
-- **Modelo**: `Qwen/Qwen2.5-3B-Instruct`. El 7B es **inviable en p150 single**:
-  assertion de tt-metal ("Qwen2.5-7B is only supported on 2 or 4 devices",
-  N300/N150x4). `max_model_len=32768` (límite de position embeddings).
-- **Redes**: `model-network` es `internal: true` (air-gap) → el engine NO publica
-  puertos al host; es alcanzable por DNS (`zyrabit-vllm-tt:8000`) desde
-  contenedores de esa red. El bridge metal está en `model-network` +
-  `zyrabit-sovereign-net` para que el host/API alcancen `:8090`.
-- **Acceso local al API**: el compose expone `8080:8080` en `zyrabit-api` y
-  `DOMAIN=localhost` en `.env` (el provider Docker de traefik está roto en este
-  entorno: min API 1.40). Sin esto, `./zyra.sh benchmark` no llega al API.
-- **Métricas reales** (p150, Qwen2.5-3B): TTFT ~80-105 ms en estado estable,
-  ~20-21 t/s, `total_ms` bridge→engine ~200-400 ms (respuesta corta). La primera
-  inferencia tras arrancar el engine paga la compilación (~20 s).
-- **Benchmark**: `./zyra.sh benchmark` reporta TTFT/tps reales del bridge; la
-  latencia total alta (~34 s) es del pipeline RAG (ChromaDB caída, sin docs
-  indexados), no de la inferencia.
-- **F1**: `benchmarks/capture_tt_benchmark.sh` guarda el JSON con métricas reales
-  en `benchmarks/results/p150-qwen25-3b.json`.
-- **F2**: provider `zyrabit-tt` en `~/.config/opencode/opencode.jsonc` apunta a
-  `http://localhost:8090/v1` (OpenAI-compatible, sin auth).
+- **Model**: `Qwen/Qwen2.5-3B-Instruct`. The 7B variant is **inviable on a single p150** (tt-metal assertion: "Qwen2.5-7B is only supported on 2 or 4 devices", N300/N150x4). `max_model_len=32768` (position embeddings limit).
+- **Networking**: `model-network` is `internal: true` (air-gapped) → engine does NOT publish ports to the host; reachable via DNS (`zyrabit-vllm-tt:8000`) from containers on that network. The metal bridge bridges `model-network` + `zyrabit-sovereign-net` so host/API can reach `:8090`.
+- **Local API Access**: compose exposes `8080:8080` on `zyrabit-api` and `DOMAIN=localhost` in `.env` (traefik Docker provider broken in this environment: min API 1.40). Without this, `./zyra.sh benchmark` cannot reach the API.
+- **Physical Metrics** (p150, Qwen2.5-3B): TTFT ~80-105 ms in steady state, ~20-21 t/s, bridge→engine `total_ms` ~200-400 ms (short response). First inference after cold start incurs compilation (~20 s).
+- **Benchmark**: `./zyra.sh benchmark` reports actual bridge TTFT/tps; high total latency (~34 s) stems from RAG pipeline fallback (ChromaDB down, no indexed docs), not inference.
+- **F1**: `benchmarks/capture_tt_benchmark.sh` persists JSON metrics in `benchmarks/results/p150-qwen25-3b.json`.
+- **F2**: provider `zyrabit-tt` in `~/.config/opencode/opencode.jsonc` points to `http://localhost:8090/v1` (OpenAI-compatible, unauthenticated).

@@ -1,42 +1,42 @@
-# Hoja de Ruta de Validación: Zyrabit Tenstorrent Bridge Local
+# Validation Roadmap: Zyrabit Local Tenstorrent Bridge
 
-Este documento define la estrategia y los protocolos de prueba para validar el pipeline de inferencia local utilizando el simulador de hardware (Golden Model) de Tenstorrent para el modelo **Qwen 2.5 1.5B**.
+This document defines the testing strategy and protocols for validating the local inference pipeline using Tenstorrent's hardware simulator (Golden Model) for the **Qwen 2.5 1.5B** model.
 
-## 1. Arquitectura del Bridge (`tt-forge` a `tt-mlir`)
+## 1. Bridge Architecture (`tt-forge` to `tt-mlir`)
 
-El flujo de ejecución de nuestro `zyrabit-tt-bridge` se encarga de traducir los grafos dinámicos de PyTorch hacia instrucciones ejecutables por la arquitectura de Tenstorrent:
+The `zyrabit-tt-bridge` execution flow translates dynamic PyTorch computation graphs into executable instructions for Tenstorrent hardware:
 
-1. **Intercepción y Lowering (StableHLO)**: Mediante `torch_xla`, capturamos el grafo de cómputo del modelo y lo reducimos a la representación intermedia estándar StableHLO.
-2. **Delegación al Compilador (`tt-forge`)**: Configuramos el entorno (`PJRT_DEVICE=TT`) para que el backend XLA envíe las operaciones a `tt-forge`, el framework de compilación de Tenstorrent.
-3. **Conversión a `tt-mlir`**: El compilador transforma el StableHLO en el dialecto específico `tt-mlir`, optimizando la distribución de tensores en la grilla Tensix y la alocación entre SRAM (L1) y DRAM.
-4. **Simulación (Golden Model)**: Con `INFERENCE_PROVIDER=tt-forge-sim`, el binario final `.tt` se ejecuta en un entorno emulado en CPU que calcula de forma precisa los tiempos y comportamientos del silicio real.
+1. **Interception & Lowering (StableHLO)**: Using `torch_xla`, we capture the model computation graph and lower it to standard StableHLO intermediate representation.
+2. **Compiler Delegation (`tt-forge`)**: Environment is set (`PJRT_DEVICE=TT`) so XLA backend dispatches operations to `tt-forge`, Tenstorrent's compilation framework.
+3. **Lowering to `tt-mlir`**: The compiler transforms StableHLO into the specific `tt-mlir` dialect, optimizing tensor placement across the Tensix grid and SRAM (L1) / DRAM allocation.
+4. **Simulation (Golden Model)**: With `INFERENCE_PROVIDER=tt-forge-sim`, the final `.tt` binary executes in a CPU emulation layer that models physical silicon timings and behavior.
 
-## 2. Protocolo de Pruebas
+## 2. Test Protocols
 
-### Test 1: Compilación de Grafo
-- **Objetivo**: Medir el tiempo de preprocesamiento (compilación local) hacia binarios Tenstorrent.
-- **Configuración**: `XLA_STABLEHLO_COMPILE=1`, Qwen 2.5 1.5B en `bfloat16`.
-- **Métrica**: Tiempo de carga (Cold-start) para generar el archivo ejecutable.
+### Test 1: Graph Compilation
+- **Goal**: Measure preprocessing / compilation duration to Tenstorrent binaries.
+- **Configuration**: `XLA_STABLEHLO_COMPILE=1`, Qwen 2.5 1.5B in `bfloat16`.
+- **Metric**: Cold-start time required to generate executable binaries.
 
-### Test 2: Inferencia en Simulador (Golden Model)
-- **Objetivo**: Determinar el rendimiento base (Cycle Counts) que obtendremos en hardware físico.
-- **Configuración**: Ejecución de inferencia usando `torch_xla.sync(wait=True)` para asegurar barreras asíncronas correctas en la medición.
-- **Métrica**: Ciclos reportados en los logs por token generado.
+### Test 2: Simulator Inference (Golden Model)
+- **Goal**: Establish baseline performance (Cycle Counts) expected on physical hardware.
+- **Configuration**: Execute inference using `torch_xla.sync(wait=True)` to enforce proper asynchronous barrier measurement.
+- **Metric**: Reported cycles per generated token in execution logs.
 
-### Test 3: Integridad de Datos (Zero-Trust PII Guard)
-- **Objetivo**: Asegurar que las rutinas de ofuscación o enmascaramiento PII actúen correctamente en el tensor ANTES de enviarse al simulador/hardware.
-- **Configuración**: Evaluación con un prompt contaminado.
-- **Métrica**: Verificación en la salida final sin corromper la dimensión de los tensores ni filtrar PII real en los logs.
+### Test 3: Data Integrity (Zero-Trust PII Guard)
+- **Goal**: Ensure PII obfuscation/masking routines process tensors BEFORE dispatching to simulator/hardware.
+- **Configuration**: Test evaluation using a redacted test prompt.
+- **Metric**: Verification of clean output without tensor shape corruption or PII leaks in system logs.
 
-## 3. Métricas de Referencia (Qwen 2.5 1.5B - bfloat16)
+## 3. Baseline Reference Metrics (Qwen 2.5 1.5B - bfloat16)
 
-| Métrica | Valor Proyectado (Simulador TT) | Notas / Observaciones |
+| Metric | Projected Value (TT Simulator) | Notes / Observations |
 | :--- | :--- | :--- |
-| **Tiempo de Compilación** | *[Pendiente]* s | Tiempo desde carga en XLA hasta compilación exitosa |
-| **Consumo SRAM Estimado** | *[Pendiente]* MB | Memoria on-chip requerida por núcleos L1 |
-| **Consumo DRAM Estimado** | *[Pendiente]* GB | Uso de memoria total (Pesos en bfloat16 + KV Cache) |
-| **Cycle Counts (Total)** | *[Pendiente]* | Total de ciclos de reloj para un pase forward |
-| **Latencia Estimada** | *[Pendiente]* ms/token | Calculado basado en frecuencia base de tarjeta target |
+| **Compilation Time** | *[Pending]* s | Duration from XLA graph load to success |
+| **SRAM Usage (Est.)** | *[Pending]* MB | On-chip memory required per L1 core |
+| **DRAM Usage (Est.)** | *[Pending]* GB | Total memory consumption (bfloat16 weights + KV Cache) |
+| **Cycle Counts (Total)** | *[Pending]* | Total clock cycles per forward pass |
+| **Latency (Est.)** | *[Pending]* ms/token | Calculated from base frequency of target card |
 
 ---
-*Nota: Estos valores representan el techo teórico extraído del Golden Model en la Mac, previo al despliegue en host Linux con PCIe real.*
+*Note: These benchmarks represent theoretical upper bounds from the Golden Model host environment prior to PCI-Express physical deployment.*

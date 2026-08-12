@@ -1,9 +1,5 @@
-# Suite heredada
+# Legacy Test Suite
 
-Estas pruebas se conservan porque cubren módulos que aún existen, pero ya no
-son criterios de aceptación del nodo documental. Cubren MCP, ReAct, n8n,
-memoria y el flujo de chat anterior basado en mocks.
+These tests are retained because they cover modules that still exist in the codebase, but they no longer serve as acceptance criteria for the document node. They cover MCP, ReAct, n8n, memory adapters, and the mock-based chat flow.
 
-No se ejecutan en la suite principal. Para reactivarlas, primero debe activarse
-`ENABLE_LEGACY_EXTENSIONS=true` y actualizar sus contratos contra la interfaz
-actual; moverlas de vuelta sin hacerlo produciría falsos positivos.
+They are excluded from the main test suite execution. To reactivate them, set `ENABLE_LEGACY_EXTENSIONS=true` and update their contract expectations against current interfaces; running them without updating will produce false negatives.
