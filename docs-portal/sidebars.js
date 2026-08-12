@@ -28,6 +28,7 @@ module.exports = {
       collapsed: false,
       items: [
         "architecture/hexagonal",
+        "agent-architecture",
         "core-architecture/pluggability",
         "architecture-mermaid",
         "core-v2",
