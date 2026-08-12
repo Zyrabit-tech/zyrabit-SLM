@@ -1,17 +1,20 @@
 #!/bin/bash
 # Launcher for the vLLM-TT engine (Blackhole p150) via tt-inference-server wrapper.
+# Configurable via TT_HF_MODEL_NAME (snapshot dir suffix) and TT_MODEL_SPEC_JSON_PATH.
 set -e
 
 source "${PYTHON_ENV_DIR}/bin/activate"
 
-export TT_MODEL_SPEC_JSON_PATH=/model_spec.json
+export TT_MODEL_SPEC_JSON_PATH="${TT_MODEL_SPEC_JSON_PATH:-/model_spec.json}"
 export CACHE_ROOT=/home/container_app_user/cache_root
 export TT_CACHE_PATH="${CACHE_ROOT}/tt_cache"
 
+MODEL_NAME="${TT_HF_MODEL_NAME:-Qwen2.5-3B-Instruct}"
+
 # Resolve the HF snapshot dir inside the offline cache (HF_HUB_OFFLINE=1).
-MODEL_SNAP="$(ls -d /hf-cache/hub/models--Qwen--Qwen2.5-3B-Instruct/snapshots/*/ 2>/dev/null | head -1 | sed 's:/$::')"
+MODEL_SNAP="$(ls -d /hf-cache/hub/models--*${MODEL_NAME}/snapshots/*/ 2>/dev/null | head -1 | sed 's:/$::')"
 if [ -z "${MODEL_SNAP}" ]; then
-    echo "ERROR: Qwen2.5-3B-Instruct not found in /hf-cache (download incomplete?)" >&2
+    echo "ERROR: ${MODEL_NAME} not found in /hf-cache (download incomplete?)" >&2
     exit 1
 fi
 export MODEL_WEIGHTS_PATH="${MODEL_SNAP}"

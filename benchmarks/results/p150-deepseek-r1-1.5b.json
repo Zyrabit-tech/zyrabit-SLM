@@ -1,0 +1,26 @@
+{
+  "timestamp": "2026-08-12T20:05:33Z",
+  "hardware": {
+    "type": "Tenstorrent Blackhole",
+    "board": "p150",
+    "devices": 1,
+    "serial": "",
+    "sysfs": "tenstorrent!0,"
+  },
+  "model": "DeepSeek-AI/DeepSeek-R1-Distill-Qwen-1.5B",
+  "engine": "vllm-tt-metalium",
+  "mode": "metal",
+  "arch": "blackhole",
+  "metrics_ms": {
+    "ttft_ms": 53.79,
+    "tps": 11.23,
+    "total_ms": 22867.0,
+    "total_ms_upstream": 22849.81
+  },
+  "usage": {
+    "prompt_tokens": 0,
+    "completion_tokens": 0,
+    "total_tokens": 0
+  },
+  "answer": "Okay, so I need to summarize the indexed documents. Hmm, where do I even start with this? I remember that indexed documents are structured data, right? Like, they're used in academic research, especially in linguistics. I think they're used to organize information and make it easier to retrieve. \n\nLet me think about what indexed documents are. They're like a collection of information that's been processed and organized into a standardized format. I've heard they're used in databases, so maybe they're part of a larger database system. I'm not entirely sure how they're specifically indexed documents, documents,,,..\n\n.. is, I. document? something means I\n\n\n\n\n\n \u2013..meaning.\n\nity.com,con.\n\ning.\n\n meaning.meaning\n\ning explicitly.\n\n meaning\u7684meaning meaning\u7684meaning ofang\u7684meaning.b meaning\u7684meaning.meaning of meaning\u7684meaning.meaning meaning\u7684meaning.meaning\n\nof\u7684meaning.\n\nwithout\u7684meaning.meaning.meaning.\n\n meaning\u7684meaning.\n\n\\n\n\n.of\u7684meaning\u3002\u7684meaning of of\u7684meaning=f\u7684etc\uff0c meaning\u7684meaning\u65b9\u9762\u7684meaning of meaning\u7684meaning\u3002of\u7684meaning of\u7684meaning o\u7684meaning.\n\n meaning\u7684meaning of\u7684meaning about\u7684meaning.b\u7684meaningmeaning about\u7684"
+}

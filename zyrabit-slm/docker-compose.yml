@@ -4,9 +4,12 @@ services:
   traefik:
     image: traefik:v3.0
     container_name: zyrabit-traefik
+    environment:
+      - DOCKER_API_VERSION=1.40
     command:
       - --api.dashboard=true
       - --providers.docker=true
+      - --providers.docker.apiVersion=1.40
       - --providers.docker.exposedbydefault=false
       - --providers.file.directory=/etc/traefik/dynamic
       - --metrics.prometheus=true
@@ -84,6 +87,8 @@ services:
       context: ..
       dockerfile: zyrabit-slm/web-ui/Dockerfile
     container_name: zyrabit-web
+    ports:
+      - "3000:80"
     labels:
       - traefik.enable=true
       - traefik.http.routers.zyrabit-web.rule=Host(`${DOMAIN}`) && PathPrefix(`/`)
@@ -150,7 +155,7 @@ services:
     environment:
       - ZYRABIT_TT_MODE=${ZYRABIT_TT_MODE:-metal}
       - ZYRABIT_TT_UPSTREAM_URL=${ZYRABIT_TT_UPSTREAM_URL:-http://zyrabit-vllm-tt:8000}
-      - ZYRABIT_TT_UPSTREAM_MODEL=${ZYRABIT_TT_UPSTREAM_MODEL:-Qwen/Qwen2.5-3B-Instruct}
+      - ZYRABIT_TT_UPSTREAM_MODEL=${ZYRABIT_TT_UPSTREAM_MODEL:-Qwen/Qwen2.5-Coder-3B-Instruct}
     networks:
       - model-network
       - zyrabit-sovereign-net
@@ -174,11 +179,13 @@ services:
       - MESH_DEVICE=${MESH_DEVICE:-P150}
       - TT_METAL_ARCH_NAME=blackhole
       - VLLM_RPC_TIMEOUT=100000
+      - TT_HF_MODEL_NAME=${TT_HF_MODEL_NAME:-Qwen2.5-3B-Instruct}
+      - TT_MODEL_SPEC_JSON_PATH=${TT_MODEL_SPEC_JSON_PATH:-/model_spec.json}
     volumes:
       - tt-cache-root:/home/container_app_user/cache_root
       - ${ZYRABIT_HF_CACHE_DIR:-./hf-cache}:/hf-cache
       - /dev/hugepages-1G:/dev/hugepages-1G
-      - ../internal/engine/tenstorrent/model_spec_qwen25_3b_p150.json:/model_spec.json:ro
+      - ../internal/engine/tenstorrent/${TT_MODEL_SPEC:-model_spec_qwen25_3b_p150.json}:/model_spec.json:ro
       - ../internal/engine/tenstorrent/run-qwen.sh:/run-qwen.sh:ro
     ports:
       - "8000:8000"
@@ -187,7 +194,7 @@ services:
 
   # 3. THE MEMORY: Vector DB
   zyrabit-db:
-    image: chromadb/chroma:0.5.3
+    image: chromadb/chroma:1.5.9
     container_name: zyrabit-db
     environment:
       - ANONYMIZED_TELEMETRY=False
