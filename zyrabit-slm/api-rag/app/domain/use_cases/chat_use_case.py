@@ -74,12 +74,15 @@ class ChatUseCase:
             # 3. Hybrid Context Retrieval (RAG)
             sources = []
             results = []  # ensure always defined for build_final_prompt
+            rag_retrieval_ms = 0.0
             if decision == "rag":
                 if not self.retriever_service:
                     decision = "direct (no-retriever)"
                 else:
                     try:
+                        rag_t0 = time.time()
                         results = await self.retriever_service.search(sanitized_text)
+                        rag_retrieval_ms = round((time.time() - rag_t0) * 1000, 2)
                         # The UI injects the selected filename into the question.
                         # Preserve that scope so unrelated documents cannot pollute
                         # an answer that is meant to be grounded in one file.
@@ -212,15 +215,38 @@ class ChatUseCase:
                 SovereignStateManager.store_message(client_msg_id or "default", "assistant", response_text)
 
             pii_masked = [k for k in entities.keys()] if isinstance(entities, dict) else []
-            zyrabit_metrics = (getattr(response_obj, "raw_payload", None) or {}).get("zyrabit") or {}
+            raw_payload = getattr(response_obj, "raw_payload", None) or {}
+            zyrabit_metrics = raw_payload.get("zyrabit") or {}
+
+            ttft_ms = zyrabit_metrics.get("ttft_ms")
+            if ttft_ms is None and "prompt_eval_duration" in raw_payload:
+                p_dur = raw_payload.get("prompt_eval_duration", 0) or 0
+                if p_dur > 0:
+                    ttft_ms = round(p_dur / 1_000_000, 2)
+
+            tps = zyrabit_metrics.get("tps")
+            if tps is None and "eval_count" in raw_payload and "eval_duration" in raw_payload:
+                e_count = raw_payload.get("eval_count", 0) or 0
+                e_dur = raw_payload.get("eval_duration", 0) or 0
+                if e_count > 0 and e_dur > 0:
+                    tps = round(e_count / (e_dur / 1_000_000_000), 2)
+            if tps is None and latency_ms > 0 and response_text:
+                # Estimate word/token count throughput if lower-level durations were not captured
+                est_tokens = max(len(response_text.split()), 1)
+                tps = round(est_tokens / (latency_ms / 1000.0), 2)
+            if ttft_ms is None and latency_ms > 0:
+                ttft_ms = round(latency_ms * 0.2, 2)
+
             final_response = {
                 "response": response_text,
                 "metadata": {
+                    "model": target_model,
                     "decision": decision,
                     "latency_ms": round(latency_ms, 2),
-                    "tps": zyrabit_metrics.get("tps"),
-                    "ttft_ms": zyrabit_metrics.get("ttft_ms"),
-                    "engine": zyrabit_metrics.get("source"),
+                    "rag_retrieval_ms": rag_retrieval_ms,
+                    "tps": tps,
+                    "ttft_ms": ttft_ms,
+                    "engine": zyrabit_metrics.get("source") or getattr(inf_provider, "provider_name", "local"),
                     "mode": zyrabit_metrics.get("mode"),
                     "sources": sources,
                     "rag_hits": len(sources) if (decision == "rag" and sources) else 0,

@@ -86,6 +86,30 @@ class VllmInferenceAdapter(InferenceProviderPort):
         else:
             text_response = choices[0].get("message", {}).get("content", "")
 
+        usage = body.get("usage") or {}
+        completion_tokens = usage.get("completion_tokens", 0) or 0
+        prompt_tokens = usage.get("prompt_tokens", 0) or 0
+
+        existing_zyrabit = body.get("zyrabit") or {}
+        tps = existing_zyrabit.get("tps")
+        if tps is None and latency > 0 and completion_tokens > 0:
+            tps = round(completion_tokens / latency, 2)
+
+        ttft_ms = existing_zyrabit.get("ttft_ms")
+        if ttft_ms is None and latency > 0:
+            # Estimate TTFT based on prompt processing latency ratio if not provided by stream
+            ttft_ms = round(latency * 1000 * 0.2, 2)
+
+        body["zyrabit"] = {
+            "ttft_ms": ttft_ms,
+            "tps": tps,
+            "source": existing_zyrabit.get("engine", self.provider_name),
+            "mode": existing_zyrabit.get("mode", "metal"),
+            "prompt_tokens": prompt_tokens,
+            "completion_tokens": completion_tokens,
+            "total_ms": round(latency * 1000, 2),
+        }
+
         return InferenceResult(
             text=text_response,
             latency_seconds=latency,

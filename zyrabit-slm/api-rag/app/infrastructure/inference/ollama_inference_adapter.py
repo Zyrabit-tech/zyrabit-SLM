@@ -91,6 +91,24 @@ class OllamaInferenceAdapter(InferenceProviderPort):
                 if "<think>" in response_text and "</think>" in response_text:
                     response_text = re.sub(r"<think>.*?</think>", "", response_text, flags=re.DOTALL).strip()
 
+                prompt_eval_dur = body.get("prompt_eval_duration", 0) or 0
+                eval_dur = body.get("eval_duration", 0) or 0
+                eval_count = body.get("eval_count", 0) or 0
+                prompt_eval_count = body.get("prompt_eval_count", 0) or 0
+
+                ttft_ms = round(prompt_eval_dur / 1_000_000, 2) if prompt_eval_dur > 0 else None
+                tps = round(eval_count / (eval_dur / 1_000_000_000), 2) if eval_dur > 0 and eval_count > 0 else None
+
+                body["zyrabit"] = {
+                    "ttft_ms": ttft_ms,
+                    "tps": tps,
+                    "source": "ollama",
+                    "mode": "metal" if "host" in self.endpoint else "docker",
+                    "prompt_tokens": prompt_eval_count,
+                    "completion_tokens": eval_count,
+                    "total_ms": round(latency * 1000, 2),
+                }
+
                 return InferenceResult(
                     text=response_text,
                     latency_seconds=latency,

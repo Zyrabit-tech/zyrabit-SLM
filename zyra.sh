@@ -658,13 +658,19 @@ for n,d in results.items():
     print(f\"  {n:<28} {d['tps']:<12} {d['ttft']:<12} {d['lat']}\")
 "
     else
-        log_info "Benchmarking active engine on [${accel_name}] via ${base_url}/chat ..."
-        local t0 t1 elapsed res http_code
+        log_info "Warming up inference engine on [${accel_name}]..."
+        curl -sk -X POST "${base_url}/chat" \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer ${token}" \
+            -d "{\"text\":\"ping\",\"client_msg_id\":\"warmup_$(date +%s)\"}" >/dev/null 2>&1 || true
+
+        log_info "Running warm benchmark (RAG search + Inference) via ${base_url}/chat ..."
+        local t0 t1 elapsed res http_code res_body
         t0=$(python3 -c 'import time; print(int(time.time()*1000))')
         res=$(curl -sk -w "\n%{http_code}" -X POST "${base_url}/chat" \
             -H "Content-Type: application/json" \
             -H "Authorization: Bearer ${token}" \
-            -d "{\"text\":\"Summarize the indexed documents.\",\"client_msg_id\":\"bench_${t0}\"}" 2>/dev/null || echo -e "{}\n000")
+            -d "{\"text\":\"Resume los puntos clave de los documentos indexados en el repositorio.\",\"client_msg_id\":\"bench_${t0}\"}" 2>/dev/null || echo -e "{}\n000")
         t1=$(python3 -c 'import time; print(int(time.time()*1000))')
         elapsed=$((t1 - t0))
         http_code=$(echo "${res}" | tail -n1)
@@ -687,21 +693,25 @@ except Exception as e:
 
 G,C,A,B,N='\033[38;2;60;180;100m','\033[38;2;70;180;220m','\033[38;2;240;170;50m','\033[1m','\033[0m'
 model = m.get('model') or m.get('upstream_model') or 'Unknown'
-ttft  = f\"{float(m['ttft_ms']):.1f} ms\" if m.get('ttft_ms') else 'N/A'
-tps   = f\"{float(m['tps']):.1f} t/s\"   if m.get('tps')    else 'N/A'
+ttft  = f\"{float(m['ttft_ms']):.1f} ms\" if m.get('ttft_ms') is not None else 'N/A'
+tps   = f\"{float(m['tps']):.1f} t/s\"   if m.get('tps') is not None else 'N/A'
 lat   = f\"{float(m.get('latency_ms', ${elapsed})):.0f} ms\"
+rag_ms = f\"{float(m['rag_retrieval_ms']):.1f} ms\" if m.get('rag_retrieval_ms') is not None else '0.0 ms'
 rag_hits = m.get('rag_hits', 0)
 accel = '${accel_name}'
 
 print(f'''
   {B}┌─ 🤖 ENGINE & HARDWARE ──────────────────────┐{N}
-  │  Model      : {C}{model:<32}{N}│
-  │  Accelerator: {G}{accel:<32}{N}│
-  {B}├─ ⚡ PERFORMANCE & LATENCY ───────────────────┤{N}
-  │  TTFT       : {G}{ttft:<32}{N}│
-  │  Throughput : {C}{tps:<32}{N}│
-  │  RAG Hits   : {C}{str(rag_hits) + ' documents':<32}{N}│
-  │  Total time : {A}{lat:<32}{N}│
+  │  Model          : {C}{model:<28}{N}│
+  │  Accelerator    : {G}{accel:<28}{N}│
+  {B}├─ ⚡ INFERENCE & THROUGHPUT ──────────────────┤{N}
+  │  TTFT (Warm)    : {G}{ttft:<28}{N}│
+  │  Throughput     : {C}{tps:<28}{N}│
+  {B}├─ 📚 DOCUMENT RETRIEVAL (RAG) ───────────────┤{N}
+  │  RAG Search Time: {A}{rag_ms:<28}{N}│
+  │  Retrieved Hits : {C}{str(rag_hits) + ' documents':<28}{N}│
+  {B}├─ ⏱️  TOTAL LATENCY ──────────────────────────┤{N}
+  │  Total Turn Time: {A}{lat:<28}{N}│
   {B}└───────────────────────────────────────────────┘{N}''')
 "
     fi
