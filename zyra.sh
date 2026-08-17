@@ -596,6 +596,7 @@ run_validate() {
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
+# ─────────────────────────────────────────────────────────────────────────────
 # BENCHMARK
 # ─────────────────────────────────────────────────────────────────────────────
 run_benchmark() {
@@ -604,15 +605,31 @@ run_benchmark() {
     base_url="$(api_base_url)"; token="$(web_api_key)"
     [[ -n "${token}" ]] || { log_err "ZYRABIT_API_KEY_WEB is not configured in .env"; exit 1; }
 
+    log_info "Probing API status at ${base_url}/health ..."
+    if ! curl -sk -f -m 5 "${base_url}/health" >/dev/null 2>&1; then
+        log_err "API is not responding at ${base_url}. Start the stack first with './zyra.sh start' or check container status with './zyra.sh verify'."
+        exit 1
+    fi
+
+    local hw_info ram cores accel accel_name
+    hw_info=$(detect_hardware); IFS='|' read -r ram cores accel <<< "$hw_info"
+    case "${accel}" in
+        tenstorrent) accel_name="Tenstorrent Blackhole (PCIe)" ;;
+        nvidia)      accel_name="NVIDIA CUDA GPU" ;;
+        metal)       accel_name="Apple Silicon Metal" ;;
+        *)           accel_name="CPU Multithreading (${cores} cores)" ;;
+    esac
+
     if [[ "${REPORT_MODE}" == "true" ]]; then
-        log_info "Running 4-engine comparison against ${base_url}/chat ..."
+        log_info "Running multi-engine comparison against ${base_url}/chat ..."
         python3 -c "
 import json, urllib.request, time, ssl
 ctx = ssl._create_unverified_context()
 url = '${base_url}/chat'; token = '${token}'
 engines = {
     'Ollama Docker (CPU)':   'ollama_docker',
-    'Ollama Host  (Metal)':  'ollama_host',
+    'Ollama Host (Metal)':   'ollama_host',
+    'Tenstorrent Bridge':    'tenstorrent',
     'Llama.cpp Embedded':    'embedded_metal',
     'Apple MLX':             'mlx',
 }
@@ -641,31 +658,49 @@ for n,d in results.items():
     print(f\"  {n:<28} {d['tps']:<12} {d['ttft']:<12} {d['lat']}\")
 "
     else
-        log_info "Benchmarking active engine at ${base_url}/chat ..."
-        local t0 t1 elapsed res
+        log_info "Benchmarking active engine on [${accel_name}] via ${base_url}/chat ..."
+        local t0 t1 elapsed res http_code
         t0=$(python3 -c 'import time; print(int(time.time()*1000))')
-        res=$(curl -sk -X POST "${base_url}/chat" \
+        res=$(curl -sk -w "\n%{http_code}" -X POST "${base_url}/chat" \
             -H "Content-Type: application/json" \
             -H "Authorization: Bearer ${token}" \
-            -d "{\"text\":\"Summarize the indexed documents.\",\"client_msg_id\":\"bench_${t0}\"}" 2>/dev/null || echo "{}")
+            -d "{\"text\":\"Summarize the indexed documents.\",\"client_msg_id\":\"bench_${t0}\"}" 2>/dev/null || echo -e "{}\n000")
         t1=$(python3 -c 'import time; print(int(time.time()*1000))')
         elapsed=$((t1 - t0))
+        http_code=$(echo "${res}" | tail -n1)
+        res_body=$(echo "${res}" | sed '$d')
+
+        if [[ "${http_code}" != "200" ]]; then
+            log_err "Benchmark request returned HTTP ${http_code}: ${res_body}"
+            exit 1
+        fi
+
         python3 -c "
-import json
-try:    m = json.loads('''${res}''').get('metadata',{})
-except: m = {}
+import json, sys
+res_raw = '''${res_body}'''
+try:
+    data = json.loads(res_raw)
+    m = data.get('metadata', {})
+except Exception as e:
+    print(f'Error parsing benchmark response: {e}', file=sys.stderr)
+    sys.exit(1)
+
 G,C,A,B,N='\033[38;2;60;180;100m','\033[38;2;70;180;220m','\033[38;2;240;170;50m','\033[1m','\033[0m'
-model = m.get('model','qwen2.5:7b')
+model = m.get('model') or m.get('upstream_model') or 'Unknown'
 ttft  = f\"{float(m['ttft_ms']):.1f} ms\" if m.get('ttft_ms') else 'N/A'
 tps   = f\"{float(m['tps']):.1f} t/s\"   if m.get('tps')    else 'N/A'
-lat   = f\"{float(m.get('latency_ms',${elapsed})):.0f} ms\"
+lat   = f\"{float(m.get('latency_ms', ${elapsed})):.0f} ms\"
+rag_hits = m.get('rag_hits', 0)
+accel = '${accel_name}'
+
 print(f'''
-  {B}┌─ 🤖 ENGINE ─────────────────────────────────┐{N}
+  {B}┌─ 🤖 ENGINE & HARDWARE ──────────────────────┐{N}
   │  Model      : {C}{model:<32}{N}│
-  │  Accelerator: Apple Silicon Metal              │
-  {B}├─ ⚡ PERFORMANCE ────────────────────────────┤{N}
+  │  Accelerator: {G}{accel:<32}{N}│
+  {B}├─ ⚡ PERFORMANCE & LATENCY ───────────────────┤{N}
   │  TTFT       : {G}{ttft:<32}{N}│
   │  Throughput : {C}{tps:<32}{N}│
+  │  RAG Hits   : {C}{str(rag_hits) + ' documents':<32}{N}│
   │  Total time : {A}{lat:<32}{N}│
   {B}└───────────────────────────────────────────────┘{N}''')
 "
@@ -677,40 +712,74 @@ print(f'''
 # ─────────────────────────────────────────────────────────────────────────────
 run_audit() {
     log_header "SYSTEM DIAGNOSTIC REPORT"
-    local base_url token t0 t1 elapsed res
+    local base_url token t0 t1 elapsed res http_code res_body
     base_url="$(api_base_url)"; token="$(web_api_key)"
     [[ -n "${token}" ]] || { log_err "ZYRABIT_API_KEY_WEB is not configured in .env"; exit 1; }
+
+    log_info "Probing API status at ${base_url}/health ..."
+    if ! curl -sk -f -m 5 "${base_url}/health" >/dev/null 2>&1; then
+        log_err "API is not responding at ${base_url}. Start the stack first with './zyra.sh start'."
+        exit 1
+    fi
+
     t0=$(python3 -c 'import time; print(int(time.time()*1000))' 2>/dev/null || echo 0)
-    res=$(curl -sk -X POST "${base_url}/chat" \
+    res=$(curl -sk -w "\n%{http_code}" -X POST "${base_url}/chat" \
         -H "Content-Type: application/json" \
         -H "Authorization: Bearer ${token}" \
-        -d "{\"text\":\"Describe the current indexed document collection.\",\"client_msg_id\":\"audit_${t0}\"}" 2>/dev/null || echo "{}")
+        -d "{\"text\":\"Describe the current indexed document collection.\",\"client_msg_id\":\"audit_${t0}\"}" 2>/dev/null || echo -e "{}\n000")
     t1=$(python3 -c 'import time; print(int(time.time()*1000))' 2>/dev/null || echo 0)
     elapsed=$((t1 - t0))
+    http_code=$(echo "${res}" | tail -n1)
+    res_body=$(echo "${res}" | sed '$d')
+
+    if [[ "${http_code}" != "200" ]]; then
+        log_err "Audit request returned HTTP ${http_code}: ${res_body}"
+        exit 1
+    fi
+
+    local hw_info ram cores accel accel_name
+    hw_info=$(detect_hardware); IFS='|' read -r ram cores accel <<< "$hw_info"
+    case "${accel}" in
+        tenstorrent) accel_name="Tenstorrent Blackhole" ;;
+        nvidia)      accel_name="NVIDIA CUDA GPU" ;;
+        metal)       accel_name="Apple Silicon Metal" ;;
+        *)           accel_name="CPU Multithreading" ;;
+    esac
+
     python3 -c "
-import json
-try:    m = json.loads('''${res}''').get('metadata',{})
-except: m = {}
+import json, sys
+res_raw = '''${res_body}'''
+try:
+    data = json.loads(res_raw)
+    m = data.get('metadata', {})
+except Exception as e:
+    print(f'Error parsing audit response: {e}', file=sys.stderr)
+    sys.exit(1)
+
 G,C,A,B,N='\033[38;2;60;180;100m','\033[38;2;70;180;220m','\033[38;2;240;170;50m','\033[1m','\033[0m'
-model    = m.get('model', 'Offline / Not Loaded')
+model    = m.get('model') or m.get('upstream_model') or 'Unknown'
 decision = str(m.get('decision', 'DIRECT')).upper()
 lat      = f\"{float(m.get('latency_ms', ${elapsed})):.0f} ms\"
 tps      = f\"{float(m['tps']):.1f} t/s\" if m.get('tps') else 'N/A'
 sources  = m.get('sources') or []
-pii      = 'PASSED — 0 tokens leaked' if not m.get('pii_detected') else 'REDACTED (PII Scrubbed)'
+pii_raw  = m.get('pii_detected', False)
+pii      = 'PASSED — 0 tokens leaked' if not pii_raw else 'REDACTED (PII Scrubbed)'
+accel    = '${accel_name}'
+
 print(f'''
-  {B}┌─ 🤖 INFERENCE ──────────────────────────────┐{N}
-  │  Model    : {C}{model:<34}{N}│
-  │  Time     : {A}{lat:<34}{N}│
-  │  Speed    : {C}{tps:<34}{N}│
+  {B}┌─ 🤖 INFERENCE & HARDWARE ───────────────────┐{N}
+  │  Model       : {C}{model:<33}{N}│
+  │  Accelerator : {G}{accel:<33}{N}│
+  │  Time        : {A}{lat:<33}{N}│
+  │  Speed       : {C}{tps:<33}{N}│
   {B}├─ 🧠 RAG & ROUTING ──────────────────────────┤{N}
-  │  Decision : {G}{decision:<34}{N}│
-  │  Sources  : {C}{len(sources)} documents retrieved{N}         │''')
+  │  Decision    : {G}{decision:<33}{N}│
+  │  Sources     : {C}{len(sources)} documents retrieved{N}        │''')
 for s in list(sources)[:3]:
-    print(f'  │  Source   : {C}{str(s):<34}{N}│')
+    print(f'  │  Source      : {C}{str(s):<33}{N}│')
 print(f'''  {B}├─ 🛡️  COMPLIANCE ─────────────────────────────┤{N}
-  │  Egress   : {G}0 BYTES (Air-Gapped){N}            │
-  │  PII      : {G}{pii:<34}{N}│
+  │  Egress      : {G}0 BYTES (Air-Gapped){N}           │
+  │  PII         : {G}{pii:<33}{N}│
   {B}└───────────────────────────────────────────────┘{N}
 ''')
 "

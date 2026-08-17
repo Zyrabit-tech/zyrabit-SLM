@@ -1,3 +1,13 @@
+# ==============================================================================
+# JUSTIFICACIÓN DE TEST DOUBLES (SECURITY SERVICE ISOLATION)
+# ==============================================================================
+# Propósito: Verificar que la capa de servicios y gatekeeper sanitizan información
+# PII (nombres, correos, etc.) ANTES de despachar la petición al motor de inferencia.
+# Justificación:
+# Se utiliza un DummyProvider en memoria para capturar el payload exacto que recibiría
+# el motor físico y comprobar de forma determinista que no contiene datos sensibles sin enmascarar.
+# ==============================================================================
+
 from unittest.mock import patch
 
 from app import services

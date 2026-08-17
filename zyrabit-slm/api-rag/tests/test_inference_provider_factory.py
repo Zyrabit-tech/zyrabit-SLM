@@ -1,3 +1,14 @@
+# ==============================================================================
+# JUSTIFICACIÓN DE MOCKS EN PRUEBAS (PROVIDER FACTORY ISOLATION)
+# ==============================================================================
+# Propósito: Validar que la fábrica de inferencia construye e instancia los adaptadores
+# correctos (Ollama, vLLM, Tenstorrent, Gemini) según las variables de entorno.
+# Justificación:
+# Se utiliza `unittest.mock.patch` sobre el entorno y llamadas HTTP de sondeo para
+# verificar la lógica de selección de adaptadores sin necesidad de conexión física
+# a endpoints remotos durante la ejecución de los tests.
+# ==============================================================================
+
 from unittest.mock import MagicMock, patch
 
 import pytest
