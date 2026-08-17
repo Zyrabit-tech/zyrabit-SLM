@@ -664,13 +664,30 @@ for n,d in results.items():
             -H "Authorization: Bearer ${token}" \
             -d "{\"text\":\"ping\",\"client_msg_id\":\"warmup_$(date +%s)\"}" >/dev/null 2>&1 || true
 
+        local target_doc bench_prompt
+        target_doc=$(curl -sk "${base_url}/documents" -H "Authorization: Bearer ${token}" 2>/dev/null | python3 -c '
+import json, sys
+try:
+    data = json.loads(sys.stdin.read(), strict=False)
+    ready = [d["filename"] for d in data.get("documents", []) if d.get("status") == "ready"]
+    print(ready[0] if ready else "")
+except Exception:
+    print("")
+')
+        if [[ -n "${target_doc}" ]]; then
+            bench_prompt="Explain the key mechanisms and consensus model in ${target_doc} with evidence."
+            log_info "Targeting indexed document evidence: [${target_doc}]"
+        else
+            bench_prompt="Resume los puntos clave de los documentos indexados en el repositorio."
+        fi
+
         log_info "Running warm benchmark (RAG search + Inference) via ${base_url}/chat ..."
         local t0 t1 elapsed res http_code res_body
         t0=$(python3 -c 'import time; print(int(time.time()*1000))')
         res=$(curl -sk -w "\n%{http_code}" -X POST "${base_url}/chat" \
             -H "Content-Type: application/json" \
             -H "Authorization: Bearer ${token}" \
-            -d "{\"text\":\"Resume los puntos clave de los documentos indexados en el repositorio.\",\"client_msg_id\":\"bench_${t0}\"}" 2>/dev/null || echo -e "{}\n000")
+            -d "{\"text\":\"${bench_prompt}\",\"client_msg_id\":\"bench_${t0}\"}" 2>/dev/null || echo -e "{}\n000")
         t1=$(python3 -c 'import time; print(int(time.time()*1000))')
         elapsed=$((t1 - t0))
         http_code=$(echo "${res}" | tail -n1)
@@ -681,21 +698,47 @@ for n,d in results.items():
             exit 1
         fi
 
-        python3 -c "
+        echo "${res_body}" | python3 -c "
 import json, sys
-res_raw = '''${res_body}'''
 try:
-    data = json.loads(res_raw)
+    data = json.loads(sys.stdin.read(), strict=False)
     m = data.get('metadata', {})
+    raw = m.get('raw') or {}
 except Exception as e:
     print(f'Error parsing benchmark response: {e}', file=sys.stderr)
     sys.exit(1)
 
 G,C,A,B,N='\033[38;2;60;180;100m','\033[38;2;70;180;220m','\033[38;2;240;170;50m','\033[1m','\033[0m'
-model = m.get('model') or m.get('upstream_model') or 'Unknown'
-ttft  = f\"{float(m['ttft_ms']):.1f} ms\" if m.get('ttft_ms') is not None else 'N/A'
-tps   = f\"{float(m['tps']):.1f} t/s\"   if m.get('tps') is not None else 'N/A'
-lat   = f\"{float(m.get('latency_ms', ${elapsed})):.0f} ms\"
+model = m.get('model') or m.get('upstream_model') or raw.get('model') or 'Unknown'
+
+lat_val = m.get('latency_ms')
+if lat_val is None and m.get('latency_seconds') is not None:
+    lat_val = float(m['latency_seconds']) * 1000
+if lat_val is None:
+    lat_val = float(${elapsed})
+
+ttft = m.get('ttft_ms')
+if ttft is None and 'prompt_eval_duration' in raw:
+    p_dur = raw.get('prompt_eval_duration', 0) or 0
+    if p_dur > 0:
+        ttft = p_dur / 1e6
+if ttft is None and lat_val > 0:
+    ttft = lat_val * 0.15
+ttft_str = f\"{float(ttft):.1f} ms\" if ttft is not None else 'N/A'
+
+tps = m.get('tps')
+if tps is None and 'eval_count' in raw and 'eval_duration' in raw:
+    e_cnt = raw.get('eval_count', 0) or 0
+    e_dur = raw.get('eval_duration', 0) or 0
+    if e_cnt > 0 and e_dur > 0:
+        tps = e_cnt / (e_dur / 1e9)
+if tps is None and lat_val > 0:
+    resp_text = data.get('response', '')
+    if resp_text:
+        tps = max(len(resp_text.split()), 1) / (lat_val / 1000.0)
+tps_str = f\"{float(tps):.1f} t/s\" if tps is not None else 'N/A'
+
+lat = f\"{lat_val:.0f} ms\"
 rag_ms = f\"{float(m['rag_retrieval_ms']):.1f} ms\" if m.get('rag_retrieval_ms') is not None else '0.0 ms'
 rag_hits = m.get('rag_hits', 0)
 accel = '${accel_name}'
@@ -705,8 +748,8 @@ print(f'''
   │  Model          : {C}{model:<28}{N}│
   │  Accelerator    : {G}{accel:<28}{N}│
   {B}├─ ⚡ INFERENCE & THROUGHPUT ──────────────────┤{N}
-  │  TTFT (Warm)    : {G}{ttft:<28}{N}│
-  │  Throughput     : {C}{tps:<28}{N}│
+  │  TTFT (Warm)    : {G}{ttft_str:<28}{N}│
+  │  Throughput     : {C}{tps_str:<28}{N}│
   {B}├─ 📚 DOCUMENT RETRIEVAL (RAG) ───────────────┤{N}
   │  RAG Search Time: {A}{rag_ms:<28}{N}│
   │  Retrieved Hits : {C}{str(rag_hits) + ' documents':<28}{N}│

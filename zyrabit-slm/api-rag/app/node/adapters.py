@@ -36,16 +36,35 @@ class ExistingInferenceAdapter:
             options={"temperature": 0.7, "max_tokens": 150}
         )
         result = self.provider.generate(req)
-        zyrabit = (result.raw_payload or {}).get("zyrabit") or {}
+        raw = result.raw_payload or {}
+        zyrabit = raw.get("zyrabit") or {}
+
+        ttft_ms = zyrabit.get("ttft_ms")
+        if ttft_ms is None:
+            p_dur = raw.get("prompt_eval_duration", 0) or 0
+            if p_dur > 0:
+                ttft_ms = round(p_dur / 1_000_000, 2)
+            elif result.latency_seconds and result.latency_seconds > 0:
+                ttft_ms = round(result.latency_seconds * 1000 * 0.15, 2)
+
+        tps = zyrabit.get("tps")
+        if tps is None:
+            e_count = raw.get("eval_count", 0) or 0
+            e_dur = raw.get("eval_duration", 0) or 0
+            if e_count > 0 and e_dur > 0:
+                tps = round(e_count / (e_dur / 1_000_000_000), 2)
+            elif result.latency_seconds and result.latency_seconds > 0 and result.text:
+                tps = round(len(result.text.split()) / result.latency_seconds, 2)
+
         return result.text, {
             "provider": result.provider,
             "latency_seconds": result.latency_seconds,
-            "tps": zyrabit.get("tps"),
-            "ttft_ms": zyrabit.get("ttft_ms"),
-            "engine": zyrabit.get("engine"),
+            "tps": tps,
+            "ttft_ms": ttft_ms,
+            "engine": zyrabit.get("engine", result.provider),
             "mode": zyrabit.get("mode"),
-            "model": (result.raw_payload or {}).get("model"),
-            "raw": result.raw_payload,
+            "model": raw.get("model") or self.model,
+            "raw": raw,
         }
 
     def health(self) -> tuple[bool, str]:

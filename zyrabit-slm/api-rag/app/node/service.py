@@ -117,8 +117,10 @@ class NodeService:
         if document_id != session_context.get("active_document_id"):
             session_context = self.update_session_context(session_id, document_id)
         effective_question = self._effective_question(question, session_context)
+        rag_t0 = time.time()
         if not document_id and self._is_conversational(effective_question):
             selected = []
+            rag_retrieval_ms = 0.0
         else:
             lexical = self.metadata.search_lexical(effective_question, limit=16, document_id=document_id)
             vector: list[EvidenceUnit] = []
@@ -126,7 +128,8 @@ class NodeService:
                 try: vector = await asyncio.to_thread(self.vector_index.search, effective_question, 16, document_id)
                 except Exception: vector = []
             selected = self._select_relevant_evidence(effective_question, lexical, vector, document_id)
-        return await self._model_response(question, session_id, selected, document_id, session_context)
+            rag_retrieval_ms = round((time.time() - rag_t0) * 1000, 2)
+        return await self._model_response(question, session_id, selected, document_id, session_context, rag_retrieval_ms=rag_retrieval_ms)
 
     @staticmethod
     def _is_conversational(question: str) -> bool:
@@ -162,7 +165,7 @@ class NodeService:
         """Compatibility wrapper for callers outside the Node query pipeline."""
         return await self._model_response(question, session_id, [])
 
-    async def _model_response(self, question: str, session_id: str, evidence: list[EvidenceUnit], document_id: str | None = None, session_context: dict | None = None) -> dict:
+    async def _model_response(self, question: str, session_id: str, evidence: list[EvidenceUnit], document_id: str | None = None, session_context: dict | None = None, rag_retrieval_ms: float = 0.0) -> dict:
         """Generate one answer from model knowledge plus bounded local evidence."""
         identity = self._identity()
         context = self._bounded_context(evidence)
@@ -175,7 +178,14 @@ class NodeService:
             return self._no_evidence_response(question)
         grounded, cited = self._validate_grounding(answer, evidence)
         decision = "model-with-evidence" if grounded else "model-knowledge"
-        metadata = {"sources": self._sources(cited), "rag_hits": len(cited), "context_hits": len(evidence), "decision": decision, **metrics}
+        metadata = {
+            "sources": self._sources(cited),
+            "rag_hits": len(cited),
+            "context_hits": len(evidence),
+            "rag_retrieval_ms": rag_retrieval_ms,
+            "decision": decision,
+            **metrics
+        }
         self.metadata.append_message(session_id, "user", question, document_id=document_id)
         self.metadata.append_message(session_id, "assistant", answer, metadata=metadata, document_id=document_id)
         self._remember_turn(session_id, question, answer, cited, document_id, session_context)
