@@ -41,14 +41,14 @@ async def _ready(service: NodeService, job_id: str) -> None:
 async def test_selected_document_never_returns_other_document_sources(tmp_path: Path):
     root = Path(__file__).parents[3]
     cio = root / "api-rag/docs/zyrabit-cioreview-en.pdf"
-    prospeo = root / "document_source/- Playbook plataforma Prospeo.docx.pdf"
+    prospeo = root / "api-rag/docs/zyrabit-architecture-playbook.pdf"
     assert cio.exists() and prospeo.exists(), "Acceptance documents must remain available"
     service = NodeService(SQLiteNodeStore(str(tmp_path / "node.db")), LocalSourceStore(str(tmp_path / "sources")), LocalDocumentParser(), CitingInference(), vector_index=InMemoryVectorIndex())
     cio_import = await service.import_file(cio.name, str(cio))
     prospeo_import = await service.import_file(prospeo.name, str(prospeo))
     await _ready(service, cio_import["job_id"]); await _ready(service, prospeo_import["job_id"])
 
-    result = await service.query("Dame el playbook de la plataforma", "scope-test", prospeo_import["document_id"])
+    result = await service.query("Arquitectura de Nodo Soberano Zyrabit", "scope-test", prospeo_import["document_id"])
     assert result["metadata"]["sources"], result
     assert {source["document_id"] for source in result["metadata"]["sources"]} == {prospeo_import["document_id"]}
     assert {source["filename"] for source in result["metadata"]["sources"]} == {prospeo.name}

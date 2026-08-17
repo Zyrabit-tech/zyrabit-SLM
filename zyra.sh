@@ -58,7 +58,7 @@ log_header() {
 
 # ─── Paths ────────────────────────────────────────────────────────────────────
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-COMPOSE_FILE="${SCRIPT_DIR}/zyrabit-slm/docker-compose.local.yml"
+COMPOSE_FILE="${SCRIPT_DIR}/zyrabit-slm/docker-compose.yml"
 PROD_COMPOSE_FILE="${SCRIPT_DIR}/zyrabit-slm/docker-compose.yml"
 ENV_FILE="${SCRIPT_DIR}/zyrabit-slm/.env"
 EXAMPLE_ENV="${SCRIPT_DIR}/zyrabit-slm/example.env"
@@ -74,7 +74,6 @@ NO_CACHE="false"
 E2E_SECURITY="false"
 REPORT_MODE="false"
 SKIP_WIZARD="false"   # --yes / -y skips wizard when .env already exists
-NOTIFY_MSG=""
 COMMANDS=()
 
 # ─── Docker compose detection ─────────────────────────────────────────────────
@@ -104,25 +103,23 @@ usage() {
     echo -e "  benchmark    Live performance metrics  (--report for 4-engine matrix)"
     echo -e "  audit        Proof-of-Control: compliance & 0-egress report"
     echo -e "  dev          Native hot-reload mode via uv (no Docker required)"
-    echo -e "  doctor       Diagnose hardware, RAM, GPU, Docker, and uv"
-    echo -e "  notify       Send notification via MCP bridge\n"
+    echo -e "  doctor       Diagnose hardware, RAM, GPU, Docker, and uv\n"
     echo -e "${BOLD}Flags:${NC}"
     echo -e "  --production     Production mode (HTTPS, Traefik, custom domain)"
     echo -e "  --yes / -y       Skip wizard prompts — use existing .env as-is"
-    echo -e "  --profile <n>    Add Docker Compose profile  (db, automation, observability-extra)"
-    echo -e "  --model <name>   Override AI model (e.g. mistral, llama3, phi3)"
+    echo -e "  --profile <n>    Add optional service profile  (bare, db, automation)"
+    echo -e "  --model <name>   Override AI model (e.g. mixtral:8x7b, qwen2.5:3b, deepseek-r1:7b)"
     echo -e "  --no-cache       Force Docker build without cache"
     echo -e "  --report         With benchmark: run 4-engine comparison matrix"
     echo -e "  --e2e-security   With validate: run full PII + air-gap + memory pipeline\n"
     echo -e "${BOLD}Examples:${NC}"
-    echo -e "  ./zyra.sh                      # First run → wizard → launch"
-    echo -e "  ./zyra.sh install              # Same: wizard if no .env, smart re-run if .env exists"
-    echo -e "  ./zyra.sh install -y           # Re-install silently with current config"
-    echo -e "  ./zyra.sh install --production # Production wizard → Traefik + HTTPS + PostgreSQL"
-    echo -e "  ./zyra.sh start                # Re-launch without setup (stack already configured)"
-    echo -e "  ./zyra.sh start --profile db   # Launch with PostgreSQL enabled"
-    echo -e "  ./zyra.sh benchmark --report   # 4-engine performance comparison"
-    echo -e "  ./zyra.sh notify \"Hello Zyra\"  # Send notification via MCP\n"
+    echo -e "  ./zyra.sh                      # Display commands & system status"
+    echo -e "  ./zyra.sh install              # Run guided setup (Hardware, MoE/Model, ReAct → .env)"
+    echo -e "  ./zyra.sh install -y           # Silent setup using current .env"
+    echo -e "  ./zyra.sh start                # Launch Full Sovereign Platform (Web UI + RAG + DB + MCP)"
+    echo -e "  ./zyra.sh start --model mixtral:8x7b  # Launch with MoE Model"
+    echo -e "  ./zyra.sh start --profile bare # Launch Standalone Engine (Headless API)"
+    echo -e "  ./zyra.sh benchmark            # Live performance metrics\n"
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -174,107 +171,95 @@ run_wizard() {
     log_header "ZYRABIT SETUP WIZARD"
     echo -e "  ${CYAN}Configure your sovereign AI stack. Press Enter to accept defaults.${NC}\n"
 
-    # ── 1. Mode ───────────────────────────────────────────────────────────────
-    log_step "1/5  Environment"
-        echo "   1) Local / Dev  ← default  (one local URL, no domain)"
-    echo "   2) Production              (HTTPS, custom domain, Traefik)"
-    read -rp "   Select [1]: " _c; _c="${_c:-1}"
-    if [[ "$_c" == "2" ]]; then
-        PRODUCTION_MODE="true"
-        read -rp "   Domain (e.g. ai.company.com) [localhost]: " _d
-        export DOMAIN="${_d:-localhost}"
-        log_ok "Production · domain=${DOMAIN}"
+    # ── 1. Hardware & Engine Detection ─────────────────────────────────────────
+    log_step "1/4  Hardware & Inference Engine"
+    local hw_detected="ollama_host"
+    local hw_label="Ollama / Host Metal"
+    if [[ -d "/dev/tenstorrent" || -e "/dev/tenstorrent" ]]; then
+        hw_detected="tenstorrent"
+        hw_label="Tenstorrent Blackhole Hardware (/dev/tenstorrent)"
+    elif [[ -x "$(command -v nvidia-smi 2>/dev/null)" ]]; then
+        hw_detected="cuda"
+        hw_label="NVIDIA CUDA GPU"
+    elif [[ "$(uname -s)" == "Darwin" ]]; then
+        hw_detected="ollama_host"
+        hw_label="Apple Silicon Metal (Mac GPU)"
     else
-        PRODUCTION_MODE="false"; export DOMAIN="localhost"
-        log_ok "Local/Dev · http://localhost:8080"
+        hw_detected="ollama_docker"
+        hw_label="Docker CPU Multithreading"
     fi
 
-    # ── 2. Inference engine ───────────────────────────────────────────────────
-    log_step "2/5  Inference Engine"
-    echo "   1) Ollama native (Mac Metal GPU) ← recommended for Mac"
-    echo "   2) Ollama Docker container       (slower, no Metal pass-through)"
-    echo "   3) Llama.cpp native Metal (GGUF) (no Ollama app needed)"
-    echo "   4) Apple MLX                     (fastest on Apple Silicon)"
-    echo "   5) Tenstorrent"
+    echo -e "   Detected Hardware: ${GREEN}${hw_label}${NC}"
+    echo "   1) Use auto-detected engine (${hw_detected}) ← recommended"
+    echo "   2) Tenstorrent Hardware (vLLM-TT Metalium)"
+    echo "   3) Apple Silicon Metal (Ollama Host)"
+    echo "   4) Apple MLX Framework"
+    echo "   5) Ollama Docker (Standard CPU)"
     read -rp "   Select [1]: " _c; _c="${_c:-1}"
     case "$_c" in
-        2) INFERENCE_PROVIDER="ollama_docker"  ;;
-        3) INFERENCE_PROVIDER="llama_cpp_server" ;;
-        4) INFERENCE_PROVIDER="mlx"            ;;
-        5) INFERENCE_PROVIDER="tenstorrent"
-           PROFILE="${PROFILE:+${PROFILE},}tenstorrent"
-           ;;
-        *) INFERENCE_PROVIDER="ollama_host"    ;;
+        2) INFERENCE_PROVIDER="tenstorrent" ;;
+        3) INFERENCE_PROVIDER="ollama_host" ;;
+        4) INFERENCE_PROVIDER="mlx" ;;
+        5) INFERENCE_PROVIDER="ollama_docker" ;;
+        *) INFERENCE_PROVIDER="${hw_detected}" ;;
     esac
     log_ok "Engine: ${INFERENCE_PROVIDER}"
 
-    # ── 3. Model ──────────────────────────────────────────────────────────────
-    log_step "3/5  AI Model"
+    # ── 2. AI Model & Architecture (MoE / Dense) ───────────────────────────────
+    log_step "2/4  AI Model Architecture"
     local hw_info ram
     hw_info=$(detect_hardware); IFS='|' read -r ram _ _ <<< "$hw_info"
-    local rec="1"
-    [[ "${ram}" -lt 8 ]] && rec="2"   # auto-recommend lighter model on low RAM
-    echo "   1) qwen2.5:7b     ~8 GB  — best quality/speed  $([ "${rec}" == "1" ] && echo "(recommended for your ${ram}GB)" || echo "")"
-    echo "   2) qwen2.5:1.5b   ~2 GB  — fast, low RAM       $([ "${rec}" == "2" ] && echo "(recommended for your ${ram}GB)" || echo "")"
-    echo "   3) mistral        ~5 GB  — strong reasoning"
-    echo "   4) deepseek-r1:7b ~5 GB  — best for code"
-    echo "   5) phi3           ~3 GB  — ultra-lightweight"
-    read -rp "   Select [${rec}]: " _c; _c="${_c:-$rec}"
+    echo "   Available Host RAM: ${ram} GB"
+    echo "   1) qwen2.5:3b     ~3 GB  — Ultra-fast (<81ms TTFT, low latency)"
+    echo "   2) mixtral:8x7b   ~26 GB — Mixture of Experts (MoE) / High reasoning capacity"
+    echo "   3) deepseek-r1:7b ~5 GB  — Reasoning Chain-of-Thought"
+    echo "   4) qwen2.5:7b     ~8 GB  — Balanced production model"
+    echo "   5) Custom model name"
+    read -rp "   Select [1]: " _c; _c="${_c:-1}"
     case "$_c" in
-        2) OVERRIDE_MODEL="qwen2.5:1.5b"  ;;
-        3) OVERRIDE_MODEL="mistral"        ;;
-        4) OVERRIDE_MODEL="deepseek-r1:7b" ;;
-        5) OVERRIDE_MODEL="phi3"           ;;
-        *) OVERRIDE_MODEL="qwen2.5:7b"    ;;
+        2) OVERRIDE_MODEL="mixtral:8x7b-instruct" ;;
+        3) OVERRIDE_MODEL="deepseek-r1:7b" ;;
+        4) OVERRIDE_MODEL="qwen2.5:7b" ;;
+        5) read -rp "   Enter model name: " OVERRIDE_MODEL ;;
+        *) OVERRIDE_MODEL="qwen2.5:3b" ;;
     esac
-    if [[ "${INFERENCE_PROVIDER}" == "llama_cpp_server" ]]; then
-        OVERRIDE_MODEL="qwen2.5-1.5b-instruct-q4_k_m.gguf"
-        log_info "Llama.cpp Metal uses the bundled GGUF model identifier."
-    fi
     log_ok "Model: ${OVERRIDE_MODEL}"
 
-    # ── 4. Database ───────────────────────────────────────────────────────────
-    log_step "4/5  Database"
-    echo "   1) SQLite WAL ← default  (zero-config, embedded, fast)"
-    echo "   2) PostgreSQL            (persistent, enterprise/production)"
+    # ── 3. Autonomous ReAct Agent & MCP Tools ──────────────────────────────────
+    log_step "3/4  Agentic Loop & Tool Execution (ReAct)"
+    echo "   Enable ReAct (Reasoning + Acting) autonomous agent with MCP tools?"
+    echo "   1) Yes ← recommended (Reasoning + Tools + PII Sandwich)"
+    echo "   2) No  (Direct RAG / Direct Inference only)"
     read -rp "   Select [1]: " _c; _c="${_c:-1}"
-    if [[ "$_c" == "2" ]]; then
-        PROFILE="${PROFILE:+${PROFILE},}db"
-        log_ok "PostgreSQL enabled — profile 'db' added"
-    else
-        log_ok "SQLite WAL (embedded)"
-    fi
+    local ENABLE_REACT="true"
+    [[ "$_c" == "2" ]] && ENABLE_REACT="false"
+    log_ok "ReAct Agent: ${ENABLE_REACT}"
 
-    # ── 5. Whisper ────────────────────────────────────────────────────────────
-    log_step "5/5  Audio Transcription (Whisper)"
-    echo "   Enable local transcription for .mp3/.mp4/.wav/.m4a files?"
-    echo "   1) Yes  (faster-whisper, CPU/Metal)"
-    echo "   2) No   (text & PDF only)"
+    # ── 4. Deployment Mode ────────────────────────────────────────────────────
+    log_step "4/4  Deployment Mode"
+    echo "   1) Full Sovereign Platform ← default (Web UI + API RAG + DB + MCP)"
+    echo "   2) Standalone Bare Engine            (Headless inference API on port 8088)"
     read -rp "   Select [1]: " _c; _c="${_c:-1}"
-    local WHISPER_MODEL="none"
-    if [[ "$_c" == "1" ]]; then
-        echo "   Model size:"
-        echo "     1) base   ~140 MB — fast"
-        echo "     2) small  ~500 MB — better accuracy"
-        echo "     3) medium ~1.5 GB — high accuracy"
-        read -rp "   Select [1]: " _w
-        case "${_w:-1}" in 2) WHISPER_MODEL="small" ;; 3) WHISPER_MODEL="medium" ;; *) WHISPER_MODEL="base" ;; esac
-        log_ok "Whisper: ${WHISPER_MODEL}"
+    local DEPLOY_MODE="platform"
+    if [[ "$_c" == "2" ]]; then
+        DEPLOY_MODE="bare"
+        PROFILE="bare"
+        log_ok "Mode: Standalone Bare Engine"
     else
-        log_ok "Audio transcription: disabled"
+        DEPLOY_MODE="platform"
+        log_ok "Mode: Full Sovereign Platform"
     fi
 
     # ── Summary ───────────────────────────────────────────────────────────────
     echo ""
     echo -e "${BOLD}${CYAN}  ╔══ YOUR CONFIGURATION ═══════════════════════════╗${NC}"
-    echo -e "${BOLD}${CYAN}  ║${NC}  Mode     : $([ "$PRODUCTION_MODE" == "true" ] && echo "Production (${DOMAIN})" || echo "Local/Dev  http://localhost:8080")"
-    echo -e "${BOLD}${CYAN}  ║${NC}  Engine   : ${INFERENCE_PROVIDER}"
-    echo -e "${BOLD}${CYAN}  ║${NC}  Model    : ${OVERRIDE_MODEL}"
-    echo -e "${BOLD}${CYAN}  ║${NC}  Database : $(echo "${PROFILE}" | grep -q "db" && echo "PostgreSQL" || echo "SQLite WAL")"
-    echo -e "${BOLD}${CYAN}  ║${NC}  Whisper  : $([ "${WHISPER_MODEL}" != "none" ] && echo "Enabled (${WHISPER_MODEL})" || echo "Disabled")"
+    echo -e "${BOLD}${CYAN}  ║${NC}  Engine     : ${INFERENCE_PROVIDER}"
+    echo -e "${BOLD}${CYAN}  ║${NC}  Model      : ${OVERRIDE_MODEL}"
+    echo -e "${BOLD}${CYAN}  ║${NC}  ReAct Agent: ${ENABLE_REACT}"
+    echo -e "${BOLD}${CYAN}  ║${NC}  Deploy Mode: ${DEPLOY_MODE}"
     echo -e "${BOLD}${CYAN}  ╚═════════════════════════════════════════════════╝${NC}"
     echo ""
-    read -rp "  Start with this config? [Y/n]: " _ok
+    read -rp "  Save and start with this config? [Y/n]: " _ok
     _ok_lower=$(echo "${_ok:-y}" | tr '[:upper:]' '[:lower:]')
     [[ "${_ok_lower}" == "n" ]] && { log_warn "Cancelled."; exit 0; }
 
@@ -285,17 +270,12 @@ run_wizard() {
     if [[ -f "${ENV_FILE}" ]]; then
         sed -i.bak "s|^INFERENCE_PROVIDER=.*|INFERENCE_PROVIDER=${INFERENCE_PROVIDER}|" "${ENV_FILE}" 2>/dev/null || true
         sed -i.bak "s|^MODEL_NAME=.*|MODEL_NAME=${OVERRIDE_MODEL}|"                     "${ENV_FILE}" 2>/dev/null || true
-        if [[ "${INFERENCE_PROVIDER}" == "llama_cpp_server" ]]; then
-            grep -q "^SLM_URL=" "${ENV_FILE}" && sed -i.bak "s|^SLM_URL=.*|SLM_URL=http://host.docker.internal:${LLAMA_SERVER_PORT}|" "${ENV_FILE}" || echo "SLM_URL=http://host.docker.internal:${LLAMA_SERVER_PORT}" >> "${ENV_FILE}"
-            # llama.cpp serves generation; embeddings must have their own local endpoint.
-            grep -q "^EMBEDDING_URL=" "${ENV_FILE}" || echo "EMBEDDING_URL=http://host.docker.internal:11434" >> "${ENV_FILE}"
-            log_info "llama.cpp generation uses a separate local EMBEDDING_URL."
-        fi
-        if [[ "${WHISPER_MODEL}" != "none" ]]; then
-            grep -q "^WHISPER_MODEL=" "${ENV_FILE}" 2>/dev/null \
-                && sed -i.bak "s|^WHISPER_MODEL=.*|WHISPER_MODEL=${WHISPER_MODEL}|" "${ENV_FILE}" \
-                || echo "WHISPER_MODEL=${WHISPER_MODEL}" >> "${ENV_FILE}"
-        fi
+        grep -q "^ENABLE_REACT_AGENT=" "${ENV_FILE}" 2>/dev/null \
+            && sed -i.bak "s|^ENABLE_REACT_AGENT=.*|ENABLE_REACT_AGENT=${ENABLE_REACT}|" "${ENV_FILE}" \
+            || echo "ENABLE_REACT_AGENT=${ENABLE_REACT}" >> "${ENV_FILE}"
+        grep -q "^DEPLOY_MODE=" "${ENV_FILE}" 2>/dev/null \
+            && sed -i.bak "s|^DEPLOY_MODE=.*|DEPLOY_MODE=${DEPLOY_MODE}|" "${ENV_FILE}" \
+            || echo "DEPLOY_MODE=${DEPLOY_MODE}" >> "${ENV_FILE}"
         rm -f "${ENV_FILE}.bak"
         log_ok "Config saved to zyrabit-slm/.env"
     fi
@@ -506,20 +486,20 @@ run_verify() {
         if [[ "$c" == "zyrabit-engine" && "$status" == "not_found" ]]; then
             if [[ "${current_provider}" == "embedded_metal" || "${current_provider}" == "mlx" ]]; then
                 printf "  ${GREEN}%-28s %-15s %-10s${NC}\n" "$c" "native-metal" "healthy"
-                ((pass++)); continue
+                pass=$((pass + 1)); continue
             elif check_local_ollama; then
                 printf "  ${GREEN}%-28s %-15s %-10s${NC}\n" "$c" "native-metal" "healthy"
-                ((pass++)); continue
+                pass=$((pass + 1)); continue
             fi
         fi
         if [[ "$status" == "running" ]]; then
             health=$(docker inspect --format='{{if .State.Health}}{{.State.Health.Status}}{{else}}N/A{{end}}' "$c" 2>/dev/null | tr -d '[:space:]')
             printf "  ${GREEN}%-28s %-15s %-10s${NC}\n" "$c" "running" "$health"
-            ((pass++))
+            pass=$((pass + 1))
             [[ "$health" == "unhealthy" ]] && { log_warn "Container $c is unhealthy:"; docker logs --tail 10 "$c"; }
         else
             printf "  ${RED}%-28s %-15s %-10s${NC}\n" "$c" "$status" "—"
-            [[ "$status" != "not_found" ]] && ((fail++))
+            [[ "$status" != "not_found" ]] && fail=$((fail + 1))
         fi
     done
 
@@ -565,21 +545,6 @@ run_doctor() {
     check_local_ollama && log_ok "Ollama detected on host (Metal)." || log_warn "Ollama not detected — will use Docker engine or embedded adapter."
     [[ -f "${ENV_FILE}" ]] && log_ok ".env found at zyrabit-slm/.env" || log_warn "No .env — run './zyra.sh install' first."
     log_ok "Doctor done."
-}
-
-# ─────────────────────────────────────────────────────────────────────────────
-# NOTIFY
-# ─────────────────────────────────────────────────────────────────────────────
-run_notify() {
-    local message="${1:-}"
-    [[ -z "$message" ]] && { log_err "Usage: ./zyra.sh notify \"your message\""; exit 1; }
-    local base_url; base_url="$(api_base_url)"
-    curl -sk "${base_url}/health" >/dev/null 2>&1 || { log_err "API not reachable. Is Zyrabit running?"; exit 1; }
-    local res
-    res=$(curl -sk -X POST "${base_url}/chat" \
-        -H "Content-Type: application/json" \
-        -d "{\"text\": \"Send a Telegram notification: ${message}\"}")
-    [[ "${res}" == *"response"* ]] && log_ok "Notification sent." || { log_err "API response: ${res}"; exit 1; }
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -764,18 +729,17 @@ while [[ "$#" -gt 0 ]]; do
         --no-cache)          NO_CACHE="true";        shift ;;
         --e2e-security)      E2E_SECURITY="true";    shift ;;
         --report)            REPORT_MODE="true";     shift ;;
-        notify)
-            COMMANDS+=("notify"); shift
-            [[ -n "${1:-}" && "$1" != -* ]] && { NOTIFY_MSG="$1"; shift; }
-            ;;
         help|--help|-h) usage; exit 0 ;;
         -*) log_err "Unknown flag: $1  (run './zyra.sh help')"; exit 1 ;;
         *)  COMMANDS+=("$1"); shift ;;
     esac
 done
 
-# No command → install (which runs wizard on first run)
-[[ ${#COMMANDS[@]} -eq 0 ]] && COMMANDS=("install")
+# No command → display available commands & usage
+if [[ ${#COMMANDS[@]} -eq 0 ]]; then
+    usage
+    exit 0
+fi
 
 # ─────────────────────────────────────────────────────────────────────────────
 # DISPATCH
@@ -791,7 +755,6 @@ for CMD in "${COMMANDS[@]}"; do
         audit)     run_audit     ;;
         dev)       run_dev       ;;
         doctor)    run_doctor    ;;
-        notify)    run_notify "${NOTIFY_MSG}" ;;
         # legacy aliases — kept for muscle memory
         wizard)    SKIP_WIZARD="false"; run_install ;; # wizard is now part of install
         build)     _build ;; # still callable for CI use

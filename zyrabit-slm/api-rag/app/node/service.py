@@ -117,13 +117,24 @@ class NodeService:
         if document_id != session_context.get("active_document_id"):
             session_context = self.update_session_context(session_id, document_id)
         effective_question = self._effective_question(question, session_context)
-        lexical = self.metadata.search_lexical(effective_question, limit=16, document_id=document_id)
-        vector: list[EvidenceUnit] = []
-        if self.retrieval_mode == "hybrid" and self.vector_index:
-            try: vector = await asyncio.to_thread(self.vector_index.search, effective_question, 16, document_id)
-            except Exception: vector = []
-        selected = self._select_relevant_evidence(effective_question, lexical, vector, document_id)
+        if not document_id and self._is_conversational(effective_question):
+            selected = []
+        else:
+            lexical = self.metadata.search_lexical(effective_question, limit=16, document_id=document_id)
+            vector: list[EvidenceUnit] = []
+            if self.retrieval_mode == "hybrid" and self.vector_index:
+                try: vector = await asyncio.to_thread(self.vector_index.search, effective_question, 16, document_id)
+                except Exception: vector = []
+            selected = self._select_relevant_evidence(effective_question, lexical, vector, document_id)
         return await self._model_response(question, session_id, selected, document_id, session_context)
+
+    @staticmethod
+    def _is_conversational(question: str) -> bool:
+        normalized = unicodedata.normalize("NFKD", question).encode("ascii", "ignore").decode().lower().strip()
+        if re.search(r"\b(hola|buenas|hello|hi|hey|que tal|como estas|quien eres|que eres|que haces|que puedes|presenta\w*|ayud\w*|cuenta\w*|gracia\w*|adios|bye)\b", normalized):
+            if not re.search(r"\b(documento|archivo|pdf|pagina|contrato|manual|texto|doc|fuente)\b", normalized):
+                return True
+        return False
 
     def _resolve_document_scope(self, document_id: str | None) -> str | None:
         if not document_id:
@@ -406,27 +417,24 @@ class NodeService:
         }
 
     def _prompt(self, question: str, evidence: str, history: list[dict], session_context: dict | None = None) -> str:
-        recent = "\n".join(f"{item['role']}: {str(item['content'])[:450]}" for item in history[-3:])
         identity = self._identity()
-        session_context = session_context or {}
-        context_pack = f"""Documento activo: {session_context.get('active_document_id') or 'ninguno'}
-Ultima intencion del usuario: {session_context.get('last_user_intent') or 'ninguna'}
-Resumen operativo: {session_context.get('conversation_summary') or 'sin resumen'}"""
-        evidence_rule = """Hay evidencia local recuperada abajo. Úsala sólo si responde o mejora la pregunta original. Si una afirmación depende de esa evidencia, añade al final del párrafo el identificador [EVIDENCE:uuid] correspondiente. Si la evidencia no sirve, ignórala y responde con conocimiento del modelo. No inventes contenido ni atribuyas al documento lo que no dice.""" if evidence else """No hay evidencia local relevante para esta pregunta. Responde con conocimiento del modelo sin afirmar que proviene de un documento."""
-        return f"""Eres {identity['assistant_name']}, un {identity['persona']} local con tono {identity['tone']}.
-La última pregunta del usuario es la instrucción prioritaria: respóndela directamente. Si es una continuación corta ("eso", "como", "dame más", "explícalo"), resuélvela usando el contexto operativo de sesión. No saludes ni repitas una respuesta previa salvo que la última pregunta sea un saludo. Usa tu conocimiento para ser útil y combina, cuando aplique, la evidencia local recuperada. Nunca digas que no puedes responder sólo porque no haya evidencia local; en ese caso responde con conocimiento del modelo. No reveles razonamiento interno.
-{evidence_rule}
-Para preguntas técnicas, define los conceptos con precisión y evita analogías vagas o marketing. Por ejemplo, un Transformer procesa representaciones de tokens mediante capas de atención y redes neuronales; no es una colección de nodos que procesa partes separadas de los datos.
-Usa Markdown limpio: una respuesta directa primero y hasta tres viñetas sólo cuando aclaren algo. No crees una sección llamada "Evidencia"; si corresponde una cita, añádela directamente al final del párrafo. No muestres IDs internos salvo las citas EVIDENCE solicitadas.
+        if not evidence:
+            recent = "\n".join(f"{item['role']}: {str(item['content'])[:250]}" for item in history[-2:])
+            history_block = f"\nConversación previa:\n{recent}\n" if recent else ""
+            return f"""Eres {identity['assistant_name']}, un asistente soberano inteligente, útil y claro con tono {identity['tone']}.
+Responde de manera natural, amable y directa a la consulta o conversación del usuario en su idioma.{history_block}
+Pregunta: {question}"""
 
-Contexto operativo de sesión:
-{context_pack}
+        recent = "\n".join(f"{item['role']}: {str(item['content'])[:450]}" for item in history[-3:])
+        evidence_rule = "Hay evidencia local recuperada abajo. Úsala para responder con precisión. Si una afirmación depende de esa evidencia, añade al final del párrafo el identificador [EVIDENCE:uuid] correspondiente. No inventes contenido."
+        return f"""Eres {identity['assistant_name']}, un {identity['persona']} local con tono {identity['tone']}.
+La última pregunta del usuario es la instrucción prioritaria: respóndela directamente usando la evidencia local recuperada.
+{evidence_rule}
 
 Conversación reciente:
 {recent}
 
-Evidencia local (puede estar vacía):
+Evidencia local:
 {evidence}
 
-Pregunta: {question}
-"""
+Pregunta: {question}"""

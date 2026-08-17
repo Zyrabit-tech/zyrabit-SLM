@@ -38,8 +38,8 @@ services:
       context: ..
       dockerfile: zyrabit-slm/api-rag/Dockerfile
     container_name: zyrabit-api
-    ports:
-      - "8080:8080"
+    expose:
+      - "8080"
     env_file:
       - .env
     environment:
@@ -72,6 +72,7 @@ services:
       - ./prompts:/app/prompts:ro
       - ./document_source:/app/document_source
       - ./db_data:/app/db_data
+      - ./api-rag/app:/app/app
 
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080/v1/health')"]
@@ -87,8 +88,10 @@ services:
       context: ..
       dockerfile: zyrabit-slm/web-ui/Dockerfile
     container_name: zyrabit-web
+    environment:
+      ZYRABIT_API_KEY_WEB: ${ZYRABIT_API_KEY_WEB}
     ports:
-      - "3000:80"
+      - "${ZYRABIT_LOCAL_PORT:-8080}:80"
     labels:
       - traefik.enable=true
       - traefik.http.routers.zyrabit-web.rule=Host(`${DOMAIN}`) && PathPrefix(`/`)
@@ -147,11 +150,11 @@ services:
       timeout: 5s
       retries: 3
 
-  # 2.6 THE METAL BRIDGE: Tenstorrent Bare-Metal Hardware
+  # 2.6 THE METAL BRIDGE: Hardware Accelerator Bridge (Tenstorrent / CUDA / Metal)
   zyrabit-tt-metal:
     <<: *tt-base
     container_name: zyrabit-tt-metal
-    profiles: [ "tenstorrent" ]
+    profiles: [ "hardware", "tenstorrent" ]
     environment:
       - ZYRABIT_TT_MODE=${ZYRABIT_TT_MODE:-metal}
       - ZYRABIT_TT_UPSTREAM_URL=${ZYRABIT_TT_UPSTREAM_URL:-http://zyrabit-vllm-tt:8000}
@@ -163,11 +166,11 @@ services:
       zyrabit-vllm-tt:
         condition: service_started
 
-  # 2.7 THE SILICON ENGINE: vLLM-TT serving on the Blackhole p150
+  # 2.7 THE SILICON ENGINE: Hardware Serving Layer (Blackhole p150 / GPU / Metal)
   zyrabit-vllm-tt:
     image: ghcr.io/tenstorrent/tt-inference-server/vllm-tt-metal-src-release-ubuntu-22.04-amd64:0.8.0-55fd115-aa4ae1e
     container_name: zyrabit-vllm-tt
-    profiles: [ "tenstorrent" ]
+    profiles: [ "hardware", "tenstorrent" ]
     command: [ "/bin/bash", "/run-qwen.sh" ]
     devices:
       - /dev/tenstorrent:/dev/tenstorrent
@@ -328,6 +331,25 @@ services:
       - zyrabit-sovereign-net
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-zyrabit} -d ${POSTGRES_DB:-zyrabit_db}"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # 8. BARE INFERENCE: Standalone Engine without Web UI / RAG (profile: bare)
+  zyrabit-bare-engine:
+    image: ollama/ollama:0.3.1
+    container_name: zyrabit-bare-engine
+    profiles: [ "bare" ]
+    environment:
+      - OLLAMA_NUM_PARALLEL=${OLLAMA_NUM_PARALLEL:-1}
+    volumes:
+      - ~/.ollama:/root/.ollama
+    ports:
+      - "8088:11434"
+    networks:
+      - zyrabit-sovereign-net
+    healthcheck:
+      test: ["CMD-SHELL", "ollama list || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 5

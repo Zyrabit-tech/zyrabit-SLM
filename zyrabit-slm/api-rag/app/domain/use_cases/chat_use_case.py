@@ -1,4 +1,3 @@
-import logging
 import os
 import re
 import time
@@ -9,8 +8,6 @@ from app.infrastructure.shared.config import MODEL_NAME
 from app.infrastructure.shared.state_tracker import SovereignStateManager
 from app.domain.services.context_manager import ContextManager
 from app.ports.inference_port import InferenceRequest
-
-logger = logging.getLogger("zyrabit.api")
 
 
 def _citation_label(metadata: dict) -> str:
@@ -79,7 +76,6 @@ class ChatUseCase:
             results = []  # ensure always defined for build_final_prompt
             if decision == "rag":
                 if not self.retriever_service:
-                    logger.warning("⚠️ Hybrid Retriever not initialized. Falling back to direct.")
                     decision = "direct (no-retriever)"
                 else:
                     try:
@@ -121,7 +117,7 @@ class ChatUseCase:
             # 4. Inference
             # Load system prompt from user profile, fallback to default
             user_profile = SovereignStateManager.get_user_profile()
-            system_prompt = (user_profile.get("system_prompt") or "").strip() or "You are Zyra, a helpful sovereign assistant."
+            system_prompt = (user_profile.get("system_prompt") or "").strip() or "Eres Zyra, un asistente soberano inteligente, útil y conciso. Responde siempre de manera natural y clara en el idioma del usuario."
 
             # 4. Memory Recovery
             if history is None:
@@ -143,10 +139,11 @@ class ChatUseCase:
             else:
                 inf_provider = self.inference_provider
 
-            # Questions grounded in retrieved documents should answer directly from
-            # the evidence. Invoking the agent/tool loop here makes a simple RAG
-            # answer depend on optional tool schemas and can discard the context.
-            if self.mcp_client and decision != "rag":
+            # Only run the agentic ReAct loop when specific operational tools are matched
+            from app.domain.agent.react_harness import classify_intent
+            matched_tools = classify_intent(sanitized_text)
+
+            if self.mcp_client and matched_tools and decision != "rag":
                 # Run the ReAct agentic loop with lean component passing
                 from app.domain.agent.tool_registry import ToolRegistry
                 from app.domain.agent.react_harness import ReactHarness
@@ -185,10 +182,26 @@ class ChatUseCase:
                     user_profile=user_profile,
                     source=source
                 )
+
+                # Construct clean structured chat messages for chat/instruct models
+                system_instruction = system_prompt
+                if decision == "rag" and results:
+                    rag_text = self.context_manager.trim_rag_context(results)
+                    system_instruction += f"\n\n### CONOCIMIENTO RELEVANTE (RAG):\n{rag_text}\n\n### REGLAS DE EVIDENCIA:\nResponde únicamente con base en el conocimiento relevante."
+
+                chat_messages = [{"role": "system", "content": system_instruction}]
+                if history:
+                    for m in history:
+                        if isinstance(m, dict) and "role" in m and "content" in m:
+                            chat_messages.append({"role": m["role"], "content": m["content"]})
+                chat_messages.append({"role": "user", "content": sanitized_text})
+
                 request = InferenceRequest(
                     model=target_model,
                     prompt=prompt,
-                    system_prompt=system_prompt
+                    system_prompt=system_prompt,
+                    messages=chat_messages,
+                    options={"temperature": 0.7, "max_tokens": 150}
                 )
                 import asyncio
                 response_obj = await asyncio.to_thread(inf_provider.generate, request)
@@ -224,7 +237,6 @@ class ChatUseCase:
             return final_response
 
         except Exception as e:
-            logger.exception("Chat execution failed")
             self.telemetry.log_security_audit(f"CRITICAL ERROR: {e}")
             return {"response": "Critical Error", "metadata": {"decision": "error"}}
 

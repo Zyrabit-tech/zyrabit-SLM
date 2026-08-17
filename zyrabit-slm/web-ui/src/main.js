@@ -5,6 +5,7 @@ import { Renderer } from "./ui/Renderer";
 import { EVENTS, IDS } from "./core/Constants";
 import { getSafeElement } from "./utils/DOM";
 import { Storage } from "./adapters/Storage";
+import { getSession, getProfile, saveProfile, patchSessionContext, getHealth, getDocuments, getTools, importSource, getJob } from "./services/api";
 
 
 /**
@@ -76,9 +77,7 @@ class ZyrabitApp {
 
     async restoreConversation() {
         try {
-            const res = await fetch(`/v1/sessions/${this.chat.sessionId}`, { cache: 'no-store' });
-            if (!res.ok) throw new Error(`HTTP_${res.status}`);
-            const payload = await res.json();
+            const payload = await getSession(this.chat.sessionId);
             const messages = payload.messages || [];
             this.sessionContext = payload.context || null;
             if (this.sessionContext?.active_document_id && !this.activeDocument) {
@@ -100,9 +99,7 @@ class ZyrabitApp {
 
     async checkOnboarding() {
         try {
-            const res = await fetch('/v1/profile');
-            const profile = await res.json();
-
+            const profile = await getProfile();
             if (!profile || !profile.onboarding_completed) {
                 document.getElementById('onboarding-modal').classList.remove('hidden');
             }

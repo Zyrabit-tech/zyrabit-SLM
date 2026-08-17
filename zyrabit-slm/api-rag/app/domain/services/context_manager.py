@@ -183,29 +183,27 @@ class ContextManager:
         if user_profile and user_profile.get("onboarding_completed"):
             profile_str = f"USUARIO: {user_profile.get('name')} | ROL: {user_profile.get('role')}\n"
 
-        final_prompt = f"""### IDENTIDAD SOBERANA:
-{persona_desc}
-CANAL ACTIVO: {source}
-TONO: {tone.upper()}
-
-### CAPACIDADES_SOBERANAS (Herramientas MCP):
-Tienes permiso total para usar estas herramientas si el usuario lo requiere:
-{mcp_tools}
-IMPORTANTE: Si el usuario te pide enviar una notificación, alertar o usar Telegram, utiliza obligatoriamente 'send_telegram_notification'.
-
-### PERFIL DEL USUARIO:
-{profile_str if profile_str else "Usuario nuevo."}
-
-### CONOCIMIENTO RELEVANTE (RAG):
-{trimmed_rag if trimmed_rag else "No se encontraron documentos relevantes en el Vault."}
+        rag_section = ""
+        if trimmed_rag:
+            rag_section = f"""### CONOCIMIENTO RELEVANTE (RAG):
+{trimmed_rag}
 
 ### REGLAS DE EVIDENCIA:
 Cuando exista conocimiento RAG, responde solo con afirmaciones explícitas en ese contexto.
 Para cifras, fechas y condiciones, copia el valor exacto del documento; no lo estimes ni lo sustituyas.
 Si el dato no aparece en el contexto, indícalo con claridad en lugar de inferirlo.
+"""
 
+        final_prompt = f"""### IDENTIDAD SOBERANA:
+{persona_desc}
+CANAL ACTIVO: {source}
+TONO: {tone.upper()}
+
+### PERFIL DEL USUARIO:
+{profile_str if profile_str else "Usuario activo."}
+{rag_section}
 ### HISTORIAL DE CONVERSACIÓN:
-{trimmed_history if trimmed_history else "No hay historial previo."}
+{trimmed_history if trimmed_history else "Sin historial previo."}
 
 ### CONSULTA ACTUAL:
 {user_query}

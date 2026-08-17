@@ -1,6 +1,7 @@
 import { bus } from "../core/EventBus";
 import { Storage } from "../adapters/Storage";
 import { EVENTS } from "../core/Constants";
+import { sendChat, deleteSession } from "./api";
 
 /**
  * ChatManager (Domain Service)
@@ -67,12 +68,8 @@ export class ChatManager {
         const chip = document.getElementById('active-context-chip');
         const documentId = chip?.dataset?.documentId || null;
         try {
-            const response = await fetch('/v1/query', {
-                method: 'POST', headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ text: message.text, session_id: this.sessionId, document_id: documentId })
-            });
-            if (!response.ok) throw new Error(`HTTP_${response.status}`);
-            this.onResponse(await response.json());
+            const result = await sendChat({ text: message.text, session_id: this.sessionId, document_id: documentId, history: message.history });
+            this.onResponse(result);
         } catch (error) {
             this.onResponse({ response: 'No pude completar la consulta local. Revisa que el nodo y el motor de inferencia estén listos.', metadata: { decision: 'request-failed', sources: [] } });
         }
@@ -149,7 +146,7 @@ export class ChatManager {
     }
 
     async resetSession() {
-        try { await fetch(`/v1/sessions/${this.sessionId}`, { method: 'DELETE' }); } catch (_) { /* local reset still works */ }
+        try { await deleteSession(this.sessionId); } catch (_) { /* local reset still works */ }
         this.sessionId = this.generateSessionId();
         Storage.save('session_id', this.sessionId);
     }

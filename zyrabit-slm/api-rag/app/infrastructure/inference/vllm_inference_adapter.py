@@ -33,10 +33,13 @@ class VllmInferenceAdapter(InferenceProviderPort):
         self.provider_name = provider_name
 
     def generate(self, request: InferenceRequest) -> InferenceResult:
-        messages = []
-        if request.system_prompt:
-            messages.append({"role": "system", "content": request.system_prompt})
-        messages.append({"role": "user", "content": request.prompt})
+        if request.messages:
+            messages = list(request.messages)
+        else:
+            messages = []
+            if request.system_prompt:
+                messages.append({"role": "system", "content": request.system_prompt})
+            messages.append({"role": "user", "content": request.prompt})
 
         payload: Dict[str, Any] = {
             "model": request.model,

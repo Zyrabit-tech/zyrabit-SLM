@@ -15,7 +15,27 @@ class ExistingInferenceAdapter:
         self.model = model
 
     def answer(self, prompt: str) -> tuple[str, dict]:
-        result = self.provider.generate(InferenceRequest(model=self.model, prompt=prompt, options={"temperature": 0.1, "max_tokens": 700}))
+        messages = None
+        if "\nPregunta: " in prompt:
+            sys_part, user_part = prompt.rsplit("\nPregunta: ", 1)
+            messages = [
+                {"role": "system", "content": sys_part.strip()},
+                {"role": "user", "content": user_part.strip()}
+            ]
+        elif "### IDENTIDAD SOBERANA:" in prompt and "### CONSULTA ACTUAL:" in prompt:
+            sys_part, user_part = prompt.rsplit("### CONSULTA ACTUAL:", 1)
+            messages = [
+                {"role": "system", "content": sys_part.strip()},
+                {"role": "user", "content": user_part.strip()}
+            ]
+
+        req = InferenceRequest(
+            model=self.model,
+            prompt=prompt,
+            messages=messages,
+            options={"temperature": 0.7, "max_tokens": 150}
+        )
+        result = self.provider.generate(req)
         zyrabit = (result.raw_payload or {}).get("zyrabit") or {}
         return result.text, {
             "provider": result.provider,
