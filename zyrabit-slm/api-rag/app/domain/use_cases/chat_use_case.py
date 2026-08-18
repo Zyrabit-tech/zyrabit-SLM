@@ -237,6 +237,29 @@ class ChatUseCase:
             if ttft_ms is None and latency_ms > 0:
                 ttft_ms = round(latency_ms * 0.2, 2)
 
+            execution_target = getattr(response_obj, "execution_target", None) or {
+                "engine": zyrabit_metrics.get("source") or getattr(inf_provider, "provider_name", "local"),
+                "device": "cpu_generic" if "docker" in zyrabit_metrics.get("mode", "") else "accelerated",
+                "backend": zyrabit_metrics.get("mode", "standard"),
+                "accelerated": zyrabit_metrics.get("mode") not in ("docker", "cpu"),
+            }
+
+            # Telemetry observations
+            if self.telemetry:
+                if ttft_ms is not None:
+                    try:
+                        self.telemetry.record_ttft(ttft_ms, model=target_model, device=execution_target.get("device", "cpu"))
+                    except TypeError:
+                        self.telemetry.record_ttft(ttft_ms)
+                if tps is not None and hasattr(self.telemetry, "record_throughput"):
+                    self.telemetry.record_throughput(tps, model=target_model, device=execution_target.get("device", "cpu"))
+                p_tokens = zyrabit_metrics.get("prompt_tokens", 0) or raw_payload.get("prompt_eval_count", 0) or 0
+                c_tokens = zyrabit_metrics.get("completion_tokens", 0) or raw_payload.get("eval_count", 0) or len(response_text.split())
+                if hasattr(self.telemetry, "record_tokens"):
+                    self.telemetry.record_tokens(p_tokens, c_tokens, model=target_model)
+                if rag_retrieval_ms > 0 and hasattr(self.telemetry, "record_rag_search"):
+                    self.telemetry.record_rag_search(rag_retrieval_ms, hits=len(sources))
+
             final_response = {
                 "response": response_text,
                 "metadata": {
@@ -248,6 +271,7 @@ class ChatUseCase:
                     "ttft_ms": ttft_ms,
                     "engine": zyrabit_metrics.get("source") or getattr(inf_provider, "provider_name", "local"),
                     "mode": zyrabit_metrics.get("mode"),
+                    "execution_target": execution_target,
                     "sources": sources,
                     "rag_hits": len(sources) if (decision == "rag" and sources) else 0,
                     "pii_detected": any(entities.values()),

@@ -32,6 +32,7 @@ class InferenceResult:
     latency_seconds: float
     provider: str
     raw_payload: Dict[str, Any] = field(default_factory=dict)
+    execution_target: Dict[str, Any] = field(default_factory=dict)
 
 
 class InferenceProviderPort(ABC):

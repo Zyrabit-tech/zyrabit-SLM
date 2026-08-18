@@ -1,114 +1,186 @@
+<div align="center">
+
+<img src="https://assets.zyrabit.com/logo_zyrabit.png" alt="Zyrabit SLM" width="120" />
+
 # Zyrabit SLM
 
-Local document-analysis workspace. It indexes files into a Chroma collection, retrieves relevant chunks for each prompt, and calls a configurable inference provider. The browser UI, API, vector store, and document volume run on the same Docker network.
+**Local-first AI runtime for evaluating sovereign document retrieval & inference workflows.**
 
-## 🎥 See it in Action: True Sovereign AI
+[![CI](https://github.com/Zyrabit-tech/zyrabit-SLM/actions/workflows/ci.yml/badge.svg)](https://github.com/Zyrabit-tech/zyrabit-SLM/actions/workflows/ci.yml)
+[![Security](https://github.com/Zyrabit-tech/zyrabit-SLM/actions/workflows/security.yml/badge.svg)](https://github.com/Zyrabit-tech/zyrabit-SLM/actions/workflows/security.yml)
+[![Version](https://img.shields.io/badge/v3.0.0--rc.1-Beta-3f5a6d?style=flat-square&labelColor=e2ecf4)](CHANGELOG.md)
+[![License: MIT](https://img.shields.io/badge/License-MIT-6090b4?style=flat-square)](LICENSE)
+[![Python 3.12](https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white&style=flat-square)](https://python.org)
 
-Curious about what this looks like in practice? We've recorded a hands-on demo showcasing Zyrabit Platform running 100% offline.
+[Quickstart](#-quickstart) · [Architecture](#-architecture) · [Capability Matrix](#-capability-matrix) · [Security](SECURITY.md)
 
-Watch the system process voice commands and capture images in real-time without relying on a single external API or internet connection. This is what true local intelligence looks like.
+</div>
 
-[👉 Watch the Offline Demo Here](https://assets.zyrabit.com/streaming/zyrabit_ocrtex_bot.mp4)
+---
 
-> ℹ️ **Note:** The video audio is in Spanish.
+## 📌 Scope & Status Notice
 
-## Local run
+Zyrabit SLM is a **beta local-first runtime** for teams evaluating private document retrieval and language-model workflows. It can run on customer-controlled infrastructure and supports an offline deployment profile (`docker-compose.airgapped.yml`) after images, model weights, and dependencies are prepared locally.
 
-Requirements: Docker Desktop and a local inference provider. The default provider is Ollama at `http://localhost:11434`.
+> **Notice**: It is not a compliance certification (GDPR/HIPAA/ISO), a guarantee against data exposure, or a substitute for an organization's security review. Review the threat model and deployment guide before using sensitive production data.
+
+---
+
+## 📊 Capability Matrix
+
+| Capability | Status | Evidence / Verification | Limitations |
+| --- | --- | --- | --- |
+| **Inference Engine** | `Beta` | FastAPI + Ollama API integration test | Performance dependent on host GPU/RAM |
+| **Document Retrieval (RAG)** | `Beta` | Hybrid search & Chroma DB unit tests | Single-node SQLite / Chroma state |
+| **PII Sanitization** | `Beta` | Regex & Luhn algorithm test suite | May miss novel formats/multilingual PII |
+| **Air-gapped Execution** | `Validated` | `docker-compose.airgapped.yml` isolated network | Weights must be pre-loaded locally |
+| **Enterprise RBAC** | `Roadmap` | Planned for v3.1 | Currently single-tenant / basic auth |
+
+---
+
+## What Zyrabit SLM offers
+
+- **FastAPI inference API** with PII sanitization controls before prompt processing
+- **RAG (Retrieval-Augmented Generation)** over local documents
+- **MCP (Model Context Protocol)** for controlled tool access
+- **Air-gap capable profile**: zero public DNS / egress dependencies when using `docker-compose.airgapped.yml`
+- **Grafana + Prometheus observability** stack
+
+---
+
+## 🏗 Architecture
+
+```text
+                    Client Request
+                         │
+                         ▼
+               ┌─────────────────┐
+               │   API Gateway   │  FastAPI + Traefik (TLS)
+               │  Rate limiting  │
+               └────────┬────────┘
+                         │
+                    ┌────▼────┐
+                    │Gatekeeper│  PII detection, prompt sanitization, policy enforcement
+                    └────┬────┘
+                         │
+                  ┌──────┴──────┐
+                  │             │
+             ┌────▼───┐   ┌────▼────┐
+             │  RAG   │   │  State  │  SQLite WAL — session memory, audit log
+             │ Engine │   │  Store  │
+             └────┬───┘   └─────────┘
+                  │
+        ┌─────────▼──────────┐
+        │  Inference Layer   │  Ollama-compatible local backends (Mistral, Phi-3, Llama-3, etc.)
+        └────────────────────┘
+                  │
+             ┌────▼────┐
+             │ Response │  Auditable, stateful, no external calls
+             └─────────┘
+```
+
+All traffic is local. State never leaves your trust boundary.
+
+---
+
+## ⚡ Quickstart
+
+**Prerequisites:** Python 3.12, [uv](https://github.com/astral-sh/uv), Docker & Docker Compose, [Ollama](https://ollama.com) running locally
 
 ```bash
+# 1. Clone and install
 git clone https://github.com/Zyrabit-tech/zyrabit-SLM.git
 cd zyrabit-SLM
-cp zyrabit-slm/example.env zyrabit-slm/.env
-# Set distinct random values for ZYRABIT_API_KEY_WEB and ZYRABIT_API_KEY_MCP.
+uv sync --all-groups
+source .venv/bin/activate
+
+# 2. Start in local/dev mode (default — no flags needed)
 ./zyra.sh install
-```
 
-Open `http://localhost:8080`. This is the only host port in the local profile. The UI proxies `/v1`, `/mcp`, and `/socket.io` to the API; Chroma is private to Docker.
-
-Useful commands:
-
-```bash
-./zyra.sh start       # start existing containers
-./zyra.sh verify      # inspect container and API health
-./zyra.sh stop        # stop the local stack
-./zyra.sh dev         # run the API with reload, without Docker
-```
-
-## System layout
-
-```text
-browser ── http://localhost:8080 ──> nginx UI ──> FastAPI
-                                                    ├── Chroma (vector search)
-                                                    ├── SQLite WAL (profiles and session state)
-                                                    ├── local files (/document_source)
-                                                    ├── local inference provider
-                                                    └── MCP bridge
-```
-
-The API starts even if Chroma is unavailable: it uses an ephemeral Chroma client for that process. This permits standalone development but does not preserve indexed documents across restarts.
-
-## Capabilities
-
-- Upload and index PDF, DOCX, text, and supported audio files; audio is transcribed before ingestion.
-- Hybrid retrieval with vector search and a BM25 in-memory index.
-- Session memory backed by SQLite WAL.
-- HTTP, Socket.IO, and AG-UI chat endpoints.
-- MCP tool discovery and JSON-RPC bridge at `/mcp`.
-- Pluggable Ollama, MLX, llama.cpp, vLLM, and compatible inference adapters.
-
-## Configuration
-
-Copy `zyrabit-slm/example.env` to `.env`. The important local fields are:
-
-| Variable | Purpose |
-| --- | --- |
-| `ZYRABIT_LOCAL_PORT` | Browser entrypoint; defaults to `8080`. |
-| `ZYRABIT_API_KEY_WEB` | Browser-to-API bearer key, injected into the UI container at startup. |
-| `ZYRABIT_API_KEY_MCP` | Key for MCP/API clients. |
-| `SLM_URL` | Inference endpoint; defaults to the host Ollama endpoint in Docker. |
-| `MODEL_NAME` | Chat model name. |
-| `EMBEDDING_MODEL` | Ollama embedding model used while indexing. |
-| `DOCS_DIR` | Document directory inside the API container. |
-
-Do not commit `.env`. The UI token is intentionally supplied at container startup rather than stored in JavaScript source. It is still visible to a user of the local browser session, so production deployments must place authentication at an external gateway and use a separate deployment configuration.
-
-## API and MCP
-
-All API routes require `Authorization: Bearer <key>` except the health route.
-
-```bash
-curl http://localhost:8080/v1/health
+# 3. Test it
 curl -X POST http://localhost:8080/v1/chat \
-  -H "Authorization: Bearer $ZYRABIT_API_KEY_MCP" \
-  -H 'Content-Type: application/json' \
-  -d '{"text":"Summarize the uploaded documents"}'
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer zyrabit-local-token" \
+  -d '{"text": "Summarize our Q3 compliance report"}'
 ```
 
-For MCP discovery and connection examples, see [MCP integration](mcp/README.md). The full component and operational contract is in [Technical reference](docs/TECHNICAL_REFERENCE.md).
+> **First time?** Run `./zyra.sh wizard` for an interactive setup covering model selection, inference engine, database, and audio transcription.
 
-## Validation
+> **Going to production?** Run `./zyra.sh install --production` — triggers the domain, HTTPS, and PostgreSQL configuration wizard.
 
-```bash
-pytest -q zyrabit-slm/api-rag/tests/unit
-pnpm --dir zyrabit-slm/web-ui build
-docker compose -f zyrabit-slm/docker-compose.local.yml config
-```
+---
 
-Python tests require the project dependencies (`uv sync --all-groups` or an equivalent environment) before running.
+## 🔍 Real-world use cases
 
-## Repository map
+| Scenario | What Zyrabit SLM does |
+|---|---|
+| **Legal firm** asks AI to review contracts | Documents stay on firm servers; PII masked before inference |
+| **Hospital** needs RAG over patient records | Air-gapped deployment profile; no record ever leaves the datacenter |
+| **Bank** runs internal compliance Q&A | Audit log of every query, model response, and retrieved chunk |
+| **Government agency** deploys on classified infra | Fully offline after initial setup; Ollama + local model weights |
+| **Enterprise IT** builds internal knowledge bot | Grafana dashboard shows latency, model load, and query volume |
+
+---
+
+## 📦 Stack components
 
 ```text
-zyrabit-slm/api-rag/   FastAPI application, domain logic, adapters, tests
-zyrabit-slm/web-ui/    Vite/Tailwind document workspace
-zyrabit-slm/           Docker profiles and runtime configuration
-mcp/                   Standalone MCP installer/diagnostic server
-docs/                  Engineering documentation
-validation/            Load and operational test assets
-internal/              Hardware-specific integrations
+zyrabit-slm/
+├── api-rag/              # FastAPI app — inference, RAG, PII pipeline, audit
+├── config/               # Environment-specific configuration
+├── prompts/              # Versioned system prompts (auditable artifacts)
+├── web-ui/               # Browser interface for local interaction
+├── grafana/              # Dashboards — latency, throughput, model health
+├── prometheus/           # Metrics collection and alerting rules
+├── traefik/              # Reverse proxy, TLS, routing (production only)
+├── scripts/              # Operational helpers
+├── docker-compose.yml    # Production stack
+└── docker-compose.local.yml  # Local/Dev stack (default)
+mcp/                      # Model Context Protocol server (controlled tool access)
+validation/               # Validation scripts and compliance artifacts
+zyra.sh                   # Unified CLI: install · start · stop · wizard · benchmark
+zyra-up.sh                # Legacy shim → delegates to zyra.sh
 ```
+
+---
+
+## 🧪 Testing
+
+```bash
+# All unit tests
+pytest -q zyrabit-slm/api-rag/tests
+
+# Unit tests only (offline, no network)
+pytest -q zyrabit-slm/api-rag/tests/unit
+
+# Sovereign QA validation (PII + architecture + air-gap)
+./zyra.sh validate --e2e-security
+```
+
+> **Rule**: if a test reaches the network, it's a bug. The entire test suite runs offline.
+
+---
+
+## 🛡 Security Model
+
+- **PII masking** runs before the prompt reaches the model — the model never sees raw sensitive data
+- **Tool access** via MCP requires explicit adapter registration — no implicit function calling
+- **Secrets** stay on-premise: never in prompts, logs, or exported artifacts
+- **Production deployments** must define explicit allowlists for origins, tokens, and integrations
+- See [SECURITY.md](SECURITY.md) for vulnerability reporting
+
+---
+
+## 🤝 Contributing
+
+Read [CONTRIBUTING.md](CONTRIBUTING.md) before opening a PR. The short version:
+
+1. Fork → branch from `main` → PR with tests
+2. No network calls in tests — treat them as bugs
+3. Prefer small, auditable changes over large refactors
+
+---
 
 ## License
 
-MIT. See [LICENSE](LICENSE).
+MIT © [Zyrabit](https://zyrabit.com)

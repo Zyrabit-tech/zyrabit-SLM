@@ -109,11 +109,19 @@ class OllamaInferenceAdapter(InferenceProviderPort):
                     "total_ms": round(latency * 1000, 2),
                 }
 
+                execution_target = {
+                    "engine": "ollama",
+                    "device": "cpu_generic",
+                    "backend": "ollama_host" if "host" in self.endpoint else "ollama_docker",
+                    "accelerated": False,
+                }
+
                 return InferenceResult(
                     text=response_text,
                     latency_seconds=latency,
                     provider=self.provider_name,
                     raw_payload=body,
+                    execution_target=execution_target,
                 )
 
             except (requests.exceptions.ConnectionError, requests.exceptions.Timeout) as exc:

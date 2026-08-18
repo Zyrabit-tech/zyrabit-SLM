@@ -704,11 +704,12 @@ try:
     data = json.loads(sys.stdin.read(), strict=False)
     m = data.get('metadata', {})
     raw = m.get('raw') or {}
+    tgt = m.get('execution_target') or {}
 except Exception as e:
     print(f'Error parsing benchmark response: {e}', file=sys.stderr)
     sys.exit(1)
 
-G,C,A,B,N='\033[38;2;60;180;100m','\033[38;2;70;180;220m','\033[38;2;240;170;50m','\033[1m','\033[0m'
+G,C,A,R,B,N='\033[38;2;60;180;100m','\033[38;2;70;180;220m','\033[38;2;240;170;50m','\033[38;2;240;80;80m','\033[1m','\033[0m'
 model = m.get('model') or m.get('upstream_model') or raw.get('model') or 'Unknown'
 
 lat_val = m.get('latency_ms')
@@ -741,13 +742,35 @@ tps_str = f\"{float(tps):.1f} t/s\" if tps is not None else 'N/A'
 lat = f\"{lat_val:.0f} ms\"
 rag_ms = f\"{float(m['rag_retrieval_ms']):.1f} ms\" if m.get('rag_retrieval_ms') is not None else '0.0 ms'
 rag_hits = m.get('rag_hits', 0)
-accel = '${accel_name}'
+
+# Runtime Execution Target vs Host Device
+host_accel = '${accel_name}'
+dev_code = tgt.get('device') or ('cpu_generic' if 'docker' in m.get('mode', '') else 'unknown')
+engine_name = tgt.get('engine') or m.get('engine') or m.get('provider') or 'unknown'
+is_accel = bool(tgt.get('accelerated', False))
+
+if dev_code == 'tenstorrent_tensix':
+    device_str = 'Tenstorrent Blackhole (Active)'
+elif dev_code == 'nvidia_cuda':
+    device_str = 'NVIDIA CUDA (Active)'
+elif dev_code == 'apple_metal':
+    device_str = 'Apple Metal (Active)'
+elif dev_code == 'cpu_generic':
+    device_str = 'CPU Standard (Non-Accelerated)'
+else:
+    device_str = dev_code
+
+# Detect mismatch if host has accelerator but API ran in CPU mode
+fallback_notice = ''
+if 'CPU' not in host_accel and not is_accel:
+    fallback_notice = f'''  {R}│  ⚠️  ALERT     : CPU Fallback ({host_accel} in host, not engaged){N}│\n'''
 
 print(f'''
-  {B}┌─ 🤖 ENGINE & HARDWARE ──────────────────────┐{N}
+  {B}┌─ 🤖 ENGINE & EXECUTION TARGET ──────────────┐{N}
   │  Model          : {C}{model:<28}{N}│
-  │  Accelerator    : {G}{accel:<28}{N}│
-  {B}├─ ⚡ INFERENCE & THROUGHPUT ──────────────────┤{N}
+  │  Engine / Server: {C}{engine_name:<28}{N}│
+  │  Compute Device : {G if is_accel else A}{device_str:<28}{N}│
+{fallback_notice}  {B}├─ ⚡ INFERENCE & THROUGHPUT ──────────────────┤{N}
   │  TTFT (Warm)    : {G}{ttft_str:<28}{N}│
   │  Throughput     : {C}{tps_str:<28}{N}│
   {B}├─ 📚 DOCUMENT RETRIEVAL (RAG) ───────────────┤{N}
@@ -839,6 +862,56 @@ print(f'''  {B}├─ 🛡️  COMPLIANCE ────────────�
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
+# INGEST — Document Pipeline (Zyrabit Wrangler)
+# ─────────────────────────────────────────────────────────────────────────────
+run_ingest() {
+    local target_path="$1"
+    if [[ -z "${target_path}" ]]; then
+        log_err "Usage: ./zyra.sh ingest <path_to_file_or_directory>"
+        exit 1
+    fi
+    if [[ ! -e "${target_path}" ]]; then
+        log_err "File or directory not found: ${target_path}"
+        exit 1
+    fi
+
+    local base_url token
+    base_url=$(_get_base_url)
+    token=$(_get_token)
+
+    log_header "DOCUMENT INGESTION (ZYRABIT WRANGLER)"
+    log_info "Target: ${target_path}"
+
+    if [[ -f "${target_path}" ]]; then
+        log_info "Uploading $(basename "${target_path}")..."
+        local res http_code res_body
+        res=$(curl -sk -w "\n%{http_code}" -X POST "${base_url}/documents" \
+            -H "Authorization: Bearer ${token}" \
+            -F "file=@${target_path}")
+        http_code=$(echo "${res}" | tail -n1)
+        res_body=$(echo "${res}" | sed '$d')
+        if [[ "${http_code}" =~ ^20[0-2]$ ]]; then
+            log_ok "Document accepted for indexing: ${res_body}"
+        else
+            log_err "Upload failed (HTTP ${http_code}): ${res_body}"
+            exit 1
+        fi
+    elif [[ -d "${target_path}" ]]; then
+        local count=0
+        for f in "${target_path}"/*; do
+            if [[ -f "$f" && "$f" =~ \.(pdf|docx|txt|md|csv)$ ]]; then
+                log_info "Uploading $(basename "$f")..."
+                curl -sk -X POST "${base_url}/documents" \
+                    -H "Authorization: Bearer ${token}" \
+                    -F "file=@$f" >/dev/null 2>&1 && ((count++)) || true
+            fi
+        done
+        log_ok "Ingestion batch finished: ${count} documents submitted."
+    fi
+}
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # ARG PARSING
 # ─────────────────────────────────────────────────────────────────────────────
 while [[ "$#" -gt 0 ]]; do
@@ -875,6 +948,7 @@ for CMD in "${COMMANDS[@]}"; do
         validate)  run_validate  ;;
         benchmark) run_benchmark ;;
         audit)     run_audit     ;;
+        ingest)    run_ingest "${COMMANDS[1]:-${EXTRA_ARGS[0]}}"; break ;;
         dev)       run_dev       ;;
         doctor)    run_doctor    ;;
         # legacy aliases — kept for muscle memory

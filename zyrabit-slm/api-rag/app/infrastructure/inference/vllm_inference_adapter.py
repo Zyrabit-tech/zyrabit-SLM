@@ -110,11 +110,21 @@ class VllmInferenceAdapter(InferenceProviderPort):
             "total_ms": round(latency * 1000, 2),
         }
 
+        is_tt = "8090" in self.endpoint or "tenstorrent" in self.provider_name.lower() or "8000" in self.endpoint
+        device = "tenstorrent_tensix" if is_tt else ("nvidia_cuda" if "cuda" in self.provider_name.lower() else "apple_metal")
+        execution_target = {
+            "engine": "vllm",
+            "device": device,
+            "backend": "vllm_tt_metal" if is_tt else "vllm_native",
+            "accelerated": True,
+        }
+
         return InferenceResult(
             text=text_response,
             latency_seconds=latency,
             provider=self.provider_name,
             raw_payload=body,
+            execution_target=execution_target,
         )
 
     def health(self) -> Dict[str, Any]:

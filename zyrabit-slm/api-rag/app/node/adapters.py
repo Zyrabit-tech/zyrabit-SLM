@@ -56,6 +56,13 @@ class ExistingInferenceAdapter:
             elif result.latency_seconds and result.latency_seconds > 0 and result.text:
                 tps = round(len(result.text.split()) / result.latency_seconds, 2)
 
+        target = getattr(result, "execution_target", None) or {
+            "engine": zyrabit.get("source", result.provider),
+            "device": "cpu_generic" if "docker" in zyrabit.get("mode", "") else "accelerated",
+            "backend": zyrabit.get("mode", "standard"),
+            "accelerated": zyrabit.get("mode") not in ("docker", "cpu"),
+        }
+
         return result.text, {
             "provider": result.provider,
             "latency_seconds": result.latency_seconds,
@@ -64,6 +71,7 @@ class ExistingInferenceAdapter:
             "engine": zyrabit.get("engine", result.provider),
             "mode": zyrabit.get("mode"),
             "model": raw.get("model") or self.model,
+            "execution_target": target,
             "raw": raw,
         }
 

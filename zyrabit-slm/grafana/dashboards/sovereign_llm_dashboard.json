@@ -1,0 +1,152 @@
+{
+  "annotations": {
+    "list": []
+  },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "liveNow": false,
+  "panels": [
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "id": 1,
+      "title": "⚡ Hardware & Generation Throughput",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "unit": "tokens/sec"
+        }
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 1 },
+      "id": 2,
+      "title": "Inference Throughput (Tokens/s)",
+      "type": "timeseries",
+      "targets": [
+        {
+          "expr": "gen_ai_server_tokens_per_second",
+          "legendFormat": "{{model}} on {{device}}"
+        }
+      ]
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "unit": "s"
+        }
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 1 },
+      "id": 3,
+      "title": "Time To First Token (TTFT - P95 / P99)",
+      "type": "timeseries",
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(gen_ai_client_time_to_first_token_seconds_bucket[5m])) by (le, model, device))",
+          "legendFormat": "P95 - {{model}} ({{device}})"
+        },
+        {
+          "expr": "histogram_quantile(0.99, sum(rate(gen_ai_client_time_to_first_token_seconds_bucket[5m])) by (le, model, device))",
+          "legendFormat": "P99 - {{model}} ({{device}})"
+        }
+      ]
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 9 },
+      "id": 4,
+      "title": "📚 RAG Retrieval & Prompt Context Scaling",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "unit": "s"
+        }
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 10 },
+      "id": 5,
+      "title": "RAG Hybrid Retrieval Latency",
+      "type": "timeseries",
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(zyrabit_rag_retrieval_duration_seconds_bucket[5m])) by (le))",
+          "legendFormat": "P95 Retrieval Latency"
+        }
+      ]
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "unit": "short"
+        }
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 10 },
+      "id": 6,
+      "title": "Token Usage (Prefill vs Decode)",
+      "type": "timeseries",
+      "targets": [
+        {
+          "expr": "sum(rate(gen_ai_client_token_usage_total[5m])) by (token_type, model)",
+          "legendFormat": "{{token_type}} tokens - {{model}}"
+        }
+      ]
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 18 },
+      "id": 7,
+      "title": "🛡️ Sovereign Security & PII Shield",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "unit": "short"
+        }
+      },
+      "gridPos": { "h": 6, "w": 24, "x": 0, "y": 19 },
+      "id": 8,
+      "title": "PII Masking & Security Interceptions Total",
+      "type": "timeseries",
+      "targets": [
+        {
+          "expr": "sum(rate(zyrabit_security_audit_total[5m]))",
+          "legendFormat": "Security Audit Events / sec"
+        },
+        {
+          "expr": "sum(rate(security_hits_total[5m])) by (entity_type)",
+          "legendFormat": "PII Masked: {{entity_type}}"
+        }
+      ]
+    }
+  ],
+  "refresh": "5s",
+  "schemaVersion": 38,
+  "style": "dark",
+  "tags": ["zyrabit", "slm", "tenstorrent", "observability", "rag"],
+  "time": {
+    "from": "now-30m",
+    "to": "now"
+  },
+  "timepicker": {
+    "refresh_intervals": ["5s", "10s", "30s", "1m"]
+  },
+  "timezone": "browser",
+  "title": "Zyrabit SLM Sovereign Observability",
+  "uid": "zyrabit-sovereign-llm",
+  "version": 1
+}

@@ -124,54 +124,34 @@ services:
       timeout: 10s
       retries: 5
 
-  # 2.5 THE SILICON BRIDGE: Tenstorrent TT-MLIR Simulation
-  zyrabit-tt-bridge: &tt-base
-    build:
-      context: ../internal/engine/tenstorrent
-      args:
-        INSTALL_TENSTORRENT: ${INSTALL_TENSTORRENT:-false}
-        TENSTORRENT_PYPI_URL: ${TENSTORRENT_PYPI_URL:-https://pypi.eng.aws.tenstorrent.com/}
-    container_name: zyrabit-tt-bridge
-    profiles: [ "tenstorrent-sim" ]
-    environment:
-      - ZYRABIT_TT_MODE=${ZYRABIT_TT_MODE:-mock}
-      - ZYRABIT_TT_MODEL_ID=${ZYRABIT_TT_MODEL_ID:-Qwen/Qwen2.5-3B-Instruct}
-      - ZYRABIT_TT_MIN_RAM_GB=${ZYRABIT_TT_MIN_RAM_GB:-24}
-      - ZYRABIT_TT_ALLOW_REMOTE_MODEL=${ZYRABIT_TT_ALLOW_REMOTE_MODEL:-false}
-    ports:
-      - "8090:8090"
-    networks:
-      - model-network
-    volumes:
-      - ./hf-cache:/root/.cache/huggingface/hub
-    healthcheck:
-      test: ["CMD", "curl", "-fsS", "http://localhost:8090/v1/health"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
-
-  # 2.6 THE METAL BRIDGE: Hardware Accelerator Bridge (Tenstorrent / CUDA / Metal)
-  zyrabit-tt-metal:
-    <<: *tt-base
-    container_name: zyrabit-tt-metal
-    profiles: [ "hardware", "tenstorrent" ]
-    environment:
-      - ZYRABIT_TT_MODE=${ZYRABIT_TT_MODE:-metal}
-      - ZYRABIT_TT_UPSTREAM_URL=${ZYRABIT_TT_UPSTREAM_URL:-http://zyrabit-vllm-tt:8000}
-      - ZYRABIT_TT_UPSTREAM_MODEL=${ZYRABIT_TT_UPSTREAM_MODEL:-Qwen/Qwen2.5-Coder-3B-Instruct}
-    networks:
-      - model-network
-      - zyrabit-sovereign-net
-    depends_on:
-      zyrabit-vllm-tt:
-        condition: service_started
-
-  # 2.7 THE SILICON ENGINE: Hardware Serving Layer (Blackhole p150 / GPU / Metal)
+  # 2.5 THE SILICON ENGINE: Hardware Serving Layer (Blackhole p150 / GPU / Metal)
   zyrabit-vllm-tt:
     image: ghcr.io/tenstorrent/tt-inference-server/vllm-tt-metal-src-release-ubuntu-22.04-amd64:0.8.0-55fd115-aa4ae1e
     container_name: zyrabit-vllm-tt
     profiles: [ "hardware", "tenstorrent" ]
-    command: [ "/bin/bash", "/run-qwen.sh" ]
+    command:
+      - /bin/bash
+      - -c
+      - |
+        set -e
+        if [ -n "$${PYTHON_ENV_DIR}" ] && [ -f "$${PYTHON_ENV_DIR}/bin/activate" ]; then
+          source "$${PYTHON_ENV_DIR}/bin/activate"
+        fi
+        export TT_MODEL_SPEC_JSON_PATH="$${TT_MODEL_SPEC_JSON_PATH:-/model_spec.json}"
+        export CACHE_ROOT=/home/container_app_user/cache_root
+        export TT_CACHE_PATH="$${CACHE_ROOT}/tt_cache"
+        TARGET_MODEL="$${TT_HF_MODEL_NAME:-$${MODEL_NAME:-Qwen2.5-3B-Instruct}}"
+        MODEL_SNAP=$$(ls -d /hf-cache/hub/models--*$$TARGET_MODEL*/snapshots/*/ 2>/dev/null | head -1 | sed 's:/$$::')
+        if [ -z "$$MODEL_SNAP" ]; then
+          MODEL_SNAP=$$(ls -d /hf-cache/hub/models--*/snapshots/*/ 2>/dev/null | head -1 | sed 's:/$$::')
+        fi
+        if [ -z "$$MODEL_SNAP" ]; then
+          echo "ERROR: Model '$$TARGET_MODEL' not found in /hf-cache" >&2
+          exit 1
+        fi
+        export MODEL_WEIGHTS_PATH="$$MODEL_SNAP"
+        echo "Serving $$MODEL_WEIGHTS_PATH on Tenstorrent..."
+        exec python /home/container_app_user/app/src/run_vllm_api_server.py
     devices:
       - /dev/tenstorrent:/dev/tenstorrent
     ipc: host
@@ -188,8 +168,7 @@ services:
       - tt-cache-root:/home/container_app_user/cache_root
       - ${ZYRABIT_HF_CACHE_DIR:-./hf-cache}:/hf-cache
       - /dev/hugepages-1G:/dev/hugepages-1G
-      - ../internal/engine/tenstorrent/${TT_MODEL_SPEC:-model_spec_qwen25_3b_p150.json}:/model_spec.json:ro
-      - ../internal/engine/tenstorrent/run-qwen.sh:/run-qwen.sh:ro
+      - ./api-rag/app/infrastructure/engine/tenstorrent/${TT_MODEL_SPEC:-model_spec_qwen25_3b_p150.json}:/model_spec.json:ro
     ports:
       - "8000:8000"
     networks:
