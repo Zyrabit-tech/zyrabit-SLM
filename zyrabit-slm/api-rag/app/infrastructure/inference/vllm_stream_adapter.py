@@ -39,8 +39,8 @@ class VllmStreamAdapter(StreamingInferencePort):
                 if models:
                     self._cached_model_id = models[0]
                     return self._cached_model_id
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug("Failed to query active streaming vLLM model: %s", exc)
         return self._cached_model_id
 
     async def stream_generate(self, request: InferenceRequest) -> AsyncIterator[str]:

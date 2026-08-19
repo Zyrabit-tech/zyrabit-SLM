@@ -46,8 +46,8 @@ class VllmInferenceAdapter(InferenceProviderPort):
                 if models:
                     self._cached_model_id = models[0]
                     return self._cached_model_id
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug("Failed to query active vLLM model: %s", exc)
         return self._cached_model_id
 
     def generate(self, request: InferenceRequest) -> InferenceResult:

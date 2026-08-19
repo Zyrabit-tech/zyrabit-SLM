@@ -73,6 +73,13 @@ class SQLiteNodeStore:
 
     @staticmethod
     def _ensure_column(conn, table: str, column: str, definition: str) -> None:
+        ALLOWED_TABLES = {"node_sources", "node_documents", "node_evidence", "node_sessions", "node_jobs", "node_capabilities"}
+        ALLOWED_COLUMNS = {"metadata_json", "document_id", "status", "error", "metrics_json"}
+        ALLOWED_DEFINITIONS = {"TEXT NOT NULL DEFAULT '{}'", "TEXT"}
+
+        if table not in ALLOWED_TABLES or column not in ALLOWED_COLUMNS or definition not in ALLOWED_DEFINITIONS:
+            raise ValueError(f"Invalid schema migration identifier: {table}.{column} ({definition})")
+
         columns = {row["name"] for row in conn.execute(f"PRAGMA table_info({table})").fetchall()}
         if column not in columns:
             conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {definition}")
