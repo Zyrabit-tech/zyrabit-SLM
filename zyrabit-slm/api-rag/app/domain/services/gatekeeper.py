@@ -51,9 +51,12 @@ class Gatekeeper:
     @classmethod
     def get_routing_decision(cls, text: str) -> str:
         """
-        Policy: Always use RAG to search user-uploaded documents first.
-        The LLM gracefully handles cases where the vector store has no
-        relevant hits — it will simply answer from its own knowledge.
-        Routing to 'direct' was causing user documents to be silently ignored.
+        Route casual greetings, self-identity and small-talk directly to the model.
+        Route informational and document queries to RAG.
         """
+        import re, unicodedata
+        normalized = unicodedata.normalize("NFKD", text).encode("ascii", "ignore").decode().lower().strip()
+        if re.search(r"\b(hola|buenas|hello|hi|hey|que tal|como estas|quien eres|que eres|que haces|que puedes|presenta\w*|ayud\w*|cuenta\w*|gracia\w*|adios|bye)\b", normalized):
+            if not re.search(r"\b(documento|archivo|pdf|pagina|contrato|manual|texto|doc|fuente)\b", normalized):
+                return "direct"
         return "rag"

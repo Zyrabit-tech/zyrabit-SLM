@@ -1,36 +1,45 @@
+---
+sidebar_position: 5
+title: 'Telegram Bridge'
+description: 'Set up a Telegram bot connected to your Zyrabit SLM instance via n8n webhooks'
+---
+
 # ✈️ Telegram Sovereign Bridge
 
-Aprende a conectar Zyra con tu Telegram para recibir notificaciones y comandos en tiempo real, manteniendo el control total de tus datos.
+> [!NOTE]
+> This guide was originally written for Spanish-speaking teams.
+
+Learn how to connect Zyra with your Telegram to receive notifications and commands in real-time, while keeping full control of your data.
 
 ---
 
 ## 🤖 Overview
-El puente de Telegram permite que Zyrabit se comunique contigo fuera de la consola web. A diferencia de las nubes comerciales, Zyrabit utiliza una conexión directa vía **MCP (Model Context Protocol)**, lo que significa que Zyra solo envía lo que tú le pides y nada más.
+The Telegram bridge allows Zyrabit to communicate with you outside the web console. Unlike commercial clouds, Zyrabit uses a direct connection via **MCP (Model Context Protocol)**, which means Zyra only sends what you ask for and nothing else.
 
 > [!IMPORTANT]
-> **Privacidad Local**: Tu Token de Bot y Chat ID nunca salen de tu contenedor `api-rag`. La comunicación con los servidores de Telegram es directa desde tu infraestructura local.
+> **Local Privacy**: Your Bot Token and Chat ID never leave your `api-rag` container. The communication with Telegram servers is direct from your local infrastructure.
 
 ---
 
-## 🚀 Quick Start: Obtener tus Credenciales
+## 🚀 Quick Start: Get your Credentials
 
-Sigue estos 3 pasos para activar el puente en menos de 2 minutos.
+Follow these 3 steps to activate the bridge in under 2 minutes.
 
-### 1. Crear tu Bot (El Mensajero)
-Habla con el "padre" de todos los bots en Telegram:
-1. Abre [@BotFather](https://t.me/BotFather) en Telegram.
-2. Envía el comando `/newbot`.
-3. Sigue las instrucciones para darle un nombre (ej: `Zyra_Sovereign_Bot`).
-4. **Copia el HTTP API Token** que te proporcionará. Este es tu `TELEGRAM_BOT_TOKEN`.
+### 1. Create your Bot (The Messenger)
+Talk to the "father" of all bots on Telegram:
+1. Open [@BotFather](https://t.me/BotFather) on Telegram.
+2. Send the command `/newbot`.
+3. Follow the instructions to give it a name (e.g., `Zyra_Sovereign_Bot`).
+4. **Copy the HTTP API Token** provided. This is your `TELEGRAM_BOT_TOKEN`.
 
-### 2. Obtener tu ID Personal (El Destinatario)
-Para que Zyra sepa a quién escribirle, necesitas tu ID único de usuario:
-1. Habla con [@userinfobot](https://t.me/userinfobot).
-2. Envía cualquier mensaje.
-3. El bot te responderá con tu **Id**. Este es tu `TELEGRAM_CHAT_ID`.
+### 2. Get your Personal ID (The Recipient)
+For Zyra to know who to write to, you need your unique user ID:
+1. Talk to [@userinfobot](https://t.me/userinfobot).
+2. Send any message.
+3. The bot will reply with your **Id**. This is your `TELEGRAM_CHAT_ID`.
 
-### 3. Configurar Zyrabit
-Abre tu archivo `.env` y pega tus llaves:
+### 3. Configure Zyrabit
+Open your `.env` file and paste your keys:
 
 ```bash
 # zyrabit-slm/.env
@@ -40,42 +49,47 @@ TELEGRAM_CHAT_ID="987654321"
 
 ---
 
-## 🛠️ Verificación
-Una vez configurado, puedes probar la conexión desde la terminal de Zyrabit:
+## 🛠️ Verification
+Once configured, you can test the connection from the Zyrabit terminal:
 
 ```bash
-# Ejecuta la prueba de notificación vía MCP
-./zyra.sh notify "🛡️ Conexión Soberana Exitosa. Hola, Kai."
+# Run the notification test via MCP
+./zyra.sh notify "🛡️ Sovereign Connection Successful. Hello, Kai."
 ```
 
 ## 🩺 Sovereign Health Check
 
-Antes de lanzar tu nodo a la comunidad, verifica que la sincronización sea perfecta. Ejecuta este comando en tu terminal para obtener un diagnóstico visual:
+Before releasing your node to the community, verify that the synchronization is perfect. Run this command in your terminal to get a visual diagnostic:
 
 ```bash
 curl -X GET http://localhost/v1/health
 ```
 
-### Qué buscar:
-- `core_status: "HEALTHY"`: El motor de Zyrabit está listo.
-- `mcp_bridge: "CONNECTED"`: El túnel de herramientas está abierto.
-- `pii_shield: "ACTIVE"`: El Gatekeeper está protegiendo tus datos.
+### What to look for:
+- `core_status: "HEALTHY"`: The Zyrabit engine is ready.
+- `mcp_bridge: "CONNECTED"`: The tools tunnel is open.
+- `pii_shield: "ACTIVE"`: The Gatekeeper is protecting your data.
 
 > [!TIP]
-> Si ves un estado `PENDING`, espera 30 segundos. Zyra está cargando el modelo en tu RAM local.
+> If you see a `PENDING` status, wait 30 seconds. Zyra is loading the model into your local RAM.
 
 ---
 
-## 🔒 Privacidad Blindada (PII Gatekeeper)
-Zyrabit v2.0 incluye un **Escudo de Intercepción**. Todo mensaje enviado a Telegram pasa primero por el `Gatekeeper`.
-- Si intentas enviar: *"Mi API key es sk-12345"*
-- Telegram recibirá: *"Mi API key es <USER_API_KEY_1>"*
+## 🔒 Armored Privacy (PII Gatekeeper)
+Zyrabit v2.0 includes an **Interception Shield**. Every message sent to Telegram passes through the `Gatekeeper` first.
+- If you try to send: *"My API key is sk-12345"*
+- Telegram will receive: *"My API key is `<USER_API_KEY_1>`"*
 
-Esto garantiza que incluso si usas Telegram, tu infraestructura sigue siendo **100% Soberana**.
+This guarantees that even if you use Telegram, your infrastructure remains **100% Sovereign**.
 
 ---
 
 ## 🔍 Troubleshooting
-- **El bot no responde**: Asegúrate de haberle dado a "START" a tu bot en Telegram antes de intentar enviar mensajes desde Zyra.
-- **Error 401**: Tu `TELEGRAM_BOT_TOKEN` es incorrecto o ha expirado.
-- **Error 400**: Tu `TELEGRAM_CHAT_ID` es incorrecto. Asegúrate de usar solo los números.
+- **The bot is not responding**: Make sure you have clicked "START" on your bot in Telegram before trying to send messages from Zyra.
+- **Error 401**: Your `TELEGRAM_BOT_TOKEN` is incorrect or has expired.
+- **Error 400**: Your `TELEGRAM_CHAT_ID` is incorrect. Make sure to use only the numbers.
+
+---
+
+## Related Documentation
+- [Integration Playbook](./integration-playbook.md)

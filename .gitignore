@@ -67,6 +67,7 @@ node_modules/
 docs-portal/node_modules/
 docs-portal/.docusaurus/
 docs-portal/build/
+zyrabit-slm/web-ui/dist/
 .pnpm-store/
 
 # Python build
@@ -74,6 +75,7 @@ docs-portal/build/
 .eggs/
 dist/
 build/
+scratch/
 
 # Cursor / IDE
 .cursor/
@@ -84,6 +86,7 @@ build/
 # ==========================================
 
 # Internal Tracking and Checklists
+plan/
 TEMP_QA_E2E_CHECKLIST.md
 TEMP_TASK_TRACKING.md
 TEMP_*.md
@@ -128,3 +131,6 @@ ops-private/
 zyrabit-slm/hf-cache/
 zyrabit-slm/db_data/*
 validation/reports/
+zyrabit-slm/models/qwen2.5-1.5b-instruct-q4_k_m.gguf
+zyrabit-slm/.llama-server.pid
+zyrabit-context/demo-brief.txt

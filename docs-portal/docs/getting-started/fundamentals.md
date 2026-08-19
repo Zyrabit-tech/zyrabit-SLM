@@ -98,19 +98,12 @@ Zyrabit uses a unified CLI script (`zyra.sh`) that automatically chooses the bes
 ```
 
 This single command:
-1. Detects your hardware (RAM, GPU, Apple Silicon Metal)
-2. Creates `.env` from `example.env` if it doesn't exist
-3. Builds Docker images for the API, Web UI, MCP, and ChromaDB
-4. Starts all containers on local ports (`8082` API · `3000` Web UI · `3001` Grafana)
-5. Pulls the best-fit SLM model based on your available RAM
-
-### Interactive Setup Wizard
-
-For a guided configuration (model selection, inference engine, PostgreSQL, Whisper audio):
-
-```bash
-./zyra.sh wizard
-```
+1. Detects your hardware (RAM, GPU, Apple Silicon Metal, Tenstorrent)
+2. Runs interactive configuration (model selection, inference engine, ReAct agent)
+3. Generates/updates `.env` configuration safely
+4. Builds Docker images for the API, Web UI, MCP, and ChromaDB
+5. Starts all containers on direct local ports
+6. Verifies stack health and readiness
 
 ### Access Your Services
 

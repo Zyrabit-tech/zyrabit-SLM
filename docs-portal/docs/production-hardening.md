@@ -1,3 +1,9 @@
+---
+sidebar_position: 1
+title: 'Production Hardening'
+description: 'Security checklist and operational guidelines for production Zyrabit deployments'
+---
+
 # Production Hardening Checklist
 
 Transitioning from a development environment to a production deployment requires strict adherence to security and resource management policies. Use this checklist to ensure your Zyrabit SLM instance is hardened for production.
@@ -54,3 +60,7 @@ services:
 
 - [ ] **Persistent Volumes:** Verify that all `./data` directories are mapped to persistent, backed-up storage.
 - [ ] **Snapshot Schedule:** Implement a daily snapshot policy for the vector database (`./data/vector-db`).
+
+## Related Documentation
+- [Compliance Reporting](./compliance-report.md)
+- [Data Portability](./data-portability.md)

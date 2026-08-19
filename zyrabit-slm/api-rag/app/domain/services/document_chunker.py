@@ -48,6 +48,7 @@ class DocumentChunker:
             for chunk in refined_splits:
                 chunk.metadata.update({
                     "source": doc.metadata.get("source"),
+                    "page": doc.metadata.get("page"),
                     "domain": domain,
                     "version": "1.0",
                     "type": "high-precision"

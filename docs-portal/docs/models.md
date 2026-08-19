@@ -1,3 +1,9 @@
+---
+sidebar_position: 4
+title: Model Configuration
+description: "Supported inference providers, model selection by hardware, and embedding configuration."
+---
+
 # Model Configuration
 
 Zyrabit SLM utilizes **Ollama** as the core inference engine, enabling the local execution of Small Language Models (SLMs) with high performance and low latency.
@@ -23,43 +29,49 @@ Alternatively, the `MODEL_NAME` environment variable can be set in the `.env` fi
 MODEL_NAME="llama3"
 ```
 
----
+## Model Selection Matrix & Architectural Archetypes
 
-## Supported Models
+Zyrabit SLM is designed to be completely model-agnostic, supporting three distinct model archetypes depending on your enterprise workload:
 
-Zyrabit is compatible with models available in the [Ollama Library](https://ollama.com/library). Common choices include:
-
-- `llama3`: Meta's general-purpose model.
-- `mistral`: High-efficiency 7B model.
-- `codellama`: Optimized for programming and logic tasks.
-- `phi3`: Lightweight, capable model from Microsoft.
-
-To manually pull a specific model:
-```bash
-docker exec -it zyrabit-engine ollama pull <model_name>
-```
+| Archetype / Profile | Recommended Models | Primary Strengths | Ideal Enterprise Workload |
+| :--- | :--- | :--- | :--- |
+| 💬 **Instruct-Tuned SLM** | `Qwen 2.5 (3B / 7B)`, `Llama 3.2 (3B)` | Ultra-low TTFT (<150ms), natural conversational flow, zero token waste | Interactive Web Chat, fast document Q&A, executive summaries |
+| 🧠 **Reasoning (CoT) SLM** | `DeepSeek-R1-Distill (1.5B / 7B / 14B)` | Multi-step scratchpad (`<think>`), logic self-verification | Complex contract audit, financial reconciliation, multi-hop reasoning |
+| 🛠️ **Autonomous Agent / Coder** | `Qwen 2.5 Coder (7B)`, `Hermes 3 (8B)` | Deterministic JSON output, strict MCP schema compliance | Automated tool invocation, database migrations, ERP connectors |
 
 ---
 
-## Hardware Acceleration
+## Model-Agnostic UI: `<think>` Accordion Support
 
-Zyrabit automatically configures the optimal acceleration backend based on host hardware:
+Reasoning models (like `DeepSeek-R1`) spend internal tokens generating chain-of-thought scratchpad text enclosed in `<think>...</think>` tags before emitting their final answer.
 
-### NVIDIA GPU (CUDA)
-Utilizes NVIDIA GPUs for inference. Requires the **NVIDIA Container Toolkit** on the host.
-
-### Apple Silicon (Metal)
-Utilizes the unified memory and Metal API on macOS for accelerated performance.
-
-### CPU Fallback
-If no GPU is detected, the engine utilizes optimized CPU instructions. It is recommended to use smaller quantized models (1.5B - 3B) for CPU-only deployments.
+Zyrabit SLM features built-in model-agnostic frontend parsing:
+1. **Automatic Detection:** Any tokens within `<think>...</think>` are automatically parsed and isolated into a collapsible **`🧠 Proceso de Razonamiento (Pensamiento)`** UI accordion.
+2. **Clean Output:** The primary chat bubble displays only the verified, grounded response with evidence citations.
+3. **Token Allocation:** When using Reasoning models, ensure `INFERENCE_TIMEOUT_SECONDS=120` or higher to accommodate multi-step verification.
 
 ---
 
-## Embedding Models
+## Hardware Acceleration & Providers
 
-For Retrieval-Augmented Generation (RAG), Zyrabit utilizes a dedicated embedding model for document vectorization. 
+Zyrabit automatically discovers host accelerators and routes inference to the optimal backend:
 
-- **Default:** `mxbai-embed-large`
+### Tenstorrent Blackhole (vLLM-TT Metalium)
+Native PCIe NPU execution using Tensix compute cores. Pre-compiled model specifications are available in `app/infrastructure/engine/tenstorrent/`.
 
-This model is selected for its high performance in semantic retrieval tasks. It can be modified in the API configuration if a custom embedding space is required.
+### Apple Silicon (Metal / MLX)
+Unified memory acceleration leveraging macOS Metal performance shaders.
+
+### NVIDIA GPU (CUDA / TensorRT-LLM)
+High-throughput batching and fp16/int8 execution via NVIDIA Container Toolkit.
+
+### Multi-Core x86 CPU (AVX2 / llama.cpp)
+Low-footprint local execution using quantized GGUF weights. Recommended for edge devices and lightweight 1.5B - 3B models.
+
+---
+
+## Embedding Models for Hybrid RAG
+
+For document vectorization, Zyrabit isolates generation from retrieval:
+- **Default:** `mxbai-embed-large` / `nomic-embed-text`
+- **Lexical Index:** SQLite FTS5 with BM25 scoring for deterministic exact keyword matching.

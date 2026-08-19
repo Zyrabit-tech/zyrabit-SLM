@@ -1,6 +1,7 @@
 import { bus } from "../core/EventBus";
 import { Storage } from "../adapters/Storage";
 import { EVENTS } from "../core/Constants";
+import { sendChat, deleteSession } from "./api";
 
 /**
  * ChatManager (Domain Service)
@@ -52,7 +53,7 @@ export class ChatManager {
         }
     }
 
-    processNext() {
+    async processNext() {
         if (this.queue.length === 0) {
             this.isProcessing = false;
             this.clearPendingTimeout();
@@ -64,15 +65,14 @@ export class ChatManager {
         bus.emit(EVENTS.UI.THINKING, true);
 
         const message = this.queue[0];
-        bus.emit(EVENTS.SOCKET.EMIT, {
-            text: message.text,
-            history: message.history,
-            client_msg_id: message.id,
-            thread_id: this.sessionId
-        });
-
-        // Event-driven loader: We rely exclusively on onResponse or onGatewayDisconnected
-        // to stop the thinking indicator. No hardcoded timeouts.
+        const chip = document.getElementById('active-context-chip');
+        const documentId = chip?.dataset?.documentId || null;
+        try {
+            const result = await sendChat({ text: message.text, session_id: this.sessionId, document_id: documentId, history: message.history });
+            this.onResponse(result);
+        } catch (error) {
+            this.onResponse({ response: 'No pude completar la consulta local. Revisa que el nodo y el motor de inferencia estén listos.', metadata: { decision: 'request-failed', sources: [] } });
+        }
     }
 
     handleRequestTimeout() {
@@ -143,6 +143,12 @@ export class ChatManager {
             return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
         }
         throw new Error('Secure random number generator is unavailable for session ID generation.');
+    }
+
+    async resetSession() {
+        try { await deleteSession(this.sessionId); } catch (_) { /* local reset still works */ }
+        this.sessionId = this.generateSessionId();
+        Storage.save('session_id', this.sessionId);
     }
 
     persist() {

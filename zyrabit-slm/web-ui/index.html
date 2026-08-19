@@ -1,356 +1,71 @@
-<!DOCTYPE html>
-<html lang="en" class="light">
-
+<!doctype html>
+<html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="icon" type="image/png" href="/img/favicon.png">
-    <title>Zyrabit SLM Console</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Funnel+Display:wght@300..800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/src/input.css">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Zyrabit · Document workspace</title>
+  <link rel="icon" type="image/png" href="/img/favicon.png">
+  <script type="module" src="/runtime-config.js"></script>
+  <link rel="stylesheet" href="/src/input.css">
+  <style>.onboarding{position:fixed;inset:0;z-index:50;display:grid;place-items:center;padding:20px;background:rgba(27,39,45,.24);backdrop-filter:blur(8px)}.onboarding-card{width:min(430px,100%);display:grid;gap:14px;padding:30px;border-radius:16px;background:#fff;box-shadow:0 24px 80px rgba(22,35,40,.24)}.onboarding-card h1{margin:0;font-size:28px}.onboarding-card p{margin:0;color:#68777e}.onboarding-card label{display:grid;gap:6px;font-size:12px;font-weight:650;color:#52616a}.onboarding-card input{padding:12px;border:1px solid #d9e2e3;border-radius:8px;font:inherit}.onboarding-card .primary-action{justify-content:center}.onboarding-card .quiet-action{justify-self:center;border:0;background:none;color:#718087;font-size:12px}</style>
+  <style>.guide{height:calc(100% - 76px);overflow:auto;padding:18px 2px 8px;color:#52616a;font-size:13px;line-height:1.55}.guide p{display:block;margin:0}.guide-intro{padding:0 0 16px;border-bottom:1px solid var(--line);color:#68777e}.guide-section{padding:18px 0;border-bottom:1px solid var(--line)}.guide-label{margin:0 0 11px!important;color:#8a989d;font-size:10px;font-weight:750;letter-spacing:.12em;text-transform:uppercase}.guide-flow{display:grid;gap:8px}.guide-row{display:grid;grid-template-columns:30px minmax(0,1fr);gap:10px;align-items:start;padding:10px 0;border-bottom:1px solid #eef2f2}.guide-row:last-child{border-bottom:0}.guide-index{display:grid;width:24px;height:24px;place-items:center;border-radius:7px;background:#edf3f5;color:#3f5a6d;font-size:10px;font-weight:800;line-height:1}.guide-row-title{display:flex;align-items:center;gap:7px;margin:0 0 3px;color:#263740;font-size:13px;font-weight:750;line-height:1.25}.guide-row-tag{display:inline-flex;align-items:center;height:18px;padding:0 6px;border:1px solid #dfe8eb;border-radius:999px;background:#f7faf9;color:#547083;font-size:9px;font-weight:750;letter-spacing:.04em;text-transform:uppercase}.guide-row-copy{color:#718087;font-size:12px;line-height:1.45}.guide-callout{display:grid;gap:7px;padding:13px 14px;border:1px solid #dfe9eb;border-radius:10px;background:#f7faf9}.guide-callout-head{display:flex;align-items:center;justify-content:space-between;gap:10px}.guide-callout-title{color:#34454d;font-size:12px;font-weight:750}.guide-pill{display:inline-flex;align-items:center;height:20px;padding:0 7px;border-radius:999px;background:#e9f1f5;color:#3f5a6d;font-size:10px;font-weight:750}.guide-callout-copy{color:#61717a;font-size:12px;line-height:1.48}.guide-prompts{display:grid;gap:7px}.guide-prompt{display:block;width:100%;padding:9px 10px;border:1px solid #e1e8e8;border-radius:8px;background:#fff;color:#44545c;font-size:12px;line-height:1.35;text-align:left;transition:background .2s,border-color .2s,color .2s}.guide-prompt:hover{border-color:#9eafb4;background:#f7faf9;color:#2d414b}.guide-footer{padding:16px 0 4px;color:#819095;font-size:11px;line-height:1.5}.guide kbd{display:inline-grid;min-width:19px;height:19px;place-items:center;padding:0 5px;border:1px solid #dce4e4;border-radius:4px;background:#f6f8f8;color:#596870;font:10px ui-monospace,monospace}.activity-summary{display:flex;gap:10px;margin:16px 0 12px;padding:12px;border:1px solid #dfe9eb;border-radius:10px;background:#f7faf9}.activity-summary b{display:block;color:#34454d;font-size:12px}.activity-summary p{margin:2px 0 0;color:#77868c;font-size:11px;line-height:1.35}.activity-pulse{width:8px;height:8px;flex:0 0 auto;margin-top:5px;border-radius:50%;background:#4e856f;box-shadow:0 0 0 4px #e2f0e9}.activity-log{height:calc(100% - 153px);padding:2px 0!important}.activity-empty{display:grid;place-content:center;height:100%;min-height:190px;text-align:center;color:#849197}.activity-empty span{font-size:24px;color:#b4c0c4}.activity-empty p{margin:8px 0 2px;font-weight:650;color:#5e6e75}.activity-empty small{font-size:11px}.activity-event{padding:12px 0;border-bottom:1px solid #edf0f0;animation:activity-in .25s ease-out}.activity-event-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px}.activity-event-head span{color:#3f5a6d;font-size:10px;font-weight:750;letter-spacing:.08em;text-transform:uppercase}.activity-event-head time{color:#9aa7ab;font-size:10px}.event-content{color:#596970;font-size:12px;line-height:1.45}.instruction-note{padding:12px;border:1px solid #dfe9eb;border-radius:10px;background:#f7faf9}.instruction-note b{display:block;color:#34454d;font-size:12px}.instruction-note p{margin:3px 0 0;color:#77868c;font-size:11px;line-height:1.4}@keyframes activity-in{from{opacity:0;transform:translateX(7px)}to{opacity:1;transform:translateX(0)}}</style>
 </head>
-
-<body class="h-screen overflow-hidden flex">
-
-    <!-- SIDEBAR -->
-    <aside class="w-72 glass-premium border-r border-black/5 p-6 flex flex-col hidden md:flex z-20">
-        <div class="flex flex-col items-center gap-2 mb-12">
-            <img src="/img/logo_zyrabit.png" alt="Zyrabit Icon" class="w-12 h-12 object-contain">
-            <img src="/img/logo_zyrabit.png" alt="Zyrabit Name" class="h-4 object-contain opacity-80 hidden">
-            <span class="text-[14px] font-bold tracking-[0.4em] text-[#3f5a6d] mt-2 uppercase">ZYRABIT</span>
-        </div>
-
-        <nav class="flex-1 space-y-10">
-            <div class="space-y-4">
-                <h2 class="text-[11px] font-semibold text-black/40 uppercase tracking-[0.2em]">Node Health</h2>
-                <div class="space-y-3">
-                    <div id="health-api" class="flex items-center justify-between p-3 bg-black/5 rounded-2xl">
-                        <span class="text-xs font-medium text-black/60">Core API</span>
-                        <zyra-status-dot id="health-api-dot" status="offline"></zyra-status-dot>
-                    </div>
-                    <div id="health-slm" class="flex items-center justify-between p-3 bg-black/5 rounded-2xl">
-                        <span class="text-xs font-medium text-black/60">SLM Engine</span>
-                        <zyra-status-dot id="health-slm-dot" status="offline"></zyra-status-dot>
-                    </div>
-                    <div id="health-db" class="flex items-center justify-between p-3 bg-black/5 rounded-2xl">
-                        <span class="text-xs font-medium text-black/60">Vector DB</span>
-                        <zyra-status-dot id="health-db-dot" status="offline"></zyra-status-dot>
-                    </div>
-                    <div id="health-mcp" class="flex items-center justify-between p-3 bg-black/5 rounded-2xl">
-                        <span class="text-xs font-medium text-black/60">MCP Bridge</span>
-                        <zyra-status-dot id="health-mcp-dot" status="offline"></zyra-status-dot>
-                    </div>
-
-                </div>
-            </div>
-
-            <div class="space-y-4">
-                <h2 class="text-[11px] font-semibold text-black/40 uppercase tracking-[0.2em]">Connectivity</h2>
-                <div class="grid grid-cols-1 gap-3">
-                    <button id="toggle-ingest"
-                        class="flex flex-col items-center justify-center p-4 bg-black/5 border border-black/5 rounded-3xl hover:bg-black/10 transition-all active:scale-95 group">
-                        <span class="text-2xl mb-1 group-hover:scale-110 transition-transform">📁</span>
-                        <span class="text-[10px] font-bold text-black/60">VAULT</span>
-                    </button>
-                </div>
-            </div>
-
-            <div class="space-y-4">
-                <h2 class="text-[11px] font-semibold text-black/40 uppercase tracking-[0.2em]">Security & Help</h2>
-                <div class="space-y-2">
-                    <button id="toggle-gdpr"
-                        class="w-full flex items-center justify-between p-4 bg-black/5 rounded-3xl hover:bg-black/10 transition-all">
-                        <span class="text-xs font-semibold text-black/60">GateKeeper</span>
-                        <span class="text-sm">🛡️</span>
-                    </button>
-
-                    <button id="toggle-settings"
-                        class="w-full flex items-center justify-between p-4 bg-black/5 rounded-3xl hover:bg-black/10 transition-all">
-                        <span class="text-xs font-semibold text-black/60">Sovereign Settings</span>
-                        <span class="text-sm">⚙️</span>
-                    </button>
-
-                    <button id="toggle-docs"
-                        class="w-full flex items-center justify-between p-4 bg-black/5 rounded-3xl hover:bg-black/10 transition-all">
-                        <span class="text-xs font-semibold text-black/60">Documentation</span>
-                        <span class="text-sm">📚</span>
-                    </button>
-                </div>
-            </div>
-
-        </nav>
-
-        <div class="mt-auto pt-8 border-t border-black/5 flex items-center justify-between">
-            <span class="text-[10px] font-medium text-black/30">v2.1.0 Sovereign</span>
-            <div class="w-2 h-2 rounded-full bg-green-500 animate-pulse shadow-lg shadow-green-500/20"></div>
-        </div>
+<body>
+  <main class="app-shell" id="app-shell">
+    <aside class="library" aria-label="Document library">
+      <div class="library-top">
+        <a class="brand" href="/" aria-label="Zyrabit home"><img src="/img/logo_zyrabit.png" alt=""><span>ZYRABIT</span></a>
+        <button id="collapse-library" class="icon-button desktop-only" aria-label="Collapse library">‹</button>
+      </div>
+      <button id="toggle-ingest" class="primary-action" type="button"><span>+</span><b>Import</b><em>documents</em></button>
+      <input id="file-input" class="hidden" type="file" multiple accept=".pdf,.docx,.txt,.md,.wav,.mp3,.m4a,.mp4,.webm,.ogg,.flac">
+      <div id="drop-zone" class="drop-zone hidden" role="button" tabindex="0" aria-label="Import documents by choosing files">
+        <div id="drop-zone-content"><span>↓</span> Drop files or browse</div><div id="drop-zone-loader" class="hidden">Preparing document…</div>
+      </div>
+      <div class="library-label"><span>Documents</span><span id="document-count">0</span></div>
+      <div id="vault-list" class="document-list" aria-live="polite"></div>
+      <div class="library-bottom">
+        <button id="toggle-settings" type="button">Instructions</button><button id="toggle-gdpr" type="button">Activity</button>
+      </div>
     </aside>
 
-    <!-- MAIN CHAT -->
-    <main class="flex-1 flex flex-col relative h-screen bg-[#f5f5f7]">
+    <section class="workspace">
+      <header class="topbar">
+        <button id="open-library" class="icon-button mobile-only" aria-label="Open documents">☰</button>
+        <div class="document-context"><span class="context-dot"></span><span id="active-document-title">All documents</span><span id="active-document-description">Your local workspace</span></div>
+        <div class="topbar-actions"><button id="clear-conversation" class="quiet-action" type="button">Clear conversation</button><span id="status-pill" class="connection-status"><i></i><span>Connecting</span></span><button id="toggle-docs" class="icon-button" aria-label="Help">?</button></div>
+      </header>
 
-        <!-- HEADER -->
-        <header
-            class="h-20 flex items-center justify-between px-6 md:px-10 glass-premium border-b border-black/5 absolute top-0 w-full z-10">
-            <div>
-                <!-- Removed SYSTEM READY and Model badges per user request -->
-            </div>
+      <div id="chat-container" class="chat-scroll" aria-live="polite">
+        <section id="floating-suggestions" class="welcome">
+          <p class="kicker">LOCAL DOCUMENT ANALYSIS</p>
+          <h1>Think with your documents.</h1>
+          <p class="welcome-copy">Import a file, choose a starting point, or ask a question. Answers stay grounded in your local library.</p>
+          <div class="starter-actions">
+            <button class="starter" type="button" data-prompt="Give me a concise summary of the key points."><span>01</span> Summarize a document</button>
+            <button class="starter" type="button" data-prompt="Find the decisions, open questions, and next steps."><span>02</span> Find decisions and next steps</button>
+            <button class="starter" type="button" data-prompt="Compare the arguments and differences across my documents."><span>03</span> Compare documents</button>
+          </div>
+        </section>
+      </div>
 
-            <!-- Redundant K Z badges removed for cleaner aesthetic -->
-        </header>
+      <div class="composer-area">
+        <div id="active-context-chip" class="context-chip hidden"><span>⌑</span><span id="active-context-name"></span><button id="clear-active-document" type="button" aria-label="Clear active document">×</button></div>
+        <form id="chat-form" class="composer">
+          <textarea id="chat-input" rows="1" aria-label="Ask about your documents" placeholder="Ask about your documents…"></textarea>
+          <button id="chat-submit" type="submit" aria-label="Send"><span class="button-text">↑</span><span class="loader-ios hidden"></span></button>
+        </form>
+        <p>Enter to send <span>·</span> Shift + Enter for a new line</p>
+      </div>
+    </section>
+  </main>
+  <div id="onboarding-modal" class="onboarding hidden"><form id="onboarding-form" class="onboarding-card"><p class="kicker">WELCOME</p><h1>Set up your workspace</h1><p>Two details, then you can start asking about your documents.</p><label>Your name<input id="ob-name" required placeholder="Your name"></label><label>Assistant name<input id="ob-assistant" required value="Zyra"></label><input id="ob-email" type="hidden" value="local@workspace"><input id="ob-role" type="hidden" value="Workspace owner"><input id="ob-interests" type="hidden" value="Document analysis"><input id="ob-persona" type="hidden" value="Precise"><input id="ob-tone" type="hidden" value="Clear"><button class="primary-action" type="submit">Continue</button><button id="ob-skip" class="quiet-action" type="button">Skip for now</button></form></div>
 
-        <!-- CHAT LIST -->
-        <div id="chat-container" class="flex-1 overflow-y-auto p-4 md:p-8 pt-24 space-y-3 scrollbar-hide pb-48">
-
-
-            <!-- INITIAL SUGGESTIONS (Zero-Lag) -->
-            <div id="floating-suggestions" class="flex flex-col items-center justify-center py-12 text-center max-w-lg mx-auto transition-opacity duration-500">
-                <div class="w-24 h-24 rounded-[2rem] bg-white shadow-2xl flex items-center justify-center mb-8 animate-bounce-subtle border border-[#a9c4d9]/30">
-                    <img src="/img/logo_zyrabit.png" alt="Zyra" class="w-12 h-12 object-contain">
-                </div>
-                <h1 class="text-3xl font-bold tracking-tight text-[#3f5a6d] mb-4">Sovereign Architecture</h1>
-                <p class="text-sm text-[#323439]/60 leading-relaxed mb-6">Your personal assistant is ready to build with you.</p>
-                
-                <div class="bg-white/80 backdrop-blur-md p-6 rounded-3xl border border-black/5 shadow-sm max-w-md text-center w-full">
-                    <h3 class="text-sm font-bold text-[#3f5a6d] mb-2">⚡ Zero-Lag Sovereign Commands</h3>
-                    <p class="text-xs text-[#323439]/60 mb-4">Instant execution via SQLite, zero LLM latency.</p>
-                    <div class="grid grid-cols-2 gap-2 text-left">
-                        <div class="bg-black/5 p-2 rounded-xl text-xs"><span class="font-bold text-zyrabit-primary">/stats</span> - Metrics</div>
-                        <div class="bg-black/5 p-2 rounded-xl text-xs"><span class="font-bold text-zyrabit-primary">/vault</span> - Knowledge base</div>
-                        <div class="bg-black/5 p-2 rounded-xl text-xs"><span class="font-bold text-zyrabit-primary">/clear</span> - Reset session</div>
-                        <div class="bg-black/5 p-2 rounded-xl text-xs"><span class="font-bold text-zyrabit-primary">/tools</span> - Capabilities</div>
-                    </div>
-                </div>
-            </div>
-
-        </div>
-
-        <!-- INPUT AREA (Relative to flow) -->
-        <div class="w-full max-w-4xl px-6 z-20 mx-auto pb-10">
-            <div class="glass-premium p-4 rounded-[2.5rem] shadow-2xl mb-4 border border-black/5">
-                <form id="chat-form" class="flex items-center gap-4">
-                    <!-- Clip button removed for exquisite look. Vault is accessible from sidebar button. -->
-                    <textarea id="chat-input" rows="1"
-                        class="flex-1 bg-transparent border-none py-2 px-2 outline-none resize-none placeholder-[#3f5a6d]/30 text-[15px] font-medium"
-                        placeholder="Type your command..."></textarea>
-
-                    <button type="submit" id="chat-submit"
-                        class="w-12 h-12 bg-[#3f5a6d] text-white rounded-full flex items-center justify-center transition-all hover:scale-105 active:scale-95 shadow-xl shadow-[#3f5a6d]/20">
-                        <span class="button-text text-xl">↑</span>
-                        <div class="loader-ios hidden"></div>
-                    </button>
-                </form>
-            </div>
-
-
-            <!-- FOOTER -->
-            <footer
-                class="flex items-center justify-between px-4 text-[10px] font-bold text-black/20 uppercase tracking-[0.2em]">
-                <div>© 2026 ZYRABIT SLM — SOVEREIGN OS</div>
-                <div class="flex gap-6">
-                    <a href="https://www.zyrabit.com" target="_blank"
-                        class="hover:text-black/40 transition-colors">WWW.ZYRABIT.COM</a>
-                    <a href="https://github.com/Zyrabit-tech/zyrabit-SLM" target="_blank"
-                        class="hover:text-black/40 transition-colors">GITHUB REPO</a>
-                </div>
-            </footer>
-        </div>
-
-
-        <!-- OVERLAYS (Panels) -->
-        <div id="gdpr-panel" class="side-panel glass-premium rounded-[2.5rem] p-5 flex flex-col shadow-3xl">
-
-
-            <div class="flex items-center justify-between mb-8">
-                <h2 class="text-xl font-bold tracking-tight">GateKeeper Logs</h2>
-                <button id="close-gdpr"
-                    class="w-8 h-8 rounded-full bg-black/5 flex items-center justify-center hover:bg-black/10 transition-all">×</button>
-            </div>
-            <div class="flex-1 overflow-y-auto space-y-4 font-mono text-[11px] bg-black/5 p-6 rounded-3xl border border-black/5"
-                id="gdpr-logs">
-                <div class="text-black/30 italic">Monitoring sovereign stream...</div>
-            </div>
-        </div>
-
-        <div id="ingest-panel" class="side-panel glass-premium rounded-[2.5rem] p-5 flex flex-col shadow-3xl">
-
-
-            <div class="flex items-center justify-between mb-8">
-                <h2 class="text-xl font-bold tracking-tight">Vault Management</h2>
-                <button id="close-ingest"
-                    class="w-8 h-8 rounded-full bg-black/5 flex items-center justify-center hover:bg-black/10 transition-all">×</button>
-            </div>
-            <div id="drop-zone"
-                class="border-2 border-dashed border-black/10 rounded-[2rem] p-10 text-center hover:border-black/20 transition-all bg-black/5 mb-8 group">
-                <div id="drop-zone-content">
-                    <div class="text-4xl mb-4 group-hover:scale-110 transition-transform">📁</div>
-                    <p class="text-xs font-semibold text-black/60">Import to Vault</p>
-                </div>
-                <div id="drop-zone-loader" class="hidden flex flex-col items-center">
-                    <div class="loader-ios mb-4"></div>
-                    <p class="text-[11px] font-bold text-black/40 uppercase tracking-widest">Hashing...</p>
-                </div>
-                <input type="file" id="file-input" multiple class="hidden">
-            </div>
-            <div id="vault-list" class="flex-1 overflow-y-auto space-y-3"></div>
-        </div>
-
-        <div id="settings-panel" class="side-panel glass-premium rounded-[2.5rem] p-5 flex flex-col shadow-3xl">
-            <div class="flex items-center justify-between mb-8">
-                <h2 class="text-xl font-bold tracking-tight">Sovereign Settings</h2>
-                <button id="close-settings"
-                    class="w-8 h-8 rounded-full bg-black/5 flex items-center justify-center hover:bg-black/10 transition-all">×</button>
-            </div>
-            <form id="settings-form" class="flex-1 flex flex-col justify-between">
-                <div class="space-y-4 flex-1">
-                    <div class="space-y-2 flex flex-col h-full">
-                        <label class="text-[10px] font-bold text-black/30 uppercase tracking-widest ml-4">System Prompt</label>
-                        <textarea id="settings-system-prompt" class="input-apple resize-none font-mono text-xs p-4 flex-1" style="min-height: 250px;" placeholder="You are Zyra, a helpful sovereign assistant."></textarea>
-                    </div>
-                </div>
-                <button type="submit" class="w-full py-4 btn-apple-primary text-xs font-bold tracking-widest mt-6">SAVE CONFIG</button>
-            </form>
-        </div>
-
-        <!-- ONBOARDING MODAL -->
-        <div id="onboarding-modal"
-            class="fixed inset-0 bg-black/40 backdrop-blur-xl z-[100] flex items-center justify-center hidden p-6">
-            <div class="bg-white rounded-[3rem] w-full max-w-xl p-12 shadow-3xl animate-in zoom-in duration-500">
-                <div class="text-center mb-10">
-                    <img src="/img/logo_zyrabit.png" alt="Zyra" class="w-16 h-16 object-contain mx-auto mb-6">
-                    <h2 class="text-3xl font-bold tracking-tight text-[#3f5a6d]">Welcome to Zyrabit</h2>
-                    <p class="text-sm text-[#323439]/40 mt-3">Let's personalize your sovereign experience.</p>
-                </div>
-
-                <form id="onboarding-form" class="space-y-6">
-                    <div class="grid grid-cols-2 gap-4">
-                        <div class="space-y-2">
-                            <label class="text-[10px] font-bold text-black/30 uppercase tracking-widest ml-4">Full
-                                Name</label>
-                            <input type="text" id="ob-name" required class="input-apple" placeholder="Abraham Gomez">
-                        </div>
-                        <div class="space-y-2">
-                            <label
-                                class="text-[10px] font-bold text-black/30 uppercase tracking-widest ml-4">Email</label>
-                            <input type="email" id="ob-email" required class="input-apple"
-                                placeholder="contact@zyrabit.com">
-                        </div>
-                    </div>
-
-                    <div class="grid grid-cols-2 gap-4">
-                        <div class="space-y-2">
-                            <label class="text-[10px] font-bold text-black/30 uppercase tracking-widest ml-4">Current
-                                Role</label>
-                            <input type="text" id="ob-role" required class="input-apple" placeholder="Founder Zyrabit">
-                        </div>
-                        <div class="space-y-2">
-                            <label class="text-[10px] font-bold text-black/30 uppercase tracking-widest ml-4">Assistant Name</label>
-                            <input type="text" id="ob-assistant" class="input-apple" placeholder="Zyra (or custom name)">
-                        </div>
-                    </div>
-
-
-                    <div class="grid grid-cols-2 gap-4">
-                        <div class="space-y-2">
-                            <label class="text-[10px] font-bold text-black/30 uppercase tracking-widest ml-4">Persona
-                                Profile</label>
-                            <select id="ob-persona" class="input-apple appearance-none">
-                                <option value="general">Sovereign General</option>
-                                <option value="marketing">Marketing Expert</option>
-                                <option value="sales">Sales & Growth</option>
-                                <option value="admin">Admin & Ops</option>
-                                <option value="aviation">Aviation Specialist</option>
-                            </select>
-                        </div>
-                        <div class="space-y-2">
-                            <label
-                                class="text-[10px] font-bold text-black/30 uppercase tracking-widest ml-4">Intelligence
-                                Tone</label>
-                            <select id="ob-tone" class="input-apple appearance-none">
-                                <option value="professional">Professional</option>
-                                <option value="disruptive">Disruptive</option>
-                                <option value="friendly">Friendly</option>
-                                <option value="technical">Highly Technical</option>
-                            </select>
-                        </div>
-                    </div>
-
-                    <div class="space-y-2">
-                        <label class="text-[10px] font-bold text-black/30 uppercase tracking-widest ml-4">Core
-                            Objectives</label>
-                        <textarea id="ob-interests" rows="2" required class="input-apple resize-none"
-                            placeholder="Scale Zyrabit and dominate the sovereign AI space."></textarea>
-                    </div>
-
-
-                    <div class="flex gap-4 pt-6">
-                        <button type="button" id="ob-skip"
-                            class="flex-1 py-4 text-xs font-bold text-black/40 hover:bg-black/5 rounded-3xl transition-all">SKIP</button>
-                        <button type="submit"
-                            class="flex-1 py-4 btn-apple-primary text-xs font-bold tracking-widest">GET STARTED</button>
-                    </div>
-                </form>
-            </div>
-        </div>
-
-        <!-- SNACKBAR CONTAINER -->
-        <div id="snackbar-container"
-            class="fixed top-24 left-1/2 -translate-x-1/2 z-[100] flex flex-col gap-3 pointer-events-none w-full max-w-sm">
-        </div>
-
-
-        <div id="docs-panel" class="side-panel glass-premium rounded-[3rem] p-8 flex flex-col shadow-3xl">
-            <div class="flex items-center justify-between mb-8">
-                <h2 class="text-2xl font-bold tracking-tight">Documentation</h2>
-                <button id="close-docs" class="w-10 h-10 rounded-full bg-black/5 flex items-center justify-center hover:bg-black/10 transition-all">×</button>
-            </div>
-            <div class="flex-1 overflow-y-auto space-y-6 pr-4">
-                <section>
-                    <h3 class="text-xs font-bold text-black/30 uppercase tracking-widest mb-3">Sovereign Commands</h3>
-                    <ul class="space-y-2 text-sm text-black/70">
-                        <li class="bg-black/5 p-3 rounded-2xl"><strong>/vault</strong> - Open knowledge management</li>
-                        <li class="bg-black/5 p-3 rounded-2xl"><strong>/clear</strong> - Reset current session</li>
-                        <li class="bg-black/5 p-3 rounded-2xl"><strong>/stats</strong> - View infrastructure latency</li>
-                    </ul>
-                </section>
-                <section>
-                    <h3 class="text-xs font-bold text-black/30 uppercase tracking-widest mb-3">Telegram Bridge</h3>
-                    <p class="text-sm leading-relaxed text-black/60">
-                        Your Zyrabit is bi-directionally linked. Messages sent from your phone appear here in real-time, allowing for sovereign remote control.
-                    </p>
-                </section>
-            </div>
-        </div>
-    </main>
-
-
-    <!-- TELEGRAM CONFIG MODAL -->
-    <div id="telegram-modal"
-        class="fixed inset-0 bg-black/40 backdrop-blur-xl z-[100] flex items-center justify-center hidden p-6">
-        <div class="bg-white rounded-[3rem] w-full max-w-md p-10 shadow-3xl animate-in zoom-in duration-300 relative border border-black/5">
-            <button id="close-telegram-modal"
-                class="absolute top-6 right-6 w-8 h-8 rounded-full bg-black/5 flex items-center justify-center hover:bg-black/10 transition-all font-bold text-sm">×</button>
-            <div class="text-center mb-6">
-                <span class="text-4xl mb-4 block">✈️</span>
-                <h3 class="text-xl font-bold text-[#3f5a6d]">Telegram Bridge Config</h3>
-                <p class="text-[11px] text-[#323439]/55 mt-2">Link your Zyrabit SLM to Telegram for sovereign remote control.</p>
-            </div>
-            <div class="space-y-4 text-xs text-[#323439]/75 leading-relaxed bg-black/5 p-5 rounded-2xl border border-black/5 font-medium animate-none">
-                <p><strong>1. Create Bot</strong>: Search for <a href="https://t.me/BotFather" target="_blank" class="text-blue-500 font-bold hover:underline">@BotFather</a> on Telegram, send <code>/newbot</code>, and copy the <strong>HTTP API Token</strong>.</p>
-                <p><strong>2. Get Chat ID</strong>: Search for <a href="https://t.me/userinfobot" target="_blank" class="text-blue-500 font-bold hover:underline">@userinfobot</a> and send any message to get your numeric <strong>Chat ID</strong>.</p>
-                <p><strong>3. Edit Environment</strong>: Open the local <code>.env</code> file in your workspace and add:
-                    <pre class="bg-black/10 p-2 rounded mt-1 font-mono text-[10px]">TELEGRAM_BOT_TOKEN="your_token"
-TELEGRAM_CHAT_ID="your_chat_id"</pre>
-                </p>
-                <p><strong>4. Restart Stack</strong>: Rebuild or restart the stack using: <code>./zyra-up.sh start</code>.</p>
-            </div>
-        </div>
-    </div>
-
-    <script type="module" src="/src/ui/components.js"></script>
-    <script type="module" src="/src/main.js"></script>
+  <div id="gdpr-panel" class="side-panel"><div class="panel-header"><div><p class="kicker">SESSION</p><h2>Activity</h2></div><button id="close-gdpr" class="icon-button" type="button">×</button></div><div class="activity-summary"><span class="activity-pulse"></span><div><b>Live workspace events</b><p>Imports, searches, and replies from this session.</p></div></div><div id="gdpr-logs" class="activity-log"><div class="activity-empty"><span>○</span><p>No activity yet</p><small>Your session events will appear here.</small></div></div></div>
+  <div id="settings-panel" class="side-panel"><div class="panel-header"><div><p class="kicker">BEHAVIOR</p><h2>Response instructions</h2></div><button id="close-settings" class="icon-button" type="button">×</button></div><form id="settings-form" class="settings-form"><div class="instruction-note"><b>Set the assistant’s working style</b><p>These instructions are applied to new replies in this workspace.</p></div><label for="settings-system-prompt">Base instruction</label><textarea id="settings-system-prompt" placeholder="For example: answer concisely, use bullet points, and identify uncertainty."></textarea><button type="submit" class="primary-action">Save instructions</button></form></div>
+  <div id="docs-panel" class="side-panel"><div class="panel-header"><div><p class="kicker">GUIDE</p><h2>How it works</h2></div><button id="close-docs" class="icon-button" type="button">×</button></div><div class="guide"><p class="guide-intro">A compact workflow for working with local documents and evidence.</p><section class="guide-section"><p class="guide-label">START HERE</p><div class="guide-flow"><div class="guide-row"><span class="guide-index">01</span><div><p class="guide-row-title">Add material <span class="guide-row-tag">Import</span></p><p class="guide-row-copy">Upload files into the local library. Zyrabit indexes text, PDFs, Word files, and supported audio.</p></div></div><div class="guide-row"><span class="guide-index">02</span><div><p class="guide-row-title">Choose scope <span class="guide-row-tag">Focus</span></p><p class="guide-row-copy">Select one document for a focused answer, or keep the full library available for comparison.</p></div></div><div class="guide-row"><span class="guide-index">03</span><div><p class="guide-row-title">Ask naturally <span class="guide-row-tag">Query</span></p><p class="guide-row-copy">Ask for summaries, decisions, contradictions, explanations, or a specific output format.</p></div></div></div></section><section class="guide-section"><p class="guide-label">READING ANSWERS</p><div class="guide-callout"><div class="guide-callout-head"><span class="guide-callout-title">Evidence check</span><span class="guide-pill">Sources</span></div><p class="guide-callout-copy">When sources appear, the answer used retrieved passages. Without sources, the reply is a direct local-model response.</p></div></section><section class="guide-section"><p class="guide-label">USEFUL PROMPTS</p><div class="guide-prompts"><button class="guide-prompt" type="button" data-prompt="Give me a concise summary of the key points.">Summarize the key points</button><button class="guide-prompt" type="button" data-prompt="Find the decisions, open questions, and next steps.">Find decisions and next steps</button><button class="guide-prompt" type="button" data-prompt="What is missing, unclear, or contradictory in these documents?">Find gaps and contradictions</button></div></section><p class="guide-footer">Tip: press <kbd>⌘</kbd> <kbd>Enter</kbd> to send a longer question.</p></div></div>
+  <div id="snackbar-container" class="fixed top-6 left-1/2 -translate-x-1/2 z-[100] flex flex-col gap-3 pointer-events-none w-full max-w-sm"></div>
+  <zyra-status-dot id="health-api-dot" status="offline" class="hidden"></zyra-status-dot><zyra-status-dot id="health-slm-dot" status="offline" class="hidden"></zyra-status-dot><zyra-status-dot id="health-db-dot" status="offline" class="hidden"></zyra-status-dot><zyra-status-dot id="health-mcp-dot" status="offline" class="hidden"></zyra-status-dot>
+  <script type="module" src="/src/ui/components.js"></script><script type="module" src="/src/main.js"></script>
 </body>
-
 </html>

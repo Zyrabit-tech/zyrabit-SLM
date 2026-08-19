@@ -1,62 +1,62 @@
 ---
 sidebar_position: 2
-title: Instalación Ubuntu + Tenstorrent P150A
-description: Guía de despliegue de Zyrabit SLM en servidor Ubuntu Linux con tarjeta aceleradora PCIe Tenstorrent P150A (Wormhole RISC-V).
+title: 'Ubuntu + Tenstorrent P150A'
+description: 'Deploy Zyrabit SLM on Ubuntu Linux with a Tenstorrent P150A PCIe accelerator'
 ---
 
-# Guía de Instalación: Ubuntu + Tenstorrent P150A (Wormhole)
+# Installation Guide: Ubuntu + Tenstorrent P150A (Wormhole)
 
-Esta guía detalla los pasos para desplegar **Zyrabit SLM** en una máquina con sistema operativo **Ubuntu Linux** equipada con la tarjeta aceleradora de IA **Tenstorrent P150A** (arquitectura Wormhole PCIe RISC-V).
+This guide details the steps to deploy **Zyrabit SLM** on a machine with **Ubuntu Linux** operating system equipped with the **Tenstorrent P150A** AI accelerator card (Wormhole PCIe RISC-V architecture).
 
 ---
 
-## 📋 Requisitos Previos del Sistema
+## 📋 System Prerequisites
 
-### 1. Requisitos de Hardware
+### 1. Hardware Requirements
 
-- **Procesador:** x86_64 o ARM64 (mínimo 4 núcleos)
-- **RAM del Host:** 16 GB o superior (24 GB recomendado si ejecutas modelos de 7B)
-- **Acelerador PCIe:** Tarjeta **Tenstorrent P150A** (16 GB TT-DDR6) instalada en ranura PCIe Gen4/Gen5 con alimentación auxiliar de 8 pines.
-- **Ranura PCIe:** Verificar acceso al dispositivo `/dev/tenstorrent`.
+- **Processor:** x86_64 or ARM64 (minimum 4 cores)
+- **Host RAM:** 16 GB or higher (24 GB recommended if running 7B models)
+- **PCIe Accelerator:** **Tenstorrent P150A** card (16 GB TT-DDR6) installed in a PCIe Gen4/Gen5 slot with 8-pin auxiliary power.
+- **PCIe Slot:** Verify access to the `/dev/tenstorrent` device.
 
-### 2. Requisitos de Software (Ubuntu 22.04 LTS o 24.04 LTS)
+### 2. Software Requirements (Ubuntu 22.04 LTS or 24.04 LTS)
 
-- Ubuntu Linux 22.04 LTS o superior (64-bit / x86_64).
-- Controladores KMD de Tenstorrent (`tenstorrent-kmd`) instalados.
+- Ubuntu Linux 22.04 LTS or higher (64-bit / x86_64).
+- Tenstorrent KMD drivers (`tenstorrent-kmd`) installed.
 - Docker Engine & Docker Compose V2.
-- Herramienta Python `uv` (para aislamiento hermético).
+- Python tool `uv` (for hermetic isolation).
 
 > [!NOTE]
-> **Si estás en Windows (PowerShell/CMD):**
-> `uname` es un comando de Linux. Para verificar la arquitectura de tu procesador desde Windows antes de instalar Ubuntu:
+> **If you are on Windows (PowerShell/CMD):**
+> `uname` is a Linux command. To verify your processor architecture from Windows before installing Ubuntu:
 >
 > ```powershell
 > (Get-CimInstance Win32_OperatingSystem).OSArchitecture
-> # o ejecutando:
+> # or by running:
 > $env:PROCESSOR_ARCHITECTURE
 > ```
 >
-> Si devuelve `64-bit` o `AMD64`, tu equipo soporta Ubuntu 64-bit para la P150A.
+> If it returns `64-bit` or `AMD64`, your machine supports 64-bit Ubuntu for the P150A.
 
 ---
 
-## 🛠️ Paso 1: Verificación de la Tarjeta Tenstorrent P150A
+## 🛠️ Step 1: Tenstorrent P150A Card Verification
 
-Asegúrate de que Ubuntu reconozca la tarjeta PCIe y que los drivers KMD estén cargados:
+Ensure that Ubuntu recognizes the PCIe card and that the KMD drivers are loaded:
 
 ```bash
-# 1. Verificar presencia de la tarjeta en el bus PCIe (ID 1e52:f000 o similar)
+# 1. Verify presence of the card on the PCIe bus (ID 1e52:f000 or similar)
 lspci | grep -i tenstorrent
 
-# 2. Confirmar existencia del nodo de dispositivo PCIe
+# 2. Confirm existence of the PCIe device node
 ls -l /dev/tenstorrent*
 
-# 3. Verificar estado de la tarjeta y temperatura mediante tt-smi (si está instalado)
+# 3. Verify card status and temperature via tt-smi (if installed)
 tt-smi
 ```
 
 > [!IMPORTANT]
-> Si el dispositivo `/dev/tenstorrent` no existe, instala el controlador oficial del kernel de Tenstorrent ejecutando:
+> If the `/dev/tenstorrent` device does not exist, install the official Tenstorrent kernel driver by running:
 >
 > ```bash
 > sudo apt-get update && sudo apt-get install -y dkms build-essential
@@ -67,47 +67,46 @@ tt-smi
 
 ---
 
-## 🚀 Paso 2: Clonar el Repositorio Zyrabit SLM
+## 🚀 Step 2: Clone the Zyrabit SLM Repository
 
 ```bash
-# Clonar el proyecto
+# Clone the project
 git clone https://github.com/Zyrabit-tech/zyrabit-SLM.git
 cd zyrabit-SLM
 ```
 
 ---
 
-## ⚡ Paso 3: Instalación Interactiva (Modo Tenstorrent P150A)
+## ⚡ Step 3: Interactive Installation (Tenstorrent P150A Mode)
 
-Zyrabit incluye soporte nativo para aceleradores Tenstorrent en su script unificado `./zyra`:
+Zyrabit includes native support for Tenstorrent accelerators in its unified `./zyra.sh` script:
 
 ```bash
-# Iniciar el instalador/wizard interactivo
-./zyra wizard
+# Start the installer
+./zyra.sh install
 ```
 
-En el menú interactivo, selecciona los siguientes valores:
+In the interactive menu, select your preferred settings:
 
-1. **Environment:** `1) Local / Dev` (o `2) Production` con tu dominio).
-2. **Inference Engine:** Selecciona la opción **`5) Tenstorrent P150A / Wormhole`**.
-3. **AI Model:** Selecciona el modelo deseado (ej. `qwen2.5:7b` o `qwen2.5:1.5b`).
-4. **Database:** `1) SQLite WAL` (desarrollo) o `2) PostgreSQL` (producción).
-5. **Whisper:** `1) Yes` si deseas transcripción de audio local con aceleración.
+1. **Hardware / Inference Engine:** Select **`2) Tenstorrent Hardware (vLLM-TT Metalium)`** or accept auto-detection.
+2. **AI Model:** Select the desired model (e.g., `qwen2.5:3b`, `deepseek-r1:1.5b`, or `qwen2.5:7b`).
+3. **ReAct Agent:** Select `1) Yes` to enable reasoning + tools.
+4. **Deployment Mode:** `1) Full Sovereign Platform` or `2) Standalone Bare Engine`.
 
-### Instalación Directa sin Wizard (Vía Banderas / Variables)
+### Direct Installation without Prompts (Via Flags / Variables)
 
-Si prefieres realizar la instalación automatizada desde la terminal o scripts CI/CD:
+If you prefer to perform the automated installation from the terminal or CI/CD scripts:
 
 ```bash
-# Iniciar stack activando el perfil Tenstorrent
-./zyra start --profile tenstorrent
+# Silent install using existing .env or default flags
+./zyra.sh install -y
 ```
 
 ---
 
-## 🐋 Paso 4: Arquitectura del Contenedor Tenstorrent
+## 🐋 Step 4: Tenstorrent Container Architecture
 
-Cuando se selecciona el perfil `tenstorrent`, Docker Compose levanta el servicio **`zyrabit-tt-metal`** definido en `docker-compose.yml`:
+When the `tenstorrent` profile is selected, Docker Compose brings up the **`zyrabit-tt-metal`** service defined in `docker-compose.yml`:
 
 ```yaml
   zyrabit-tt-metal:
@@ -124,41 +123,41 @@ Cuando se selecciona el perfil `tenstorrent`, Docker Compose levanta el servicio
       - "8090:8090"
 ```
 
-Este servicio:
+This service:
 
-- Monta directamente el dispositivo de hardware `/dev/tenstorrent` dentro del contenedor Linux.
-- Utiliza la compilación TT-MLIR / TT-Metalium para ejecutar la inferencia de matrices sobre los núcleos RISC-V Tensix de la P150A.
-- Expone la API OpenAI-compatible en el puerto local `8090`.
+- Directly mounts the `/dev/tenstorrent` hardware device inside the Linux container.
+- Uses the TT-MLIR / TT-Metalium compilation to run matrix inference on the P150A's RISC-V Tensix cores.
+- Exposes the OpenAI-compatible API on local port `8090`.
 
 ---
 
-## ✅ Paso 5: Verificación de Salud y Pruebas
+## ✅ Step 5: Health Check and Testing
 
-Una vez desplegado el stack, verifica la conectividad y el estado del acelerador:
+Once the stack is deployed, verify the connectivity and the accelerator status:
 
 ```bash
-# 1. Comprobar estado de los contenedores
+# 1. Check containers status
 ./zyra verify
 
-# 2. Consultar el endpoint de inferencia activado
+# 2. Query the activated inference endpoint
 curl http://localhost:8082/v1/health
 
-# 3. Realizar una consulta de prueba a la API de Zyrabit
+# 3. Perform a test query to the Zyrabit API
 curl -X POST http://localhost:8082/v1/chat \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer zyrabit-local-token" \
-  -d '{"text": "Hola Zyrabit, confirma que estás ejecutando inferencia sobre la tarjeta Tenstorrent P150A."}'
+  -d '{"text": "Hello Zyrabit, confirm that you are running inference on the Tenstorrent P150A card."}'
 ```
 
 ---
 
-## 📊 Paso 6: Benchmarks de Rendimiento
+## 📊 Step 6: Performance Benchmarks
 
-Para medir los tokens por segundo (t/s) y la latencia del primer token (TTFT) en la P150A:
+To measure tokens per second (t/s) and time to first token (TTFT) on the P150A:
 
 ```bash
-# Ejecutar benchmark live
+# Run live benchmark
 ./zyra benchmark
 ```
 
-Los resultados reflejarán la aceleración de hardware en la tarjeta Tenstorrent sin consumo de CPU ni memoria RAM del host.
+The results will reflect the hardware acceleration on the Tenstorrent card without CPU or host RAM consumption.

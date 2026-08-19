@@ -20,6 +20,13 @@ DB_PORT: int = int(os.getenv("DB_PORT", 8000))
 RAG_COLLECTION: str = os.getenv("RAG_COLLECTION", "zyrabit_knowledge")
 MODEL_NAME: str = os.getenv("MODEL_NAME", "qwen2.5:7b")
 EMBEDDING_MODEL: str = os.getenv("EMBEDDING_MODEL", "mxbai-embed-large")
+# Generation and embeddings may use different local servers.  This is required
+# for llama.cpp generation, which does not implement Ollama's /api/embed route.
+EMBEDDING_URL: str = os.getenv("EMBEDDING_URL", "http://host.docker.internal:11434").rstrip("/")
+NODE_DATA_DIR: str = os.getenv("NODE_DATA_DIR", "/app/db_data/node")
+NODE_ENABLE_OCR: bool = os.getenv("NODE_ENABLE_OCR", "false").lower() == "true"
+NODE_RETRIEVAL_MODE: str = os.getenv("NODE_RETRIEVAL_MODE", "hybrid").strip().lower()
+ENABLE_LEGACY_EXTENSIONS: bool = os.getenv("ENABLE_LEGACY_EXTENSIONS", "false").lower() == "true"
 
 # Security
 # Default to local dev origins if not specified. In production, this MUST be set in .env

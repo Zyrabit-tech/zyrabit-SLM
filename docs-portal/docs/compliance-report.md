@@ -1,3 +1,9 @@
+---
+sidebar_position: 3
+title: 'Compliance Reporting'
+description: 'Prometheus metrics available for compliance auditing and internal reporting'
+---
+
 # Compliance Reporting
 
 Zyrabit SLM provides built-in metrics to support internal audits and external compliance reporting.
@@ -9,3 +15,6 @@ Zyrabit SLM provides built-in metrics to support internal audits and external co
 - `zyrabit_token_usage_total`: Provides data for cost-efficiency and resource allocation tracking.
 
 These metrics are exposed via the integrated Prometheus instance and can be visualized in the pre-configured Grafana dashboards.
+
+## Related Documentation
+- [Production Hardening](./production-hardening.md)

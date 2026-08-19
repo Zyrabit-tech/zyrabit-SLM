@@ -114,8 +114,8 @@ class SovereignStateManager:
             if cursor.fetchone()[0] == 0:
                 conn.execute("""
                     INSERT INTO user_profile (id, name, email, role, interests, persona, preferred_model, tone, assistant_name, system_prompt, onboarding_completed)
-                    VALUES (1, 'Abraham', 'abraham@zyrabit.com', 'Co-Founder / Architect', 'Docker, SLMs, quantization, agent architectures', 'soul', 'qwen2.5:7b', 'warm-direct', 'Zyra', ?, 1)
-                """, (DEFAULT_SOUL_PROMPT,))
+                    VALUES (1, '', '', '', '', 'general', 'qwen2.5:1.5b', 'clear', 'Zyra', '', 0)
+                """)
                 logger.info("Seeded default Abraham 'Soul' profile.")
 
             # 4. FTS5 Virtual Table for Zero-Lag Hybrid RAG

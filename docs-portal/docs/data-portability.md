@@ -1,3 +1,9 @@
+---
+sidebar_position: 2
+title: 'Data Portability'
+description: 'Data ownership guarantees, export formats, and decommissioning procedures'
+---
+
 # Data Portability & Exit Strategy
 
 Zyrabit SLM is designed with a commitment to data sovereignty and transparency. We ensure that your organization retains full control over its data, with a clear path to export or migrate your information without vendor lock-in.
@@ -38,3 +44,6 @@ If you decide to decommission Zyrabit SLM:
 3. **Delete volumes (Optional):** `docker volume prune`.
 
 Your datasets remain in open, non-proprietary formats, ensuring they can be repurposed in any other RAG or AI orchestration framework.
+
+## Related Documentation
+- [Production Hardening](./production-hardening.md)

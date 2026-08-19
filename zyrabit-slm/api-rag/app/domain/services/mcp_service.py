@@ -11,8 +11,18 @@ from pathlib import Path
 try:
     from mcp.server.fastmcp import FastMCP
 except ImportError:
-    import unittest.mock as mock
-    FastMCP = mock.MagicMock()
+    class FastMCP:
+        """Lightweight no-op handler when the optional FastMCP package is not present."""
+        def __init__(self, name: str = "Zyrabit Sovereign Core"):
+            self.name = name
+        def tool(self, *args, **kwargs):
+            def decorator(func):
+                return func
+            return decorator
+        def resource(self, *args, **kwargs):
+            def decorator(func):
+                return func
+            return decorator
 
 from app.infrastructure.shared.config import DOCS_DIR
 

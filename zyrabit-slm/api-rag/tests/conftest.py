@@ -1,3 +1,15 @@
+# ==============================================================================
+# JUSTIFICACIÓN DE MOCKS EN PRUEBAS (TEST INFRASTRUCTURE ISOLATION)
+# ==============================================================================
+# Propósito: Aislar las pruebas unitarias y de integración de la infraestructura real.
+# Justificación:
+# 1. Permite ejecutar la suite completa en entornos CI/CD sin requerir hardware
+#    acelerador físico (Tenstorrent P150, GPU NVIDIA o Apple Silicon).
+# 2. Evita dependencias de red externas (cero llamadas salientes) garantizando el
+#    principio de soberanía y determinismo de pruebas offline.
+# 3. Protege bases de datos persistentes locales simulando ChromaDB en memoria.
+# ==============================================================================
+
 import pytest
 import os
 from unittest.mock import MagicMock, AsyncMock, patch
@@ -22,6 +34,8 @@ def client():
 def mock_infrastructure():
     """
     Global fixture that prevents tests from connecting to real infrastructure.
+    Justificación: Aísla el runtime de red y persistencia para asegurar pruebas
+    rápidas, herméticas y reproducibles en cualquier entorno de testing.
     """
     mock_chroma = MagicMock()
     mock_chroma.heartbeat.return_value = True

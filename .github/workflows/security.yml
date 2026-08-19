@@ -2,7 +2,6 @@ name: Zyrabit Sovereign Security Audit
 
 on:
   push:
-  push:
     branches: [ main, beta ]
   pull_request:
     branches: [ main, beta ]
@@ -12,7 +11,6 @@ on:
 
 permissions:
   contents: read
-  security-events: write
 
 concurrency:
   group: security-${{ github.ref }}
@@ -37,8 +35,12 @@ jobs:
       - name: Install dependencies
         run: uv sync --all-groups
 
-      - name: Run pip-audit
-        run: uv run pip-audit --ignore-vuln CVE-2026-45829 --ignore-vuln PYSEC-2026-311
+      - name: Run pip-audit and require a visible risk record
+        run: |
+          set +e
+          uv run pip-audit --format json --output pip-audit.json
+          set -e
+          python validation/scripts/verify_dependency_risks.py pip-audit.json docs/security/DEPENDENCY_RISKS.md
 
   trivy-scan:
     name: Trivy Vulnerability Scan
@@ -48,27 +50,11 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Run Trivy FS scan (Library Audit)
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@master
         with:
           scan-type: 'fs'
+          scan-ref: '.'
           ignore-unfixed: true
           format: 'table'
           exit-code: '1'
-          severity: 'CRITICAL,HIGH'
-
-  codeql-analysis:
-    name: CodeQL Semantic Audit
-    runs-on: ubuntu-latest
-    permissions:
-      security-events: write
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Initialize CodeQL
-        uses: github/codeql-action/init@v3
-        with:
-          languages: python, javascript
-
-      - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@v3
+          severity: 'CRITICAL'

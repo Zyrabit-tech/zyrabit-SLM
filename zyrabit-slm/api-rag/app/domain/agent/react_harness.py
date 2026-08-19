@@ -90,7 +90,7 @@ TOOL_GROUPS = {
 def classify_intent(query: str) -> List[str]:
     """
     Keyword-based intent classifier (0ms, deterministic).
-    Returns list of tool names relevant to the query.
+    Returns list of tool names relevant to the query, or empty list for pure conversational chat.
     """
     query_lower = query.lower()
     matched_tools: set = set()
@@ -98,10 +98,6 @@ def classify_intent(query: str) -> List[str]:
     for group in TOOL_GROUPS.values():
         if any(kw in query_lower for kw in group["keywords"]):
             matched_tools.update(group["tools"])
-
-    # Fallback: if no specific intent matched, use general query tool
-    if not matched_tools:
-        matched_tools = {"secure_query"}
 
     return list(matched_tools)
 
@@ -313,9 +309,5 @@ class ReactHarness:
             "Parece que me he enredado un poco procesando tanta información. "
             "¿Podrías replantear tu pregunta o darme instrucciones más específicas?"
         )
-        if steps_log:
-            last_thought = steps_log[-1].get("thought", "")
-            if last_thought:
-                fallback_msg = f"{fallback_msg}\n\n*Último pensamiento interno:* {last_thought}"
-                
+        # Reasoning traces remain operational telemetry only; never expose them to users.
         return fallback_msg, steps_log

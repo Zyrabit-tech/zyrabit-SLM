@@ -1,28 +1,34 @@
+---
+sidebar_position: 2
+title: 'Documentation Style Guide'
+description: 'Writing standards and formatting conventions for Zyrabit documentation'
+---
+
 # 📝 Zyrabit Documentation Style Guide (ZDSG)
 
-Esta guía establece el estándar para toda la documentación de Zyrabit SLM, garantizando que sea legible tanto para humanos como para IAs.
+This guide establishes the standard for all Zyrabit SLM documentation, ensuring it is readable by both humans and AIs.
 
 ---
 
-## 1. Estructura y Jerarquía
-Toda página debe comenzar con un H1 (`#`) que incluya un emoji descriptivo.
+## 1. Structure and Hierarchy
+Every page must start with an H1 (`#`) that includes a descriptive emoji.
 
-### Ejemplo:
-`# 🛡️ Seguridad Soberana`
+### Example:
+`# 🛡️ Sovereign Security`
 
 ---
 
-## 2. Bloques de Código y Terminal
-El estándar para ejemplos técnicos es vital para la reproducibilidad.
+## 2. Code Blocks and Terminal
+The standard for technical examples is vital for reproducibility.
 
-### Terminal (Interacción)
-Usa el lenguaje `bash`. Si es un comando que el usuario debe ejecutar, usa el prefijo `$`.
+### Terminal (Interaction)
+Use the `bash` language. If it is a command the user must execute, use the `$` prefix.
 ```bash
 $ ./zyra.sh start
 ```
 
-### Logs o Salidas
-No uses el prefijo `$`.
+### Logs or Outputs
+Do not use the `$` prefix.
 ```text
 [INFO] Zyrabit Core started on port 8080
 [SUCCESS] Vector DB connection established
@@ -30,44 +36,44 @@ No uses el prefijo `$`.
 
 ---
 
-## 3. Alertas y Notas (GitHub Style)
-Utilizamos el estándar de alertas de GitHub para resaltar información crítica.
+## 3. Alerts and Notes (GitHub Style)
+We use the GitHub alerts standard to highlight critical information.
 
 > [!NOTE]
-> Información útil o contexto adicional.
+> Useful information or additional context.
 
 > [!WARNING]
-> Advertencias sobre configuraciones que podrían fallar.
+> Warnings about configurations that might fail.
 
 > [!CAUTION]
-> Riesgos de pérdida de datos o brechas de seguridad.
+> Risks of data loss or security breaches.
 
 ---
 
-## 4. Tipografía y Visuales
-*   **Fuentes**: Títulos en `Funnel Display` y cuerpo en `Inter`.
-*   **Código**: `JetBrains Mono`.
-*   **Colores**: Basados en el branding Zyrabit (`#3f5a6d`, `#6090b4`).
+## 4. Typography and Visuals
+*   **Fonts**: Titles in `Funnel Display` and body in `Inter`.
+*   **Code**: `JetBrains Mono`.
+*   **Colors**: Based on Zyrabit branding (`#3f5a6d`, `#6090b4`).
 
 ---
 
-## 5. Estrategia Multilingüe e i18n
-Para soportar múltiples idiomas de forma soberana:
+## 5. Multilingual Strategy and i18n
+To support multiple languages in a sovereign way:
 
-### Estructura de Directorios
-Separamos por código de idioma ISO (2 letras):
+### Directory Structure
+We separate by ISO language code (2 letters):
 - `docs/en/` (Source of truth)
-- `docs/es/` (Traducción oficial)
+- `docs/es/` (Official translation)
 
-### Implementación del Traductor (Zyra-AI Sync)
-Proponemos un flujo automatizado:
-1.  **Agente de Traducción**: Un script de Node/Python que lee los archivos Markdown.
-2.  **Preservación de Estructura**: El agente traduce solo los textos narrativos, dejando intactos los bloques de código, diagramas de Mermaid y enlaces.
-3.  **Localización**: El agente puede ajustar ejemplos (ej. cambiar una ruta `/Users/...` por `/home/...` según el idioma/contexto si es necesario).
+### Translator Implementation (Zyra-AI Sync)
+We propose an automated flow:
+1.  **Translation Agent**: A Node/Python script that reads the Markdown files.
+2.  **Structure Preservation**: The agent translates only the narrative texts, leaving code blocks, Mermaid diagrams, and links intact.
+3.  **Localization**: The agent can adjust examples (e.g., changing a path `/Users/...` to `/home/...` depending on the language/context if necessary).
 
 ---
 
-## 6. AI-Readability (Optimización para LLMs)
-Para que las IAs entiendan mejor nuestra documentación:
-- **Descripciones en Imágenes**: Siempre usa el atributo `alt`.
-- **Metadata**: Incluye un bloque front-matter en cada archivo con `description` y `tags`.
+## 6. AI-Readability (Optimization for LLMs)
+For AIs to better understand our documentation:
+- **Image Descriptions**: Always use the `alt` attribute.
+- **Metadata**: Include a front-matter block in each file with `description` and `tags`.

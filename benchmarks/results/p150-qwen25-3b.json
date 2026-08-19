@@ -1,0 +1,26 @@
+{
+  "timestamp": "2026-08-12T00:39:25Z",
+  "hardware": {
+    "type": "Tenstorrent Blackhole",
+    "board": "p150",
+    "devices": 1,
+    "serial": "",
+    "sysfs": "tenstorrent!0,"
+  },
+  "model": "Qwen/Qwen2.5-3B-Instruct",
+  "engine": "vllm-tt-metalium",
+  "mode": "metal",
+  "arch": "blackhole",
+  "metrics_ms": {
+    "ttft_ms": 81.62,
+    "tps": 21.18,
+    "total_ms": 2647.0,
+    "total_ms_upstream": 2630.69
+  },
+  "usage": {
+    "prompt_tokens": 0,
+    "completion_tokens": 0,
+    "total_tokens": 0
+  },
+  "answer": "I'm sorry, but you haven't provided any specific indexed documents for me to summarize. Could you please provide more details or specify which documents you would like me to summarize? If you have a particular topic or set of keywords in mind, that would also be helpful."
+}

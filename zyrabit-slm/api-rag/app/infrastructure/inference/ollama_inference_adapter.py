@@ -42,16 +42,21 @@ class OllamaInferenceAdapter(InferenceProviderPort):
 
     def _generate_with_retry(self, request: InferenceRequest) -> InferenceResult:
         """Internal generate with exponential backoff retry (3 attempts)."""
+        is_chat = bool(request.messages)
+        target_url = self.endpoint.replace("/api/generate", "/api/chat") if is_chat else self.endpoint
         payload: Dict[str, Any] = {
             "model": request.model,
-            "prompt": request.prompt,
             "stream": request.stream,
             "options": {"num_ctx": 4096},
         }
-        if request.system_prompt:
-            payload["system"] = request.system_prompt
+        if is_chat:
+            payload["messages"] = list(request.messages)
+        else:
+            payload["prompt"] = request.prompt
+            if request.system_prompt:
+                payload["system"] = request.system_prompt
+
         if request.options:
-            # Separate top-level Ollama API params from model options
             for key, value in request.options.items():
                 if key in ("format",):
                     payload[key] = value
@@ -64,7 +69,7 @@ class OllamaInferenceAdapter(InferenceProviderPort):
         for attempt, delay in enumerate(_RETRY_DELAYS):
             start_time = time.time()
             try:
-                response = requests.post(self.endpoint, json=payload, timeout=timeout)
+                response = requests.post(target_url, json=payload, timeout=timeout)
                 latency = max(time.time() - start_time, 0.0)
 
                 if response.status_code != 200:
@@ -77,11 +82,46 @@ class OllamaInferenceAdapter(InferenceProviderPort):
                 except ValueError as exc:
                     raise InferenceProviderError("Ollama returned invalid JSON response.") from exc
 
+                if is_chat:
+                    response_text = str(body.get("message", {}).get("content", ""))
+                else:
+                    response_text = str(body.get("response", ""))
+
+                import re
+                if "<think>" in response_text and "</think>" in response_text:
+                    response_text = re.sub(r"<think>.*?</think>", "", response_text, flags=re.DOTALL).strip()
+
+                prompt_eval_dur = body.get("prompt_eval_duration", 0) or 0
+                eval_dur = body.get("eval_duration", 0) or 0
+                eval_count = body.get("eval_count", 0) or 0
+                prompt_eval_count = body.get("prompt_eval_count", 0) or 0
+
+                ttft_ms = round(prompt_eval_dur / 1_000_000, 2) if prompt_eval_dur > 0 else None
+                tps = round(eval_count / (eval_dur / 1_000_000_000), 2) if eval_dur > 0 and eval_count > 0 else None
+
+                body["zyrabit"] = {
+                    "ttft_ms": ttft_ms,
+                    "tps": tps,
+                    "source": "ollama",
+                    "mode": "metal" if "host" in self.endpoint else "docker",
+                    "prompt_tokens": prompt_eval_count,
+                    "completion_tokens": eval_count,
+                    "total_ms": round(latency * 1000, 2),
+                }
+
+                execution_target = {
+                    "engine": "ollama",
+                    "device": "cpu_generic",
+                    "backend": "ollama_host" if "host" in self.endpoint else "ollama_docker",
+                    "accelerated": False,
+                }
+
                 return InferenceResult(
-                    text=str(body.get("response", "")),
+                    text=response_text,
                     latency_seconds=latency,
                     provider=self.provider_name,
                     raw_payload=body,
+                    execution_target=execution_target,
                 )
 
             except (requests.exceptions.ConnectionError, requests.exceptions.Timeout) as exc:

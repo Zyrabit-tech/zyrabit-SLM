@@ -15,10 +15,10 @@ export class Renderer {
 
 
     setupListeners() {
-        bus.on(EVENTS.UI.MSG_ADDED, (data) => this.renderMessage(data.role, data.text, data.metadata));
+        bus.on(EVENTS.UI.MSG_ADDED, (data) => this.renderMessage(data.role, data.text, data.metadata, data.timestamp));
         bus.on(EVENTS.UI.THINKING, (state) => this.toggleThinking(state));
         bus.on('UI:CLEAR_CHAT', () => {
-            this.container.innerHTML = '';
+            this.container.querySelectorAll('zyra-chat-message').forEach(el => el.remove());
             this.lastDate = null;
             const suggestions = document.getElementById('floating-suggestions');
             if (suggestions) {
@@ -29,10 +29,9 @@ export class Renderer {
     }
 
 
-    renderMessage(role, text, metadata = null) {
+    renderMessage(role, text, metadata = null, timestamp = null) {
         const now = new Date();
-        const dateStr = now.toLocaleDateString([], { weekday: 'long', day: 'numeric', month: 'long' });
-        const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        const timeStr = timestamp || now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
         // User requested Telegram incoming messages to look like user messages
         let effectiveRole = role;
@@ -40,19 +39,14 @@ export class Renderer {
             effectiveRole = 'user';
         }
 
-        // Add Date Separator if needed
-        if (this.lastDate !== dateStr) {
-            const separator = document.createElement('div');
-            separator.className = 'date-separator';
-            separator.innerHTML = `<span class="date-text">${dateStr}</span>`;
-            this.container.appendChild(separator);
-            this.lastDate = dateStr;
-        }
-
         const msg = document.createElement('zyra-chat-message');
         msg.data = { role: effectiveRole, text, metadata, timestamp: timeStr };
         
         this.container.appendChild(msg);
+
+        if (metadata?.sources) {
+            window.dispatchEvent(new CustomEvent('zyra:sources', { detail: metadata.sources }));
+        }
         
         // Auto-scroll to bottom
         requestAnimationFrame(() => {
@@ -138,21 +132,9 @@ export class Renderer {
 
             const newLoader = document.createElement('div');
             newLoader.id = 'thinking-bubble';
-            newLoader.className = 'flex justify-start animate-in fade-in slide-in-from-bottom-2 duration-300';
+            newLoader.className = 'thinking-bubble';
             newLoader.innerHTML = `
-                <div class="flex items-start gap-3 max-w-[85%]">
-                    <div class="w-8 h-8 rounded-full bg-zyrabit-surface border border-zyrabit-border flex items-center justify-center flex-shrink-0">
-                        <img src="/img/logo_zyrabit.png" class="w-5 h-5 object-contain animate-pulse">
-                    </div>
-                    <div class="bg-white p-4 rounded-2xl rounded-tl-none text-sm text-[#3f5a6d] italic flex items-center gap-2 border border-black/5 shadow-sm">
-                        <div class="flex gap-1 flex-shrink-0">
-                            <div class="w-1.5 h-1.5 bg-[#3f5a6d] rounded-full animate-bounce"></div>
-                            <div class="w-1.5 h-1.5 bg-[#3f5a6d] rounded-full animate-bounce [animation-delay:0.2s]"></div>
-                            <div class="w-1.5 h-1.5 bg-[#3f5a6d] rounded-full animate-bounce [animation-delay:0.4s]"></div>
-                        </div>
-                        <span class="thinking-text font-medium text-xs tracking-wide">Zyra está pensando...</span>
-                    </div>
-                </div>
+                <span class="thinking-dots" aria-hidden="true"><i></i><i></i><i></i></span><span class="thinking-text">Searching your document library…</span>
             `;
 
             this.container.appendChild(newLoader);
@@ -160,13 +142,10 @@ export class Renderer {
 
             // Premium UX: Cycle through descriptive tasks so the user knows exactly what the sovereign engine is doing
             const legends = [
-                "Buscando en documentos del Vault...",
-                "Consultando base de datos soberana...",
-                "Aplicando escudo de privacidad (Gatekeeper)...",
-                "Ejecutando búsqueda híbrida (FTS5 + Vectorial)...",
-                "Sintetizando respuestas con el SLM local...",
-                "Analizando contexto y dependencias...",
-                "Preparando memoria y nota reflexiva..."
+                "Searching your document library…",
+                "Finding relevant passages…",
+                "Preparing answer context…",
+                "Writing a response locally…"
             ];
             let legendIdx = 0;
             const textEl = newLoader.querySelector('.thinking-text');
@@ -202,4 +181,3 @@ export class Renderer {
         }
     }
 }
-

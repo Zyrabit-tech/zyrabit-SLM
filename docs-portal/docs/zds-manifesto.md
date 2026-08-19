@@ -1,26 +1,32 @@
+---
+sidebar_position: 1
+title: 'Design System Manifesto'
+description: 'Visual design principles and identity guidelines for the Zyrabit Design System'
+---
+
 # Zyrabit Documentation Standard (ZDS)
 
-Este documento define las reglas de oro para toda la documentación de la infraestructura Zyrabit. Seguimos los patrones de diseño de **Stripe** (interactividad), **Apple** (estética) y **OpenAI** (claridad AI-Native).
+This document defines the golden rules for all Zyrabit infrastructure documentation. We follow the design patterns of **Stripe** (interactivity), **Apple** (aesthetics), and **OpenAI** (AI-Native clarity).
 
-## 1. Estructura de Página
-Cada documento debe seguir este orden:
-1.  **Technical Summary**: Un bloque oculto o resumen breve para LLMs/Agentes.
-2.  **Overview**: El "Por Qué" de la funcionalidad.
-3.  **Quick Start**: El camino más corto al éxito (3 pasos máximo).
-4.  **Deep Dive**: Detalles técnicos, diagramas y referencias.
-5.  **Troubleshooting**: Errores comunes y cómo resolverlos.
+## 1. Page Structure
+Every document must follow this order:
+1. **Technical Summary**: A hidden block or brief summary for LLMs/Agents.
+2. **Overview**: The "Why" of the functionality.
+3. **Quick Start**: The shortest path to success (3 steps maximum).
+4. **Deep Dive**: Technical details, diagrams, and references.
+5. **Troubleshooting**: Common errors and how to solve them.
 
-## 2. Componentes Visuales
-Utilizamos alertas de GitHub para enfatizar información:
-- `> [!NOTE]`: Información de fondo o arquitectura.
-- `> [!TIP]`: Atajos de productividad o mejores prácticas.
-- `> [!IMPORTANT]`: Requerimientos críticos para la soberanía de los datos.
-- `> [!WARNING]`: Acciones que podrían comprometer la privacidad o el rendimiento.
+## 2. Visual Components
+We use GitHub alerts to emphasize information:
+- `> [!NOTE]`: Background information or architecture.
+- `> [!TIP]`: Productivity shortcuts or best practices.
+- `> [!IMPORTANT]`: Critical requirements for data sovereignty.
+- `> [!WARNING]`: Actions that could compromise privacy or performance.
 
-## 3. Estilo de Escritura
-- **Voz**: Activa ("Configura el bot" en lugar de "El bot debe ser configurado").
-- **Tono**: Arquitectónico y Seguro.
-- **Claridad**: Evitar adjetivos innecesarios. Si algo es "rápido", demuéstralo con un benchmark, no lo digas.
+## 3. Writing Style
+- **Voice**: Active ("Configure the bot" instead of "The bot must be configured").
+- **Tone**: Architectural and Confident.
+- **Clarity**: Avoid unnecessary adjectives. If something is "fast", prove it with a benchmark, don't just say it.
 
 ## 4. AI-Native Ready
-Cada página debe ser procesable por el **Model Context Protocol (MCP)**. Esto significa usar encabezados claros y metadatos en formato markdown.
+Each page must be processable by the **Model Context Protocol (MCP)**. This means using clear headings and metadata in markdown format.

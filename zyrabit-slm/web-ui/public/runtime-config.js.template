@@ -1,0 +1,3 @@
+window.ZYRABIT_RUNTIME_CONFIG = {
+  apiToken: "${ZYRABIT_API_KEY_WEB}"
+};

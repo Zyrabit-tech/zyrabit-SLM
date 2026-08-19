@@ -1,0 +1,70 @@
+{
+  "model_id": "id_tt-transformers_DeepSeek-R1-Distill-Qwen-1.5B_p150",
+  "impl": {
+    "impl_id": "tt_transformers",
+    "impl_name": "tt-transformers",
+    "repo_url": "https://github.com/tenstorrent/tt-metal",
+    "code_path": "models/tt_transformers"
+  },
+  "hf_model_repo": "deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B",
+  "model_name": "DeepSeek-R1-Distill-Qwen-1.5B",
+  "inference_engine": "vLLM",
+  "device_type": "P150",
+  "tt_metal_commit": "55fd115",
+  "device_model_spec": {
+    "device": "P150",
+    "max_concurrency": 32,
+    "max_context": 32768,
+    "perf_targets_map": {},
+    "default_impl": true,
+    "perf_reference": [],
+    "vllm_args": {
+      "model": "deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B",
+      "block_size": "64",
+      "max_model_len": "32768",
+      "max_num_seqs": "32",
+      "max_num_batched_tokens": "32768",
+      "num_scheduler_steps": "10",
+      "max-log-len": "32",
+      "seed": "9472",
+      "enable_auto_tool_choice": "true",
+      "tool_call_parser": "hermes",
+      "override_tt_config": "{}"
+    },
+    "override_tt_config": {},
+    "env_vars": {
+      "MESH_DEVICE": "P150",
+      "ARCH_NAME": "blackhole"
+    }
+  },
+  "system_requirements": null,
+  "env_vars": {
+    "VLLM_CONFIGURE_LOGGING": "1",
+    "VLLM_RPC_TIMEOUT": "900000",
+    "VLLM_TARGET_DEVICE": "tt",
+    "MESH_DEVICE": "P150",
+    "ARCH_NAME": "blackhole"
+  },
+  "vllm_commit": "aa4ae1e",
+  "hf_weights_repo": "deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B",
+  "param_count": 1.5,
+  "min_disk_gb": 15,
+  "min_ram_gb": 16,
+  "model_type": "LLM",
+  "repacked": 0,
+  "version": "0.8.0",
+  "docker_image": "ghcr.io/tenstorrent/tt-inference-server/vllm-tt-metal-src-release-ubuntu-22.04-amd64:0.8.0-55fd115-aa4ae1e",
+  "status": "EXPERIMENTAL",
+  "code_link": "https://github.com/tenstorrent/tt-metal/tree/55fd115/models/tt_transformers",
+  "override_tt_config": {},
+  "supported_modalities": ["text"],
+  "subdevice_type": null,
+  "uses_tensor_model_cache": true,
+  "cli_args": {
+    "service_port": 8000,
+    "no_auth": true,
+    "disable_trace_capture": true
+  },
+  "display_name": null,
+  "has_builtin_warmup": false
+}

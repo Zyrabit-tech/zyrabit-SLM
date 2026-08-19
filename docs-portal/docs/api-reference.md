@@ -1,3 +1,9 @@
+---
+sidebar_position: 1
+title: 'API Reference'
+description: 'REST API endpoints for chat, document ingestion, and model management'
+---
+
 # API Reference
 
 Zyrabit SLM provides a robust REST API for document ingestion and inference. It is designed to be partially compatible with the OpenAI API specification to simplify integration with existing AI tools and libraries.
@@ -92,3 +98,7 @@ All requests must include a valid service token in the Authorization header:
 ```bash
 Authorization: Bearer <YOUR_SERVICE_TOKEN>
 ```
+
+## Related Documentation
+- [Integration Playbook](./integration-playbook.md)
+- [Hexagonal Architecture](./architecture/hexagonal.md)

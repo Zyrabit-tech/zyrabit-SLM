@@ -51,6 +51,12 @@ class ZyraStatusDot extends HTMLElement {
  */
 function parseMarkdown(text) {
     if (!text) return "";
+    text = text
+        .normalize('NFKC')
+        .replace(/[\u200B-\u200D\uFEFF\u00AD]/g, '')
+        .replace(/\u00A0/g, ' ')
+        .replace(/[ \t]+\n/g, '\n')
+        .replace(/\n{3,}/g, '\n\n');
     
     // 1. Escape HTML special characters for XSS prevention
     let html = text
@@ -164,56 +170,72 @@ class ZyraChatMessage extends HTMLElement {
 
         this.shadowRoot.innerHTML = `
             <style>
-                :host { display: block; width: 100%; margin-bottom: 0.75rem; animation: slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1); }
-                @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+                :host { display: block; width: 100%; margin-bottom: 1.25rem; animation: slideUp .28s ease-out; }
+                @keyframes slideUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
                 
                 .wrapper { 
                     display: flex; 
                     flex-direction: column;
-                    max-width: 80%; 
+                    max-width: min(100%, 720px);
                     ${isUser ? 'margin-left: auto; align-items: flex-end;' : 'align-items: flex-start;'} 
                 }
                 
                 .bubble { 
-                    padding: 12px 16px; 
-                    border-radius: 1.25rem; 
-                    font-size: 14.5px; 
-                    line-height: 1.45; 
+                    padding: 2px 0;
+                    border-radius: 0;
+                    font-size: 15px;
+                    line-height: 1.62;
                     word-break: break-word;
-                    box-shadow: 0 2px 8px rgba(0,0,0,0.04);
                     position: relative;
                 }
 
                 .user { 
-                    background: #3f5a6d; 
+                    background: #3f5a6d;
                     color: white; 
-                    border-top-right-radius: 4px;
-                    box-shadow: 0 4px 15px rgba(63, 90, 109, 0.15);
+                    border-radius: 14px 14px 3px 14px;
+                    padding: 11px 15px;
+                    line-height: 1.5;
+                    max-width: 560px;
                 }
 
                 .assistant { 
-                    background: white; 
-                    color: #323439; 
-                    border: 1px solid rgba(0,0,0,0.03);
-                    border-top-left-radius: 4px;
+                    background: transparent;
+                    color: #25313a;
                 }
+
+                .assistant-label {
+                    display: inline-flex;
+                    align-items: center;
+                    gap: 6px;
+                    margin-bottom: 8px;
+                    color: #607785;
+                    font-size: 10px;
+                    font-weight: 720;
+                    letter-spacing: .06em;
+                    text-transform: uppercase;
+                }
+                .assistant-label::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: #86aebe; }
+                .evidence-intro { margin: 0 0 10px; color: #526773; }
+                .evidence-excerpt { border: 1px solid #e0e9ea; background: #f7faf9; border-radius: 10px; padding: 0 12px; }
+                .evidence-excerpt summary { cursor: pointer; padding: 10px 0; color: #3f5a6d; font-size: 12px; font-weight: 650; }
+                .evidence-excerpt .excerpt-body { max-height: 280px; overflow: auto; padding: 0 0 12px; color: #41515a; font-size: 13px; line-height: 1.58; }
 
                 /* Markdown Styling overrides */
                 .bubble p {
-                    margin: 8px 0;
+                    margin: 10px 0;
                 }
                 .bubble p:first-child { margin-top: 0; }
                 .bubble p:last-child { margin-bottom: 0; }
                 .bubble ul, .bubble ol {
-                    margin: 8px 0;
-                    padding-left: 20px;
+                    margin: 10px 0;
+                    padding-left: 22px;
                 }
                 .bubble li {
                     margin-bottom: 4px;
                 }
                 .bubble h1, .bubble h2, .bubble h3 {
                     font-weight: 700;
-                    margin-top: 14px;
+                    margin-top: 18px;
                     margin-bottom: 6px;
                 }
                 .assistant h1, .assistant h2, .assistant h3 { color: #1e293b; }
@@ -234,7 +256,7 @@ class ZyraChatMessage extends HTMLElement {
                     font-weight: 500;
                 }
                 .assistant code {
-                    background-color: rgba(63, 90, 109, 0.08);
+                    background-color: #edf2f3;
                     color: #3f5a6d;
                 }
                 .user code {
@@ -246,13 +268,13 @@ class ZyraChatMessage extends HTMLElement {
                     font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
                     font-size: 12.5px;
                     border-radius: 8px;
-                    padding: 12px;
+                    padding: 13px;
                     overflow-x: auto;
                     margin: 10px 0;
                 }
                 .assistant pre {
-                    background: #f8fafc;
-                    border: 1px solid rgba(0, 0, 0, 0.05);
+                    background: #f5f7f7;
+                    border: 1px solid #e3e8e8;
                 }
                 .user pre {
                     background: rgba(255, 255, 255, 0.1);
@@ -268,7 +290,7 @@ class ZyraChatMessage extends HTMLElement {
                 .user pre code { color: white; }
 
                 .source-tag {
-                    font-size: 8px;
+                    font-size: 9px;
                     font-weight: bold;
                     text-transform: uppercase;
                     letter-spacing: 0.1em;
@@ -279,38 +301,82 @@ class ZyraChatMessage extends HTMLElement {
 
                 .timestamp {
                     font-size: 9px;
-                    margin-top: 4px;
-                    opacity: 0.5;
-                    font-weight: 700;
-                    letter-spacing: 0.02em;
-                    ${isUser ? 'text-align: right; color: rgba(255,255,255,0.8);' : 'text-align: left; color: #3f5a6d;'}
+                    margin-top: 5px;
+                    padding: 0 2px;
+                    opacity: .58;
+                    font-weight: 600;
+                    letter-spacing: .02em;
+                    ${isUser ? 'text-align: right; color: rgba(255,255,255,.82);' : 'text-align: left; color: #65737d;'}
                 }
 
                 .meta { 
-                    font-size: 9px; 
-                    margin-top: 8px; 
-                    padding-top: 8px;
-                    border-top: 1px solid rgba(0,0,0,0.05);
-                    opacity: 0.6; 
-                    font-family: monospace; 
-                    display: flex; 
-                    flex-direction: column; 
-                    gap: 4px; 
+                    font-size: 11px;
+                    margin-top: 13px;
+                    color: #65737d;
+                    font-family: inherit;
                 }
                 
-                .sources { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
-                .source-pill { background: rgba(63, 90, 109, 0.05); padding: 2px 4px; border-radius: 4px; font-size: 8px; border: 1px solid rgba(63, 90, 109, 0.1); }
+                .meta summary { cursor: pointer; font-weight: 650; color: #3f5a6d; list-style: none; }
+                .meta summary::-webkit-details-marker { display: none; }
+                .sources { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px; }
+                .source-pill { background: #f2f5f5; padding: 3px 7px; border-radius: 999px; font-size: 10px; border: 1px solid #e0e7e7; color: #45545e; }
+                .thought-box { margin-bottom: 12px; border: 1px solid #d0dfe5; background: #f0f6f8; border-radius: 10px; padding: 0 12px; }
+                .thought-box summary { cursor: pointer; padding: 9px 0; color: #4a6375; font-size: 12px; font-weight: 650; display: flex; align-items: center; gap: 6px; user-select: none; }
+                .thought-box .thought-content { max-height: 320px; overflow-y: auto; padding: 0 0 10px; color: #556875; font-size: 12px; line-height: 1.5; font-family: ui-monospace, SFMono-Regular, monospace; border-top: 1px solid #e1ebef; }
             </style>
             <div class="wrapper">
                 ${isTelegram ? `<div class="source-tag">✈️ Telegram</div>` : ''}
                 <div class="bubble ${isUser ? 'user' : 'assistant'}">
+                    ${!isUser ? `<div class="assistant-label">${this.assistantLabel()}</div>` : ''}
                     <div id="content"></div>
                     ${this.renderMetadata()}
-                    <div class="timestamp">${this._timestamp}</div>
                 </div>
+                <div class="timestamp">${this._timestamp}</div>
             </div>
         `;
-        this.shadowRoot.getElementById('content').innerHTML = parseMarkdown(this._text);
+        const content = this.shadowRoot.getElementById('content');
+        let text = this._text || '';
+        let thoughtHtml = '';
+        let thoughtText = '';
+
+        if (text.includes('</think>')) {
+            const parts = text.split('</think>');
+            thoughtText = parts[0].replace(/<think>/i, '').trim();
+            text = parts.slice(1).join('</think>').trim();
+        } else if (/<think>/i.test(text)) {
+            const thinkMatch = text.match(/<think>([\s\S]*)$/i);
+            if (thinkMatch) {
+                thoughtText = thinkMatch[1].trim();
+                text = text.replace(/<think>[\s\S]*$/i, '').trim();
+            }
+        }
+
+        if (thoughtText) {
+            thoughtHtml = `
+                <details class="thought-box">
+                    <summary><span>🧠</span> Proceso de Razonamiento (Pensamiento)</summary>
+                    <div class="thought-content">${parseMarkdown(thoughtText)}</div>
+                </details>
+            `;
+        }
+
+        const cleanText = text
+            .replace(/\n?\[EVIDENCE:[0-9a-fA-F-]{36}\]/g, '')
+            .replace(/\n{0,2}(?:evidencia|evidence|fuente|source):\s*$/i, '')
+            .trim();
+        if (this._metadata?.decision === 'evidence-extractive-fallback') {
+            content.innerHTML = `${thoughtHtml}<p class="evidence-intro">No pude validar una redacción del modelo. Te dejo el pasaje recuperado para que lo revises directamente.</p><details class="evidence-excerpt"><summary>Ver pasaje verificable</summary><div class="excerpt-body">${parseMarkdown(cleanText.replace(/^No puedo verificar[\s\S]*?documento seleccionado:\s*/i, ''))}</div></details>`;
+        } else {
+            content.innerHTML = `${thoughtHtml}${parseMarkdown(cleanText || (thoughtHtml ? '*(Razonamiento completado sin respuesta explícita adicional)*' : ''))}`;
+        }
+    }
+
+
+    assistantLabel() {
+        const decision = this._metadata?.decision;
+        if (decision === 'conversation-greeting' || decision === 'conversation-acknowledgement' || decision === 'conversation-clarification' || decision === 'profile-welcome') return 'Zyra · contigo';
+        if (this._metadata?.sources?.length) return 'Zyra · evidencia local';
+        return 'Zyra';
     }
 
 
@@ -318,13 +384,36 @@ class ZyraChatMessage extends HTMLElement {
     renderMetadata() {
         if (!this._metadata) return '';
         const m = this._metadata;
-        const sources = m.sources ? [...new Set(m.sources)].map(s => `<span class="source-pill">${s}</span>`).join('') : '';
+        const escapeHtml = (value) => String(value).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\"/g, '&quot;').replace(/'/g, '&#039;');
+        const sources = m.sources ? m.sources.map(source => {
+            if (typeof source === 'string') return `<span class="source-pill">${escapeHtml(source)}</span>`;
+            const location = source.locator?.page ? `p. ${source.locator.page}` : source.locator?.sheet ? `${source.locator.sheet} ${source.locator.range || ''}` : source.locator?.slide ? `slide ${source.locator.slide}` : 'evidence';
+            return `<span class="source-pill" title="${escapeHtml(source.excerpt || '')}">${escapeHtml(source.filename || 'document')} · ${escapeHtml(location)}</span>`;
+        }).join('') : '';
+        const latency = m.latency_seconds != null ? ` · ${(Number(m.latency_seconds) * 1000).toFixed(0)} ms` : '';
+        const decisionLabels = {
+            'library-empty-greeting': 'Biblioteca vacía · bienvenida',
+            'library-empty-guidance': 'Biblioteca vacía · siguiente paso',
+            'library-indexing-guidance': 'Documento en preparación',
+            'profile-welcome': 'Espacio configurado',
+            'session-restored': 'Conversación restaurada',
+            'conversation-greeting': 'Conversación local',
+            'conversation-acknowledgement': 'Conversación local',
+            'conversation-clarification': 'Conversación local',
+            'model-knowledge': 'Consultado con el modelo local',
+            'model-with-evidence': 'Modelo local + documentos consultados',
+            'evidence-not-found': 'Sin evidencia para esta pregunta',
+            'selected-document-unavailable': 'Documento no disponible',
+            'evidence-query': 'Respuesta basada en evidencia',
+            'evidence-query-lexical': 'Respuesta basada en evidencia léxica',
+            'evidence-extractive-fallback': 'Fragmento verificable',
+            'inference-unavailable': 'Motor local no disponible',
+        };
+        const decision = escapeHtml(decisionLabels[m.decision] || 'Estado de consulta no especificado');
 
         return `
-            <div class="meta">
-                <span>${(m.decision || 'direct').toUpperCase()} | ${m.latency_ms || 0}ms | HITS: ${m.rag_hits || 0}</span>
-                ${sources ? `<div class="sources"><strong>SOURCES:</strong> ${sources}</div>` : ''}
-            </div>
+            <div class="meta">${decision}${latency}</div>
+            ${sources ? `<details class="meta"><summary>Sources · ${m.rag_hits || 0} passages</summary><div class="sources">${sources}</div></details>` : ''}
         `;
     }
 }
