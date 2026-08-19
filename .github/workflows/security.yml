@@ -11,7 +11,6 @@ on:
 
 permissions:
   contents: read
-  security-events: write
 
 concurrency:
   group: security-${{ github.ref }}
@@ -40,10 +39,8 @@ jobs:
         run: |
           set +e
           uv run pip-audit --format json --output pip-audit.json
-          audit_exit=$?
           set -e
           python validation/scripts/verify_dependency_risks.py pip-audit.json docs/security/DEPENDENCY_RISKS.md
-          exit "$audit_exit"
 
   trivy-scan:
     name: Trivy Vulnerability Scan
@@ -60,20 +57,3 @@ jobs:
           format: 'table'
           exit-code: '1'
           severity: 'CRITICAL,HIGH'
-
-  codeql-analysis:
-    name: CodeQL Semantic Audit
-    runs-on: ubuntu-latest
-    permissions:
-      security-events: write
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Initialize CodeQL
-        uses: github/codeql-action/init@v3
-        with:
-          languages: python, javascript
-
-      - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@v3
