@@ -5,11 +5,12 @@ import { Renderer } from "./ui/Renderer";
 import { EVENTS, IDS } from "./core/Constants";
 import { getSafeElement } from "./utils/DOM";
 import { Storage } from "./adapters/Storage";
+import { getSession, getProfile, saveProfile, patchSessionContext, getHealth, getDocuments, getTools, importSource, getJob } from "./services/api";
 
 
 /**
  * Auth Interceptor
- * Automatically injects the local service token into API requests
+ * Injects the token provided to the local container at startup.
  */
 const originalFetch = window.fetch;
 window.fetch = async function (resource, init) {
@@ -17,7 +18,7 @@ window.fetch = async function (resource, init) {
     if (typeof resource === 'string' && resource.startsWith('/v1')) {
         init.headers = {
             ...init.headers,
-            'Authorization': 'Bearer zyrabit-local-token'
+            'Authorization': `Bearer ${window.ZYRABIT_RUNTIME_CONFIG?.apiToken || ''}`
         };
     }
     return originalFetch(resource, init);
@@ -35,20 +36,21 @@ class ZyrabitApp {
 
         // Recover Conversation memory from Storage
         this.history = Storage.load('chat_history') || [];
+        this.activeDocument = Storage.load('active_document') || null;
 
         this.init();
     }
 
-    init() {
+    async init() {
         this.setupUIListeners();
         this.socket.connect();
         this.startHealthChecks();
-        this.checkOnboarding();
-        this.chat.recover(); // Recover Shadow State
+
+        await this.restoreConversation();
 
         // Restore visual history
         this.history.forEach(msg => {
-            this.renderer.renderMessage(msg.role, msg.content, msg.metadata);
+            this.renderer.renderMessage(msg.role, msg.content, msg.metadata, msg.timestamp);
         });
 
         // Hide floating suggestions if history exists
@@ -57,16 +59,47 @@ class ZyrabitApp {
             if (suggestions) suggestions.style.display = 'none';
         }
 
-        this.loadVault();
-        this.loadTools();
+        this.chat.recover(); // Recover Shadow State
 
+        this.loadVault();
+        this.checkOnboarding();
+
+        const shell = document.getElementById('app-shell');
+        const collapse = document.getElementById('collapse-library');
+        const open = document.getElementById('open-library');
+        if (shell && Storage.load('library_collapsed')) shell.classList.add('library-collapsed');
+        if (collapse && shell) collapse.onclick = () => {
+            shell.classList.toggle('library-collapsed');
+            Storage.save('library_collapsed', shell.classList.contains('library-collapsed'));
+        };
+        if (open && shell) open.onclick = () => shell.classList.toggle('library-open');
+    }
+
+    async restoreConversation() {
+        try {
+            const payload = await getSession(this.chat.sessionId);
+            const messages = payload.messages || [];
+            this.sessionContext = payload.context || null;
+            if (this.sessionContext?.active_document_id && !this.activeDocument) {
+                this.activeDocument = { id: this.sessionContext.active_document_id, filename: '' };
+                Storage.save('active_document', this.activeDocument);
+            }
+            if (messages.length === 0) return;
+            this.history = messages.map((message) => ({
+                role: message.role,
+                content: message.content,
+                metadata: message.role === 'assistant' ? (message.metadata || { decision: 'session-restored', sources: [] }) : undefined,
+                timestamp: message.created_at ? new Date(message.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : undefined
+            }));
+            Storage.save('chat_history', this.history);
+        } catch (e) {
+            this.history = Storage.load('chat_history') || [];
+        }
     }
 
     async checkOnboarding() {
         try {
-            const res = await fetch('/v1/profile');
-            const profile = await res.json();
-
+            const profile = await getProfile();
             if (!profile || !profile.onboarding_completed) {
                 document.getElementById('onboarding-modal').classList.remove('hidden');
             }
@@ -112,11 +145,15 @@ class ZyrabitApp {
                         body: JSON.stringify(profile)
                     });
                     getSafeElement('onboarding-modal').classList.add('hidden');
-                    this.showNotification(`System Initialized: Welcome, ${profile.name}`, "success");
-                    bus.emit(EVENTS.CHAT.SEND, {
-                        text: `System initialization complete. Identity: ${profile.name}. Role: ${profile.role}. Persona Active: ${profile.persona}. Tone: ${profile.tone}. Await commands.`,
-                        history: []
+                    this.showNotification(`Listo, ${profile.name || 'bienvenido'}.`, "success");
+                    const welcome = `Hola${profile.name ? ` ${profile.name.split(' ')[0]}` : ''}. Soy ${profile.assistant_name}. Ya dejé tu espacio listo. Cuando quieras, importa el primer documento y lo revisamos juntos con fuentes verificables.`;
+                    bus.emit(EVENTS.UI.MSG_ADDED, {
+                        role: 'assistant',
+                        text: welcome,
+                        metadata: { decision: 'profile-welcome', sources: [] }
                     });
+                    this.history.push({ role: 'assistant', content: welcome });
+                    Storage.save('chat_history', this.history);
                 } catch (e) {
                     this.showNotification("Error guardando perfil", "error");
                 }
@@ -161,7 +198,7 @@ class ZyrabitApp {
             }
 
             input.onkeydown = (e) => {
-                if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+                if (e.key === 'Enter' && !e.shiftKey) {
                     e.preventDefault();
                     form.requestSubmit();
                 }
@@ -172,13 +209,33 @@ class ZyrabitApp {
 
         // 3. Navigation & Panels
         bind(IDS.TOGGLE_GDPR, 'onclick', () => this.togglePanel(IDS.GDPR_PANEL));
-        getSafeElement('toggle-ingest').onclick = () => this.togglePanel(IDS.INGEST_PANEL);
+        getSafeElement('toggle-ingest').onclick = () => getSafeElement(IDS.FILE_INPUT).click();
         getSafeElement('toggle-docs').onclick = () => this.togglePanel(IDS.DOCS_PANEL);
+        bind('clear-conversation', 'onclick', async () => {
+            this.history = [];
+            Storage.remove('chat_history');
+            Storage.remove('pending_messages');
+            await this.chat.resetSession();
+            bus.emit('UI:CLEAR_CHAT');
+            this.showNotification('Conversation cleared.', 'success');
+        });
         getSafeElement('toggle-settings').onclick = () => this.togglePanel('settings-panel');
         getSafeElement('close-gdpr').onclick = () => this.togglePanel(null);
-        getSafeElement('close-ingest').onclick = () => this.togglePanel(null);
+        bind('close-ingest', 'onclick', () => this.togglePanel(null));
         getSafeElement('close-docs').onclick = () => this.togglePanel(null);
         getSafeElement('close-settings').onclick = () => this.togglePanel(null);
+
+        document.querySelectorAll('.prompt-chip, .starter[data-prompt], .guide-prompt[data-prompt]').forEach((button) => {
+            button.onclick = () => {
+                const input = getSafeElement(IDS.CHAT_INPUT);
+                input.value = button.dataset.prompt || '';
+                input.focus();
+            };
+        });
+
+        const clearSources = document.getElementById('clear-sources');
+        if (clearSources) clearSources.onclick = () => this.renderSources([]);
+        window.addEventListener('zyra:sources', (event) => this.renderSources(event.detail || []));
 
         // Telegram modal bindings
         const triggerTelegram = document.getElementById('trigger-telegram');
@@ -276,15 +333,15 @@ class ZyrabitApp {
                 const submitBtn = getSafeElement(IDS.CHAT_SUBMIT);
                 input.disabled = false;
                 submitBtn.disabled = false;
-                input.placeholder = "Type your command...";
+                input.placeholder = "Ask about your documents…";
 
                 const statusPill = document.getElementById("status-pill");
                 if (statusPill) {
-                    statusPill.className = "flex items-center gap-2 px-4 py-2 bg-green-500/10 border border-green-500/20 rounded-full animate-none";
-                    const dot = statusPill.querySelector("div");
+                    statusPill.className = "connection-status connected";
+                    const dot = statusPill.querySelector("i");
                     if (dot) dot.className = "w-2 h-2 rounded-full bg-green-500 shadow-sm";
                     const text = statusPill.querySelector("span");
-                    if (text) text.textContent = "SYSTEM READY";
+                    if (text) text.textContent = "Local workspace";
                 }
             } catch (e) {
                 console.warn("⚠️ Failed to update UI elements on gateway connect:", e);
@@ -302,11 +359,11 @@ class ZyrabitApp {
 
                 const statusPill = document.getElementById("status-pill");
                 if (statusPill) {
-                    statusPill.className = "flex items-center gap-2 px-4 py-2 bg-red-500/10 border border-red-500/20 rounded-full";
-                    const dot = statusPill.querySelector("div");
+                    statusPill.className = "connection-status disconnected";
+                    const dot = statusPill.querySelector("i");
                     if (dot) dot.className = "w-2 h-2 rounded-full bg-red-500 shadow-sm animate-pulse";
                     const text = statusPill.querySelector("span");
-                    if (text) text.textContent = "OFFLINE";
+                    if (text) text.textContent = "Reconnecting";
                 }
             } catch (e) {
                 console.warn("⚠️ Failed to update UI elements on gateway disconnect:", e);
@@ -355,15 +412,15 @@ class ZyrabitApp {
             const logs = getSafeElement(IDS.GDPR_LOGS);
             const time = new Date().toLocaleTimeString();
             const div = document.createElement('div');
-            div.className = 'border-b border-gray-100 pb-2 mb-2 animate-in slide-in-from-right-4 duration-300';
+            div.className = 'activity-event';
 
             // Using a safer approach for the inner content
             div.innerHTML = `
-                <div class="flex justify-between items-center mb-1">
-                    <span class="font-bold text-zyrabit-primary">[${type}]</span>
-                    <span class="text-[8px] opacity-40">${time}</span>
+                <div class="activity-event-head">
+                    <span>${type}</span>
+                    <time>${time}</time>
                 </div>
-                <div class="text-gray-600 event-content"></div>
+                <div class="event-content"></div>
             `;
             div.querySelector('.event-content').textContent = event;
             logs.prepend(div);
@@ -452,7 +509,9 @@ class ZyrabitApp {
 
     async loadVault() {
         try {
-            const res = await fetch('/v1/documents');
+            // Version changes (for example a reindex after a failed attempt)
+            // must be reflected immediately; never reuse a stale library list.
+            const res = await fetch('/v1/documents', { cache: 'no-store' });
             if (!res.ok) throw new Error(`HTTP Error: ${res.status}`);
             const data = await res.json();
             const list = document.getElementById('vault-list');
@@ -460,26 +519,31 @@ class ZyrabitApp {
 
             list.innerHTML = '';
 
+            const count = document.getElementById('document-count');
+            if (count) count.textContent = String(data.documents?.length || 0);
+
             if (!data.documents || data.documents.length === 0) {
-                list.innerHTML = '<div class="text-xs text-center text-black/40 mt-4">No documents in vault</div>';
+                list.innerHTML = '<div class="empty-library">No documents yet. Import one to start asking questions.</div>';
                 return;
             }
 
             data.documents.forEach(doc => {
-                const div = document.createElement('div');
-                div.className = 'flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-100 group';
+                const div = document.createElement('button');
+                div.type = 'button';
+                div.className = 'document-row';
                 div.innerHTML = `
-                    <div class="flex items-center gap-2 overflow-hidden">
-                        <span class="text-lg">📄</span>
-                        <div class="overflow-hidden">
-                            <div class="text-[10px] font-bold truncate doc-name"></div>
-                            <div class="text-[8px] opacity-40 doc-size"></div>
+                    <span class="document-glyph">⌑</span>
+                    <div class="overflow-hidden">
+                        <div class="document-name"></div>
+                        <div class="document-size"></div>
                         </div>
-                    </div>
                 `;
-                div.querySelector('.doc-name').textContent = doc.filename;
-                div.querySelector('.doc-size').textContent = `${(doc.size_bytes / 1024).toFixed(1)} KB`;
+                div.querySelector('.document-name').textContent = doc.filename;
+                const statusLabel = doc.status === 'ready' ? 'Indexed and ready' : doc.status === 'processing' || doc.status === 'queued' ? 'Indexing…' : 'Needs attention';
+                div.querySelector('.document-size').textContent = `${statusLabel} · ${(doc.size_bytes / 1024).toFixed(1)} KB`;
+                div.onclick = () => this.selectDocument(doc, div);
                 list.appendChild(div);
+                if (this.activeDocument?.id === doc.id) this.selectDocument(doc, div);
             });
         } catch (e) {
             console.error("Failed to load documents:", e);
@@ -488,6 +552,99 @@ class ZyrabitApp {
                 list.innerHTML = '<div class="text-xs text-center text-red-500 mt-4">Failed to load documents</div>';
             }
         }
+    }
+
+    selectDocument(doc, row) {
+        const filename = doc.filename;
+        document.querySelectorAll('.document-row.active').forEach((item) => item.classList.remove('active'));
+        row.classList.add('active');
+        const title = document.getElementById('active-document-title');
+        const description = document.getElementById('active-document-description');
+        if (title) title.textContent = filename;
+        if (description) description.textContent = 'Ask a question about this document or compare it with the rest of your library.';
+        this.setActiveDocument(filename, doc.id);
+        this.syncSessionContext(doc.id);
+        const input = document.getElementById(IDS.CHAT_INPUT);
+        if (input) {
+            input.placeholder = `Ask about ${filename}…`;
+            input.focus();
+        }
+    }
+
+    setActiveDocument(filename, documentId = null) {
+        const chip = document.getElementById('active-context-chip');
+        const name = document.getElementById('active-context-name');
+        if (!chip || !name) return;
+        if (!filename) {
+            chip.classList.add('hidden');
+            delete chip.dataset.documentId;
+            this.activeDocument = null;
+            Storage.remove('active_document');
+            this.syncSessionContext(null);
+            return;
+        }
+        name.textContent = filename;
+        if (documentId) {
+            chip.dataset.documentId = documentId;
+            this.activeDocument = { id: documentId, filename };
+            Storage.save('active_document', this.activeDocument);
+        }
+        chip.classList.remove('hidden');
+        const clear = document.getElementById('clear-active-document');
+        if (clear) clear.onclick = () => this.clearActiveDocument();
+    }
+
+    clearActiveDocument() {
+        document.querySelectorAll('.document-row.active').forEach((item) => item.classList.remove('active'));
+        const title = document.getElementById('active-document-title');
+        const description = document.getElementById('active-document-description');
+        if (title) title.textContent = 'All documents';
+        if (description) description.textContent = 'Your local workspace';
+        this.setActiveDocument(null);
+        const input = document.getElementById(IDS.CHAT_INPUT);
+        if (input) input.placeholder = 'Ask about your documents…';
+    }
+
+    async syncSessionContext(documentId) {
+        try {
+            const res = await fetch(`/v1/sessions/${this.chat.sessionId}/context`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ active_document_id: documentId })
+            });
+            if (res.ok) {
+                const payload = await res.json();
+                this.sessionContext = payload.context || null;
+            }
+        } catch (_) {
+            // The chat request still carries the active document id as a fallback.
+        }
+    }
+
+    renderSources(sources) {
+        const list = document.getElementById('sources-list');
+        if (!list) return;
+        list.innerHTML = '';
+        const uniqueSources = sources || [];
+        if (uniqueSources.length === 0) {
+            list.innerHTML = '<div class="context-empty"><span aria-hidden="true">⌁</span><p>Sources used in an answer will appear here.</p></div>';
+            return;
+        }
+        uniqueSources.forEach((source) => {
+            const card = document.createElement('div');
+            card.className = 'source-card';
+            const name = document.createElement('strong');
+            name.textContent = typeof source === 'string' ? source : source.filename;
+            const note = document.createElement('span');
+            if (typeof source === 'string') note.textContent = 'Used as answer context';
+            else {
+                const locator = source.locator || {};
+                const location = locator.page ? `Page ${locator.page}` : locator.sheet ? `${locator.sheet} ${locator.range || ''}` : locator.slide ? `Slide ${locator.slide}` : 'Document evidence';
+                note.textContent = source.excerpt ? `${location} · ${source.excerpt}` : location;
+            }
+            card.append(name, note);
+            list.appendChild(card);
+        });
     }
 
     async loadTools() {
@@ -533,14 +690,25 @@ class ZyrabitApp {
             }
 
             try {
-                const res = await fetch('/v1/ingest', { method: 'POST', body: formData });
-                if (!res.ok) throw new Error(`HTTP_${res.status}`);
+                const res = await fetch('/v1/sources/import', { method: 'POST', body: formData });
+                if (!res.ok) {
+                    const payload = await res.json().catch(() => ({}));
+                    throw new Error(payload.detail || `The import request was rejected (HTTP ${res.status}).`);
+                }
+                const accepted = await res.json();
+                if (accepted.job_id) await this.waitForJob(accepted.job_id);
                 await this.loadVault();
+                const title = document.getElementById('active-document-title');
+                const description = document.getElementById('active-document-description');
+                if (title) title.textContent = file.name;
+                if (description) description.textContent = 'Indexed and ready for questions.';
+                this.setActiveDocument(file.name, accepted.document_id);
                 this.addGdprLog("INGEST", `SUCCESS_${file.name.toUpperCase()}`);
-                this.showNotification(`File uploaded: ${file.name}`, "success");
+                this.showNotification(`${file.name} is indexed and ready.`, "success");
             } catch (e) {
                 this.addGdprLog("INGEST", `FAILED_${file.name.toUpperCase()}`);
-                this.showNotification(`Upload failed: ${file.name}`, "error");
+                const reason = e?.message || 'The import could not be completed.';
+                this.showNotification(`${file.name}: ${reason}`, "error");
             } finally {
                 const dropZone = document.getElementById('drop-zone-content');
                 const loader = document.getElementById('drop-zone-loader');
@@ -550,6 +718,19 @@ class ZyrabitApp {
                 }
             }
         }
+    }
+
+    async waitForJob(jobId) {
+        const deadline = Date.now() + 120000;
+        while (Date.now() < deadline) {
+            const res = await fetch(`/v1/jobs/${jobId}`);
+            if (!res.ok) throw new Error('Job status unavailable');
+            const job = await res.json();
+            if (job.status === 'ready') return job;
+            if (job.status === 'failed') throw new Error(job.error || 'Indexing failed');
+            await new Promise(resolve => setTimeout(resolve, 700));
+        }
+        throw new Error('Indexing timed out');
     }
 
     showNotification(message, type = 'info') {

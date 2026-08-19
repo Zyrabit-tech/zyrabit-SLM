@@ -35,7 +35,8 @@ COPY pyproject.toml uv.lock ./
 RUN uv sync --frozen --no-dev --no-install-project
 
 # Download spacy model into the venv
-RUN uv run python -m spacy download en_core_web_sm
+ENV VIRTUAL_ENV=/app/.venv
+RUN uv pip install --no-cache https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl
 
 # Create placeholder directory and file
 RUN mkdir -p /app/document_source && touch /app/document_source/.keep
@@ -54,6 +55,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libgomp1 \
     libcurl4 \
     curl \
+    tesseract-ocr \
+    tesseract-ocr-eng \
+    tesseract-ocr-spa \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy the pre-built virtual environment from builder

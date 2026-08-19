@@ -8,8 +8,6 @@ from app.infrastructure.inference.ollama_stream_adapter import OllamaStreamAdapt
 from app.infrastructure.inference.gemini_inference_adapter import GeminiInferenceAdapter
 from app.infrastructure.inference.vllm_inference_adapter import VllmInferenceAdapter
 from app.infrastructure.inference.vllm_stream_adapter import VllmStreamAdapter
-from app.infrastructure.inference.llama_cpp_embedded_adapter import LlamaCppEmbeddedAdapter
-from app.infrastructure.inference.mlx_inference_adapter import MlxInferenceAdapter
 from app.infrastructure.shared.config import SLM_URL
 
 class InferenceProviderFactory:
@@ -23,12 +21,17 @@ class InferenceProviderFactory:
             endpoint = kwargs.get("endpoint", f"{SLM_URL}/api/generate")
             return OllamaInferenceAdapter(endpoint=endpoint)
         elif provider_lower == "embedded_metal":
+            # Optional native runtimes must be imported only when selected.  MLX
+            # loads Metal libraries at import time and would otherwise make an
+            # Ollama-only process (and its tests) depend on the host GPU stack.
+            from app.infrastructure.inference.llama_cpp_embedded_adapter import LlamaCppEmbeddedAdapter
             return LlamaCppEmbeddedAdapter()
         elif provider_lower == "mlx":
+            from app.infrastructure.inference.mlx_inference_adapter import MlxInferenceAdapter
             return MlxInferenceAdapter()
-        elif provider_lower == "vllm":
+        elif provider_lower in ("vllm", "llama_cpp_server", "tenstorrent"):
             endpoint = kwargs.get("endpoint", f"{SLM_URL}/v1/chat/completions")
-            return VllmInferenceAdapter(endpoint=endpoint)
+            return VllmInferenceAdapter(endpoint=endpoint, provider_name=provider_lower)
         elif provider_lower == "gemini":
             api_key = kwargs.get("api_key")
             model_name = kwargs.get("model_name")
@@ -49,7 +52,7 @@ class InferenceProviderFactory:
         if provider_lower in ("ollama", "ollama_host", "ollama_docker"):
             endpoint = kwargs.get("endpoint", f"{SLM_URL}/api/generate")
             return OllamaStreamAdapter(endpoint=endpoint)
-        elif provider_lower == "vllm":
+        elif provider_lower in ("vllm", "llama_cpp_server", "tenstorrent"):
             endpoint = kwargs.get("endpoint", f"{SLM_URL}/v1/chat/completions")
             return VllmStreamAdapter(endpoint=endpoint)
         # TODO: Add Gemini stream adapter when needed

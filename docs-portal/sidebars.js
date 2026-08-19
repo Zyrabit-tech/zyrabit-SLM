@@ -1,54 +1,81 @@
 module.exports = {
-  tutorialSidebar: [
+  mainSidebar: [
     {
       type: "doc",
       id: "intro",
-      label: "Introduction",
+      label: "📖 Introduction",
     },
+
     {
       type: "category",
-      label: "Sovereign Core v2.0",
-      items: [
-        "core-v2",
-        "telegram-bridge",
-        "zds-manifesto",
-      ],
-    },
-    {
-      type: "category",
-      label: "Getting Started",
+      label: "🚀 Getting Started",
+      collapsed: false,
       items: [
         "getting-started/fundamentals",
         "first-rag",
         "installation",
+        {
+          type: "category",
+          label: "Hardware Guides",
+          items: ["getting-started/ubuntu-tenstorrent"],
+        },
       ],
     },
+
     {
       type: "category",
-      label: "Core Architecture",
+      label: "🏗️ Architecture",
+      collapsed: false,
       items: [
-        "architecture-mermaid",
-        "models",
-        "data-portability",
+        "architecture/hexagonal",
+        "agent-architecture",
         "core-architecture/pluggability",
+        "architecture-mermaid",
+        "core-v2",
+        "frontend-architecture",
       ],
     },
+
     {
       type: "category",
-      label: "API & Integrations",
+      label: "🔧 Guides",
       items: [
-        "api-reference",
-        "integration-playbook",
+        "guides/swap-database",
+        "guides/swap-models",
+        "guides/swap-hardware",
+        "models",
+        "telegram-bridge",
         "erp-connection",
       ],
     },
+
     {
       type: "category",
-      label: "Production & Compliance",
+      label: "📡 API & Integrations",
+      items: ["api-reference", "integration-playbook"],
+    },
+
+    {
+      type: "category",
+      label: "🛡️ Operations",
       items: [
         "production-hardening",
+        "data-portability",
         "compliance-report",
+        "benchmarks",
       ],
+    },
+
+    {
+      type: "category",
+      label: "📐 Design System",
+      items: ["zds-manifesto", "zds-style-guide"],
+    },
+
+    {
+      type: "doc",
+      id: "ai-context",
+      label: "🤖 AI Context",
     },
   ],
 };

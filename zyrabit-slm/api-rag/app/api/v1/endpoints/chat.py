@@ -1,8 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from typing import Optional
-from app.api.v1.dependencies import get_chat_use_case
-from app.domain.use_cases.chat_use_case import ChatUseCase
+from app.api.v1.dependencies import get_node_service
 
 router = APIRouter()
 
@@ -11,6 +10,8 @@ class ChatQuery(BaseModel):
     client_msg_id: Optional[str] = None
     history: Optional[list] = []
     provider: Optional[str] = None
+    session_id: Optional[str] = None
+    document_id: Optional[str] = None
 
 class ChatResponse(BaseModel):
     response: str
@@ -19,19 +20,13 @@ class ChatResponse(BaseModel):
 @router.post("/chat", response_model=ChatResponse)
 async def chat_router(
     query: ChatQuery, 
-    chat_use_case: ChatUseCase = Depends(get_chat_use_case)
+    node_service = Depends(get_node_service)
 ):
     """
     Primary chat endpoint. Injects ChatUseCase via FastAPI Depends.
     """
     try:
-        # The logic is now encapsulated in the Use Case
-        result = await chat_use_case.execute(
-            text=query.text, 
-            client_msg_id=query.client_msg_id,
-            history=query.history,
-            provider=query.provider
-        )
+        result = await node_service.query(query.text, query.session_id or query.client_msg_id or "default", query.document_id)
         return ChatResponse(**result)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

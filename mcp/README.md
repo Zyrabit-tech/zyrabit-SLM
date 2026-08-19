@@ -1,14 +1,14 @@
-# Zyrabit MCP — Installer Agent
+# Zyrabit MCP
 
-An MCP (Model Context Protocol) server that acts as an automated technical assistant for deploying and diagnosing the Zyrabit SLM ecosystem.
+Standalone MCP diagnostic server for local Zyrabit SLM installations. It is separate from the in-process API bridge at `/mcp`.
 
 ---
 
-## What it does
+## Interface
 
 | Capability | Description |
 |---|---|
-| `docs://install-guide` (resource) | Serves the README and CONTRIBUTING guide to MCP clients for context-aware assistance |
+| `docs://install-guide` (resource) | Serves the README and CONTRIBUTING guide as client context |
 | `check_system_status` (tool) | Returns disk and memory health of the host without requiring Docker daemon access |
 | `suggest_fix` (tool) | Returns a recommended fix based on a plain-text error description |
 | `GET /diagnose` (HTTP) | REST endpoint combining status + fix suggestion for generic HTTP consumers |
@@ -16,7 +16,7 @@ An MCP (Model Context Protocol) server that acts as an automated technical assis
 
 ---
 
-## Two execution modes
+## Execution modes
 
 | Mode | How to start | Used by |
 |---|---|---|
@@ -25,7 +25,7 @@ An MCP (Model Context Protocol) server that acts as an automated technical assis
 
 ---
 
-## Connecting to AI Clients
+## Connect an MCP client
 
 ### Claude Desktop
 
@@ -35,14 +35,14 @@ Add to your `claude_desktop_config.json`:
 {
   "mcpServers": {
     "zyrabit-installer": {
-      "command": "docker",
-      "args": ["exec", "-i", "zyrabit-mcp", "python", "install_server.py"]
+      "command": "python",
+      "args": ["/absolute/path/to/zyrabit-SLM/mcp/install_server.py"]
     }
   }
 }
 ```
 
-> Make sure the `zyrabit-mcp` container is running (`./zyra.sh start`).
+> The minimal local compose profile does not include this standalone server. Run it directly, or add it to a deployment-specific compose file.
 
 ### Cursor IDE
 
@@ -50,11 +50,7 @@ Go to **Settings → Features → MCP Servers** and add:
 
 - **Type:** `command`
 - **Name:** `Zyrabit Installer`
-- **Command:** `docker exec -i zyrabit-mcp python install_server.py`
-
-Or, to run without Docker (local dev):
-
-- **Command:** `python path/to/mcp/install_server.py`
+- **Command:** `python /absolute/path/to/zyrabit-SLM/mcp/install_server.py`
 
 ---
 
@@ -97,7 +93,7 @@ Recognized patterns:
 
 ---
 
-## Security
+## Execution boundary
 
 - The server does not expose Docker socket access by default.
 - `check_system_status` uses only `df` and `free` — no shell injection vectors.

@@ -18,6 +18,7 @@ class InferenceRequest:
     model: str
     prompt: str
     system_prompt: Optional[str] = None
+    messages: Optional[list] = None
     stream: bool = False
     timeout_seconds: Optional[float] = None
     options: Dict[str, Any] = field(default_factory=dict)
@@ -31,6 +32,7 @@ class InferenceResult:
     latency_seconds: float
     provider: str
     raw_payload: Dict[str, Any] = field(default_factory=dict)
+    execution_target: Dict[str, Any] = field(default_factory=dict)
 
 
 class InferenceProviderPort(ABC):

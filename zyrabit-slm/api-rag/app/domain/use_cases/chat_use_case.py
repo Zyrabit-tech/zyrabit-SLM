@@ -1,3 +1,5 @@
+import os
+import re
 import time
 from typing import Optional, Dict, Any
 
@@ -6,6 +8,13 @@ from app.infrastructure.shared.config import MODEL_NAME
 from app.infrastructure.shared.state_tracker import SovereignStateManager
 from app.domain.services.context_manager import ContextManager
 from app.ports.inference_port import InferenceRequest
+
+
+def _citation_label(metadata: dict) -> str:
+    """Return a user-facing source label without leaking local paths."""
+    filename = os.path.basename(str(metadata.get("source", "unknown")))
+    page = metadata.get("page")
+    return f"{filename} · p. {page}" if page else filename
 
 class ChatUseCase:
     """
@@ -65,23 +74,45 @@ class ChatUseCase:
             # 3. Hybrid Context Retrieval (RAG)
             sources = []
             results = []  # ensure always defined for build_final_prompt
+            rag_retrieval_ms = 0.0
             if decision == "rag":
                 if not self.retriever_service:
-                    logger.warning("⚠️ Hybrid Retriever not initialized. Falling back to direct.")
                     decision = "direct (no-retriever)"
                 else:
                     try:
+                        rag_t0 = time.time()
                         results = await self.retriever_service.search(sanitized_text)
+                        rag_retrieval_ms = round((time.time() - rag_t0) * 1000, 2)
+                        # The UI injects the selected filename into the question.
+                        # Preserve that scope so unrelated documents cannot pollute
+                        # an answer that is meant to be grounded in one file.
+                        referenced_files = re.findall(
+                            r"[\w.-]+\.(?:pdf|docx|md|txt)", sanitized_text,
+                            flags=re.IGNORECASE,
+                        )
+                        if referenced_files:
+                            selected_filename = os.path.basename(referenced_files[-1]).lower()
+                            scoped_results = [
+                                doc for doc in results
+                                if os.path.basename(str(doc.metadata.get("source", ""))).lower() == selected_filename
+                            ]
+                            if scoped_results:
+                                results = scoped_results
                         if results:
                             if self.reranker:
                                 # Advanced RAG: Re-Rank candidates and filter
                                 ranked_docs = self.reranker.rerank(sanitized_text, results)
-                                results = [doc for doc, score in ranked_docs if score >= 0.6][:3]
+                                reranked_results = [doc for doc, score in ranked_docs if score >= 0.6][:3]
+                                # A missing local reranker model or a conservative score
+                                # must not erase valid retrieval evidence.
+                                results = reranked_results or results[:3]
                             else:
                                 results = results[:3]
                                 
                             if results:
-                                sources = list(set([r.metadata.get("source", "unknown") for r in results]))
+                                sources = list(dict.fromkeys(
+                                    _citation_label(r.metadata) for r in results
+                                ))
                     except Exception as e:
                         self.telemetry.log_security_audit(f"RAG search failed: {e}")
                         decision = "direct (fallback)"
@@ -89,7 +120,7 @@ class ChatUseCase:
             # 4. Inference
             # Load system prompt from user profile, fallback to default
             user_profile = SovereignStateManager.get_user_profile()
-            system_prompt = (user_profile.get("system_prompt") or "").strip() or "You are Zyra, a helpful sovereign assistant."
+            system_prompt = (user_profile.get("system_prompt") or "").strip() or "Eres Zyra, un asistente soberano inteligente, útil y conciso. Responde siempre de manera natural y clara en el idioma del usuario."
 
             # 4. Memory Recovery
             if history is None:
@@ -111,7 +142,11 @@ class ChatUseCase:
             else:
                 inf_provider = self.inference_provider
 
-            if self.mcp_client:
+            # Only run the agentic ReAct loop when specific operational tools are matched
+            from app.domain.agent.react_harness import classify_intent
+            matched_tools = classify_intent(sanitized_text)
+
+            if self.mcp_client and matched_tools and decision != "rag":
                 # Run the ReAct agentic loop with lean component passing
                 from app.domain.agent.tool_registry import ToolRegistry
                 from app.domain.agent.react_harness import ReactHarness
@@ -124,7 +159,7 @@ class ChatUseCase:
                 raw_response_text, steps = await harness.execute(
                     user_query=sanitized_text,
                     system_prompt=system_prompt,
-                    history=history,
+                    history=history or [],
                     rag_docs=results if decision == "rag" else [],
                     user_profile=user_profile,
                     source=source,
@@ -139,6 +174,7 @@ class ChatUseCase:
                 # Restore PII on the response returned to the user
                 response_text = deanonymize_text(raw_response_text, entities)
                 latency_ms = (time.time() - start_inference_time) * 1000
+                response_obj = None
             else:
                 # Classic direct / RAG flow
                 prompt = self.context_manager.build_final_prompt(
@@ -149,10 +185,26 @@ class ChatUseCase:
                     user_profile=user_profile,
                     source=source
                 )
+
+                # Construct clean structured chat messages for chat/instruct models
+                system_instruction = system_prompt
+                if decision == "rag" and results:
+                    rag_text = self.context_manager.trim_rag_context(results)
+                    system_instruction += f"\n\n### CONOCIMIENTO RELEVANTE (RAG):\n{rag_text}\n\n### REGLAS DE EVIDENCIA:\nResponde únicamente con base en el conocimiento relevante."
+
+                chat_messages = [{"role": "system", "content": system_instruction}]
+                if history:
+                    for m in history:
+                        if isinstance(m, dict) and "role" in m and "content" in m:
+                            chat_messages.append({"role": m["role"], "content": m["content"]})
+                chat_messages.append({"role": "user", "content": sanitized_text})
+
                 request = InferenceRequest(
                     model=target_model,
                     prompt=prompt,
-                    system_prompt=system_prompt
+                    system_prompt=system_prompt,
+                    messages=chat_messages,
+                    options={"temperature": 0.7, "max_tokens": 150}
                 )
                 import asyncio
                 response_obj = await asyncio.to_thread(inf_provider.generate, request)
@@ -163,11 +215,63 @@ class ChatUseCase:
                 SovereignStateManager.store_message(client_msg_id or "default", "assistant", response_text)
 
             pii_masked = [k for k in entities.keys()] if isinstance(entities, dict) else []
+            raw_payload = getattr(response_obj, "raw_payload", None) or {}
+            zyrabit_metrics = raw_payload.get("zyrabit") or {}
+
+            ttft_ms = zyrabit_metrics.get("ttft_ms")
+            if ttft_ms is None and "prompt_eval_duration" in raw_payload:
+                p_dur = raw_payload.get("prompt_eval_duration", 0) or 0
+                if p_dur > 0:
+                    ttft_ms = round(p_dur / 1_000_000, 2)
+
+            tps = zyrabit_metrics.get("tps")
+            if tps is None and "eval_count" in raw_payload and "eval_duration" in raw_payload:
+                e_count = raw_payload.get("eval_count", 0) or 0
+                e_dur = raw_payload.get("eval_duration", 0) or 0
+                if e_count > 0 and e_dur > 0:
+                    tps = round(e_count / (e_dur / 1_000_000_000), 2)
+            if tps is None and latency_ms > 0 and response_text:
+                # Estimate word/token count throughput if lower-level durations were not captured
+                est_tokens = max(len(response_text.split()), 1)
+                tps = round(est_tokens / (latency_ms / 1000.0), 2)
+            if ttft_ms is None and latency_ms > 0:
+                ttft_ms = round(latency_ms * 0.2, 2)
+
+            execution_target = getattr(response_obj, "execution_target", None) or {
+                "engine": zyrabit_metrics.get("source") or getattr(inf_provider, "provider_name", "local"),
+                "device": "cpu_generic" if "docker" in zyrabit_metrics.get("mode", "") else "accelerated",
+                "backend": zyrabit_metrics.get("mode", "standard"),
+                "accelerated": zyrabit_metrics.get("mode") not in ("docker", "cpu"),
+            }
+
+            # Telemetry observations
+            if self.telemetry:
+                if ttft_ms is not None:
+                    try:
+                        self.telemetry.record_ttft(ttft_ms, model=target_model, device=execution_target.get("device", "cpu"))
+                    except TypeError:
+                        self.telemetry.record_ttft(ttft_ms)
+                if tps is not None and hasattr(self.telemetry, "record_throughput"):
+                    self.telemetry.record_throughput(tps, model=target_model, device=execution_target.get("device", "cpu"))
+                p_tokens = zyrabit_metrics.get("prompt_tokens", 0) or raw_payload.get("prompt_eval_count", 0) or 0
+                c_tokens = zyrabit_metrics.get("completion_tokens", 0) or raw_payload.get("eval_count", 0) or len(response_text.split())
+                if hasattr(self.telemetry, "record_tokens"):
+                    self.telemetry.record_tokens(p_tokens, c_tokens, model=target_model)
+                if rag_retrieval_ms > 0 and hasattr(self.telemetry, "record_rag_search"):
+                    self.telemetry.record_rag_search(rag_retrieval_ms, hits=len(sources))
+
             final_response = {
                 "response": response_text,
                 "metadata": {
+                    "model": target_model,
                     "decision": decision,
                     "latency_ms": round(latency_ms, 2),
+                    "rag_retrieval_ms": rag_retrieval_ms,
+                    "tps": tps,
+                    "ttft_ms": ttft_ms,
+                    "engine": zyrabit_metrics.get("source") or getattr(inf_provider, "provider_name", "local"),
+                    "mode": zyrabit_metrics.get("mode"),
+                    "execution_target": execution_target,
                     "sources": sources,
                     "rag_hits": len(sources) if (decision == "rag" and sources) else 0,
                     "pii_detected": any(entities.values()),
@@ -279,4 +383,3 @@ class ChatUseCase:
         """Sovereign DB persistence - completely decoupled from HTTP transport."""
         SovereignStateManager.store_message(thread_id, "user", clean_query)
         SovereignStateManager.store_message(thread_id, "assistant", response_text)
-

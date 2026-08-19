@@ -31,15 +31,44 @@ class VllmInferenceAdapter(InferenceProviderPort):
         self.endpoint = endpoint.strip()
         self.default_timeout_seconds = default_timeout_seconds
         self.provider_name = provider_name
+        self._cached_model_id: str | None = None
+
+    def get_active_model(self) -> str | None:
+        """Dynamically query the active served model from vLLM /v1/models."""
+        parsed = urlparse(self.endpoint)
+        base_url = f"{parsed.scheme}://{parsed.netloc}"
+        models_url = f"{base_url}/v1/models"
+        try:
+            response = requests.get(models_url, timeout=3.0)
+            if response.status_code == 200:
+                data = response.json()
+                models = [m.get("id") for m in data.get("data", []) if m.get("id")]
+                if models:
+                    self._cached_model_id = models[0]
+                    return self._cached_model_id
+        except Exception as exc:
+            logger.debug("Failed to query active vLLM model: %s", exc)
+        return self._cached_model_id
 
     def generate(self, request: InferenceRequest) -> InferenceResult:
-        messages = []
-        if request.system_prompt:
-            messages.append({"role": "system", "content": request.system_prompt})
-        messages.append({"role": "user", "content": request.prompt})
+        if request.messages:
+            messages = list(request.messages)
+        else:
+            messages = []
+            if request.system_prompt:
+                messages.append({"role": "system", "content": request.system_prompt})
+            messages.append({"role": "user", "content": request.prompt})
+
+        # Dynamic model resolution: query the active model loaded in the NPU/GPU engine
+        active_model = self.get_active_model()
+        target_model = request.model or active_model
+
+        if active_model:
+            # If request.model is a tag alias or generic name, prioritize the active served model
+            target_model = active_model
 
         payload: Dict[str, Any] = {
-            "model": request.model,
+            "model": target_model,
             "messages": messages,
             "stream": request.stream,
         }
@@ -83,11 +112,45 @@ class VllmInferenceAdapter(InferenceProviderPort):
         else:
             text_response = choices[0].get("message", {}).get("content", "")
 
+        usage = body.get("usage") or {}
+        completion_tokens = usage.get("completion_tokens", 0) or 0
+        prompt_tokens = usage.get("prompt_tokens", 0) or 0
+
+        existing_zyrabit = body.get("zyrabit") or {}
+        tps = existing_zyrabit.get("tps")
+        if tps is None and latency > 0 and completion_tokens > 0:
+            tps = round(completion_tokens / latency, 2)
+
+        ttft_ms = existing_zyrabit.get("ttft_ms")
+        if ttft_ms is None and latency > 0:
+            # Estimate TTFT based on prompt processing latency ratio if not provided by stream
+            ttft_ms = round(latency * 1000 * 0.2, 2)
+
+        body["zyrabit"] = {
+            "ttft_ms": ttft_ms,
+            "tps": tps,
+            "source": existing_zyrabit.get("engine", self.provider_name),
+            "mode": existing_zyrabit.get("mode", "metal"),
+            "prompt_tokens": prompt_tokens,
+            "completion_tokens": completion_tokens,
+            "total_ms": round(latency * 1000, 2),
+        }
+
+        is_tt = "8090" in self.endpoint or "tenstorrent" in self.provider_name.lower() or "8000" in self.endpoint
+        device = "tenstorrent_tensix" if is_tt else ("nvidia_cuda" if "cuda" in self.provider_name.lower() else "apple_metal")
+        execution_target = {
+            "engine": "vllm",
+            "device": device,
+            "backend": "vllm_tt_metal" if is_tt else "vllm_native",
+            "accelerated": True,
+        }
+
         return InferenceResult(
             text=text_response,
             latency_seconds=latency,
             provider=self.provider_name,
             raw_payload=body,
+            execution_target=execution_target,
         )
 
     def health(self) -> Dict[str, Any]:

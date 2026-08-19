@@ -1,25 +1,25 @@
-# Ejemplos cURL - Zyrabit Brain API
+# cURL Examples — Zyrabit Brain API
 
-Base URL: `https://localhost` (usa `-k` para ignorar certificado self-signed)
+Base URL: `https://localhost` (use `-k` to ignore self-signed certificates)
 
 ---
 
-## Credenciales Prometheus / Grafana
+## Prometheus / Grafana Credentials
 
-Las variables `PROMETHEUS_BASIC_AUTH` y `GRAFANA_BASIC_AUTH` en `.env` contienen un **hash** (no la contraseña en texto plano). El hash en `example.env` corresponde a:
+`PROMETHEUS_BASIC_AUTH` and `GRAFANA_BASIC_AUTH` in `.env` contain a **hash** (not plaintext). The hash in `example.env` corresponds to:
 
-- **Usuario:** `admin`
-- **Contraseña:** `changeme`
+- **Username:** `admin`
+- **Password:** `changeme`
 
-**No hace falta generar nuevas.** Usa `admin` / `changeme` para acceder a:
+**No need to generate new credentials.** Use `admin` / `changeme` to access:
 - https://localhost/prometheus
 - https://localhost/grafana
 
-Si quieres otra contraseña: `htpasswd -nbB admin 'tu-password'` y reemplaza el valor en `.env`.
+To change the password: `htpasswd -nbB admin 'your-password'` and update `.env`.
 
 ---
 
-## Health
+## Health Check
 
 ```bash
 curl -k https://localhost/health
@@ -27,61 +27,61 @@ curl -k https://localhost/health
 
 ---
 
-## Chat (RAG o SLM directo)
+## Chat (RAG or direct SLM)
 
 ```bash
-# Pregunta que usa RAG (keywords: zyrabit, architecture, etc.)
+# Query using RAG (keywords: zyrabit, architecture, etc.)
 curl -k -X POST https://localhost/v1/chat \
   -H "Content-Type: application/json" \
-  -d '{"text":"¿Qué es Zyrabit y cuál es su arquitectura?"}'
+  -d '{"text":"What is Zyrabit and how is its architecture designed?"}'
 
-# Pregunta general (va directo al SLM)
+# General query (routes directly to SLM)
 curl -k -X POST https://localhost/v1/chat \
   -H "Content-Type: application/json" \
-  -d '{"text":"¿Qué es Python?"}'
+  -d '{"text":"What is Python?"}'
 ```
 
 ---
 
-## Ingestar documento
+## Ingest Document
 
 ```bash
 # PDF
 curl -k -X POST https://localhost/v1/ingest \
-  -F "file=@/ruta/a/documento.pdf"
+  -F "file=@/path/to/document.pdf"
 
-# TXT o MD
+# TXT or MD
 curl -k -X POST https://localhost/v1/ingest \
-  -F "file=@/ruta/a/documento.txt"
+  -F "file=@/path/to/document.txt"
 ```
 
 ---
 
-## Webhook n8n
+## n8n Webhook
 
-Requiere `Authorization: Bearer <N8N_SERVICE_TOKEN>` del `.env`. Con `N8N_REQUIRE_SIGNATURE=false` no hace falta firma.
+Requires `Authorization: Bearer <N8N_SERVICE_TOKEN>` from `.env`. When `N8N_REQUIRE_SIGNATURE=false`, signatures are not required.
 
 ```bash
-export N8N_TOKEN="zyrabit-service-token"   # valor por defecto en example.env
+export N8N_TOKEN="zyrabit-service-token"   # default value in example.env
 
 curl -k -X POST https://localhost/v1/integrations/n8n/webhook \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer $N8N_TOKEN" \
-  -d '{"text":"Resume el estado de Zyrabit"}'
+  -d '{"text":"Summarize the state of Zyrabit"}'
 ```
 
-### Workflow n8n
+### n8n Workflow
 
-Importa `docs/n8n_zyrabit_webhook_workflow.json` en n8n (Import from File). El workflow:
-- Manual Trigger → HTTP Request a Zyrabit
-- URL: `https://host.docker.internal/...` (si n8n corre en Docker) o `https://localhost/...` (si n8n corre en el host)
-- Header `Authorization: Bearer zyrabit-service-token` (debe coincidir con `N8N_SERVICE_TOKEN` en `.env`)
+Import `docs/n8n_zyrabit_webhook_workflow.json` into n8n (Import from File). Workflow design:
+- Manual Trigger → HTTP Request to Zyrabit
+- URL: `https://host.docker.internal/...` (if n8n runs in Docker) or `https://localhost/...` (if n8n runs on host)
+- Header `Authorization: Bearer zyrabit-service-token` (must match `N8N_SERVICE_TOKEN` in `.env`)
 
-Levanta n8n: `docker compose --profile automation up -d n8n`
+Start n8n: `docker compose --profile automation up -d n8n`
 
 ---
 
-## Prometheus (con Basic Auth)
+## Prometheus (Basic Auth)
 
 ```bash
 curl -k -u admin:changeme https://localhost/prometheus/-/healthy
@@ -89,7 +89,7 @@ curl -k -u admin:changeme https://localhost/prometheus/-/healthy
 
 ---
 
-## Grafana (con Basic Auth)
+## Grafana (Basic Auth)
 
 ```bash
 curl -k -u admin:changeme https://localhost/grafana/api/health

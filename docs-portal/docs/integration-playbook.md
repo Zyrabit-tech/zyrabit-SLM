@@ -1,3 +1,9 @@
+---
+sidebar_position: 2
+title: 'Integration Playbook'
+description: 'Standards and patterns for integrating Zyrabit with external systems'
+---
+
 # Integration Playbook
 
 This document details architectural decisions and standards for integrating Zyrabit SLM with external systems and third-party tools.
@@ -40,3 +46,7 @@ To improve model accuracy without internet exposure, follow this local fine-tuni
 3. **Batch Processing:** Run offline LoRA/PEFT jobs in batches using local compute resources.
 4. **Benchmarking:** Evaluate the tuned model against a localized benchmark dataset.
 5. **Promotion:** Promote the model to production only if it passes both quality and safety gates.
+
+## Related Documentation
+- [API Reference](./api-reference.md)
+- [Hexagonal Architecture](./architecture/hexagonal.md)

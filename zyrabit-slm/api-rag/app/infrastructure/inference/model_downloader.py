@@ -70,6 +70,20 @@ class ModelDownloader:
                 logger.info(f"Using cached GGUF model: {local_path}")
                 return str(local_path)
 
+            # Search in alternative local paths before downloading
+            search_dirs = [
+                Path("zyrabit-slm/models"),
+                Path.home() / "models",
+                Path.home() / ".cache" / "lm-studio" / "models",
+                Path.home() / ".ollama" / "models",
+            ]
+            for search_dir in search_dirs:
+                if search_dir.exists():
+                    for match in search_dir.rglob(f"*{filename}*"):
+                        if match.is_file() and match.stat().st_size > 100_000_000:
+                            logger.info(f"Auto-detected existing GGUF model at: {match}")
+                            return str(match)
+
             logger.info(f"Downloading GGUF model '{filename}' from repo '{repo_id}' to cache...")
             try:
                 downloaded_file = hf_hub_download(

@@ -4,9 +4,13 @@ services:
   traefik:
     image: traefik:v3.0
     container_name: zyrabit-traefik
+    profiles: [ "production" ]
+    environment:
+      - DOCKER_API_VERSION=1.40
     command:
       - --api.dashboard=true
       - --providers.docker=true
+      - --providers.docker.apiVersion=1.40
       - --providers.docker.exposedbydefault=false
       - --providers.file.directory=/etc/traefik/dynamic
       - --metrics.prometheus=true
@@ -35,6 +39,10 @@ services:
       context: ..
       dockerfile: zyrabit-slm/api-rag/Dockerfile
     container_name: zyrabit-api
+    ports:
+      - "8088:8080"
+    expose:
+      - "8080"
     env_file:
       - .env
     environment:
@@ -50,7 +58,7 @@ services:
         condition: service_started
     labels:
       - traefik.enable=true
-      - traefik.http.routers.zyrabit-api.rule=Host(`${DOMAIN}`) && (PathPrefix(`/v1`) || PathPrefix(`/socket.io`) || PathPrefix(`/ag-ui`))
+      - traefik.http.routers.zyrabit-api.rule=Host(`${DOMAIN:-localhost}`) && (PathPrefix(`/v1`) || PathPrefix(`/socket.io`) || PathPrefix(`/ag-ui`))
       - traefik.http.routers.zyrabit-api.entrypoints=websecure
       - traefik.http.routers.zyrabit-api.tls=true
       - traefik.http.routers.zyrabit-api.middlewares=api-ratelimit@docker,secureHeaders@file
@@ -60,13 +68,13 @@ services:
       - traefik.docker.network=zyrabit-slm_zyrabit-sovereign-net
     networks:
       - zyrabit-sovereign-net
-      - model-network
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - ./secrets:/run/secrets:ro
       - ./prompts:/app/prompts:ro
       - ./document_source:/app/document_source
       - ./db_data:/app/db_data
+      - ./api-rag/app:/app/app
 
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080/v1/health')"]
@@ -82,9 +90,13 @@ services:
       context: ..
       dockerfile: zyrabit-slm/web-ui/Dockerfile
     container_name: zyrabit-web
+    environment:
+      ZYRABIT_API_KEY_WEB: ${ZYRABIT_API_KEY_WEB}
+    ports:
+      - "${ZYRABIT_LOCAL_PORT:-8080}:80"
     labels:
       - traefik.enable=true
-      - traefik.http.routers.zyrabit-web.rule=Host(`${DOMAIN}`) && PathPrefix(`/`)
+      - traefik.http.routers.zyrabit-web.rule=Host(`${DOMAIN:-localhost}`) && PathPrefix(`/`)
       - traefik.http.routers.zyrabit-web.entrypoints=websecure
       - traefik.http.routers.zyrabit-web.tls=true
       - traefik.http.routers.zyrabit-web.middlewares=secureHeaders@file
@@ -107,58 +119,77 @@ services:
       - 8.8.8.8
       - 1.1.1.1
     networks:
-      - model-network
+      - zyrabit-sovereign-net
     healthcheck:
       test: ["CMD-SHELL", "ollama list || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 5
 
-  # 2.5 THE SILICON BRIDGE: Tenstorrent TT-MLIR Simulation
-  zyrabit-tt-bridge: &tt-base
-    build:
-      context: ../internal/engine/tenstorrent
-      args:
-        INSTALL_TENSTORRENT: ${INSTALL_TENSTORRENT:-false}
-        TENSTORRENT_PYPI_URL: ${TENSTORRENT_PYPI_URL:-https://pypi.eng.aws.tenstorrent.com/}
-    container_name: zyrabit-tt-bridge
-    profiles: [ "tenstorrent-sim" ]
-    environment:
-      - ZYRABIT_TT_MODE=${ZYRABIT_TT_MODE:-mock}
-      - ZYRABIT_TT_MODEL_ID=${ZYRABIT_TT_MODEL_ID:-Qwen/Qwen2.5-1.5B-Instruct}
-      - ZYRABIT_TT_MIN_RAM_GB=${ZYRABIT_TT_MIN_RAM_GB:-24}
-      - ZYRABIT_TT_ALLOW_REMOTE_MODEL=${ZYRABIT_TT_ALLOW_REMOTE_MODEL:-false}
-    ports:
-      - "8090:8090"
-    networks:
-      - model-network
-    volumes:
-      - ./hf-cache:/root/.cache/huggingface/hub
-    healthcheck:
-      test: ["CMD", "curl", "-fsS", "http://localhost:8090/v1/health"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
-
-  # 2.6 THE METAL BRIDGE: Tenstorrent Bare-Metal Hardware
-  zyrabit-tt-metal:
-    <<: *tt-base
-    container_name: zyrabit-tt-metal
-    profiles: [ "tenstorrent" ]
+  # 2.5 THE SILICON ENGINE: Hardware Serving Layer (Blackhole p150 / GPU / Metal)
+  zyrabit-vllm-tt:
+    image: ghcr.io/tenstorrent/tt-inference-server/vllm-tt-metal-src-release-ubuntu-22.04-amd64:0.8.0-55fd115-aa4ae1e
+    container_name: zyrabit-vllm-tt
+    profiles: [ "hardware", "tenstorrent" ]
+    env_file:
+      - .env
+    command:
+      - /bin/bash
+      - -c
+      - |
+        set -e
+        if [ -n "$${PYTHON_ENV_DIR}" ] && [ -f "$${PYTHON_ENV_DIR}/bin/activate" ]; then
+          source "$${PYTHON_ENV_DIR}/bin/activate"
+        fi
+        export TT_MODEL_SPEC_JSON_PATH="$${TT_MODEL_SPEC_JSON_PATH:-/model_spec.json}"
+        export CACHE_ROOT=/home/container_app_user/cache_root
+        export TT_CACHE_PATH="$${CACHE_ROOT}/tt_cache"
+        TARGET_MODEL="$${TT_HF_MODEL_NAME:-$${MODEL_NAME:-Qwen2.5-3B-Instruct}}"
+        MODEL_SNAP=$$(find /hf-cache/hub -maxdepth 4 -type d -path "*/snapshots/*" 2>/dev/null | grep -i "$$TARGET_MODEL" | head -1 | sed 's:/$$::')
+        if [ -z "$$MODEL_SNAP" ]; then
+          MODEL_SNAP=$$(find /hf-cache/hub -maxdepth 4 -type d -path "*/snapshots/*" 2>/dev/null | head -1 | sed 's:/$$::')
+        fi
+        if [ -z "$$MODEL_SNAP" ]; then
+          echo "ERROR: Model '$$TARGET_MODEL' not found in /hf-cache" >&2
+          ls -la /hf-cache /hf-cache/hub 2>/dev/null || true
+          exit 1
+        fi
+        export MODEL_WEIGHTS_PATH="$$MODEL_SNAP"
+        echo "Serving $$MODEL_WEIGHTS_PATH on Tenstorrent..."
+        exec python /home/container_app_user/app/src/run_vllm_api_server.py
     devices:
       - /dev/tenstorrent:/dev/tenstorrent
     ipc: host
+    environment:
+      - CACHE_ROOT=/home/container_app_user/cache_root
+      - HF_HOME=/hf-cache
+      - HF_HUB_OFFLINE=1
+      - MESH_DEVICE=${MESH_DEVICE:-P150}
+      - TT_METAL_ARCH_NAME=blackhole
+      - VLLM_RPC_TIMEOUT=100000
+      - TT_HF_MODEL_NAME=${TT_HF_MODEL_NAME:-Qwen2.5-3B-Instruct}
+      - TT_MODEL_SPEC_JSON_PATH=${TT_MODEL_SPEC_JSON_PATH:-/model_spec.json}
+    volumes:
+      - tt-cache-root:/home/container_app_user/cache_root
+      - ${ZYRABIT_HF_CACHE_DIR:-./hf-cache}:/hf-cache
+      - /dev/hugepages-1G:/dev/hugepages-1G
+      - ./api-rag/app/infrastructure/engine/tenstorrent/${TT_MODEL_SPEC:-model_spec_qwen25_3b_p150.json}:/model_spec.json:ro
+    ports:
+      - "8090:8000"
+    networks:
+      - zyrabit-sovereign-net
 
   # 3. THE MEMORY: Vector DB
   zyrabit-db:
-    image: chromadb/chroma:0.5.3
+    image: chromadb/chroma:1.5.9
     container_name: zyrabit-db
     environment:
       - ANONYMIZED_TELEMETRY=False
       - CHROMA_OTEL_COLLECTION_ENDPOINT=http://localhost:4317
       - CHROMA_OTEL_SERVICE_NAME=zyrabit-vector-db
       - ORT_LOGGING_LEVEL=3
-
+    ports:
+      - "8000:8000"
     volumes:
       - ./chroma-data:/data
     networks:
@@ -166,7 +197,6 @@ services:
     healthcheck:
       test: ["CMD-SHELL", "bash -c 'cat < /dev/null > /dev/tcp/127.0.0.1/8000' || exit 1"]
       interval: 30s
-
       timeout: 10s
       retries: 3
 
@@ -177,8 +207,8 @@ services:
     command:
       - --config.file=/etc/prometheus/prometheus.yml
       - --storage.tsdb.path=/prometheus
-      - --web.external-url=https://localhost/prometheus
-      - --web.route-prefix=/prometheus
+    ports:
+      - "9090:9090"
     volumes:
       - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
       - prometheus-data:/prometheus
@@ -188,19 +218,27 @@ services:
       - traefik.http.routers.zyrabit-prometheus.entrypoints=websecure
       - traefik.http.routers.zyrabit-prometheus.tls=true
       - traefik.http.routers.zyrabit-prometheus.middlewares=prometheus-auth@docker,secureHeaders@file
-      - traefik.http.middlewares.prometheus-auth.basicauth.users=${PROMETHEUS_BASIC_AUTH:?set PROMETHEUS_BASIC_AUTH}
+      - traefik.http.middlewares.prometheus-auth.basicauth.users=${PROMETHEUS_BASIC_AUTH:-admin:$$2y$$05$$placeholder}
       - traefik.http.services.zyrabit-prometheus.loadbalancer.server.port=9090
       - traefik.docker.network=zyrabit-slm_zyrabit-sovereign-net
     networks:
       - zyrabit-sovereign-net
 
   # 5. THE MONITOR (Dashboard): Grafana
+  # External Host Port: 3000 -> Internal Container Port: 3000
   zyrabit-grafana:
     image: grafana/grafana:11.1.0
     container_name: zyrabit-grafana
     environment:
-      - GF_SERVER_ROOT_URL=https://localhost/grafana
-      - GF_SERVER_SERVE_FROM_SUB_PATH=true
+      - GF_SERVER_ROOT_URL=${GRAFANA_ROOT_URL:-%(protocol)s://%(domain)s:%(http_port)s/}
+      - GF_SERVER_SERVE_FROM_SUB_PATH=${GRAFANA_SERVE_FROM_SUB_PATH:-false}
+      - GF_AUTH_ANONYMOUS_ENABLED=true
+      - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
+      - GF_AUTH_DISABLE_LOGIN_FORM=false
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    ports:
+      - "3000:3000"
     volumes:
       - grafana-data:/var/lib/grafana
       - ./grafana/datasources:/etc/grafana/provisioning/datasources
@@ -211,7 +249,7 @@ services:
       - traefik.http.routers.zyrabit-grafana.entrypoints=websecure
       - traefik.http.routers.zyrabit-grafana.tls=true
       - traefik.http.routers.zyrabit-grafana.middlewares=grafana-auth@docker,secureHeaders@file
-      - traefik.http.middlewares.grafana-auth.basicauth.users=${GRAFANA_BASIC_AUTH:?set GRAFANA_BASIC_AUTH}
+      - traefik.http.middlewares.grafana-auth.basicauth.users=${GRAFANA_BASIC_AUTH:-admin:$$2y$$05$$placeholder}
       - traefik.http.services.zyrabit-grafana.loadbalancer.server.port=3000
       - traefik.docker.network=zyrabit-slm_zyrabit-sovereign-net
     depends_on:
@@ -289,14 +327,31 @@ services:
       timeout: 10s
       retries: 5
 
+  # 8. BARE INFERENCE: Standalone Engine without Web UI / RAG (profile: bare)
+  zyrabit-bare-engine:
+    image: ollama/ollama:0.3.1
+    container_name: zyrabit-bare-engine
+    profiles: [ "bare" ]
+    environment:
+      - OLLAMA_NUM_PARALLEL=${OLLAMA_NUM_PARALLEL:-1}
+    volumes:
+      - ~/.ollama:/root/.ollama
+    ports:
+      - "8088:11434"
+    networks:
+      - zyrabit-sovereign-net
+    healthcheck:
+      test: ["CMD-SHELL", "ollama list || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
 networks:
   zyrabit-sovereign-net:
     driver: bridge
-  model-network:
-    driver: bridge
-    internal: true
 
 volumes:
   prometheus-data:
   grafana-data:
   postgres-data:
+  tt-cache-root:

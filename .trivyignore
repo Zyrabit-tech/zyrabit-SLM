@@ -1,6 +1,6 @@
-# Archivo de ignorados de Trivy (Trivy Ignore File)
-# Útil en entornos Air-Gapped para ignorar falsos positivos o vulnerabilidades OS de severidad baja.
-# Agrega aquí los IDs de CVE que Trivy debe ignorar (un ID por línea).
-# Por ejemplo:
+# Trivy Ignore File
+# Useful in Air-Gapped environments to ignore false positives or low severity OS vulnerabilities.
+# Add CVE IDs here that Trivy should ignore (one ID per line).
+# Example:
 # CVE-2023-12345
 # PYSEC-2023-444

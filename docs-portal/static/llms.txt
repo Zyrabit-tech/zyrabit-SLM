@@ -1,0 +1,22 @@
+# Zyrabit SLM
+
+Zyrabit SLM is a Sovereign Local Model runtime and RAG engine built on Hexagonal Architecture.
+
+## Architecture Summary
+The system separates core domain logic from infrastructure using Ports and Adapters.
+- Primary Adapters: FastAPI, Socket.IO
+- Domain: Use Cases, Gatekeeper, PII Masking
+- Ports: Interfaces defining infrastructure contracts
+- Secondary Adapters: ChromaDB, Ollama, etc.
+
+## Map
+- Hexagonal Architecture: /docs/architecture/hexagonal
+- Swap Database: /docs/guides/swap-database
+- Configure Models: /docs/guides/swap-models
+- Hardware Configuration: /docs/guides/swap-hardware
+- AI Context: /docs/ai-context
+
+## Ports & Adapters
+- `InferencePort` -> `OllamaInferenceAdapter`
+- `VectorStorePort` -> `ChromaAdapter`
+- `McpClientPort` -> `InternalMcpClientAdapter`
