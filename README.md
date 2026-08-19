@@ -85,28 +85,93 @@ All traffic is local. State never leaves your trust boundary.
 
 ## ⚡ Quickstart
 
-**Prerequisites:** Python 3.12, [uv](https://github.com/astral-sh/uv), Docker & Docker Compose, [Ollama](https://ollama.com) running locally
+**Prerequisites:** Python 3.12, [uv](https://github.com/astral-sh/uv), Docker & Docker Compose, [Ollama](https://ollama.com) (or local GGUF weights)
 
 ```bash
 # 1. Clone and install
 git clone https://github.com/Zyrabit-tech/zyrabit-SLM.git
 cd zyrabit-SLM
+chmod +x zyra.sh install.sh
 uv sync --all-groups
 source .venv/bin/activate
 
-# 2. Start in local/dev mode (default — no flags needed)
+# 2. Start in local/dev mode (default — direct open ports, no Traefik)
 ./zyra.sh install
 
-# 3. Test it
+# 3. Test local inference
 curl -X POST http://localhost:8080/v1/chat \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer zyrabit-local-token" \
-  -d '{"text": "Summarize our Q3 compliance report"}'
+  -d '{"text": "Summarize our sovereign architecture capabilities"}'
 ```
 
-> **First time?** Run `./zyra.sh wizard` for an interactive setup covering model selection, inference engine, database, and audio transcription.
+> [!TIP]
+> **Avoid using `sudo ./zyra.sh`**: Running scripts with `sudo` creates root-owned files that break normal user permissions. If you see Docker `permission denied` errors, add your user to the docker group: `sudo usermod -aG docker $USER && newgrp docker`.
 
-> **Going to production?** Run `./zyra.sh install --production` — triggers the domain, HTTPS, and PostgreSQL configuration wizard.
+> **Local / Dev Mode (Default)**: Runs FastAPI, Web UI, Chroma Vector DB, Grafana (:3000), and Prometheus (:9090) with direct open ports and auto-discovered local models. No TLS or reverse proxy complexity.
+>
+> **Production Mode**: Pass `./zyra.sh install --production` or `./zyra.sh start --production` to activate Traefik TLS reverse proxy, strict `.env` credential validation, domain binding, and production hardening.
+
+---
+
+## 🤖 AI Agent Setup (Cursor, Antigravity, Windsurf, Cline)
+
+If you are using an AI coding assistant to configure, troubleshoot, or build tools on Zyrabit SLM, copy and paste the prompt below into your assistant's chat or system instructions.
+
+### 📋 Setup & Autonomous Troubleshooting Prompt
+
+```text
+You are pair-programming on Zyrabit SLM, a sovereign, local-first AI runtime.
+
+Task: Setup, verify, and operate the local Zyrabit SLM environment.
+
+1. Environment & Permissions Check:
+   - Check if Docker daemon is running and user has docker permissions (no root/sudo needed).
+   - Ensure scripts have executable permissions: `chmod +x zyra.sh install.sh`
+   - Run `python3 --version` (requires Python 3.12) and check if `uv` is installed.
+   - Check if Ollama is running locally: `curl -s http://localhost:11434/api/tags` or if local GGUF models exist.
+
+2. Installation & Configuration:
+   - Run `uv sync --all-groups` to synchronize the virtual environment.
+   - Run `./zyra.sh install` (or `./zyra.sh start` if already configured).
+   - Local models in Ollama, HF cache, or ~/models will be auto-detected.
+
+3. Health & Sanity Checks:
+   - Check container status: `docker compose -f zyrabit-slm/docker-compose.yml ps`
+   - Test health endpoint: `curl -s http://localhost:8080/v1/health`
+   - Test local inference:
+     curl -X POST http://localhost:8080/v1/chat \
+       -H "Content-Type: application/json" \
+       -H "Authorization: Bearer zyrabit-local-token" \
+       -d '{"text": "Hello, Zyrabit!"}'
+
+4. Architectural Invariants:
+   - Zero external egress: All models, embeddings, and vector stores must run locally.
+   - PII Sandwich: Prompts are sanitized before reaching inference engines.
+   - Tool calling must be routed through the local MCP gateway.
+```
+
+### 🧩 MCP Server Configuration for Agents
+
+Connect this Zyrabit instance as a local MCP server for your agent (`claude_desktop_config.json`, Cursor MCP, or Antigravity MCP):
+
+```json
+{
+  "zyrabit-slm": {
+    "command": "uv",
+    "args": [
+      "--directory",
+      "/path/to/zyrabit-SLM/mcp",
+      "run",
+      "zyrabit-mcp"
+    ],
+    "env": {
+      "ZYRABIT_API_URL": "http://localhost:8080",
+      "ZYRABIT_API_KEY": "zyrabit-local-token"
+    }
+  }
+}
+```
 
 ---
 

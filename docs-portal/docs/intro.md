@@ -19,13 +19,22 @@ Watch the system process voice commands and capture images in real-time without 
 
 > ℹ️ **Note:** The video audio is in Spanish.
 
+## 🤖 Sovereign Runtime for AI Agents
+
+Zyrabit SLM serves as a **local-first backend and security firewall for autonomous AI agents** (Cursor, Antigravity, AutoGen, CrewAI, LangGraph, and Cline):
+
+- **Zero-Trust Tool Execution (MCP)**: Safely exposes local file operations, databases, and internal APIs to agents via the standard [Model Context Protocol](https://modelcontextprotocol.io).
+- **PII & Secret Protection**: Outbound agent prompts are automatically scrubbed of credentials, API keys, and sensitive personally identifiable information before hitting models.
+- **Sovereign Agent Memory**: State, conversation history, and document embeddings stay local in SQLite WAL and ChromaDB — zero external data egress.
+
 ## Architecture & Design Principles
 
 Zyrabit is built on a zero-trust architecture, ensuring that data processing remains entirely within the host network perimeter. It integrates vector databases, local inference engines, and workflow automation into a unified, reproducible deployment model.
 
 ### Core Capabilities
 
-- **Private RAG Engine:** A high-performance vector retrieval system coupled with local language models for deterministic, context-aware querying of proprietary datasets.
+- **Private RAG & Agent Memory:** A high-performance vector retrieval system coupled with local language models for deterministic, context-aware querying of proprietary datasets.
+- **Autonomous Agent Tooling (MCP):** Pre-packaged Model Context Protocol servers allowing AI agents to interact with on-premise infrastructure safely.
 - **Hardware-Aware Inference:** Dynamic compute routing that automatically maps execution to the optimal available backend (Apple Metal, NVIDIA CUDA, or CPU/AVX2) without manual configuration overhead.
 - **Native Observability:** Integrated telemetry stack utilizing Prometheus and Grafana to expose critical metrics, including inference latency, VRAM allocation, and query throughput.
 - **Workflow Orchestration:** Native integration with n8n to enable the design and execution of complex, API-driven AI pipelines.
@@ -33,6 +42,7 @@ Zyrabit is built on a zero-trust architecture, ensuring that data processing rem
 ## Target Environments
 
 Zyrabit is engineered for deployments that require stringent data governance and low-latency local execution:
+- Sovereign AI Agents operating on corporate codebases and confidential data.
 - Air-gapped enterprise networks.
 - Compliance-regulated industries (Healthcare, Finance, Public Sector).
 - Edge computing nodes and localized data centers.

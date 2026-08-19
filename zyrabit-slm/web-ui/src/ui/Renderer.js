@@ -18,7 +18,7 @@ export class Renderer {
         bus.on(EVENTS.UI.MSG_ADDED, (data) => this.renderMessage(data.role, data.text, data.metadata, data.timestamp));
         bus.on(EVENTS.UI.THINKING, (state) => this.toggleThinking(state));
         bus.on('UI:CLEAR_CHAT', () => {
-            this.container.innerHTML = '';
+            this.container.querySelectorAll('zyra-chat-message').forEach(el => el.remove());
             this.lastDate = null;
             const suggestions = document.getElementById('floating-suggestions');
             if (suggestions) {

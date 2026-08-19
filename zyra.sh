@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-
 # ──────────────────────────────────────────────────────────────────────────────
 #   ZYRABIT SLM — Unified CLI
 #   Version: 2.3.1
@@ -48,7 +47,6 @@ log_warn() { echo -e "${YELLOW}⚠${NC} $1"; }
 log_err()  { echo -e "${RED}✖${NC} $1" >&2; }
 log_step() { echo -e "\n${BOLD}${BRAND_AMBER}▶ $1${NC}"; }
 log_header() {
-    print_banner
     echo -e "${BOLD}${BRAND_ICE}═════════════════════════════════════════════════════════════════${NC}"
     echo -e "${BOLD}${GREEN}   $1${NC}"
     echo -e "${BOLD}${BRAND_ICE}═════════════════════════════════════════════════════════════════${NC}\n"
@@ -164,6 +162,65 @@ detect_hardware() {
     echo "${ram_gb}|${cores}|${accelerator}"
 }
 
+detect_local_models() {
+    local detected=()
+    # 1. Check Ollama running or CLI
+    if check_local_ollama && command -v ollama >/dev/null 2>&1; then
+        while read -r name _; do
+            if [[ -n "$name" && "$name" != "NAME" ]]; then
+                local lower_name; lower_name="$(echo "$name" | tr '[:upper:]' '[:lower:]')"
+                # Filter out embedding models
+                if [[ "$lower_name" != *embed* && "$lower_name" != *bge-* && "$lower_name" != *minilm* && "$lower_name" != *bert* && "$lower_name" != *rerank* ]]; then
+                    detected+=("ollama:${name}")
+                fi
+            fi
+        done < <(ollama list 2>/dev/null || true)
+    elif [[ -d "${HOME}/.ollama/models/manifests/registry.ollama.ai/library" ]]; then
+        for d in "${HOME}/.ollama/models/manifests/registry.ollama.ai/library"/*; do
+            if [[ -d "$d" ]]; then
+                local model_base; model_base="$(basename "$d")"
+                local lower_base; lower_base="$(echo "$model_base" | tr '[:upper:]' '[:lower:]')"
+                if [[ "$lower_base" != *embed* && "$lower_base" != *bge-* && "$lower_base" != *minilm* && "$lower_base" != *bert* ]]; then
+                    for tag in "$d"/*; do
+                        [[ -f "$tag" ]] && detected+=("ollama:${model_base}:$(basename "$tag")")
+                    done
+                fi
+            fi
+        done
+    fi
+
+    # 2. Check Hugging Face hub cache
+    local hf_hub="${HOME}/.cache/huggingface/hub"
+    if [[ -d "${hf_hub}" ]]; then
+        for model_dir in "${hf_hub}"/models--*; do
+            if [[ -d "${model_dir}" ]]; then
+                local repo_name; repo_name="$(basename "${model_dir}" | sed 's/^models--//; s/--/\//')"
+                local lower_repo; lower_repo="$(echo "$repo_name" | tr '[:upper:]' '[:lower:]')"
+                if [[ "$lower_repo" != *embed* && "$lower_repo" != *bge-* && "$lower_repo" != *minilm* && "$lower_repo" != *bert* ]]; then
+                    detected+=("hf:${repo_name}")
+                fi
+            fi
+        done
+    fi
+
+    # 3. Check local GGUF models
+    local gguf_dirs=("${SCRIPT_DIR}/zyrabit-slm/models" "${HOME}/models" "${HOME}/.cache/zyrabit/models" "${HOME}/.cache/lm-studio/models")
+    for gguf_dir in "${gguf_dirs[@]}"; do
+        if [[ -d "${gguf_dir}" ]]; then
+            while read -r gguf_file; do
+                if [[ -n "${gguf_file}" ]]; then
+                    local lower_gguf; lower_gguf="$(echo "$gguf_file" | tr '[:upper:]' '[:lower:]')"
+                    if [[ "$lower_gguf" != *embed* && "$lower_gguf" != *bge-* && "$lower_gguf" != *minilm* ]]; then
+                        detected+=("gguf:$(basename "${gguf_file}")|${gguf_file}")
+                    fi
+                fi
+            done < <(find "${gguf_dir}" -maxdepth 3 -type f -name "*.gguf" 2>/dev/null || true)
+        fi
+    done
+
+    printf '%s\n' "${detected[@]}"
+}
+
 # ─────────────────────────────────────────────────────────────────────────────
 # WIZARD — called by install on first run (or --yes skips it)
 # ─────────────────────────────────────────────────────────────────────────────
@@ -206,24 +263,126 @@ run_wizard() {
     log_ok "Engine: ${INFERENCE_PROVIDER}"
 
     # ── 2. AI Model & Architecture (MoE / Dense) ───────────────────────────────
-    log_step "2/4  AI Model Architecture"
+    log_step "2/4  AI Model Architecture & Smart Selection"
     local hw_info ram
     hw_info=$(detect_hardware); IFS='|' read -r ram _ _ <<< "$hw_info"
-    echo "   Available Host RAM: ${ram} GB"
-    echo "   1) qwen2.5:3b     ~3 GB  — Ultra-fast (<81ms TTFT, low latency)"
-    echo "   2) mixtral:8x7b   ~26 GB — Mixture of Experts (MoE) / High reasoning capacity"
-    echo "   3) deepseek-r1:7b ~5 GB  — Reasoning Chain-of-Thought"
-    echo "   4) qwen2.5:7b     ~8 GB  — Balanced production model"
-    echo "   5) Custom model name"
-    read -rp "   Select [1]: " _c; _c="${_c:-1}"
-    case "$_c" in
-        2) OVERRIDE_MODEL="mixtral:8x7b-instruct" ;;
-        3) OVERRIDE_MODEL="deepseek-r1:7b" ;;
-        4) OVERRIDE_MODEL="qwen2.5:7b" ;;
-        5) read -rp "   Enter model name: " OVERRIDE_MODEL ;;
-        *) OVERRIDE_MODEL="qwen2.5:3b" ;;
-    esac
-    log_ok "Model: ${OVERRIDE_MODEL}"
+    echo -e "   Available Host RAM: ${BOLD}${ram} GB${NC}"
+
+    # Scan for existing downloaded models (excluding embedding models)
+    local raw_detected=()
+    while IFS= read -r line; do
+        [[ -n "$line" ]] && raw_detected+=("$line")
+    done < <(detect_local_models)
+
+    # Build unified choice array
+    local menu_labels=()
+    local menu_values=()
+    local menu_types=()
+
+    # Prioritize and recommend best local model if available
+    local best_rec_idx=1
+    local found_top_rec=0
+
+    for m in "${raw_detected[@]}"; do
+        local display_name="${m}"
+        local val="${m}"
+        local type="ollama"
+        if [[ "$m" == ollama:* ]]; then
+            val="${m#ollama:}"
+            display_name="${val} (Ollama local)"
+            type="ollama"
+        elif [[ "$m" == hf:* ]]; then
+            val="${m#hf:}"
+            display_name="${val} (Hugging Face Cache)"
+            type="hf"
+        elif [[ "$m" == gguf:* ]]; then
+            local gguf_file; gguf_file="$(echo "$m" | cut -d'|' -f2)"
+            val="${gguf_file}"
+            display_name="$(basename "$gguf_file") (Local GGUF)"
+            type="gguf"
+        fi
+
+        # Check recommendation match
+        local tag_rec=""
+        if [[ $found_top_rec -eq 0 ]]; then
+            if [[ "$val" == *"deepseek-r1:7b"* || "$val" == *"deepseek-r1"* ]] && [[ "$ram" -ge 8 ]]; then
+                tag_rec=" ${BOLD}${GREEN}★ RECOMENDADO (${ram}GB RAM, Razonamiento Avanzado)${NC}"
+                found_top_rec=1
+            elif [[ "$val" == *"qwen2.5:7b"* ]] && [[ "$ram" -ge 8 ]]; then
+                tag_rec=" ${BOLD}${GREEN}★ RECOMENDADO (${ram}GB RAM, Producción Balanceada)${NC}"
+                found_top_rec=1
+            elif [[ "$val" == *"qwen2.5:3b"* || "$val" == *"qwen2.5:1.5b"* ]]; then
+                tag_rec=" ${BOLD}${GREEN}★ RECOMENDADO (${ram}GB RAM, Ultra Rápido)${NC}"
+                found_top_rec=1
+            fi
+        fi
+
+        menu_labels+=("${display_name}${tag_rec}")
+        menu_values+=("${val}")
+        menu_types+=("${type}")
+    done
+
+    echo ""
+    local opt_num=1
+    if [[ ${#raw_detected[@]} -gt 0 ]]; then
+        echo -e "   ${GREEN}⚡ Modelos Locales Detectados (Listos, sin descargas):${NC}"
+        for lbl in "${menu_labels[@]}"; do
+            echo -e "   ${BOLD}${opt_num})${NC} ${lbl}"
+            ((opt_num++))
+        done
+        echo ""
+    fi
+
+    # Standard Catalogue additions
+    echo -e "   ${CYAN}🌐 O Descargar un Modelo del Catálogo:${NC}"
+
+    local cat_models=(
+        "qwen2.5:7b|qwen2.5:7b     ~8 GB  — Balanced production model"
+        "mixtral:8x7b-instruct|mixtral:8x7b   ~26 GB — Mixture of Experts (MoE) / High reasoning"
+        "deepseek-r1:7b|deepseek-r1:7b ~5 GB  — Reasoning Chain-of-Thought"
+        "qwen2.5:3b|qwen2.5:3b     ~3 GB  — Ultra-fast (<81ms TTFT, low latency)"
+    )
+
+    for item in "${cat_models[@]}"; do
+        local c_val; c_val="$(echo "$item" | cut -d'|' -f1)"
+        local c_lbl; c_lbl="$(echo "$item" | cut -d'|' -f2)"
+        local tag_rec=""
+        if [[ $found_top_rec -eq 0 ]]; then
+            if [[ "$c_val" == "qwen2.5:7b" && "$ram" -ge 8 ]]; then
+                tag_rec=" ${BOLD}${GREEN}★ RECOMENDADO para ${ram}GB RAM${NC}"
+                found_top_rec=1
+            elif [[ "$c_val" == "qwen2.5:3b" ]]; then
+                tag_rec=" ${BOLD}${GREEN}★ RECOMENDADO para ${ram}GB RAM${NC}"
+                found_top_rec=1
+            fi
+        fi
+        menu_labels+=("${c_lbl}${tag_rec}")
+        menu_values+=("${c_val}")
+        menu_types+=("catalogue")
+        echo -e "   ${BOLD}${opt_num})${NC} ${c_lbl}${tag_rec}"
+        ((opt_num++))
+    done
+
+    # Custom model option
+    local custom_idx=${opt_num}
+    echo -e "   ${BOLD}${custom_idx})${NC} Escribir nombre de modelo personalizado o ruta a .gguf\n"
+
+    read -rp "   Selecciona una opción [1]: " _c; _c="${_c:-1}"
+
+    if [[ "$_c" == "${custom_idx}" ]]; then
+        read -rp "   Introduce el nombre o ruta del modelo: " OVERRIDE_MODEL
+    elif [[ "$_c" =~ ^[0-9]+$ ]] && [[ "$_c" -ge 1 && "$_c" -le ${#menu_values[@]} ]]; then
+        local chosen_arr_idx=$(( _c - 1 ))
+        OVERRIDE_MODEL="${menu_values[$chosen_arr_idx]}"
+        local chosen_type="${menu_types[$chosen_arr_idx]}"
+        if [[ "$chosen_type" == "gguf" ]]; then
+            LLAMA_MODEL_PATH="${OVERRIDE_MODEL}"
+        fi
+    else
+        OVERRIDE_MODEL="${menu_values[0]}"
+    fi
+
+    log_ok "Modelo seleccionado: ${OVERRIDE_MODEL}"
 
     # ── 3. Autonomous ReAct Agent & MCP Tools ──────────────────────────────────
     log_step "3/4  Agentic Loop & Tool Execution (ReAct)"
@@ -268,8 +427,41 @@ run_wizard() {
         cp "${EXAMPLE_ENV}" "${ENV_FILE}"
     fi
     if [[ -f "${ENV_FILE}" ]]; then
+        local target_slm_url="http://zyrabit-engine:11434"
+        local target_tt_model="${OVERRIDE_MODEL}"
+
+        case "${INFERENCE_PROVIDER}" in
+            tenstorrent|vllm)
+                target_slm_url="http://zyrabit-vllm-tt:8000"
+                case "${OVERRIDE_MODEL}" in
+                    "qwen2.5:7b")     target_tt_model="Qwen2.5-7B-Instruct" ;;
+                    "qwen2.5:3b")     target_tt_model="Qwen2.5-3B-Instruct" ;;
+                    "deepseek-r1:7b") target_tt_model="DeepSeek-R1-Distill-Qwen-7B" ;;
+                    "mixtral:8x7b-instruct") target_tt_model="Mixtral-8x7B-Instruct-v0.1" ;;
+                    *) target_tt_model="${OVERRIDE_MODEL}" ;;
+                esac
+                ;;
+            ollama_host)
+                target_slm_url="http://host.docker.internal:11434"
+                ;;
+            *)
+                target_slm_url="http://zyrabit-engine:11434"
+                ;;
+        esac
+
         sed -i.bak "s|^INFERENCE_PROVIDER=.*|INFERENCE_PROVIDER=${INFERENCE_PROVIDER}|" "${ENV_FILE}" 2>/dev/null || true
+        sed -i.bak "s|^SLM_URL=.*|SLM_URL=${target_slm_url}|"                           "${ENV_FILE}" 2>/dev/null || true
         sed -i.bak "s|^MODEL_NAME=.*|MODEL_NAME=${OVERRIDE_MODEL}|"                     "${ENV_FILE}" 2>/dev/null || true
+        
+        if grep -q "^TT_HF_MODEL_NAME=" "${ENV_FILE}" 2>/dev/null; then
+            sed -i.bak "s|^TT_HF_MODEL_NAME=.*|TT_HF_MODEL_NAME=${target_tt_model}|"   "${ENV_FILE}" 2>/dev/null || true
+        else
+            echo "TT_HF_MODEL_NAME=${target_tt_model}" >> "${ENV_FILE}"
+        fi
+
+        # Remove obsolete upstream bridge variable if present
+        sed -i.bak "/^ZYRABIT_TT_UPSTREAM_MODEL=/d" "${ENV_FILE}" 2>/dev/null || true
+
         grep -q "^ENABLE_REACT_AGENT=" "${ENV_FILE}" 2>/dev/null \
             && sed -i.bak "s|^ENABLE_REACT_AGENT=.*|ENABLE_REACT_AGENT=${ENABLE_REACT}|" "${ENV_FILE}" \
             || echo "ENABLE_REACT_AGENT=${ENABLE_REACT}" >> "${ENV_FILE}"
@@ -340,7 +532,9 @@ ensure_local_secrets() {
         fi
     done
     rm -f "${ENV_FILE}.bak"
-    [[ "${generated}" == "1" ]] && log_ok "Generated distinct local API keys in zyrabit-slm/.env"
+    if [[ "${generated}" == "1" ]]; then
+        log_ok "Generated distinct local API keys in zyrabit-slm/.env"
+    fi
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -360,22 +554,123 @@ _pull_models() {
     local model_name="${1}"
     local provider
     provider=$(grep '^INFERENCE_PROVIDER=' "${ENV_FILE}" 2>/dev/null | cut -d= -f2 || echo "ollama_host")
+
+    # If model_name is a direct file path to a GGUF
+    if [[ "${model_name}" == *.gguf || -f "${model_name}" ]]; then
+        if [[ -f "${model_name}" ]]; then
+            log_ok "Using local GGUF model file: ${model_name}"
+            return 0
+        fi
+    fi
+
     if [[ "${provider}" == "llama_cpp_server" ]]; then
-        [[ -f "${LLAMA_MODEL_PATH}" ]] || { log_err "Missing GGUF model: ${LLAMA_MODEL_PATH}"; return 1; }
-        log_ok "GGUF model ready for llama.cpp Metal."
-    elif [[ "${provider}" == ollama* ]]; then
-        log_info "Pulling model '${model_name}' into Ollama..."
-        if check_local_ollama; then
-            ollama pull "${model_name}" 2>/dev/null   || log_warn "Pull failed. Run manually: ollama pull ${model_name}"
-            ollama pull mxbai-embed-large 2>/dev/null || true
+        if [[ -f "${LLAMA_MODEL_PATH}" ]]; then
+            log_ok "GGUF model ready: ${LLAMA_MODEL_PATH}"
+            return 0
+        fi
+        # Attempt to search local directories before erroring
+        local discovered_gguf
+        discovered_gguf=$(find "${SCRIPT_DIR}/zyrabit-slm/models" "${HOME}/models" "${HOME}/.cache/zyrabit/models" -maxdepth 3 -type f -name "*.gguf" 2>/dev/null | head -1 || true)
+        if [[ -n "${discovered_gguf}" ]]; then
+            log_ok "Auto-detected GGUF model: ${discovered_gguf}"
+            LLAMA_MODEL_PATH="${discovered_gguf}"
+            return 0
+        fi
+        log_warn "Missing GGUF model: ${LLAMA_MODEL_PATH}. Place your .gguf in zyrabit-slm/models/ or download one."
+    elif [[ "${provider}" == "tenstorrent" || "${provider}" == "vllm" || "${provider}" == "mlx" || "${provider}" == "cuda" ]]; then
+        local hf_cache
+        hf_cache=$(grep '^ZYRABIT_HF_CACHE_DIR=' "${ENV_FILE}" 2>/dev/null | cut -d= -f2 || echo "${HOME}/.cache/huggingface")
+        hf_cache="${hf_cache:-${HOME}/.cache/huggingface}"
+        local tt_model
+        tt_model=$(grep '^TT_HF_MODEL_NAME=' "${ENV_FILE}" 2>/dev/null | cut -d= -f2 || echo "${model_name}")
+        tt_model="${tt_model:-${model_name}}"
+
+        log_info "Checking Hugging Face cache for '${tt_model}' in ${hf_cache}..."
+        local found
+        found=$(find "${hf_cache}/hub" -maxdepth 4 -type d -path "*/snapshots/*" 2>/dev/null | grep -i "${tt_model}" | head -1 || true)
+        if [[ -n "${found}" ]]; then
+            log_ok "Weights verified in cache: $(basename "${found}")"
         else
-            $DOCKER_COMPOSE_CMD -f "$(active_compose_file)" exec -T zyrabit-engine ollama pull "${model_name}" ||
-                log_warn "Pull failed — container may still be initializing."
+            log_warn "Model weights for '${tt_model}' not found in ${hf_cache}/hub."
+            local hf_repo="Qwen/${tt_model}"
+            [[ "${tt_model}" == *"DeepSeek"* ]] && hf_repo="deepseek-ai/${tt_model}"
+            [[ "${tt_model}" == *"Mistral"* ]] && hf_repo="mistralai/${tt_model}"
+            log_info "Downloading weights for ${hf_repo} to ${hf_cache}..."
+            if command -v huggingface-cli >/dev/null 2>&1; then
+                HF_HUB_ENABLE_HF_TRANSFER=0 HF_HOME="${hf_cache}" huggingface-cli download "${hf_repo}" || log_warn "Download failed. Ensure internet connection or place weights manually in ${hf_cache}."
+            elif python3 -c "import huggingface_hub" >/dev/null 2>&1; then
+                python3 -c "import os; from huggingface_hub import snapshot_download; snapshot_download(repo_id='${hf_repo}', cache_dir='${hf_cache}/hub')" || log_warn "Download failed."
+            else
+                log_warn "Neither 'huggingface-cli' nor 'huggingface_hub' python package found. If needed, download weights manually into ${hf_cache}/hub."
+            fi
+        fi
+    elif [[ "${provider}" == ollama* ]]; then
+        log_info "Verifying Ollama models for '${model_name}'..."
+        if check_local_ollama; then
+            if ollama list 2>/dev/null | grep -q "${model_name}"; then
+                log_ok "Model '${model_name}' already exists in Ollama. Skipping pull."
+            else
+                log_info "Pulling '${model_name}' into Ollama..."
+                ollama pull "${model_name}" 2>/dev/null || log_warn "Pull failed. You can run manually: ollama pull ${model_name}"
+            fi
+            if ! ollama list 2>/dev/null | grep -q "mxbai-embed-large"; then
+                ollama pull mxbai-embed-large 2>/dev/null || true
+            fi
+        else
+            if $DOCKER_COMPOSE_CMD -f "$(active_compose_file)" exec -T zyrabit-engine ollama list 2>/dev/null | grep -q "${model_name}"; then
+                log_ok "Model '${model_name}' already loaded in container."
+            else
+                $DOCKER_COMPOSE_CMD -f "$(active_compose_file)" exec -T zyrabit-engine ollama pull "${model_name}" ||
+                    log_warn "Pull failed — container may still be initializing or network offline."
+            fi
         fi
         log_ok "Models ready."
     else
         log_info "Provider '${provider}' uses embedded/MLX weights — downloaded automatically on first request."
     fi
+}
+
+validate_production_env() {
+    [[ -f "${ENV_FILE}" ]] || {
+        log_err "Production mode requires a configured .env file at zyrabit-slm/.env"
+        exit 1
+    }
+
+    local missing=()
+    local domain; domain=$(grep '^DOMAIN=' "${ENV_FILE}" 2>/dev/null | cut -d= -f2- | tr -d '"' | tr -d "'" || true)
+    if [[ -z "${domain}" || "${domain}" == "localhost" || "${domain}" == replace-with-* ]]; then
+        missing+=("DOMAIN must be configured to a valid public/internal domain (cannot be 'localhost' or placeholder)")
+    fi
+
+    local web_key; web_key=$(grep '^ZYRABIT_API_KEY_WEB=' "${ENV_FILE}" 2>/dev/null | cut -d= -f2- | tr -d '"' | tr -d "'" || true)
+    if [[ -z "${web_key}" || "${web_key}" == replace-with-* || "${web_key}" == zyrabit-*-token ]]; then
+        missing+=("ZYRABIT_API_KEY_WEB must be set to a secure, non-default secret")
+    fi
+
+    local mcp_key; mcp_key=$(grep '^ZYRABIT_API_KEY_MCP=' "${ENV_FILE}" 2>/dev/null | cut -d= -f2- | tr -d '"' | tr -d "'" || true)
+    if [[ -z "${mcp_key}" || "${mcp_key}" == replace-with-* || "${mcp_key}" == zyrabit-*-token ]]; then
+        missing+=("ZYRABIT_API_KEY_MCP must be set to a secure, non-default secret")
+    fi
+
+    local prom_auth; prom_auth=$(grep '^PROMETHEUS_BASIC_AUTH=' "${ENV_FILE}" 2>/dev/null | cut -d= -f2- || true)
+    if [[ -z "${prom_auth}" || "${prom_auth}" != *:* || "${prom_auth}" == *placeholder* ]]; then
+        missing+=("PROMETHEUS_BASIC_AUTH must be set to 'username:htpasswd_hash' for Traefik access")
+    fi
+
+    local graf_auth; graf_auth=$(grep '^GRAFANA_BASIC_AUTH=' "${ENV_FILE}" 2>/dev/null | cut -d= -f2- || true)
+    if [[ -z "${graf_auth}" || "${graf_auth}" != *:* || "${graf_auth}" == *placeholder* ]]; then
+        missing+=("GRAFANA_BASIC_AUTH must be set to 'username:htpasswd_hash' for Traefik access")
+    fi
+
+    if [[ ${#missing[@]} -gt 0 ]]; then
+        log_err "Production validation failed. Please address these in zyrabit-slm/.env:"
+        for item in "${missing[@]}"; do
+            echo -e "   ${RED}✗ ${item}${NC}"
+        done
+        echo ""
+        exit 1
+    fi
+    log_ok "Production environment validated."
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -386,18 +681,26 @@ run_start() {
     local compose_file compose_args
     compose_file="$(active_compose_file)"
     compose_args=("-f" "${compose_file}")
-    [[ -n "${PROFILE:-}" ]] && compose_args+=("--profile" "${PROFILE}")
+    local current_provider
+    current_provider=$(grep '^INFERENCE_PROVIDER=' "${ENV_FILE}" 2>/dev/null | cut -d= -f2 || echo "ollama_host")
+
+    if [[ "${current_provider}" == "tenstorrent" || "${current_provider}" == "vllm" ]]; then
+        compose_args+=("--profile" "hardware")
+    fi
 
     if [[ "${PRODUCTION_MODE}" == "true" ]]; then
+        validate_production_env
+        compose_args+=("--profile" "production")
         log_header "ZYRABIT — PRODUCTION"
         log_info "Domain: ${DOMAIN:-localhost}"
         $DOCKER_COMPOSE_CMD "${compose_args[@]}" up -d
     else
-        log_header "ZYRABIT — LOCAL / DEV"
-        local current_provider
-        current_provider=$(grep '^INFERENCE_PROVIDER=' "${ENV_FILE}" 2>/dev/null | cut -d= -f2 || echo "ollama_host")
+        log_header "ZYRABIT — LOCAL / DEV (Traefik bypassed, direct ports active)"
 
-        if [[ "${current_provider}" == "llama_cpp_server" ]]; then
+        if [[ "${current_provider}" == "tenstorrent" || "${current_provider}" == "vllm" ]]; then
+            log_info "Tenstorrent Blackhole provider detected — activating hardware accelerator container..."
+            $DOCKER_COMPOSE_CMD "${compose_args[@]}" up -d --remove-orphans --scale zyrabit-engine=0
+        elif [[ "${current_provider}" == "llama_cpp_server" ]]; then
             if [[ ! -f "${LLAMA_MODEL_PATH}" ]]; then log_err "GGUF model missing. Run setup again after downloading it."; exit 1; fi
             if ! curl -fsS --max-time 2 "http://127.0.0.1:${LLAMA_SERVER_PORT}/v1/models" >/dev/null 2>&1; then
                 log_info "Starting llama.cpp native Metal server on port ${LLAMA_SERVER_PORT}..."
@@ -420,31 +723,34 @@ run_start() {
                     exit 1
                 }
             fi
-            $DOCKER_COMPOSE_CMD "${compose_args[@]}" up -d --scale zyrabit-engine=0 2>/dev/null || $DOCKER_COMPOSE_CMD "${compose_args[@]}" up -d
+            $DOCKER_COMPOSE_CMD "${compose_args[@]}" up -d --remove-orphans --scale zyrabit-engine=0 2>/dev/null || $DOCKER_COMPOSE_CMD "${compose_args[@]}" up -d --remove-orphans
         elif [[ "${current_provider}" == "embedded_metal" || "${current_provider}" == "mlx" ]]; then
             log_info "Provider is '${current_provider}' (Native Metal) — skipping zyrabit-engine container."
-            $DOCKER_COMPOSE_CMD "${compose_args[@]}" up -d --scale zyrabit-engine=0 2>/dev/null ||
-            $DOCKER_COMPOSE_CMD "${compose_args[@]}" up -d
+            $DOCKER_COMPOSE_CMD "${compose_args[@]}" up -d --remove-orphans --scale zyrabit-engine=0 2>/dev/null ||
+            $DOCKER_COMPOSE_CMD "${compose_args[@]}" up -d --remove-orphans
         elif check_local_ollama && [[ "${current_provider}" != "ollama_docker" && "${current_provider}" != "ollama" ]]; then
             log_info "Ollama detected on host (Metal) — skipping zyrabit-engine container."
-            $DOCKER_COMPOSE_CMD "${compose_args[@]}" up -d --scale zyrabit-engine=0 2>/dev/null ||
-            $DOCKER_COMPOSE_CMD "${compose_args[@]}" up -d
+            $DOCKER_COMPOSE_CMD "${compose_args[@]}" up -d --remove-orphans --scale zyrabit-engine=0 2>/dev/null ||
+            $DOCKER_COMPOSE_CMD "${compose_args[@]}" up -d --remove-orphans
         else
-            log_info "Starting infrastructure with zyrabit-engine container..."
-            $DOCKER_COMPOSE_CMD "${compose_args[@]}" up -d
+            log_info "Starting local services (Web UI, API RAG, Vector DB, Grafana, Prometheus)..."
+            $DOCKER_COMPOSE_CMD "${compose_args[@]}" up -d --remove-orphans
         fi
     fi
 
     log_ok "Stack is up."
     echo ""
     if [[ "${PRODUCTION_MODE}" != "true" ]]; then
-        echo -e "  ${BOLD}🚀 Zyrabit ready!${NC}"
+        echo -e "  ${BOLD}🚀 Zyrabit Local / Dev Services Ready!${NC}"
         local local_port="${ZYRABIT_LOCAL_PORT:-8080}"
-        echo -e "  ${CYAN}➜ Workspace${NC} http://localhost:${local_port}"
-        echo -e "  ${CYAN}➜ API${NC}       http://localhost:${local_port}/v1"
-        echo -e "  ${CYAN}➜ Health${NC}    http://localhost:${local_port}/v1/health"
+        echo -e "  ${CYAN}➜ Web UI (Workspace)${NC}  http://localhost:${local_port}"
+        echo -e "  ${CYAN}➜ API RAG (FastAPI)${NC}    http://localhost:8088/v1  (or http://localhost:${local_port}/v1)"
+        echo -e "  ${CYAN}➜ Grafana Dashboard${NC}    http://localhost:3000"
+        echo -e "  ${CYAN}➜ Prometheus Metrics${NC}   http://localhost:9090"
+        echo -e "  ${CYAN}➜ Vector DB (Chroma)${NC}   http://localhost:8000"
+        echo -e "  ${CYAN}➜ MCP Agent Server${NC}     http://localhost:8001"
     else
-        echo -e "  ${BOLD}🚀 Zyrabit ready!${NC}"
+        echo -e "  ${BOLD}🚀 Zyrabit Production Services Ready (Traefik TLS)!${NC}"
         echo -e "  ${CYAN}➜ Web UI${NC}     https://${DOMAIN:-localhost}"
         echo -e "  ${CYAN}➜ API${NC}        https://${DOMAIN:-localhost}/v1"
         echo -e "  ${CYAN}➜ Grafana${NC}    https://${DOMAIN:-localhost}/grafana"
@@ -459,7 +765,7 @@ run_start() {
 run_stop() {
     log_header "STOPPING ZYRABIT"
     require_docker
-    $DOCKER_COMPOSE_CMD -f "$(active_compose_file)" down
+    $DOCKER_COMPOSE_CMD -f "$(active_compose_file)" --profile hardware --profile monitoring --profile production down --remove-orphans
     log_ok "Stack stopped."
 }
 
@@ -468,17 +774,23 @@ run_stop() {
 # ─────────────────────────────────────────────────────────────────────────────
 run_verify() {
     log_header "HEALTH CHECK"
-    local containers
-    [[ "${PRODUCTION_MODE}" == "true" ]] \
-        && containers=("zyrabit-api" "zyrabit-web" "zyrabit-db" "zyrabit-prometheus" "zyrabit-grafana") \
-        || containers=("zyrabit-api" "zyrabit-web" "zyrabit-db")
+    local current_provider
+    current_provider=$(grep '^INFERENCE_PROVIDER=' "${ENV_FILE}" 2>/dev/null | cut -d= -f2 || echo "ollama_host")
+
+    local containers=("zyrabit-traefik" "zyrabit-api" "zyrabit-web" "zyrabit-db" "zyrabit-mcp")
+
+    if [[ "${PRODUCTION_MODE}" == "true" ]]; then
+        containers+=("zyrabit-prometheus" "zyrabit-grafana" "zyrabit-loki")
+    fi
+    if [[ "${current_provider}" == "tenstorrent" || "${current_provider}" == "vllm" ]]; then
+        containers+=("zyrabit-vllm-tt")
+    elif [[ "${current_provider}" == "ollama_docker" || "${current_provider}" == "ollama" ]]; then
+        containers+=("zyrabit-engine")
+    fi
 
     local pass=0 fail=0
     printf "  ${BOLD}%-28s %-15s %-10s${NC}\n" "CONTAINER" "STATUS" "HEALTH"
     printf "  ${CYAN}%-28s %-15s %-10s${NC}\n"  "────────────────────────────" "───────────────" "──────────"
-
-    local current_provider
-    current_provider=$(grep '^INFERENCE_PROVIDER=' "${ENV_FILE}" 2>/dev/null | cut -d= -f2 || echo "ollama_host")
 
     for c in "${containers[@]}"; do
         local status health
@@ -542,6 +854,15 @@ run_doctor() {
     echo -e "  ${BOLD}Compose${NC}      ${DOCKER_COMPOSE_CMD}"
     echo -e "  ${BOLD}uv${NC}           $(uv --version 2>/dev/null || echo "not installed")"
     require_docker
+    if [[ -e /dev/tenstorrent ]]; then
+        log_ok "Tenstorrent PCIe device present (/dev/tenstorrent)."
+        local hp; hp=$(cat /sys/kernel/mm/hugepages/hugepages-1048576kB/nr_hugepages 2>/dev/null || echo "0")
+        if [[ "$hp" -gt 0 ]]; then
+            log_ok "HugePages 1GB configured (${hp} pages)."
+        else
+            log_warn "HugePages 1GB is 0. Tenstorrent Blackhole benefits from 1GB hugepages."
+        fi
+    fi
     check_local_ollama && log_ok "Ollama detected on host (Metal)." || log_warn "Ollama not detected — will use Docker engine or embedded adapter."
     [[ -f "${ENV_FILE}" ]] && log_ok ".env found at zyrabit-slm/.env" || log_warn "No .env — run './zyra.sh install' first."
     log_ok "Doctor done."
@@ -939,6 +1260,8 @@ fi
 # ─────────────────────────────────────────────────────────────────────────────
 # DISPATCH
 # ─────────────────────────────────────────────────────────────────────────────
+print_banner
+
 for CMD in "${COMMANDS[@]}"; do
     case "${CMD}" in
         install)   run_install   ;;
@@ -951,9 +1274,7 @@ for CMD in "${COMMANDS[@]}"; do
         ingest)    run_ingest "${COMMANDS[1]:-${EXTRA_ARGS[0]}}"; break ;;
         dev)       run_dev       ;;
         doctor)    run_doctor    ;;
-        # legacy aliases — kept for muscle memory
-        wizard)    SKIP_WIZARD="false"; run_install ;; # wizard is now part of install
-        build)     _build ;; # still callable for CI use
+        build)     _build ;; # callable for CI use
         *) log_err "Unknown command: '${CMD}'.  Run './zyra.sh help'"; exit 1 ;;
     esac
 done

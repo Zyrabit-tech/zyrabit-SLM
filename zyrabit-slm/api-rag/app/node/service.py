@@ -174,8 +174,23 @@ class NodeService:
         prompt = self._prompt(question, context, history, session_context)
         try:
             answer, metrics = await asyncio.to_thread(self.inference.answer, prompt)
-        except Exception:
-            return self._no_evidence_response(question)
+        except Exception as exc:
+            documents = self.documents()
+            ready = [d for d in documents if d.get("status") == "ready"]
+            if not ready:
+                return self._no_evidence_response(question)
+            err_msg = f"⚠️ Error en el motor de inferencia: No se pudo conectar al runtime ({exc}). Verifica que el motor configurado esté activo y escuchando."
+            return {
+                "response": err_msg,
+                "metadata": {
+                    "sources": [],
+                    "rag_hits": 0,
+                    "context_hits": len(evidence),
+                    "rag_retrieval_ms": rag_retrieval_ms,
+                    "decision": "engine-offline-error",
+                    "error": str(exc),
+                }
+            }
         grounded, cited = self._validate_grounding(answer, evidence)
         decision = "model-with-evidence" if grounded else "model-knowledge"
         metadata = {
@@ -429,22 +444,22 @@ class NodeService:
     def _prompt(self, question: str, evidence: str, history: list[dict], session_context: dict | None = None) -> str:
         identity = self._identity()
         if not evidence:
-            recent = "\n".join(f"{item['role']}: {str(item['content'])[:250]}" for item in history[-2:])
+            recent = "\n".join(f"{item['role']}: {str(item['content'])[:350]}" for item in history[-4:])
             history_block = f"\nConversación previa:\n{recent}\n" if recent else ""
             return f"""Eres {identity['assistant_name']}, un asistente soberano inteligente, útil y claro con tono {identity['tone']}.
 Responde de manera natural, amable y directa a la consulta o conversación del usuario en su idioma.{history_block}
 Pregunta: {question}"""
 
         recent = "\n".join(f"{item['role']}: {str(item['content'])[:450]}" for item in history[-3:])
-        evidence_rule = "Hay evidencia local recuperada abajo. Úsala para responder con precisión. Si una afirmación depende de esa evidencia, añade al final del párrafo el identificador [EVIDENCE:uuid] correspondiente. No inventes contenido."
+        evidence_rule = """Si la consulta del usuario se refiere a los documentos o a la evidencia local provista, fundamenta tu respuesta en ella y añade el identificador [EVIDENCE:uuid] correspondiente.
+Si el usuario solo saluda, agradece, charla de forma casual o hace preguntas generales, responde de manera natural, amable y directa en su idioma sin inventar citas."""
         return f"""Eres {identity['assistant_name']}, un {identity['persona']} local con tono {identity['tone']}.
-La última pregunta del usuario es la instrucción prioritaria: respóndela directamente usando la evidencia local recuperada.
 {evidence_rule}
 
 Conversación reciente:
 {recent}
 
-Evidencia local:
+Evidencia local disponible:
 {evidence}
 
 Pregunta: {question}"""

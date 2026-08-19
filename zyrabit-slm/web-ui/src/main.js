@@ -211,11 +211,11 @@ class ZyrabitApp {
         bind(IDS.TOGGLE_GDPR, 'onclick', () => this.togglePanel(IDS.GDPR_PANEL));
         getSafeElement('toggle-ingest').onclick = () => getSafeElement(IDS.FILE_INPUT).click();
         getSafeElement('toggle-docs').onclick = () => this.togglePanel(IDS.DOCS_PANEL);
-        bind('clear-conversation', 'onclick', () => {
+        bind('clear-conversation', 'onclick', async () => {
             this.history = [];
             Storage.remove('chat_history');
             Storage.remove('pending_messages');
-            this.chat.resetSession();
+            await this.chat.resetSession();
             bus.emit('UI:CLEAR_CHAT');
             this.showNotification('Conversation cleared.', 'success');
         });
