@@ -167,7 +167,6 @@ class NodeService:
 
     async def _model_response(self, question: str, session_id: str, evidence: list[EvidenceUnit], document_id: str | None = None, session_context: dict | None = None, rag_retrieval_ms: float = 0.0) -> dict:
         """Generate one answer from model knowledge plus bounded local evidence."""
-        identity = self._identity()
         context = self._bounded_context(evidence)
         history = self.metadata.get_history(session_id)
         session_context = session_context or self.metadata.get_session_context(session_id)

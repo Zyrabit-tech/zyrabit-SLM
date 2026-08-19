@@ -5,7 +5,7 @@ import { Renderer } from "./ui/Renderer";
 import { EVENTS, IDS } from "./core/Constants";
 import { getSafeElement } from "./utils/DOM";
 import { Storage } from "./adapters/Storage";
-import { getSession, getProfile, saveProfile, patchSessionContext, getHealth, getDocuments, getTools, importSource, getJob } from "./services/api";
+import { getSession, getProfile } from "./services/api";
 
 
 /**

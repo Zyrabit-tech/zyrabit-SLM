@@ -1,6 +1,5 @@
 import abc
 from typing import Any, Dict, Optional, ContextManager
-from contextlib import nullcontext
 
 
 class TelemetryPort(abc.ABC):

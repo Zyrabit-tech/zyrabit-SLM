@@ -1,7 +1,6 @@
 """Infrastructure adapters for the Node ports."""
 from __future__ import annotations
 
-import asyncio
 import os
 from typing import Sequence
 

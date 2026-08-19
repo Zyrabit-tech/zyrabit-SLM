@@ -1,6 +1,6 @@
 import logging
 from typing import Any, Dict, Optional, ContextManager
-from contextlib import contextmanager, nullcontext
+from contextlib import contextmanager
 import time
 
 from app.domain.ports.telemetry_port import TelemetryPort

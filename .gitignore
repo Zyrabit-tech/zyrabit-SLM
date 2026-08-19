@@ -67,6 +67,7 @@ node_modules/
 docs-portal/node_modules/
 docs-portal/.docusaurus/
 docs-portal/build/
+zyrabit-slm/web-ui/dist/
 .pnpm-store/
 
 # Python build
@@ -74,6 +75,7 @@ docs-portal/build/
 .eggs/
 dist/
 build/
+scratch/
 
 # Cursor / IDE
 .cursor/

@@ -1,7 +1,6 @@
 """Local parsers that produce evidence units with human-readable locators."""
 from __future__ import annotations
 
-import os
 import re
 import subprocess
 import tempfile

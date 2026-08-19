@@ -4,9 +4,8 @@ from __future__ import annotations
 import os
 import tempfile
 from pathlib import Path
-from uuid import uuid4
 
-from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from pydantic import BaseModel, Field
 
 from app.api.v1.dependencies import get_node_service
