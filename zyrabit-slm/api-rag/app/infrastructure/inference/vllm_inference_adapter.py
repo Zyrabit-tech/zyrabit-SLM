@@ -31,6 +31,24 @@ class VllmInferenceAdapter(InferenceProviderPort):
         self.endpoint = endpoint.strip()
         self.default_timeout_seconds = default_timeout_seconds
         self.provider_name = provider_name
+        self._cached_model_id: str | None = None
+
+    def get_active_model(self) -> str | None:
+        """Dynamically query the active served model from vLLM /v1/models."""
+        parsed = urlparse(self.endpoint)
+        base_url = f"{parsed.scheme}://{parsed.netloc}"
+        models_url = f"{base_url}/v1/models"
+        try:
+            response = requests.get(models_url, timeout=3.0)
+            if response.status_code == 200:
+                data = response.json()
+                models = [m.get("id") for m in data.get("data", []) if m.get("id")]
+                if models:
+                    self._cached_model_id = models[0]
+                    return self._cached_model_id
+        except Exception:
+            pass
+        return self._cached_model_id
 
     def generate(self, request: InferenceRequest) -> InferenceResult:
         if request.messages:
@@ -41,8 +59,16 @@ class VllmInferenceAdapter(InferenceProviderPort):
                 messages.append({"role": "system", "content": request.system_prompt})
             messages.append({"role": "user", "content": request.prompt})
 
+        # Dynamic model resolution: query the active model loaded in the NPU/GPU engine
+        active_model = self.get_active_model()
+        target_model = request.model or active_model
+
+        if active_model:
+            # If request.model is a tag alias or generic name, prioritize the active served model
+            target_model = active_model
+
         payload: Dict[str, Any] = {
-            "model": request.model,
+            "model": target_model,
             "messages": messages,
             "stream": request.stream,
         }

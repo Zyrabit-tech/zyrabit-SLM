@@ -175,7 +175,7 @@ services:
       - /dev/hugepages-1G:/dev/hugepages-1G
       - ./api-rag/app/infrastructure/engine/tenstorrent/${TT_MODEL_SPEC:-model_spec_qwen25_3b_p150.json}:/model_spec.json:ro
     ports:
-      - "8000:8000"
+      - "8090:8000"
     networks:
       - zyrabit-sovereign-net
 
@@ -207,8 +207,6 @@ services:
     command:
       - --config.file=/etc/prometheus/prometheus.yml
       - --storage.tsdb.path=/prometheus
-      - --web.external-url=https://localhost/prometheus
-      - --web.route-prefix=/prometheus
     ports:
       - "9090:9090"
     volumes:
@@ -227,12 +225,18 @@ services:
       - zyrabit-sovereign-net
 
   # 5. THE MONITOR (Dashboard): Grafana
+  # External Host Port: 3000 -> Internal Container Port: 3000
   zyrabit-grafana:
     image: grafana/grafana:11.1.0
     container_name: zyrabit-grafana
     environment:
-      - GF_SERVER_ROOT_URL=https://localhost/grafana
-      - GF_SERVER_SERVE_FROM_SUB_PATH=true
+      - GF_SERVER_ROOT_URL=${GRAFANA_ROOT_URL:-%(protocol)s://%(domain)s:%(http_port)s/}
+      - GF_SERVER_SERVE_FROM_SUB_PATH=${GRAFANA_SERVE_FROM_SUB_PATH:-false}
+      - GF_AUTH_ANONYMOUS_ENABLED=true
+      - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
+      - GF_AUTH_DISABLE_LOGIN_FORM=false
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
     ports:
       - "3000:3000"
     volumes:

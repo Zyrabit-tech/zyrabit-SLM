@@ -71,7 +71,7 @@ OVERRIDE_MODEL=""
 NO_CACHE="false"
 E2E_SECURITY="false"
 REPORT_MODE="false"
-SKIP_WIZARD="false"   # --yes / -y skips wizard when .env already exists
+SKIP_PROMPTS="false"   # --yes / -y skips interactive prompts when .env already exists
 COMMANDS=()
 
 # ─── Docker compose detection ─────────────────────────────────────────────────
@@ -93,8 +93,8 @@ usage() {
     echo -e "${BOLD}Zyrabit SLM — Sovereign AI Runtime${NC}\n"
     echo -e "${BOLD}Usage:${NC}  ./zyra.sh [command] [flags]\n"
     echo -e "${BOLD}Commands:${NC}"
-    echo -e "  install      Setup & launch  (runs wizard on first install, smart on re-runs)"
-    echo -e "  start        Re-launch existing stack without wizard or model pull"
+    echo -e "  install      Setup & launch  (guided configuration on first run, smart on re-runs)"
+    echo -e "  start        Re-launch existing stack without configuration prompts"
     echo -e "  stop         Tear down all containers"
     echo -e "  verify       Health check: container status + API probe"
     echo -e "  validate     Sovereign QA: unit tests, PII, air-gap, architecture"
@@ -104,7 +104,7 @@ usage() {
     echo -e "  doctor       Diagnose hardware, RAM, GPU, Docker, and uv\n"
     echo -e "${BOLD}Flags:${NC}"
     echo -e "  --production     Production mode (HTTPS, Traefik, custom domain)"
-    echo -e "  --yes / -y       Skip wizard prompts — use existing .env as-is"
+    echo -e "  --yes / -y       Skip interactive prompts — use existing .env as-is"
     echo -e "  --profile <n>    Add optional service profile  (bare, db, automation)"
     echo -e "  --model <name>   Override AI model (e.g. mixtral:8x7b, qwen2.5:3b, deepseek-r1:7b)"
     echo -e "  --no-cache       Force Docker build without cache"
@@ -155,7 +155,7 @@ detect_hardware() {
         cores="$(nproc 2>/dev/null || echo 4)"
     fi
     if   command -v nvidia-smi >/dev/null 2>&1;                                 then accelerator="nvidia"
-    elif [[ -e /dev/tenstorrent ]] || command -v tt-smi >/dev/null 2>&1;        then accelerator="tenstorrent"; export SLM_URL="http://zyrabit-tt-metal:8090"
+    elif [[ -e /dev/tenstorrent ]] || command -v tt-smi >/dev/null 2>&1;        then accelerator="tenstorrent"; export SLM_URL="http://zyrabit-vllm-tt:8000"
     elif [[ "$(uname -s)" == "Darwin" && "$(uname -m)" == "arm64" ]];           then accelerator="metal";       export SLM_URL="http://host.docker.internal:11434"
     else                                                                              accelerator="cpu"
     fi
@@ -222,10 +222,10 @@ detect_local_models() {
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
-# WIZARD — called by install on first run (or --yes skips it)
+# CONFIGURATION SETUP — called by install on first run (or --yes skips it)
 # ─────────────────────────────────────────────────────────────────────────────
-run_wizard() {
-    log_header "ZYRABIT SETUP WIZARD"
+run_setup_config() {
+    log_header "ZYRABIT CONFIGURATION SETUP"
     echo -e "  ${CYAN}Configure your sovereign AI stack. Press Enter to accept defaults.${NC}\n"
 
     # ── 1. Hardware & Engine Detection ─────────────────────────────────────────
@@ -266,7 +266,23 @@ run_wizard() {
     log_step "2/4  AI Model Architecture & Smart Selection"
     local hw_info ram
     hw_info=$(detect_hardware); IFS='|' read -r ram _ _ <<< "$hw_info"
-    echo -e "   Available Host RAM: ${BOLD}${ram} GB${NC}"
+
+    local hw_ctx_label="${ram} GB RAM"
+    local hw_rec_prefix="${ram}GB RAM"
+    if [[ "${INFERENCE_PROVIDER}" == "tenstorrent" ]]; then
+        hw_ctx_label="Tenstorrent NPU | Host RAM: ${ram} GB"
+        hw_rec_prefix="Tenstorrent NPU + ${ram}GB"
+    elif [[ "${INFERENCE_PROVIDER}" == "cuda" ]]; then
+        hw_ctx_label="NVIDIA CUDA GPU | Host RAM: ${ram} GB"
+        hw_rec_prefix="CUDA GPU + ${ram}GB"
+    elif [[ "${INFERENCE_PROVIDER}" == "ollama_host" && "$(uname -s)" == "Darwin" ]]; then
+        hw_ctx_label="Apple Silicon Metal | Unified RAM: ${ram} GB"
+        hw_rec_prefix="Apple Metal + ${ram}GB"
+    elif [[ "${INFERENCE_PROVIDER}" == "mlx" ]]; then
+        hw_ctx_label="Apple MLX Framework | Unified RAM: ${ram} GB"
+        hw_rec_prefix="Apple MLX + ${ram}GB"
+    fi
+    echo -e "   Target Hardware   : ${BOLD}${CYAN}${hw_ctx_label}${NC}"
 
     # Scan for existing downloaded models (excluding embedding models)
     local raw_detected=()
@@ -304,20 +320,32 @@ run_wizard() {
 
         # Check recommendation match
         local tag_rec=""
-        if [[ $found_top_rec -eq 0 ]]; then
-            if [[ "$val" == *"deepseek-r1:7b"* || "$val" == *"deepseek-r1"* ]] && [[ "$ram" -ge 8 ]]; then
-                tag_rec=" ${BOLD}${GREEN}★ RECOMENDADO (${ram}GB RAM, Razonamiento Avanzado)${NC}"
-                found_top_rec=1
-            elif [[ "$val" == *"qwen2.5:7b"* ]] && [[ "$ram" -ge 8 ]]; then
-                tag_rec=" ${BOLD}${GREEN}★ RECOMENDADO (${ram}GB RAM, Producción Balanceada)${NC}"
-                found_top_rec=1
-            elif [[ "$val" == *"qwen2.5:3b"* || "$val" == *"qwen2.5:1.5b"* ]]; then
-                tag_rec=" ${BOLD}${GREEN}★ RECOMENDADO (${ram}GB RAM, Ultra Rápido)${NC}"
-                found_top_rec=1
+        local tag_note=""
+        if [[ "${INFERENCE_PROVIDER}" == "tenstorrent" ]]; then
+            if [[ "$val" == *"1.5"* || "$val" == *"1.5b"* || "$val" == *"1.5B"* || "$val" == *"3b"* || "$val" == *"3B"* ]]; then
+                if [[ $found_top_rec -eq 0 ]]; then
+                    tag_rec=" ${BOLD}${GREEN}★ RECOMENDADO (Nativo Tenstorrent NPU — <80ms TTFT)${NC}"
+                    found_top_rec=1
+                fi
+            elif [[ "$val" == *"7b"* || "$val" == *"7B"* || "$val" == *"8x7b"* ]]; then
+                tag_note=" ${YELLOW}(7B+ requiere multi-tarjeta en NPU o CPU)${NC}"
+            fi
+        else
+            if [[ $found_top_rec -eq 0 ]]; then
+                if [[ "$val" == *"deepseek-r1:7b"* || "$val" == *"deepseek-r1"* ]] && [[ "$ram" -ge 8 ]]; then
+                    tag_rec=" ${BOLD}${GREEN}★ RECOMENDADO (${hw_rec_prefix}, Razonamiento Avanzado)${NC}"
+                    found_top_rec=1
+                elif [[ "$val" == *"qwen2.5:7b"* ]] && [[ "$ram" -ge 8 ]]; then
+                    tag_rec=" ${BOLD}${GREEN}★ RECOMENDADO (${hw_rec_prefix}, Producción Balanceada)${NC}"
+                    found_top_rec=1
+                elif [[ "$val" == *"qwen2.5:3b"* || "$val" == *"qwen2.5:1.5b"* ]]; then
+                    tag_rec=" ${BOLD}${GREEN}★ RECOMENDADO (${hw_rec_prefix}, Ultra Rápido)${NC}"
+                    found_top_rec=1
+                fi
             fi
         fi
 
-        menu_labels+=("${display_name}${tag_rec}")
+        menu_labels+=("${display_name}${tag_rec}${tag_note}")
         menu_values+=("${val}")
         menu_types+=("${type}")
     done
@@ -336,24 +364,41 @@ run_wizard() {
     # Standard Catalogue additions
     echo -e "   ${CYAN}🌐 O Descargar un Modelo del Catálogo:${NC}"
 
-    local cat_models=(
-        "qwen2.5:7b|qwen2.5:7b     ~8 GB  — Balanced production model"
-        "mixtral:8x7b-instruct|mixtral:8x7b   ~26 GB — Mixture of Experts (MoE) / High reasoning"
-        "deepseek-r1:7b|deepseek-r1:7b ~5 GB  — Reasoning Chain-of-Thought"
-        "qwen2.5:3b|qwen2.5:3b     ~3 GB  — Ultra-fast (<81ms TTFT, low latency)"
-    )
+    local cat_models=()
+    if [[ "${INFERENCE_PROVIDER}" == "tenstorrent" ]]; then
+        cat_models=(
+            "qwen2.5:3b|qwen2.5:3b     ~3 GB  — Ultra-fast (<81ms TTFT, Nativo 1x Tenstorrent p150)"
+            "deepseek-r1:1.5b|deepseek-r1:1.5b ~2 GB  — Reasoning CoT (Nativo 1x Tenstorrent p150)"
+            "qwen2.5:7b|qwen2.5:7b     ~8 GB  — Balanced production (Requiere multi-tarjeta en NPU)"
+            "mixtral:8x7b-instruct|mixtral:8x7b   ~26 GB — Mixture of Experts (Requiere multi-tarjeta en NPU)"
+        )
+    else
+        cat_models=(
+            "qwen2.5:7b|qwen2.5:7b     ~8 GB  — Balanced production model"
+            "mixtral:8x7b-instruct|mixtral:8x7b   ~26 GB — Mixture of Experts (MoE) / High reasoning"
+            "deepseek-r1:7b|deepseek-r1:7b ~5 GB  — Reasoning Chain-of-Thought"
+            "qwen2.5:3b|qwen2.5:3b     ~3 GB  — Ultra-fast (<81ms TTFT, low latency)"
+        )
+    fi
 
     for item in "${cat_models[@]}"; do
         local c_val; c_val="$(echo "$item" | cut -d'|' -f1)"
         local c_lbl; c_lbl="$(echo "$item" | cut -d'|' -f2)"
         local tag_rec=""
         if [[ $found_top_rec -eq 0 ]]; then
-            if [[ "$c_val" == "qwen2.5:7b" && "$ram" -ge 8 ]]; then
-                tag_rec=" ${BOLD}${GREEN}★ RECOMENDADO para ${ram}GB RAM${NC}"
-                found_top_rec=1
-            elif [[ "$c_val" == "qwen2.5:3b" ]]; then
-                tag_rec=" ${BOLD}${GREEN}★ RECOMENDADO para ${ram}GB RAM${NC}"
-                found_top_rec=1
+            if [[ "${INFERENCE_PROVIDER}" == "tenstorrent" ]]; then
+                if [[ "$c_val" == "qwen2.5:3b" || "$c_val" == "deepseek-r1:1.5b" ]]; then
+                    tag_rec=" ${BOLD}${GREEN}★ RECOMENDADO (Nativo Tenstorrent NPU)${NC}"
+                    found_top_rec=1
+                fi
+            else
+                if [[ "$c_val" == "qwen2.5:7b" && "$ram" -ge 8 ]]; then
+                    tag_rec=" ${BOLD}${GREEN}★ RECOMENDADO para ${hw_rec_prefix}${NC}"
+                    found_top_rec=1
+                elif [[ "$c_val" == "qwen2.5:3b" ]]; then
+                    tag_rec=" ${BOLD}${GREEN}★ RECOMENDADO para ${hw_rec_prefix}${NC}"
+                    found_top_rec=1
+                fi
             fi
         fi
         menu_labels+=("${c_lbl}${tag_rec}")
@@ -479,21 +524,21 @@ run_wizard() {
 run_install() {
     log_header "ZYRABIT INSTALL"
 
-    # Wizard decision logic:
-    #   no .env        → always run wizard
-    #   .env exists + --yes / -y → skip wizard, use existing config
-    #   .env exists + interactive → ask once
+    # Setup decision logic:
+    #   no .env                  → run guided configuration setup
+    #   .env exists + --yes / -y → skip prompts, use existing config
+    #   .env exists + interactive → ask once if user wants to reconfigure
     if [[ ! -f "${ENV_FILE}" ]]; then
-        log_info "First install detected — launching setup wizard..."
-        run_wizard
-    elif [[ "${SKIP_WIZARD}" == "true" ]]; then
-        log_ok "Using existing config (--yes). Skipping wizard."
+        log_info "First install detected — starting configuration setup..."
+        run_setup_config
+    elif [[ "${SKIP_PROMPTS}" == "true" ]]; then
+        log_ok "Using existing config (--yes). Skipping interactive prompts."
     else
         echo -e "  ${CYAN}Config found at zyrabit-slm/.env${NC}"
-        read -rp "  Reconfigure? (runs wizard again) [y/N]: " _r
+        read -rp "  Reconfigure stack settings? [y/N]: " _r
         _r_lower=$(echo "${_r:-n}" | tr '[:upper:]' '[:lower:]')
         if [[ "${_r_lower}" == "y" ]]; then
-            run_wizard
+            run_setup_config
         else
             log_ok "Using existing config."
         fi
@@ -501,7 +546,7 @@ run_install() {
 
     ensure_local_secrets
 
-    # At this point OVERRIDE_MODEL may have been set by wizard
+    # At this point OVERRIDE_MODEL may have been set during configuration
     local hw_info ram model_name
     hw_info=$(detect_hardware); IFS='|' read -r ram _ _ <<< "$hw_info"
     model_name="${OVERRIDE_MODEL:-}"
@@ -519,7 +564,7 @@ run_install() {
 }
 
 ensure_local_secrets() {
-    [[ -f "${ENV_FILE}" ]] || { log_err "Missing ${ENV_FILE}; run the setup wizard again."; exit 1; }
+    [[ -f "${ENV_FILE}" ]] || { log_err "Missing ${ENV_FILE}; run './zyra.sh install' to configure."; exit 1; }
 
     local key generated=0 value
     for key in ZYRABIT_API_KEY_WEB ZYRABIT_API_KEY_MCP; do
@@ -674,7 +719,7 @@ validate_production_env() {
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
-# START — re-launch existing stack (no wizard, no pull)
+# START — re-launch existing stack without reconfiguring
 # ─────────────────────────────────────────────────────────────────────────────
 run_start() {
     require_docker
@@ -745,6 +790,9 @@ run_start() {
         local local_port="${ZYRABIT_LOCAL_PORT:-8080}"
         echo -e "  ${CYAN}➜ Web UI (Workspace)${NC}  http://localhost:${local_port}"
         echo -e "  ${CYAN}➜ API RAG (FastAPI)${NC}    http://localhost:8088/v1  (or http://localhost:${local_port}/v1)"
+        if [[ "${current_provider}" == "tenstorrent" || "${current_provider}" == "vllm" ]]; then
+            echo -e "  ${CYAN}➜ NPU Engine (vLLM)${NC}   http://localhost:8090"
+        fi
         echo -e "  ${CYAN}➜ Grafana Dashboard${NC}    http://localhost:3000"
         echo -e "  ${CYAN}➜ Prometheus Metrics${NC}   http://localhost:9090"
         echo -e "  ${CYAN}➜ Vector DB (Chroma)${NC}   http://localhost:8000"
@@ -1238,7 +1286,7 @@ run_ingest() {
 while [[ "$#" -gt 0 ]]; do
     case "$1" in
         --production|--prod) PRODUCTION_MODE="true"; shift ;;
-        --yes|-y)            SKIP_WIZARD="true";     shift ;;
+        --yes|-y)            SKIP_PROMPTS="true";    shift ;;
         --profile)           PROFILE="$2";           shift 2 ;;
         --domain)            export DOMAIN="$2";     shift 2 ;;
         --model)             OVERRIDE_MODEL="$2";    shift 2 ;;
@@ -1265,6 +1313,7 @@ print_banner
 for CMD in "${COMMANDS[@]}"; do
     case "${CMD}" in
         install)   run_install   ;;
+        wizard)    log_warn "El comando 'wizard' ha sido eliminado. Usa './zyra.sh install' para instalar y configurar."; run_install ;;
         start)     run_start     ;;
         stop)      run_stop      ;;
         verify)    run_verify    ;;

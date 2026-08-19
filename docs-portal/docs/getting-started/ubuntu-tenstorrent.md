@@ -79,28 +79,27 @@ cd zyrabit-SLM
 
 ## ⚡ Step 3: Interactive Installation (Tenstorrent P150A Mode)
 
-Zyrabit includes native support for Tenstorrent accelerators in its unified `./zyra` script:
+Zyrabit includes native support for Tenstorrent accelerators in its unified `./zyra.sh` script:
 
 ```bash
-# Start the interactive installer/wizard
-./zyra wizard
+# Start the installer
+./zyra.sh install
 ```
 
-In the interactive menu, select the following values:
+In the interactive menu, select your preferred settings:
 
-1. **Environment:** `1) Local / Dev` (or `2) Production` with your domain).
-2. **Inference Engine:** Select option **`5) Tenstorrent P150A / Wormhole`**.
-3. **AI Model:** Select the desired model (e.g., `qwen2.5:7b` or `qwen2.5:1.5b`).
-4. **Database:** `1) SQLite WAL` (development) or `2) PostgreSQL` (production).
-5. **Whisper:** `1) Yes` if you want local audio transcription with acceleration.
+1. **Hardware / Inference Engine:** Select **`2) Tenstorrent Hardware (vLLM-TT Metalium)`** or accept auto-detection.
+2. **AI Model:** Select the desired model (e.g., `qwen2.5:3b`, `deepseek-r1:1.5b`, or `qwen2.5:7b`).
+3. **ReAct Agent:** Select `1) Yes` to enable reasoning + tools.
+4. **Deployment Mode:** `1) Full Sovereign Platform` or `2) Standalone Bare Engine`.
 
-### Direct Installation without Wizard (Via Flags / Variables)
+### Direct Installation without Prompts (Via Flags / Variables)
 
 If you prefer to perform the automated installation from the terminal or CI/CD scripts:
 
 ```bash
-# Start stack activating the Tenstorrent profile
-./zyra start --profile tenstorrent
+# Silent install using existing .env or default flags
+./zyra.sh install -y
 ```
 
 ---
