@@ -43,6 +43,7 @@ def test_readme_mandatory_sections_in_order(readme_content):
         "## ⚡ Quickstart",
         "## 🌐 Service Endpoints & Ports",
         "## 🖥️ Interface & Walkthrough",
+        "## 🎯 Model Selection Matrix",
         "## 🤖 AI Agent Setup (Cursor, Antigravity, Windsurf, Cline)",
         "## 🔍 Real-world Use Cases",
         "## 📦 Stack Components",

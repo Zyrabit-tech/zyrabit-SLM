@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import asyncio
+import os
 from typing import Sequence
 
 from app.node.domain import EvidenceUnit
@@ -16,7 +17,15 @@ class ExistingInferenceAdapter:
 
     def answer(self, prompt: str) -> tuple[str, dict]:
         messages = None
-        if "\nPregunta: " in prompt:
+        if "\nUsuario: " in prompt:
+            sys_part, user_part = prompt.rsplit("\nUsuario: ", 1)
+            # Remove any trailing assistant prefix from user part if present
+            user_part = user_part.split("\nZyra:")[0].split("\nAssistant:")[0].strip()
+            messages = [
+                {"role": "system", "content": sys_part.strip()},
+                {"role": "user", "content": user_part}
+            ]
+        elif "\nPregunta: " in prompt:
             sys_part, user_part = prompt.rsplit("\nPregunta: ", 1)
             messages = [
                 {"role": "system", "content": sys_part.strip()},
@@ -29,11 +38,14 @@ class ExistingInferenceAdapter:
                 {"role": "user", "content": user_part.strip()}
             ]
 
+        temperature = float(os.getenv("INFERENCE_TEMPERATURE", "0.1"))
+        max_tokens = int(os.getenv("INFERENCE_MAX_TOKENS", "1024"))
+
         req = InferenceRequest(
             model=self.model,
             prompt=prompt,
             messages=messages,
-            options={"temperature": 0.7, "max_tokens": 150}
+            options={"temperature": temperature, "max_tokens": max_tokens, "repetition_penalty": 1.1}
         )
         result = self.provider.generate(req)
         raw = result.raw_payload or {}

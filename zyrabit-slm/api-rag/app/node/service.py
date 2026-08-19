@@ -201,6 +201,36 @@ class NodeService:
             "decision": decision,
             **metrics
         }
+
+        # Record real-time Prometheus telemetry for Grafana dashboards
+        try:
+            from app.infrastructure.telemetry.prometheus_telemetry_adapter import (
+                TTFT_HISTOGRAM, TOKEN_USAGE_COUNTER, THROUGHPUT_GAUGE,
+                RAG_RETRIEVAL_HISTOGRAM, SECURITY_AUDIT_COUNTER, _prometheus_available
+            )
+            if _prometheus_available:
+                target_model = str(metrics.get("model", "default"))
+                device = str(metrics.get("execution_target", {}).get("device", "accelerated"))
+                ttft_ms = metrics.get("ttft_ms")
+                if ttft_ms is not None and ttft_ms > 0:
+                    TTFT_HISTOGRAM.labels(model=target_model, device=device).observe(ttft_ms / 1000.0)
+                tps = metrics.get("tps")
+                if tps is not None and tps > 0:
+                    THROUGHPUT_GAUGE.labels(model=target_model, device=device).set(tps)
+                raw_info = metrics.get("raw", {})
+                usage = raw_info.get("usage", {}) if isinstance(raw_info, dict) else {}
+                p_tokens = usage.get("prompt_tokens", 0) or 0
+                c_tokens = usage.get("completion_tokens", 0) or 0
+                if p_tokens > 0:
+                    TOKEN_USAGE_COUNTER.labels(model=target_model, token_type="prompt").inc(p_tokens)
+                if c_tokens > 0:
+                    TOKEN_USAGE_COUNTER.labels(model=target_model, token_type="completion").inc(c_tokens)
+                if rag_retrieval_ms > 0:
+                    RAG_RETRIEVAL_HISTOGRAM.observe(rag_retrieval_ms / 1000.0)
+                SECURITY_AUDIT_COUNTER.inc()
+        except Exception:
+            pass
+
         self.metadata.append_message(session_id, "user", question, document_id=document_id)
         self.metadata.append_message(session_id, "assistant", answer, metadata=metadata, document_id=document_id)
         self._remember_turn(session_id, question, answer, cited, document_id, session_context)
@@ -396,7 +426,12 @@ class NodeService:
     @staticmethod
     def _compact_summary(current: str, question: str, answer: str, document_id: str | None) -> str:
         clean_question = re.sub(r"\s+", " ", question).strip()
-        clean_answer = re.sub(r"\s+", " ", re.sub(r"\[EVIDENCE:[0-9a-fA-F-]{36}\]", "", answer)).strip()
+        clean_answer = answer
+        if "</think>" in clean_answer:
+            clean_answer = clean_answer.split("</think>")[-1]
+        elif "<think>" in clean_answer:
+            clean_answer = re.sub(r"<think>[\s\S]*?(?:<\/think>|$)", "", clean_answer)
+        clean_answer = re.sub(r"\s+", " ", re.sub(r"\[EVIDENCE:[0-9a-fA-F-]{36}\]", "", clean_answer)).strip()
         if len(clean_answer) > 220:
             clean_answer = f"{clean_answer[:217].rstrip()}..."
         entry = f"Usuario: {clean_question}. Respuesta: {clean_answer}"
@@ -444,11 +479,21 @@ class NodeService:
     def _prompt(self, question: str, evidence: str, history: list[dict], session_context: dict | None = None) -> str:
         identity = self._identity()
         if not evidence:
-            recent = "\n".join(f"{item['role']}: {str(item['content'])[:350]}" for item in history[-4:])
+            recent_items = []
+            for item in history[-4:]:
+                content = str(item.get("content", ""))
+                if "</think>" in content:
+                    content = content.split("</think>")[-1].strip()
+                elif "<think>" in content:
+                    content = re.sub(r"<think>[\s\S]*?(?:<\/think>|$)", "", content).strip()
+                if content:
+                    recent_items.append(f"{item['role']}: {content[:350]}")
+            recent = "\n".join(recent_items)
             history_block = f"\nConversación previa:\n{recent}\n" if recent else ""
             return f"""Eres {identity['assistant_name']}, un asistente soberano inteligente, útil y claro con tono {identity['tone']}.
 Responde de manera natural, amable y directa a la consulta o conversación del usuario en su idioma.{history_block}
-Pregunta: {question}"""
+Usuario: {question}
+{identity['assistant_name']}:"""
 
         recent = "\n".join(f"{item['role']}: {str(item['content'])[:450]}" for item in history[-3:])
         evidence_rule = """Si la consulta del usuario se refiere a los documentos o a la evidencia local provista, fundamenta tu respuesta en ella y añade el identificador [EVIDENCE:uuid] correspondiente.

@@ -203,7 +203,26 @@ In **Local / Dev Mode** (default), direct service ports are exposed for easy deb
 
 <img src="https://assets.zyrabit.com/public/images/zyrabit-web.png" alt="Zyrabit SLM Web UI Document Workspace" width="850" />
 
+<br/><br/>
+
+### 4. Real-Time Observability & Telemetry (Grafana)
+*Production hardware throughput, TTFT percentiles, token usage, and PII interception metrics.*
+
+<br/>
+
+<img src="https://assets.zyrabit.com/public/images/zyrabit-grafana.png" alt="Zyrabit SLM Grafana Telemetry Dashboard" width="850" />
+
 </div>
+
+---
+
+## 🎯 Model Selection Matrix
+
+| Scenario / Workload | Model Architecture | Recommended Weights | Optimal Characteristics |
+| :--- | :--- | :--- | :--- |
+| 💬 **Fast Chat & Direct RAG** | Instruct-Tuned SLM | `Qwen 2.5 (3B / 7B)` | Ultra-low TTFT (<150ms), direct conversational flow, zero token waste |
+| 🧠 **Deep Audit & Logic** | Reasoning (CoT) SLM | `DeepSeek-R1-Distill (1.5B / 7B)` | Multi-step scratchpad (`<think>`), complex contract cross-referencing |
+| 🛠️ **Autonomous MCP Agent** | Tool / Coder SLM | `Qwen 2.5 Coder (7B)` | Deterministic JSON schema output, high MCP function-calling accuracy |
 
 ---
 

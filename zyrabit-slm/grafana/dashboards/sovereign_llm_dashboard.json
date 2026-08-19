@@ -21,7 +21,13 @@
       "fieldConfig": {
         "defaults": {
           "color": { "mode": "palette-classic" },
-          "unit": "tokens/sec"
+          "unit": "tokens/sec",
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "fillOpacity": 15
+          }
         }
       },
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 1 },
@@ -30,8 +36,9 @@
       "type": "timeseries",
       "targets": [
         {
+          "refId": "A",
           "expr": "gen_ai_server_tokens_per_second",
-          "legendFormat": "{{model}} on {{device}}"
+          "legendFormat": "{{model}} ({{device}})"
         }
       ]
     },
@@ -40,19 +47,27 @@
       "fieldConfig": {
         "defaults": {
           "color": { "mode": "palette-classic" },
-          "unit": "s"
+          "unit": "s",
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "fillOpacity": 15
+          }
         }
       },
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 1 },
       "id": 3,
-      "title": "Time To First Token (TTFT - P95 / P99)",
+      "title": "Time To First Token (TTFT)",
       "type": "timeseries",
       "targets": [
         {
+          "refId": "A",
           "expr": "histogram_quantile(0.95, sum(rate(gen_ai_client_time_to_first_token_seconds_bucket[5m])) by (le, model, device))",
           "legendFormat": "P95 - {{model}} ({{device}})"
         },
         {
+          "refId": "B",
           "expr": "histogram_quantile(0.99, sum(rate(gen_ai_client_time_to_first_token_seconds_bucket[5m])) by (le, model, device))",
           "legendFormat": "P99 - {{model}} ({{device}})"
         }
@@ -62,7 +77,7 @@
       "collapsed": false,
       "gridPos": { "h": 1, "w": 24, "x": 0, "y": 9 },
       "id": 4,
-      "title": "📚 RAG Retrieval & Prompt Context Scaling",
+      "title": "📚 RAG Retrieval & Token Telemetry",
       "type": "row"
     },
     {
@@ -70,7 +85,13 @@
       "fieldConfig": {
         "defaults": {
           "color": { "mode": "palette-classic" },
-          "unit": "s"
+          "unit": "s",
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "fillOpacity": 15
+          }
         }
       },
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 10 },
@@ -79,6 +100,7 @@
       "type": "timeseries",
       "targets": [
         {
+          "refId": "A",
           "expr": "histogram_quantile(0.95, sum(rate(zyrabit_rag_retrieval_duration_seconds_bucket[5m])) by (le))",
           "legendFormat": "P95 Retrieval Latency"
         }
@@ -89,7 +111,11 @@
       "fieldConfig": {
         "defaults": {
           "color": { "mode": "palette-classic" },
-          "unit": "short"
+          "unit": "short",
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 40
+          }
         }
       },
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 10 },
@@ -98,7 +124,8 @@
       "type": "timeseries",
       "targets": [
         {
-          "expr": "sum(rate(gen_ai_client_token_usage_total[5m])) by (token_type, model)",
+          "refId": "A",
+          "expr": "sum(gen_ai_client_token_usage_total) by (token_type, model)",
           "legendFormat": "{{token_type}} tokens - {{model}}"
         }
       ]
@@ -115,20 +142,28 @@
       "fieldConfig": {
         "defaults": {
           "color": { "mode": "palette-classic" },
-          "unit": "short"
+          "unit": "short",
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "fillOpacity": 15
+          }
         }
       },
       "gridPos": { "h": 6, "w": 24, "x": 0, "y": 19 },
       "id": 8,
-      "title": "PII Masking & Security Interceptions Total",
+      "title": "PII Masking & Security Interceptions",
       "type": "timeseries",
       "targets": [
         {
-          "expr": "sum(rate(zyrabit_security_audit_total[5m]))",
-          "legendFormat": "Security Audit Events / sec"
+          "refId": "A",
+          "expr": "sum(zyrabit_security_audit_total)",
+          "legendFormat": "Security Audits Total"
         },
         {
-          "expr": "sum(rate(security_hits_total[5m])) by (entity_type)",
+          "refId": "B",
+          "expr": "sum(zyrabit_security_hits_total) by (entity_type)",
           "legendFormat": "PII Masked: {{entity_type}}"
         }
       ]
@@ -139,7 +174,7 @@
   "style": "dark",
   "tags": ["zyrabit", "slm", "tenstorrent", "observability", "rag"],
   "time": {
-    "from": "now-30m",
+    "from": "now-1h",
     "to": "now"
   },
   "timepicker": {
@@ -148,5 +183,5 @@
   "timezone": "browser",
   "title": "Zyrabit SLM Sovereign Observability",
   "uid": "zyrabit-sovereign-llm",
-  "version": 1
+  "version": 2
 }

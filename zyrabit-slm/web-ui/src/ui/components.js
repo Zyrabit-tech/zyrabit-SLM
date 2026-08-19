@@ -320,6 +320,9 @@ class ZyraChatMessage extends HTMLElement {
                 .meta summary::-webkit-details-marker { display: none; }
                 .sources { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px; }
                 .source-pill { background: #f2f5f5; padding: 3px 7px; border-radius: 999px; font-size: 10px; border: 1px solid #e0e7e7; color: #45545e; }
+                .thought-box { margin-bottom: 12px; border: 1px solid #d0dfe5; background: #f0f6f8; border-radius: 10px; padding: 0 12px; }
+                .thought-box summary { cursor: pointer; padding: 9px 0; color: #4a6375; font-size: 12px; font-weight: 650; display: flex; align-items: center; gap: 6px; user-select: none; }
+                .thought-box .thought-content { max-height: 320px; overflow-y: auto; padding: 0 0 10px; color: #556875; font-size: 12px; line-height: 1.5; font-family: ui-monospace, SFMono-Regular, monospace; border-top: 1px solid #e1ebef; }
             </style>
             <div class="wrapper">
                 ${isTelegram ? `<div class="source-tag">✈️ Telegram</div>` : ''}
@@ -332,14 +335,39 @@ class ZyraChatMessage extends HTMLElement {
             </div>
         `;
         const content = this.shadowRoot.getElementById('content');
-        const cleanText = (this._text || '')
+        let text = this._text || '';
+        let thoughtHtml = '';
+        let thoughtText = '';
+
+        if (text.includes('</think>')) {
+            const parts = text.split('</think>');
+            thoughtText = parts[0].replace(/<think>/i, '').trim();
+            text = parts.slice(1).join('</think>').trim();
+        } else if (/<think>/i.test(text)) {
+            const thinkMatch = text.match(/<think>([\s\S]*)$/i);
+            if (thinkMatch) {
+                thoughtText = thinkMatch[1].trim();
+                text = text.replace(/<think>[\s\S]*$/i, '').trim();
+            }
+        }
+
+        if (thoughtText) {
+            thoughtHtml = `
+                <details class="thought-box">
+                    <summary><span>🧠</span> Proceso de Razonamiento (Pensamiento)</summary>
+                    <div class="thought-content">${parseMarkdown(thoughtText)}</div>
+                </details>
+            `;
+        }
+
+        const cleanText = text
             .replace(/\n?\[EVIDENCE:[0-9a-fA-F-]{36}\]/g, '')
             .replace(/\n{0,2}(?:evidencia|evidence|fuente|source):\s*$/i, '')
             .trim();
         if (this._metadata?.decision === 'evidence-extractive-fallback') {
-            content.innerHTML = `<p class="evidence-intro">No pude validar una redacción del modelo. Te dejo el pasaje recuperado para que lo revises directamente.</p><details class="evidence-excerpt"><summary>Ver pasaje verificable</summary><div class="excerpt-body">${parseMarkdown(cleanText.replace(/^No puedo verificar[\s\S]*?documento seleccionado:\s*/i, ''))}</div></details>`;
+            content.innerHTML = `${thoughtHtml}<p class="evidence-intro">No pude validar una redacción del modelo. Te dejo el pasaje recuperado para que lo revises directamente.</p><details class="evidence-excerpt"><summary>Ver pasaje verificable</summary><div class="excerpt-body">${parseMarkdown(cleanText.replace(/^No puedo verificar[\s\S]*?documento seleccionado:\s*/i, ''))}</div></details>`;
         } else {
-            content.innerHTML = parseMarkdown(cleanText);
+            content.innerHTML = `${thoughtHtml}${parseMarkdown(cleanText || (thoughtHtml ? '*(Razonamiento completado sin respuesta explícita adicional)*' : ''))}`;
         }
     }
 
