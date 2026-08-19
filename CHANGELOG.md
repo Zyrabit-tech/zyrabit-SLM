@@ -7,6 +7,36 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.4.0] - 2026-08-19
+
+### Added
+
+- **Model-Agnostic Reasoning Parser**: Web UI now automatically detects `<think>...</think>` tags from any CoT model (DeepSeek-R1, QwQ, o1) and renders internal thoughts in a collapsible `🧠 Proceso de Razonamiento` accordion, showing only the clean final answer in the chat bubble.
+- **Model Selection Matrix**: Added a compact decision matrix to `README.md` and a comprehensive guide to `docs-portal/docs/models.md` covering Instruct, Reasoning (CoT), and Tool/Coder model archetypes with hardware recommendations.
+- **Business Rule Contract Tests**: New `test_model_reasoning_and_business_rules.py` suite validating that reasoning tokens never pollute SQLite history, prompts are sanitized, and greetings bypass document retrieval.
+- **Configurable Inference Parameters**: `INFERENCE_TEMPERATURE` and `INFERENCE_MAX_TOKENS` are now environment variables (default: `0.1` / `1024`), enabling deterministic sampling without code changes.
+- **Grafana Telemetry Screenshot**: Added Grafana dashboard screenshot to `README.md` Interface & Walkthrough section.
+
+### Changed
+
+- **Native Chat Message Splitting**: `ExistingInferenceAdapter` now correctly separates `system` and `user` roles for the OpenAI-compatible vLLM endpoint, preventing template misapplication on reasoning models.
+- **Reasoning Token Sanitization**: `_compact_summary()` and `_prompt()` in `NodeService` now strip all `<think>` blocks before persisting history or building subsequent prompts, eliminating the feedback loop that caused token degradation.
+- **Frontend Fetch Timeouts**: All `fetch()` calls in `api.js` now use `AbortSignal.timeout()` via a centralized `fetchWithTimeout` helper with per-endpoint timeouts (8s–120s), preventing indefinite hangs.
+
+### Fixed
+
+- **CI Contribution Policy**: Fixed `ci.yml` so `beta → main` PRs correctly pass validation instead of falling through to the rejection branch.
+- **CI Trivy Scan**: Updated `security.yml` from broken `aquasecurity/trivy-action@v0.28.0` to `@master`, added explicit `scan-ref: '.'`, and set `severity: 'CRITICAL'`.
+- **CI pip-audit Exit Code**: Removed raw `exit "$audit_exit"` that caused the job to fail even when all findings were documented in the risk register.
+- **CI CodeQL Cleanup**: Removed duplicate CodeQL job from `security.yml` to eliminate GitHub Code Scanning configuration mismatch warnings.
+- **Grafana RefId Collision**: Fixed `Multiple queries using the same RefId` error by assigning unique `refId` values (`A`, `B`) to all dashboard panel targets.
+- **Grafana Datasource UID**: Added `uid: prometheus` to `datasource.yml` for reliable dashboard provisioning.
+
+### Security
+
+- **SQLite Migration Whitelist**: `_ensure_column()` in `sqlite_store.py` now validates table, column, and definition against strict allow-lists before executing `ALTER TABLE`, eliminating the SQL injection taint flow flagged by Ixtli CPG.
+- **Silent Exception Logging**: Replaced `except Exception: pass` in `vllm_inference_adapter.py` and `vllm_stream_adapter.py` with `logger.debug()` to surface suppressed errors in diagnostics.
+
 ## [2.2.0-beta] - 2026-06-30
 
 ### Added

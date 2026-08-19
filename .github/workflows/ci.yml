@@ -45,9 +45,13 @@ jobs:
           echo "PR: ${HEAD} → ${BASE}"
 
           # main: only beta can merge into it
-          if [ "${BASE}" = "main" ] && [ "${HEAD}" != "beta" ]; then
-            echo "❌ Only 'beta' can merge into 'main'. Got: '${HEAD}'"
-            exit 1
+          if [ "${BASE}" = "main" ]; then
+            if [ "${HEAD}" != "beta" ]; then
+              echo "❌ Only 'beta' can merge into 'main'. Got: '${HEAD}'"
+              exit 1
+            fi
+            echo "✅ Release promotion beta → main: OK"
+            exit 0
           fi
 
           # beta-x.y.z branches: only feat/* or fix/* branches can target them
