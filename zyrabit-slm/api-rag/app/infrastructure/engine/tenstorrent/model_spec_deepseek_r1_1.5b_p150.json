@@ -6,7 +6,7 @@
     "repo_url": "https://github.com/tenstorrent/tt-metal",
     "code_path": "models/tt_transformers"
   },
-  "hf_model_repo": "DeepSeek-AI/DeepSeek-R1-Distill-Qwen-1.5B",
+  "hf_model_repo": "deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B",
   "model_name": "DeepSeek-R1-Distill-Qwen-1.5B",
   "inference_engine": "vLLM",
   "device_type": "P150",
@@ -19,7 +19,7 @@
     "default_impl": true,
     "perf_reference": [],
     "vllm_args": {
-      "model": "DeepSeek-AI/DeepSeek-R1-Distill-Qwen-1.5B",
+      "model": "deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B",
       "block_size": "64",
       "max_model_len": "32768",
       "max_num_seqs": "32",
@@ -46,7 +46,7 @@
     "ARCH_NAME": "blackhole"
   },
   "vllm_commit": "aa4ae1e",
-  "hf_weights_repo": "DeepSeek-AI/DeepSeek-R1-Distill-Qwen-1.5B",
+  "hf_weights_repo": "deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B",
   "param_count": 1.5,
   "min_disk_gb": 15,
   "min_ram_gb": 16,
