@@ -61,21 +61,23 @@ jobs:
           # ── Determine tag set per branch type ──────────────────────────────
           TAGS=""
 
-          if [ "${BRANCH}" = "main" ]; then
-            # Stable release: :latest + :x.y.z
-            TAGS="${IMAGE}:latest"
-            TAGS="${TAGS},${IMAGE}:${VERSION}"
-            TAGS="${TAGS},${GHCR}:latest"
+          if [ "${BRANCH}" = "main" ] || [[ "${BRANCH}" =~ ^v[0-9] ]]; then
+            # Stable immutable release: :x.y.z + :vX.Y.Z + :x.y.z-<sha>
+            TAGS="${IMAGE}:${VERSION}"
+            TAGS="${TAGS},${IMAGE}:v${VERSION}"
+            TAGS="${TAGS},${IMAGE}:${VERSION}-${SHORT_SHA}"
             TAGS="${TAGS},${GHCR}:${VERSION}"
+            TAGS="${TAGS},${GHCR}:v${VERSION}"
+            TAGS="${TAGS},${GHCR}:${VERSION}-${SHORT_SHA}"
             echo "is_release=true"         >> $GITHUB_OUTPUT
             echo "channel=stable"          >> $GITHUB_OUTPUT
 
           elif [ "${BRANCH}" = "beta" ]; then
-            # Staging release: :beta + :beta-x.y.z
-            TAGS="${IMAGE}:beta"
-            TAGS="${TAGS},${IMAGE}:beta-${VERSION}"
-            TAGS="${TAGS},${GHCR}:beta"
+            # Staging release: :beta-x.y.z + :beta-x.y.z-<sha>
+            TAGS="${IMAGE}:beta-${VERSION}"
+            TAGS="${TAGS},${IMAGE}:beta-${VERSION}-${SHORT_SHA}"
             TAGS="${TAGS},${GHCR}:beta-${VERSION}"
+            TAGS="${TAGS},${GHCR}:beta-${VERSION}-${SHORT_SHA}"
             echo "is_release=false"        >> $GITHUB_OUTPUT
             echo "channel=beta"            >> $GITHUB_OUTPUT
 
@@ -89,8 +91,8 @@ jobs:
             echo "is_release=false"        >> $GITHUB_OUTPUT
             echo "channel=beta-rc"         >> $GITHUB_OUTPUT
 
-          elif echo "${BRANCH}" | grep -qE '^feat/'; then
-            # Feature/preview build: :edge-<sha> only (no stable tags)
+          elif echo "${BRANCH}" | grep -qE '^(feat|fix|chore)/'; then
+            # Feature/fix/preview build: :edge-<sha>
             TAGS="${IMAGE}:edge-${SHORT_SHA}"
             TAGS="${TAGS},${GHCR}:edge-${SHORT_SHA}"
             echo "is_release=false"        >> $GITHUB_OUTPUT

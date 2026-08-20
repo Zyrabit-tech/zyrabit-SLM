@@ -26,6 +26,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - **CI Contribution Policy**: Fixed `ci.yml` so `beta → main` PRs correctly pass validation instead of falling through to the rejection branch.
+- **CI Docusaurus MDX Build**: Escaped JSX angle brackets in `docs/models.md` and enabled PR build validation in `deploy-docs.yml`.
+- **CI Immutable Docker Tagging**: Enforced strict enterprise immutable image tagging (`:${VERSION}`, `:${VERSION}-${SHA}`) without mutable `:latest` in `release.yml`.
 - **CI Trivy Scan**: Updated `security.yml` from broken `aquasecurity/trivy-action@v0.28.0` to `@master`, added explicit `scan-ref: '.'`, and set `severity: 'CRITICAL'`.
 - **CI pip-audit Exit Code**: Removed raw `exit "$audit_exit"` that caused the job to fail even when all findings were documented in the risk register.
 - **CI CodeQL Cleanup**: Removed duplicate CodeQL job from `security.yml` to eliminate GitHub Code Scanning configuration mismatch warnings.
