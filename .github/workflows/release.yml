@@ -62,23 +62,22 @@ jobs:
           TAGS=""
 
           if [ "${BRANCH}" = "main" ] || [[ "${BRANCH}" =~ ^v[0-9] ]]; then
-            # Stable release: :x.y.z + :x.y.z-<sha> + :latest
+            # Stable immutable release: :x.y.z + :vX.Y.Z + :x.y.z-<sha>
             TAGS="${IMAGE}:${VERSION}"
+            TAGS="${TAGS},${IMAGE}:v${VERSION}"
             TAGS="${TAGS},${IMAGE}:${VERSION}-${SHORT_SHA}"
-            TAGS="${TAGS},${IMAGE}:latest"
-            TAGS="${TAGS},${GHCR}:latest"
             TAGS="${TAGS},${GHCR}:${VERSION}"
+            TAGS="${TAGS},${GHCR}:v${VERSION}"
             TAGS="${TAGS},${GHCR}:${VERSION}-${SHORT_SHA}"
             echo "is_release=true"         >> $GITHUB_OUTPUT
             echo "channel=stable"          >> $GITHUB_OUTPUT
 
           elif [ "${BRANCH}" = "beta" ]; then
-            # Staging release: :beta + :beta-x.y.z + :beta-x.y.z-<sha>
+            # Staging release: :beta-x.y.z + :beta-x.y.z-<sha>
             TAGS="${IMAGE}:beta-${VERSION}"
             TAGS="${TAGS},${IMAGE}:beta-${VERSION}-${SHORT_SHA}"
-            TAGS="${TAGS},${IMAGE}:beta"
-            TAGS="${TAGS},${GHCR}:beta"
             TAGS="${TAGS},${GHCR}:beta-${VERSION}"
+            TAGS="${TAGS},${GHCR}:beta-${VERSION}-${SHORT_SHA}"
             echo "is_release=false"        >> $GITHUB_OUTPUT
             echo "channel=beta"            >> $GITHUB_OUTPUT
 
@@ -96,8 +95,6 @@ jobs:
             # Feature/fix/preview build: :edge-<sha>
             TAGS="${IMAGE}:edge-${SHORT_SHA}"
             TAGS="${TAGS},${GHCR}:edge-${SHORT_SHA}"
-            echo "is_release=false"        >> $GITHUB_OUTPUT
-            echo "channel=edge"            >> $GITHUB_OUTPUT
             echo "is_release=false"        >> $GITHUB_OUTPUT
             echo "channel=edge"            >> $GITHUB_OUTPUT
 
