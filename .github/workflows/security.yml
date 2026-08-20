@@ -40,7 +40,7 @@ jobs:
           set +e
           uv run pip-audit --format json --output pip-audit.json
           set -e
-          python validation/scripts/verify_dependency_risks.py pip-audit.json docs/security/DEPENDENCY_RISKS.md
+          python3 validation/scripts/verify_dependency_risks.py pip-audit.json docs/security/DEPENDENCY_RISKS.md
 
   trivy-scan:
     name: Trivy Vulnerability Scan
