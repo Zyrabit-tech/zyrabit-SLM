@@ -1,18 +1,9 @@
 name: Release and Deploy
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Branch → Docker tag strategy:
-#
-#   main              → :latest + :x.y.z  (stable release)
-#   beta              → :beta + :beta-x.y.z  (staging release)
-#   beta-x.y.z        → :beta-x.y.z-rc + :beta-x.y.z-sha  (versioned beta RC)
-#   feat/xxx-betaX.Y  → :edge-<sha>  (preview builds, no :latest tag)
-# ─────────────────────────────────────────────────────────────────────────────
-
 on:
   push:
     tags:
-      - 'v*'       # e.g. v3.0.0-rc.1, v3.0.0
+      - 'v*'       # e.g. v2.4.3
   workflow_dispatch:
     inputs:
       force_push:
@@ -25,7 +16,8 @@ env:
   IMAGE_NAME: zyrabit-slm
 
 jobs:
-  release:
+  build-arch:
+    name: Build Arch Image
     runs-on: ${{ matrix.runner }}
     strategy:
       fail-fast: false
@@ -33,10 +25,12 @@ jobs:
         include:
           - platform: linux/amd64
             runner: ubuntu-latest
+            arch_suffix: amd64
           - platform: linux/arm64
             runner: ubuntu-24.04-arm
+            arch_suffix: arm64
     permissions:
-      contents: write
+      contents: read
       packages: write
 
     steps:
@@ -50,7 +44,7 @@ jobs:
           echo "tag=v${VERSION_VAL}"    >> $GITHUB_OUTPUT
           echo "version=${VERSION_VAL}" >> $GITHUB_OUTPUT
 
-      - name: Resolve branch type and Docker tags
+      - name: Resolve branch type and Arch Tags
         id: meta
         run: |
           BRANCH="${{ github.ref_name }}"
@@ -59,77 +53,40 @@ jobs:
           OWNER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
           IMAGE="zyrabitcore/${{ env.IMAGE_NAME }}"
           GHCR="ghcr.io/${OWNER}/${{ env.IMAGE_NAME }}"
+          SUFFIX="${{ matrix.arch_suffix }}"
 
           echo "branch=${BRANCH}"      >> $GITHUB_OUTPUT
           echo "sha=${SHORT_SHA}"      >> $GITHUB_OUTPUT
+          echo "version=${VERSION}"    >> $GITHUB_OUTPUT
           echo "owner=${OWNER}"        >> $GITHUB_OUTPUT
           echo "image=${IMAGE}"        >> $GITHUB_OUTPUT
           echo "ghcr=${GHCR}"          >> $GITHUB_OUTPUT
 
-          # ── Determine tag set per branch type ──────────────────────────────
           TAGS=""
-
           if [ "${BRANCH}" = "main" ] || [[ "${BRANCH}" =~ ^v[0-9] ]]; then
-            # Stable immutable release: :x.y.z + :vX.Y.Z + :x.y.z-<sha>
-            TAGS="${IMAGE}:${VERSION}"
-            TAGS="${TAGS},${IMAGE}:v${VERSION}"
-            TAGS="${TAGS},${IMAGE}:${VERSION}-${SHORT_SHA}"
-            TAGS="${TAGS},${GHCR}:${VERSION}"
-            TAGS="${TAGS},${GHCR}:v${VERSION}"
-            TAGS="${TAGS},${GHCR}:${VERSION}-${SHORT_SHA}"
-            echo "is_release=true"         >> $GITHUB_OUTPUT
-            echo "channel=stable"          >> $GITHUB_OUTPUT
-
+            TAGS="${IMAGE}:${VERSION}-${SUFFIX}"
+            TAGS="${TAGS},${IMAGE}:v${VERSION}-${SUFFIX}"
+            TAGS="${TAGS},${IMAGE}:${VERSION}-${SHORT_SHA}-${SUFFIX}"
+            TAGS="${TAGS},${GHCR}:${VERSION}-${SUFFIX}"
+            TAGS="${TAGS},${GHCR}:v${VERSION}-${SUFFIX}"
+            TAGS="${TAGS},${GHCR}:${VERSION}-${SHORT_SHA}-${SUFFIX}"
+            echo "channel=stable" >> $GITHUB_OUTPUT
           elif [ "${BRANCH}" = "beta" ]; then
-            # Staging release: :beta-x.y.z + :beta-x.y.z-<sha>
-            TAGS="${IMAGE}:beta-${VERSION}"
-            TAGS="${TAGS},${IMAGE}:beta-${VERSION}-${SHORT_SHA}"
-            TAGS="${TAGS},${GHCR}:beta-${VERSION}"
-            TAGS="${TAGS},${GHCR}:beta-${VERSION}-${SHORT_SHA}"
-            echo "is_release=false"        >> $GITHUB_OUTPUT
-            echo "channel=beta"            >> $GITHUB_OUTPUT
-
-          elif echo "${BRANCH}" | grep -qE '^beta-[0-9]+\.[0-9]+\.[0-9]+$'; then
-            # Versioned beta branch (RC): :beta-x.y.z-rc + :beta-x.y.z-sha
-            BVER="${BRANCH#beta-}"
-            TAGS="${IMAGE}:beta-${BVER}-rc"
-            TAGS="${TAGS},${IMAGE}:beta-${BVER}-${SHORT_SHA}"
-            TAGS="${TAGS},${GHCR}:beta-${BVER}-rc"
-            TAGS="${TAGS},${GHCR}:beta-${BVER}-${SHORT_SHA}"
-            echo "is_release=false"        >> $GITHUB_OUTPUT
-            echo "channel=beta-rc"         >> $GITHUB_OUTPUT
-
-          elif echo "${BRANCH}" | grep -qE '^(feat|fix|chore)/'; then
-            # Feature/fix/preview build: :edge-<sha>
-            TAGS="${IMAGE}:edge-${SHORT_SHA}"
-            TAGS="${TAGS},${GHCR}:edge-${SHORT_SHA}"
-            echo "is_release=false"        >> $GITHUB_OUTPUT
-            echo "channel=edge"            >> $GITHUB_OUTPUT
-
+            TAGS="${IMAGE}:beta-${VERSION}-${SUFFIX}"
+            TAGS="${TAGS},${IMAGE}:beta-${VERSION}-${SHORT_SHA}-${SUFFIX}"
+            TAGS="${TAGS},${GHCR}:beta-${VERSION}-${SUFFIX}"
+            TAGS="${TAGS},${GHCR}:beta-${VERSION}-${SHORT_SHA}-${SUFFIX}"
+            echo "channel=beta" >> $GITHUB_OUTPUT
           else
             echo "⚠️  Unknown branch pattern '${BRANCH}' — skipping Docker push."
-            echo "is_release=false"        >> $GITHUB_OUTPUT
-            echo "channel=skip"            >> $GITHUB_OUTPUT
+            echo "channel=skip" >> $GITHUB_OUTPUT
           fi
-
           echo "tags=${TAGS}" >> $GITHUB_OUTPUT
-          echo "──────────── Build Summary ────────────────"
-          echo "  Branch  : ${BRANCH}"
-          echo "  Channel : $(grep channel $GITHUB_OUTPUT | tail -1 | cut -d= -f2)"
-          echo "  Platform: ${{ matrix.platform }}"
-          echo "  Tags    : ${TAGS}"
-          echo "────────────────────────────────────────────"
-
-      # ── Skip job early for unknown branches ────────────────────────────────
-      - name: Skip if no tags resolved
-        if: steps.meta.outputs.channel == 'skip'
-        run: echo "Branch not configured for Docker publish. Exiting." && exit 0
 
       - name: Set up Docker Buildx
         if: steps.meta.outputs.channel != 'skip'
         uses: docker/setup-buildx-action@v3
 
-      # ── Login to registries ────────────────────────────────────────────────
       - name: Log in to GHCR
         if: steps.meta.outputs.channel != 'skip'
         uses: docker/login-action@v3
@@ -145,7 +102,6 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_PAT }}
 
-      # ── Vulnerability scan BEFORE build ────────────────────────────────────
       - name: Run Trivy vulnerability scan
         if: steps.meta.outputs.channel != 'skip'
         uses: aquasecurity/trivy-action@master
@@ -155,8 +111,7 @@ jobs:
           severity: 'CRITICAL'
           exit-code: '1'
 
-      # ── Build and push ─────────────────────────────────────────────────────
-      - name: Build and push Docker image
+      - name: Build and push Arch Docker image
         if: steps.meta.outputs.channel != 'skip'
         uses: docker/build-push-action@v5
         with:
@@ -165,34 +120,76 @@ jobs:
           push: true
           platforms: ${{ matrix.platform }}
           tags: ${{ steps.meta.outputs.tags }}
-          labels: |
-            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
-            org.opencontainers.image.revision=${{ github.sha }}
-            org.opencontainers.image.version=${{ steps.version.outputs.version }}
-            com.zyrabit.channel=${{ steps.meta.outputs.channel }}
-            com.zyrabit.branch=${{ steps.meta.outputs.branch }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      # ── GitHub Release (stable main only) ──────────────────────────────────
+  publish-manifest:
+    name: Create Multi-Arch Manifest List
+    needs: build-arch
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Read VERSION
+        id: version
+        run: |
+          VERSION_VAL=$(cat VERSION | tr -d '\n' | xargs)
+          echo "tag=v${VERSION_VAL}"    >> $GITHUB_OUTPUT
+          echo "version=${VERSION_VAL}" >> $GITHUB_OUTPUT
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_PAT }}
+
+      - name: Merge and Push Multi-Arch Manifests
+        run: |
+          BRANCH="${{ github.ref_name }}"
+          SHORT_SHA=$(git rev-parse --short HEAD)
+          VERSION="${{ steps.version.outputs.version }}"
+          OWNER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
+          IMAGE="zyrabitcore/${{ env.IMAGE_NAME }}"
+          GHCR="ghcr.io/${OWNER}/${{ env.IMAGE_NAME }}"
+
+          if [ "${BRANCH}" = "main" ] || [[ "${BRANCH}" =~ ^v[0-9] ]]; then
+            echo "Creating Unified Multi-Arch Manifest for Docker Hub..."
+            docker buildx imagetools create -t ${IMAGE}:${VERSION} ${IMAGE}:${VERSION}-amd64 ${IMAGE}:${VERSION}-arm64
+            docker buildx imagetools create -t ${IMAGE}:v${VERSION} ${IMAGE}:${VERSION}-amd64 ${IMAGE}:${VERSION}-arm64
+            docker buildx imagetools create -t ${IMAGE}:${VERSION}-${SHORT_SHA} ${IMAGE}:${VERSION}-amd64 ${IMAGE}:${VERSION}-arm64
+            
+            echo "Creating Unified Multi-Arch Manifest for GHCR..."
+            docker buildx imagetools create -t ${GHCR}:${VERSION} ${GHCR}:${VERSION}-amd64 ${GHCR}:${VERSION}-arm64
+            docker buildx imagetools create -t ${GHCR}:v${VERSION} ${GHCR}:${VERSION}-amd64 ${GHCR}:${VERSION}-arm64
+            docker buildx imagetools create -t ${GHCR}:${VERSION}-${SHORT_SHA} ${GHCR}:${VERSION}-amd64 ${GHCR}:${VERSION}-arm64
+
+          elif [ "${BRANCH}" = "beta" ]; then
+            echo "Creating Beta Multi-Arch Manifest for Docker Hub & GHCR..."
+            docker buildx imagetools create -t ${IMAGE}:beta-${VERSION} ${IMAGE}:beta-${VERSION}-amd64 ${IMAGE}:beta-${VERSION}-arm64
+            docker buildx imagetools create -t ${IMAGE}:beta-${VERSION}-${SHORT_SHA} ${IMAGE}:beta-${VERSION}-amd64 ${IMAGE}:beta-${VERSION}-arm64
+            docker buildx imagetools create -t ${GHCR}:beta-${VERSION} ${GHCR}:beta-${VERSION}-amd64 ${GHCR}:beta-${VERSION}-arm64
+            docker buildx imagetools create -t ${GHCR}:beta-${VERSION}-${SHORT_SHA} ${GHCR}:beta-${VERSION}-amd64 ${GHCR}:beta-${VERSION}-arm64
+          fi
+
       - name: Create GitHub Release
-        if: steps.meta.outputs.is_release == 'true' && matrix.platform == 'linux/amd64'
+        if: github.ref_name == 'main' || startsWith(github.ref_name, 'v')
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.version.outputs.tag }}
-          name: Upgrade ${{ steps.version.outputs.tag }}
+          name: Release ${{ steps.version.outputs.tag }}
           generate_release_notes: true
-
-      # ── Summary ────────────────────────────────────────────────────────────
-      - name: Print publish summary
-        if: steps.meta.outputs.channel != 'skip'
-        run: |
-          echo "## 🐳 Docker Publish Summary" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "| Field | Value |" >> $GITHUB_STEP_SUMMARY
-          echo "|---|---|" >> $GITHUB_STEP_SUMMARY
-          echo "| **Branch** | \`${{ steps.meta.outputs.branch }}\` |" >> $GITHUB_STEP_SUMMARY
-          echo "| **Channel** | \`${{ steps.meta.outputs.channel }}\` |" >> $GITHUB_STEP_SUMMARY
-          echo "| **Version** | \`${{ steps.version.outputs.version }}\` |" >> $GITHUB_STEP_SUMMARY
-          echo "| **SHA** | \`${{ steps.meta.outputs.sha }}\` |" >> $GITHUB_STEP_SUMMARY
-          echo "| **Tags pushed** | \`$(echo '${{ steps.meta.outputs.tags }}' | tr ',' '\n' | head -4 | tr '\n' ' ')\` |" >> $GITHUB_STEP_SUMMARY
