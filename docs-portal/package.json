@@ -22,6 +22,11 @@
     "three": "^0.185.1"
   },
   "pnpm": {
+    "onlyBuiltDependencies": [
+      "@node-rs/jieba",
+      "core-js",
+      "esbuild"
+    ],
     "overrides": {
       "serialize-javascript": ">=7.0.5",
       "image-size": ">=1.2.1",

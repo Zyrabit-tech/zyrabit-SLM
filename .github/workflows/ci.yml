@@ -5,21 +5,12 @@ on:
     branches:
       - main
       - beta
-      - 'beta-*'       # e.g. beta-2.3.0, beta-3.0.0
-      - 'feat/**'      # feature branches
-      - 'feature/**'   # legacy feature branches
-      - 'fix/**'       # bug fix branches
-      - 'chore/**'     # maintenance branches
-      - 'docs/**'      # documentation branches
+      - 'beta-*'
   push:
     branches:
+      - main
       - beta
       - 'beta-*'
-      - 'feat/**'
-      - 'feature/**'
-      - 'fix/**'
-      - 'chore/**'
-      - 'docs/**'
   workflow_dispatch:
 
 permissions:

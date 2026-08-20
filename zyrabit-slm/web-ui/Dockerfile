@@ -5,9 +5,9 @@ WORKDIR /app
 
 # Install pnpm and dependencies
 RUN apk add --no-cache libc6-compat
-RUN npm install -g pnpm && npm cache clean --force
-COPY zyrabit-slm/web-ui/package.json zyrabit-slm/web-ui/pnpm-lock.yaml* ./
-RUN pnpm install
+RUN npm install -g pnpm@10.34.5 && npm cache clean --force
+COPY zyrabit-slm/web-ui/package.json zyrabit-slm/web-ui/pnpm-lock.yaml ./
+RUN pnpm install --frozen-lockfile
 
 # Copy source and build
 COPY zyrabit-slm/web-ui .
