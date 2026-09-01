@@ -9,7 +9,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "lucide-static": "^0.344.0",
+    "lucide-static": "^1.37.0",
     "socket.io-client": "^4.8.3"
   },
   "devDependencies": {
