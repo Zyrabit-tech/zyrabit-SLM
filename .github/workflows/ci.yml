@@ -76,7 +76,7 @@ jobs:
       PIP_NO_PYTHON_VERSION_WARNING: "1"
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Setup uv
         uses: astral-sh/setup-uv@v5
@@ -105,7 +105,7 @@ jobs:
     needs: contribution-policy
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Setup Node & pnpm
         uses: pnpm/action-setup@v4
@@ -135,7 +135,7 @@ jobs:
     needs: contribution-policy
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Setup Node & pnpm
         uses: pnpm/action-setup@v4
@@ -165,7 +165,7 @@ jobs:
     needs: [tests, frontend-tests, docs-build-verification]
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -201,7 +201,7 @@ jobs:
       )
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Validate Production Compose Configuration
         run: |
