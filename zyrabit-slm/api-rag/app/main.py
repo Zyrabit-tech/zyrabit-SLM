@@ -94,6 +94,16 @@ async def lifespan(app: FastAPI):
                 logger.warning(f"⚠️ Waiting for ChromaDB at {DB_HOST}:{DB_PORT} (attempt {attempt}/3): {err}")
                 await asyncio.sleep(1)
 
+        if not chroma_client:
+            chroma_persist_dir = os.getenv("CHROMA_PERSISTENCE_DIR", os.path.join(os.getenv("NODE_DATA_DIR", "/app/db_data/node"), "chroma"))
+            try:
+                logger.info(f"📦 Remote ChromaDB unavailable at {DB_HOST}:{DB_PORT}. Initializing Embedded Persistent ChromaDB at {chroma_persist_dir}...")
+                os.makedirs(chroma_persist_dir, exist_ok=True)
+                chroma_client = chromadb.PersistentClient(path=chroma_persist_dir)
+                logger.info(f"✅ Embedded Persistent ChromaDB initialized at {chroma_persist_dir}")
+            except Exception as e:
+                logger.error(f"ChromaDB is unavailable. Both remote ({DB_HOST}:{DB_PORT}) and embedded failed: {e}")
+
         lc_chroma = None
         app.state.vector_store = None
         app.state.retriever_service = None
