@@ -129,6 +129,19 @@ class NodeService:
                 except Exception: vector = []
             selected = self._select_relevant_evidence(effective_question, lexical, vector, document_id)
             rag_retrieval_ms = round((time.time() - rag_t0) * 1000, 2)
+            if document_id and not selected:
+                answer = "No encontré un pasaje o evidencia suficiente en el documento seleccionado para responder con certeza. De acuerdo con la política de abstención estricta ('Cita o Calla'), el sistema prefiere no especular."
+                metadata = {
+                    "sources": [],
+                    "rag_hits": 0,
+                    "context_hits": 0,
+                    "rag_retrieval_ms": rag_retrieval_ms,
+                    "decision": "abstention-insufficient-evidence",
+                    "abstention": True
+                }
+                self.metadata.append_message(session_id, "user", question, document_id=document_id)
+                self.metadata.append_message(session_id, "assistant", answer, metadata=metadata, document_id=document_id)
+                return {"response": answer, "metadata": metadata}
         return await self._model_response(question, session_id, selected, document_id, session_context, rag_retrieval_ms=rag_retrieval_ms)
 
     @staticmethod

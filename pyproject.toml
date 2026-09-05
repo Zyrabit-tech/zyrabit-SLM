@@ -1,7 +1,7 @@
 [project]
-name = "zyrabit-slm"
+name = "zyrabit-platform"
 version = "2.1.0"
-description = "Sovereign SLM with RAG and secure bridge"
+description = "The Open Platform for Sovereign AI"
 readme = "README.md"
 requires-python = ">=3.12,<3.13"
 dependencies = [
