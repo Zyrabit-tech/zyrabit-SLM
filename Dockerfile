@@ -1,5 +1,5 @@
 # ──────────────────────────────────────────────────────────────────────────────
-#   ZYRABIT PLATFORM — Unified All-in-One Dockerfile
+#   ZYRABIT PLATFORM — Official Container Distribution
 #   Zero-Trust Multi-Stage: SPA Web UI + FastAPI RAG Core in ~450MB image
 # ──────────────────────────────────────────────────────────────────────────────
 

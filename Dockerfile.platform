@@ -1,0 +1,96 @@
+# ──────────────────────────────────────────────────────────────────────────────
+#   ZYRABIT PLATFORM — Official Container Distribution
+#   Zero-Trust Multi-Stage: SPA Web UI + FastAPI RAG Core in ~450MB image
+# ──────────────────────────────────────────────────────────────────────────────
+
+# STAGE 1: Frontend SPA Builder ───────────────────────────────────────────────
+FROM node:22-alpine AS web-builder
+
+WORKDIR /app
+RUN apk add --no-cache libc6-compat
+RUN npm install -g pnpm@10.34.5 && npm cache clean --force
+
+COPY zyrabit-slm/web-ui/package.json zyrabit-slm/web-ui/pnpm-lock.yaml ./
+RUN pnpm install --frozen-lockfile
+
+COPY zyrabit-slm/web-ui .
+RUN pnpm run build
+
+
+# STAGE 2: Python Environment Builder ─────────────────────────────────────────
+FROM python:3.12-slim-bookworm AS py-builder
+
+COPY --from=ghcr.io/astral-sh/uv:0.6.5 /uv /uvx /bin/
+
+WORKDIR /app
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    UV_LINK_MODE=copy
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    cmake \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+ENV CFLAGS="-Wno-stringop-overflow -Wno-array-bounds -O2"
+ENV CXXFLAGS="-Wno-stringop-overflow -Wno-array-bounds -O2"
+ENV CMAKE_ARGS="-DGGML_NATIVE=OFF -DGGML_AVX=OFF -DGGML_AVX2=OFF -DCMAKE_C_FLAGS='-Wno-stringop-overflow' -DCMAKE_CXX_FLAGS='-Wno-stringop-overflow'"
+
+COPY pyproject.toml uv.lock ./
+
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --frozen --no-dev --no-install-project
+
+ENV VIRTUAL_ENV=/app/.venv
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv pip install https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl
+
+RUN mkdir -p /app/document_source && touch /app/document_source/.keep
+
+
+# STAGE 3: Hardened Runtime Container ─────────────────────────────────────────
+FROM python:3.12-slim-bookworm
+
+WORKDIR /app
+
+RUN apt-get update && apt-get upgrade -y && apt-get install -y --no-install-recommends \
+    libgomp1 \
+    libcurl4 \
+    curl \
+    tesseract-ocr \
+    tesseract-ocr-eng \
+    tesseract-ocr-spa \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy pre-built virtual environment from Python builder
+COPY --from=py-builder /app/.venv /app/.venv
+
+# Copy API backend application code
+COPY zyrabit-slm/api-rag/app ./app
+
+# Copy built SPA frontend from Node builder
+COPY --from=web-builder /app/dist ./static_ui
+
+# Copy placeholder document directory
+COPY --from=py-builder /app/document_source /app/document_source
+
+# Environment configuration
+ENV PYTHONPATH="/app/.venv/lib/python3.12/site-packages:/app" \
+    PATH="/app/.venv/bin:$PATH" \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    STATIC_UI_PATH="/app/static_ui" \
+    SLM_URL="http://host.docker.internal:11434"
+
+# Non-root user isolation
+RUN groupadd -g 10001 nonroot && \
+    useradd -m -d /home/nonroot -r -u 10001 -g nonroot nonroot && \
+    mkdir -p /app/db_data && \
+    chown -R nonroot:nonroot /app /home/nonroot
+
+USER nonroot
+
+EXPOSE 8080
+
+ENTRYPOINT ["python3", "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8080"]
