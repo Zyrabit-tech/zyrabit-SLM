@@ -133,6 +133,102 @@ async def detailed_status(
         "inference": "ready" if slm_ok else "offline"
     }
 
+@router.get("/engine/status")
+@router.get("/engine/detect")
+async def detect_inference_engines(request: Request):
+    """
+    Auto-detects available inference engines across local host, container network, and native accelerators.
+    Supports Ollama, vLLM (including Tenstorrent), llama.cpp server, and native MLX/Metal.
+    """
+    import httpx
+    detected = []
+    
+    # 1. Check Ollama (Host & Container)
+    ollama_candidates = [
+        ("ollama_host", "http://host.docker.internal:11434"),
+        ("ollama_local", "http://127.0.0.1:11434"),
+        ("ollama_container", "http://zyrabit-engine:11434"),
+    ]
+    async with httpx.AsyncClient(timeout=1.5) as client:
+        for name, base_url in ollama_candidates:
+            try:
+                res = await client.get(f"{base_url}/api/tags")
+                if res.status_code == 200:
+                    models = [m.get("name") for m in res.json().get("models", [])]
+                    detected.append({
+                        "engine": "ollama",
+                        "target": name,
+                        "url": base_url,
+                        "status": "online",
+                        "models": models
+                    })
+                    break
+            except Exception:
+                pass
+
+        # 2. Check vLLM / Tenstorrent NPU
+        vllm_candidates = [
+            ("vllm_npu", "http://host.docker.internal:8090"),
+            ("vllm_local", "http://127.0.0.1:8090"),
+            ("vllm_container", "http://zyrabit-vllm-tt:8090"),
+        ]
+        for name, base_url in vllm_candidates:
+            try:
+                res = await client.get(f"{base_url}/v1/models")
+                if res.status_code == 200:
+                    models = [m.get("id") for m in res.json().get("data", [])]
+                    detected.append({
+                        "engine": "vllm",
+                        "target": name,
+                        "url": base_url,
+                        "status": "online",
+                        "models": models
+                    })
+                    break
+            except Exception:
+                pass
+
+        # 3. Check llama.cpp server
+        llama_candidates = [
+            ("llama_cpp_host", "http://host.docker.internal:8081"),
+            ("llama_cpp_local", "http://127.0.0.1:8081"),
+        ]
+        for name, base_url in llama_candidates:
+            try:
+                res = await client.get(f"{base_url}/v1/models")
+                if res.status_code == 200:
+                    models = [m.get("id") for m in res.json().get("data", [])]
+                    detected.append({
+                        "engine": "llama_cpp",
+                        "target": name,
+                        "url": base_url,
+                        "status": "online",
+                        "models": models
+                    })
+                    break
+            except Exception:
+                pass
+
+    # 4. Check Native Metal / Apple Silicon
+    is_mac = platform.system() == "Darwin"
+    if is_mac:
+        detected.append({
+            "engine": "native_apple_silicon",
+            "target": "mlx/metal",
+            "url": "in-process",
+            "status": "available",
+            "models": ["mlx-community/Qwen2.5-7B-Instruct-4bit"]
+        })
+
+    active_provider = os.getenv("INFERENCE_PROVIDER", "ollama")
+    return {
+        "active_provider": active_provider,
+        "active_model": MODEL_NAME,
+        "engines_found": len(detected),
+        "engines": detected,
+    }
+
+
 from pydantic import BaseModel
 from app.infrastructure.shared.state_tracker import SovereignStateManager
 

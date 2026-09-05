@@ -1513,7 +1513,7 @@ name = "mlx"
 version = "0.32.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "mlx-metal" },
+    { name = "mlx-metal", marker = "sys_platform == 'darwin'" },
 ]
 wheels = [
     { url = "https://files.pythonhosted.org/packages/f2/b6/023b69395b8b58b196184c282b15fc462dcb34bf42b76ef3d367088f86d0/mlx-0.32.1-cp312-cp312-macosx_14_0_arm64.whl", hash = "sha256:f0b6a28089caeacdc27b89e18ff786ee956b8253cf8819778575fd90d2af8caa", size = 615807, upload-time = "2026-08-18T02:45:13.598Z" },
@@ -3374,7 +3374,7 @@ wheels = [
 ]
 
 [[package]]
-name = "zyrabit-slm"
+name = "zyrabit-platform"
 version = "2.1.0"
 source = { virtual = "." }
 dependencies = [

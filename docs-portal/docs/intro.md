@@ -1,13 +1,13 @@
 ---
 sidebar_position: 1
 title: Introduction
-description: "Zyrabit SLM — A production-grade local AI orchestration stack with pluggable hexagonal architecture for sovereign, offline-capable document analysis and inference."
+description: "Zyrabit Platform — The open infrastructure platform for Sovereign AI. Run, govern and verify AI on your own infrastructure."
 slug: /
 ---
 
-# Zyrabit SLM
+# Zyrabit Platform
 
-Zyrabit SLM is a production-grade Small Language Model (SLM) orchestration stack designed for on-premise and private cloud environments. It provides a containerized architecture to deploy, manage, and scale local AI capabilities while maintaining strict data privacy and network isolation.
+Zyrabit Platform is an enterprise-grade AI infrastructure layer designed for on-premise and private cloud environments. It provides a modular, containerized architecture to deploy, manage, and scale local AI capabilities while maintaining strict data sovereignty and verifiable evidence boundaries.
 
 ## 🎥 See it in Action: True Sovereign AI
 
