@@ -114,8 +114,10 @@ class StructuredExtractionService:
 
         user_content += "\nRespond with the JSON object now:"
 
+        from app.infrastructure.shared.config import MODEL_NAME
+        target_model = model or MODEL_NAME
         request = InferenceRequest(
-            model=model or "default",
+            model=target_model,
             prompt=user_content,
             system_prompt=system_prompt,
             options={"temperature": 0.0, "max_tokens": 2048},
