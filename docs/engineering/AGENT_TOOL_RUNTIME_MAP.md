@@ -2,7 +2,9 @@
 
 **Rama / contexto:** `feat/unified-distribution` · Lite-first · soberano  
 **Relacionado:** [`DX_SIMPLIFICATION_PLAN.md`](./DX_SIMPLIFICATION_PLAN.md), MCP (`mcp/`), ReAct + HITL (backlog UI)  
-**Propósito:** modelo mental de cómo queda el agente que *hace cosas*, alineado con lo que ya estamos construyendo — sin vertical ofensivo.\n\n**Demo ejecutable (Caso 3):** [`examples/case3-hitl-ops/`](../../examples/case3-hitl-ops/) · Post: [`docs/medium/caso-3-agente-ops-gobernado.md`](../medium/caso-3-agente-ops-gobernado.md).
+**Propósito:** modelo mental de cómo queda el agente que *hace cosas*, alineado con lo que ya estamos construyendo — sin vertical ofensivo.
+
+**Demo ejecutable (Caso 3):** [`examples/case3-hitl-ops/`](../../examples/case3-hitl-ops/) · Post: [`docs/medium/caso-3-agente-ops-gobernado.md`](../medium/caso-3-agente-ops-gobernado.md).
 
 ---
 
