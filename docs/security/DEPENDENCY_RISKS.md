@@ -8,6 +8,9 @@ before a production release.
 | Advisory | Component | Installed version | Fix available | State | Required action |
 | --- | --- | ---: | --- | --- | --- |
 | `PYSEC-2026-311` | `chromadb` | `1.5.9` | No upstream fixed version published | open | Track upstream advisory; do not expose Chroma directly outside the local runtime network; obtain explicit release-risk acceptance before production. |
+| `CVE-2026-45830` | `chromadb` | `1.5.9` | No upstream fixed version published | open | Track upstream advisory; validate multi-tenant authorization policies; obtain explicit release-risk acceptance before production. |
+| `CVE-2026-45831` | `chromadb` | `1.5.9` | No upstream fixed version published | open | Track upstream advisory; enforce strict collection-level RBAC; obtain explicit release-risk acceptance before production. |
+| `CVE-2026-45833` | `chromadb` | `1.5.9` | No upstream fixed version published | open | Track upstream advisory; disable trust_remote_code in collection update; obtain explicit release-risk acceptance before production. |
 | `PYSEC-2026-2447` | `diskcache` | `5.6.3` | No upstream fixed version published | open | Track upstream advisory; obtain explicit release-risk acceptance before production. |
 
 ## Release rule

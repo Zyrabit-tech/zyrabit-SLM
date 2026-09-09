@@ -94,6 +94,16 @@ async def lifespan(app: FastAPI):
                 logger.warning(f"⚠️ Waiting for ChromaDB at {DB_HOST}:{DB_PORT} (attempt {attempt}/3): {err}")
                 await asyncio.sleep(1)
 
+        if not chroma_client:
+            chroma_persist_dir = os.getenv("CHROMA_PERSISTENCE_DIR", os.path.join(os.getenv("NODE_DATA_DIR", "/app/db_data/node"), "chroma"))
+            try:
+                logger.info(f"📦 Remote ChromaDB unavailable at {DB_HOST}:{DB_PORT}. Initializing Embedded Persistent ChromaDB at {chroma_persist_dir}...")
+                os.makedirs(chroma_persist_dir, exist_ok=True)
+                chroma_client = chromadb.PersistentClient(path=chroma_persist_dir)
+                logger.info(f"✅ Embedded Persistent ChromaDB initialized at {chroma_persist_dir}")
+            except Exception as e:
+                logger.error(f"ChromaDB is unavailable. Both remote ({DB_HOST}:{DB_PORT}) and embedded failed: {e}")
+
         lc_chroma = None
         app.state.vector_store = None
         app.state.retriever_service = None
@@ -171,6 +181,10 @@ async def lifespan(app: FastAPI):
             asyncio.create_task(app.state.tg_worker.start())
             asyncio.create_task(ObsidianService.start_auto_learner_loop(app.state.inference_provider, interval_seconds=600))
         
+        # Non-blocking adoption telemetry heartbeat (zero PII, air-gap tolerant)
+        from app.infrastructure.telemetry.adoption_telemetry import AdoptionTelemetry
+        asyncio.create_task(AdoptionTelemetry.send_heartbeat(storage_dir=NODE_DATA_DIR))
+
         logger.info("✅ Infrastructure initialized successfully.")
 
     except Exception as e:
@@ -252,6 +266,35 @@ if ENABLE_LEGACY_EXTENSIONS:
 app.include_router(ag_ui.router, prefix="/ag-ui", tags=["AG-UI"])
 app.include_router(node.router, prefix=API_V1_STR, tags=["Node"], dependencies=[Depends(get_current_user)])
 
-@app.get("/", include_in_schema=False)
-async def root():
-    return {"status": "Zyrabit SLM API is running."}
+# SPA Static Files & Root Handling
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
+
+static_dir = os.getenv("STATIC_UI_PATH", "/app/static_ui")
+if not os.path.exists(static_dir):
+    local_dist = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../web-ui/dist"))
+    if os.path.exists(local_dist):
+        static_dir = local_dist
+
+if os.path.exists(static_dir) and os.path.isdir(static_dir):
+    logger.info(f"🎨 Serving Unified Web UI from {static_dir}")
+    assets_dir = os.path.join(static_dir, "assets")
+    if os.path.exists(assets_dir):
+        app.mount("/assets", StaticFiles(directory=assets_dir), name="assets")
+
+    @app.get("/{full_path:path}", include_in_schema=False)
+    async def serve_spa(full_path: str):
+        if full_path.startswith(("v1/", "socket.io", "ag-ui", "metrics", "mcp")):
+            from fastapi import HTTPException
+            raise HTTPException(status_code=404, detail="Not Found")
+        file_path = os.path.join(static_dir, full_path)
+        if full_path and os.path.isfile(file_path):
+            return FileResponse(file_path)
+        index_file = os.path.join(static_dir, "index.html")
+        if os.path.exists(index_file):
+            return FileResponse(index_file)
+        return {"status": "Zyrabit Platform API is running."}
+else:
+    @app.get("/", include_in_schema=False)
+    async def root():
+        return {"status": "Zyrabit Platform API is running."}

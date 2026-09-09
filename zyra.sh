@@ -37,7 +37,7 @@ print_banner() {
     echo '  ███████╗   ██║   ██║  ██║██║  ██║██████╔╝██║   ██║   '
     echo '  ╚══════╝   ╚═╝   ╚═╝  ╚═╝╚═╝  ╚═╝╚═════╝ ╚═╝   ╚═╝   '
     echo -e "${NC}"
-    echo -e "${BOLD}${BRAND_SLATE}   🐝 ZYRABIT SLM — Sovereign AI Runtime${NC}"
+    echo -e "${BOLD}${BRAND_SLATE}   🐝 ZYRABIT PLATFORM — Sovereign AI Runtime${NC}"
     echo -e "${BRAND_ICE}════════════════════════════════════════════════════════════${NC}\n"
 }
 
@@ -90,11 +90,11 @@ fi
 # ─────────────────────────────────────────────────────────────────────────────
 usage() {
     print_banner
-    echo -e "${BOLD}Zyrabit SLM — Sovereign AI Runtime${NC}\n"
+    echo -e "${BOLD}Zyrabit Platform — Sovereign AI Runtime${NC}\n"
     echo -e "${BOLD}Usage:${NC}  ./zyra.sh [command] [flags]\n"
     echo -e "${BOLD}Commands:${NC}"
+    echo -e "  up / start   Instant launch existing stack without configuration prompts"
     echo -e "  install      Setup & launch  (guided configuration on first run, smart on re-runs)"
-    echo -e "  start        Re-launch existing stack without configuration prompts"
     echo -e "  stop         Tear down all containers"
     echo -e "  verify       Health check: container status + API probe"
     echo -e "  validate     Sovereign QA: unit tests, PII, air-gap, architecture"
@@ -733,6 +733,10 @@ run_start() {
         compose_args+=("--profile" "hardware")
     fi
 
+    if [[ -n "${PROFILE}" ]]; then
+        compose_args+=("--profile" "${PROFILE}")
+    fi
+
     if [[ "${PRODUCTION_MODE}" == "true" ]]; then
         validate_production_env
         compose_args+=("--profile" "production")
@@ -1314,7 +1318,7 @@ for CMD in "${COMMANDS[@]}"; do
     case "${CMD}" in
         install)   run_install   ;;
         wizard)    log_warn "El comando 'wizard' ha sido eliminado. Usa './zyra.sh install' para instalar y configurar."; run_install ;;
-        start)     run_start     ;;
+        start|up)  run_start     ;;
         stop)      run_stop      ;;
         verify)    run_verify    ;;
         validate)  run_validate  ;;
