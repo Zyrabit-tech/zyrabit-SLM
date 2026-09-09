@@ -13,7 +13,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-6090b4?style=flat-square)](LICENSE)
 [![Python 3.12](https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white&style=flat-square)](https://python.org)
 
-[⚡ Quickstart](#-quickstart) · [🐳 Docker Hub](https://hub.docker.com/r/zyrabitcore/zyrabit-slm) · [Hardware Sizing](#-hardware-requirements--sizing) · [Benchmarks](#-inference--performance-baselines) · [Architecture](#-architecture) · [Security](SECURITY.md)
+[⚡ Quickstart](#-quickstart) · [🧭 DX Roadmap](#-dx-roadmap-lite-first) · [🐳 Docker Hub](https://hub.docker.com/r/zyrabitcore/zyrabit-slm) · [Hardware Sizing](#-hardware-requirements--sizing) · [Benchmarks](#-inference--performance-baselines) · [Architecture](#-architecture) · [Security](SECURITY.md)
 
 </div>
 
@@ -32,6 +32,17 @@ Zyrabit Platform is an enterprise-ready, **local-first AI infrastructure layer**
 > **Notice**: Zyrabit SLM provides runtime isolation and PII guardrails for evaluation and deployment on customer-controlled infrastructure. It is not an automatic compliance certification (GDPR/HIPAA/ISO). Review your organizational threat model before processing classified or sensitive production data.
 
 ---
+
+
+---
+
+## 🧭 DX Roadmap (Lite first)
+
+We optimize for **time-to-trust**: one container, port `8080`, PII + cited RAG — not a heavier default stack.
+
+- **Lite (recommended):** Docker one-liner below → [http://localhost:8080](http://localhost:8080)
+- **Platform / from source:** Compose profiles + `./zyra.sh` (Advanced)
+- **Plan DX (tracked):** [`docs/engineering/DX_SIMPLIFICATION_PLAN.md`](./docs/engineering/DX_SIMPLIFICATION_PLAN.md)
 
 ## 📊 Capability Matrix
 
@@ -120,9 +131,9 @@ All traffic, embeddings, vector transformations, and inference tokens remain str
 
 ## ⚡ Quickstart
 
-### Option A: Instant Docker (60 Seconds — Zero Build)
+### Recommended: Lite — Instant Docker (≈60s)
 
-If you already have Docker and a local inference engine (Ollama, vLLM, or LM Studio):
+**This is the default path.** Requires Docker and a local inference engine on the host (Ollama, vLLM, or LM Studio):
 
 ```bash
 docker run -d \
@@ -139,7 +150,7 @@ Open **[http://localhost:8080](http://localhost:8080)** in your browser to acces
 
 ---
 
-### Option B: Full Source Deployment (Enterprise Profiles)
+### Advanced: From source / Platform (Compose + `zyra.sh`)
 
 **Prerequisites:** Python 3.12, [uv](https://github.com/astral-sh/uv), Docker & Docker Compose.
 
@@ -179,7 +190,9 @@ curl -X POST http://localhost:8088/v1/chat \
 
 ## 🌐 Service Endpoints & Ports
 
-In **Local / Dev Mode** (default), direct service ports are exposed for easy debugging and low latency:
+**Lite (all-in-one image):** use **only** [http://localhost:8080](http://localhost:8080) (UI + API).
+
+**Platform / Compose (from source):** additional direct ports for debugging:
 
 | Service | Local Dev URL | Direct Port | Description |
 | :--- | :--- | :---: | :--- |
