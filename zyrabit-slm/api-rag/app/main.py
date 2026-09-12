@@ -244,7 +244,13 @@ app.include_router(chat.router, prefix=API_V1_STR, tags=["Chat"], dependencies=[
 app.include_router(health.router, prefix=API_V1_STR, tags=["Monitoring"])
 if ENABLE_LEGACY_EXTENSIONS:
     from app.api.v1.endpoints import mcp as mcp_router
-    app.include_router(mcp_router.router, prefix="/mcp", tags=["MCP"])
+    # Auth parity with chat/documents (GHSA-r4q8-hjfc-ggp2 / CWE-306)
+    app.include_router(
+        mcp_router.router,
+        prefix="/mcp",
+        tags=["MCP"],
+        dependencies=[Depends(get_current_user)],
+    )
 app.include_router(documents.router, prefix=API_V1_STR, tags=["Documents"], dependencies=[Depends(get_current_user)])
 if ENABLE_LEGACY_EXTENSIONS:
     from app.api.v1.endpoints import integrations
