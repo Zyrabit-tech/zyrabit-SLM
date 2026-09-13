@@ -33,8 +33,13 @@ from app.domain.services.retriever_service import HybridRetrieverService
 # pyrefly: ignore [missing-import]
 from langchain_chroma import Chroma
 
-# Setup Socket.io (V5.2 Fix: Correct path mapping)
-sio = socketio.AsyncServer(async_mode='asgi', cors_allowed_origins='*')
+# Setup Socket.io (V5.2 Fix: Robust timeouts for local inference)
+sio = socketio.AsyncServer(
+    async_mode='asgi',
+    cors_allowed_origins='*',
+    ping_timeout=60,
+    ping_interval=20
+)
 # By setting socketio_path to empty string, we tell the ASGI app to handle
 # the requests directly at the mount point.
 socket_app = socketio.ASGIApp(sio, socketio_path='')
