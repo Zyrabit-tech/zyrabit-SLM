@@ -274,7 +274,23 @@ app.include_router(node.router, prefix=API_V1_STR, tags=["Node"], dependencies=[
 
 # SPA Static Files & Root Handling
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
+from app.core.security.api_key_store import ApiKeyStore
+
+@app.get("/runtime-config.js", include_in_schema=False)
+async def runtime_config():
+    """
+    Dynamically emits client bootstrap configuration.
+    Injects the local Web UI API token so browser requests to /v1 are authenticated out-of-the-box.
+    """
+    token = (
+        ApiKeyStore.get_client_key("webui")
+        or ApiKeyStore.get_client_key("web")
+        or os.getenv("API_KEY")
+        or (list(ApiKeyStore._keys.keys())[0] if ApiKeyStore._keys else "")
+    )
+    js_content = f'window.ZYRABIT_RUNTIME_CONFIG = {{ apiToken: "{token}" }};\n'
+    return Response(content=js_content, media_type="application/javascript")
 
 static_dir = os.getenv("STATIC_UI_PATH", "/app/static_ui")
 if not os.path.exists(static_dir):

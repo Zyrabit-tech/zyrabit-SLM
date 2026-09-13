@@ -71,6 +71,14 @@ export class ChatManager {
             const result = await sendChat({ text: message.text, session_id: this.sessionId, document_id: documentId, history: message.history });
             this.onResponse(result);
         } catch (error) {
+            // Fail-Safe: remove the failed message from queue to prevent sticky loops on page refresh
+            if (this.queue.length > 0) {
+                this.queue.shift();
+                this.persist();
+            }
+            this.isProcessing = false;
+            this.clearPendingTimeout();
+            bus.emit(EVENTS.UI.THINKING, false);
             this.onResponse({ response: 'No pude completar la consulta local. Revisa que el nodo y el motor de inferencia estén listos.', metadata: { decision: 'request-failed', sources: [] } });
         }
     }
@@ -157,8 +165,14 @@ export class ChatManager {
 
     recover() {
         if (this.queue.length > 0) {
-            console.log("Recovering shadow state:", this.queue.length, "messages");
-            this.processNext();
+            const now = Date.now();
+            // Discard messages older than 2 minutes to prevent zombie state on reload
+            this.queue = this.queue.filter(m => (now - (m.timestamp || now)) < 120000);
+            this.persist();
+            if (this.queue.length > 0) {
+                console.log("Recovering shadow state:", this.queue.length, "messages");
+                this.processNext();
+            }
         }
     }
 }
