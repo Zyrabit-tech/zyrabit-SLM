@@ -31,39 +31,128 @@ logger = logging.getLogger("zyrabit.api")
 # Initialize FastMCP Server
 mcp = FastMCP("Zyrabit Sovereign Core")
 
+def _vault_root() -> Path:
+    """Resolved vault root (DOCS_DIR)."""
+    return Path(DOCS_DIR).resolve()
+
+
+def _import_allowlist_roots() -> list:
+    """
+    Directories from which import_to_vault may read sources.
+    Default: DOCS_DIR itself + optional VAULT_IMPORT_ALLOWLIST (os.pathsep-separated).
+    """
+    roots = [_vault_root()]
+    extra = os.getenv("VAULT_IMPORT_ALLOWLIST", "").strip()
+    if extra:
+        for part in extra.split(os.pathsep):
+            part = part.strip()
+            if part:
+                roots.append(Path(part).resolve())
+    return roots
+
+
+def _is_under(path: Path, root: Path) -> bool:
+    try:
+        path.resolve().relative_to(root.resolve())
+        return True
+    except ValueError:
+        return False
+
+
+def _confine_source(source_path: str):
+    """Resolve source and require it stays under an allowlisted root. Returns Path or error str."""
+    if not source_path or not str(source_path).strip():
+        return "Error: source_path is required."
+    try:
+        src = Path(source_path).resolve(strict=False)
+    except Exception as e:
+        return f"Error: invalid source_path: {e}"
+    if not src.exists() or not src.is_file():
+        return f"Error: Source file {source_path} not found."
+    if not any(_is_under(src, root) for root in _import_allowlist_roots()):
+        logger.warning("🛡️ Security Block: source_path outside allowlist: %s", source_path)
+        return "Security Alert: source_path is outside the allowed import directories."
+    return src
+
+
+def _confine_destination(destination_name: str):
+    """
+    Force destination to a single basename under the vault.
+    Rejects traversal, absolute paths, and empty names (CWE-22).
+    """
+    if not destination_name or not str(destination_name).strip():
+        return "Error: destination_name is required."
+
+    # Reject separators / absolute forms before applying basename
+    if (
+        "/" in destination_name
+        or "\\" in destination_name
+        or Path(destination_name).is_absolute()
+        or destination_name.strip() in (".", "..")
+    ):
+        logger.warning("🛡️ Security Block: unsafe destination_name rejected: %s", destination_name)
+        return "Security Alert: destination_name must be a plain filename inside the vault."
+
+    safe_name = Path(destination_name).name
+    if not safe_name or safe_name in (".", "..") or safe_name != destination_name:
+        logger.warning("🛡️ Security Block: unsafe destination_name rejected: %s", destination_name)
+        return "Security Alert: destination_name must be a plain filename inside the vault."
+
+    vault = _vault_root()
+    dest_path = (vault / safe_name).resolve()
+    if not _is_under(dest_path, vault):
+        logger.warning("🛡️ Security Block: destination escaped vault: %s", destination_name)
+        return "Security Alert: destination resolved outside the vault."
+    return dest_path
+
+
 @mcp.tool()
 async def import_to_vault(source_path: str, destination_name: str) -> str:
     """
-    Securely move an external file into the Zyrabit Vault.
-    Validates that the file does not contain executable scripts.
+    Securely copy a file from an allowlisted directory into the Zyrabit Vault.
+    Confines both source_path and destination_name (basename only under DOCS_DIR).
+    Also rejects content with common executable patterns (defense in depth).
     """
-    src = Path(source_path)
-    if not src.exists():
-        return f"Error: Source file {source_path} not found."
+    src_or_err = _confine_source(source_path)
+    if isinstance(src_or_err, str):
+        return src_or_err
+    src = src_or_err
 
-    # SECURITY CHECK: Block executable patterns
+    dest_or_err = _confine_destination(destination_name)
+    if isinstance(dest_or_err, str):
+        return dest_or_err
+    dest_path = dest_or_err
+    safe_name = dest_path.name
+
+    # SECURITY CHECK: Block executable patterns (defense in depth — not a path control)
     try:
         with open(src, "r", encoding="utf-8", errors="ignore") as f:
-            content = f.read(10000) # Check first 10k characters
-            
+            content = f.read(10000)  # Check first 10k characters
+
             forbidden_patterns = [
-                "#!/bin/", "#!/usr/bin/", "os.system(", "subprocess.run(", 
+                "#!/bin/", "#!/usr/bin/", "os.system(", "subprocess.run(",
                 "<script>", "eval(", "exec(", "import os"
             ]
-            
+
             for pattern in forbidden_patterns:
                 if pattern in content:
-                    logger.warning(f"🛡️ Security Block: Executable pattern '{pattern}' detected in {source_path}")
-                    return f"Security Alert: File {source_path} contains potentially executable code and was rejected."
+                    logger.warning(
+                        "🛡️ Security Block: Executable pattern '%s' detected in %s",
+                        pattern,
+                        source_path,
+                    )
+                    return (
+                        f"Security Alert: File {source_path} contains potentially "
+                        "executable code and was rejected."
+                    )
     except Exception as e:
         return f"Error during security scan: {e}"
 
-    # Move to Vault
-    dest_path = Path(DOCS_DIR) / destination_name
     try:
+        _vault_root().mkdir(parents=True, exist_ok=True)
         shutil.copy2(src, dest_path)
-        logger.info(f"📥 Vault: Imported {destination_name} successfully.")
-        return f"Success: File imported to Vault as {destination_name}"
+        logger.info("📥 Vault: Imported %s successfully.", safe_name)
+        return f"Success: File imported to Vault as {safe_name}"
     except Exception as e:
         return f"Error moving file: {e}"
 
