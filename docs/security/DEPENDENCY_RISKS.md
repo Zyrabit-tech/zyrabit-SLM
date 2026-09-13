@@ -9,6 +9,9 @@ before a production release.
 | --- | --- | ---: | --- | --- | --- |
 | `PYSEC-2026-311` | `chromadb` | `1.5.9` | No upstream fixed version published | open | Track upstream advisory; do not expose Chroma directly outside the local runtime network; obtain explicit release-risk acceptance before production. |
 | `PYSEC-2026-2447` | `diskcache` | `5.6.3` | No upstream fixed version published | open | Track upstream advisory; obtain explicit release-risk acceptance before production. |
+| `PYSEC-2026-3815` | `diskcache` | `5.6.3` | No upstream fixed version published | open | Track upstream advisory; obtain explicit release-risk acceptance before production. |
+| `PYSEC-2026-3814` | `chromadb` | `1.5.9` | No upstream fixed version published | open | Track upstream advisory; keep Chroma local-only; explicit release-risk acceptance before production. |
+| `PYSEC-2026-3813` | `chromadb` | `1.5.9` | No upstream fixed version published | open | Track upstream advisory; keep Chroma local-only; explicit release-risk acceptance before production. |
 
 ## Release rule
 
@@ -16,5 +19,5 @@ before a production release.
 security job. Entries marked **open** also block a production release decision;
 they are recorded here so the exception is visible, reviewable and removable.
 The current beta may be built and tested locally, but it is **not cleared for a
-production release** until the two open records have an owner, review date and
+production release** until all open records have an owner, review date and
 explicit decision.
