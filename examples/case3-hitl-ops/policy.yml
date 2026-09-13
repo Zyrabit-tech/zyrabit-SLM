@@ -1,0 +1,41 @@
+# Policy for Case 3 demo — governed ops agent
+# risk: read | write | external
+# decision: allow | ask_human | deny
+
+profiles:
+  safe:
+    default: deny
+    rules:
+      - tool: ticket.get
+        risk: read
+        decision: allow
+      - tool: health.check
+        risk: read
+        decision: allow
+  ops:
+    default: deny
+    rules:
+      - tool: ticket.get
+        risk: read
+        decision: allow
+      - tool: health.check
+        risk: read
+        decision: allow
+      - tool: ticket.create
+        risk: write
+        decision: ask_human
+      - tool: webhook.notify
+        risk: external
+        decision: ask_human
+      # Explicit deny examples (anti dual-use)
+      - tool: nmap.scan
+        risk: external
+        decision: deny
+      - tool: shell.exec
+        risk: write
+        decision: deny
+
+allowlisted_webhooks:
+  - name: local_ticket_inbox
+    url: http://127.0.0.1:8765/tickets
+    description: Local mock ticket inbox (replaces Jira/Linear in the demo)

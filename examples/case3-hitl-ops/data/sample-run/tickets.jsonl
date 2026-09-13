@@ -1,0 +1,1 @@
+{"id": "TCK-7E975591", "created_at": "2026-09-09T03:27:26.726004+00:00", "title": "Fallo de login en prod", "priority": "high", "body": "Usuarios no pueden autenticarse desde 21:00 CT.", "source": "zyrabit-case3-demo", "requester": "abraham"}

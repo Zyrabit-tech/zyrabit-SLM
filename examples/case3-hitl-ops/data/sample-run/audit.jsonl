@@ -1,0 +1,10 @@
+{"ts": "2026-09-09T03:27:11.937043+00:00", "event": "tool_proposed", "profile": "ops", "tool": "ticket.create", "risk": "write", "policy": "ask_human", "args": {"title": "Fallo de login en prod", "priority": "high"}}
+{"ts": "2026-09-09T03:27:11.937463+00:00", "event": "hitl_approved", "tool": "ticket.create", "by": "abraham"}
+{"ts": "2026-09-09T03:27:16.963773+00:00", "event": "tool_error", "tool": "ticket.create", "error": "<urlopen error timed out>"}
+{"ts": "2026-09-09T03:27:17.048526+00:00", "event": "tool_proposed", "profile": "ops", "tool": "nmap.scan", "risk": "external", "policy": "deny", "args": {"title": "Fallo de login en prod", "priority": "high"}}
+{"ts": "2026-09-09T03:27:17.048945+00:00", "event": "tool_denied", "tool": "nmap.scan", "reason": "policy_deny"}
+{"ts": "2026-09-09T03:27:17.128557+00:00", "event": "tool_proposed", "profile": "ops", "tool": "ticket.create", "risk": "write", "policy": "ask_human", "args": {"title": "Should not create", "priority": "high"}}
+{"ts": "2026-09-09T03:27:17.129042+00:00", "event": "hitl_rejected", "tool": "ticket.create", "by": "abraham"}
+{"ts": "2026-09-09T03:27:26.695215+00:00", "event": "tool_proposed", "profile": "ops", "tool": "ticket.create", "risk": "write", "policy": "ask_human", "args": {"title": "Fallo de login en prod", "priority": "high"}}
+{"ts": "2026-09-09T03:27:26.695685+00:00", "event": "hitl_approved", "tool": "ticket.create", "by": "abraham"}
+{"ts": "2026-09-09T03:27:26.726722+00:00", "event": "tool_succeeded", "tool": "ticket.create", "ticket_id": "TCK-7E975591", "result_ok": true}

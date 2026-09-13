@@ -1,6 +1,6 @@
 const config = {
-  title: "Zyrabit Docs",
-  tagline: "Local sovereign AI, production-ready",
+  title: "Zyrabit Platform Docs",
+  tagline: "The Open Platform for Sovereign AI",
   favicon: "https://assets.zyrabit.com/logos/favicon.png",
   url: "https://docs.zyrabit.com",
   baseUrl: "/",
