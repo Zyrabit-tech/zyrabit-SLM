@@ -1,8 +1,21 @@
 const DEFAULT_TIMEOUT_MS = 30000;
 
+export function getRuntimeToken() {
+    return (
+        window.ZYRABIT_RUNTIME_CONFIG?.apiToken
+        || (typeof localStorage !== 'undefined' ? localStorage.getItem('zyrabit_api_token') : '')
+        || ''
+    );
+}
+
 async function fetchWithTimeout(url, options = {}, timeoutMs = DEFAULT_TIMEOUT_MS) {
     const signal = options.signal || (typeof AbortSignal !== 'undefined' && AbortSignal.timeout ? AbortSignal.timeout(timeoutMs) : undefined);
-    return fetch(url, { ...options, signal });
+    const token = getRuntimeToken();
+    const headers = {
+        ...(options.headers || {}),
+        ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+    };
+    return fetch(url, { ...options, headers, signal });
 }
 
 export async function sendChat({ text, client_msg_id = null, history = null, provider = null, session_id = null, document_id = null } = {}) {

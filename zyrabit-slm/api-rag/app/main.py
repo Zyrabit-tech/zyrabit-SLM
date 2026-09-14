@@ -294,8 +294,15 @@ async def runtime_config():
         or os.getenv("API_KEY")
         or (list(ApiKeyStore._keys.keys())[0] if ApiKeyStore._keys else "")
     )
-    js_content = f'window.ZYRABIT_RUNTIME_CONFIG = {{ apiToken: "{token}" }};\n'
-    return Response(content=js_content, media_type="application/javascript")
+    js_content = (
+        f'window.ZYRABIT_RUNTIME_CONFIG = {{ apiToken: "{token}" }};\n'
+        f'try {{ localStorage.setItem("zyrabit_api_token", "{token}"); }} catch (e) {{}}\n'
+    )
+    return Response(
+        content=js_content,
+        media_type="application/javascript",
+        headers={"Cache-Control": "no-cache, no-store, must-revalidate"}
+    )
 
 static_dir = os.getenv("STATIC_UI_PATH", "/app/static_ui")
 if not os.path.exists(static_dir):

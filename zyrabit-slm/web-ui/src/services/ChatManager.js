@@ -71,15 +71,15 @@ export class ChatManager {
             const result = await sendChat({ text: message.text, session_id: this.sessionId, document_id: documentId, history: message.history });
             this.onResponse(result);
         } catch (error) {
-            // Fail-Safe: remove the failed message from queue to prevent sticky loops on page refresh
-            if (this.queue.length > 0) {
-                this.queue.shift();
-                this.persist();
-            }
+            console.error("❌ sendChat error:", error);
             this.isProcessing = false;
             this.clearPendingTimeout();
             bus.emit(EVENTS.UI.THINKING, false);
-            this.onResponse({ response: 'No pude completar la consulta local. Revisa que el nodo y el motor de inferencia estén listos.', metadata: { decision: 'request-failed', sources: [] } });
+            const detail = error?.message ? ` (${error.message})` : '';
+            this.onResponse({
+                response: `No pude completar la consulta local${detail}. Revisa que el nodo y el motor de inferencia estén listos.`,
+                metadata: { decision: 'request-failed', sources: [] }
+            });
         }
     }
 
