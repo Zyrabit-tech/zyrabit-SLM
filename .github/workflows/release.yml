@@ -48,7 +48,6 @@ jobs:
         id: meta
         run: |
           BRANCH="${{ github.ref_name }}"
-          SHORT_SHA=$(git rev-parse --short HEAD)
           VERSION="${{ steps.version.outputs.version }}"
           OWNER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
           IMAGE="zyrabitcore/${{ env.IMAGE_NAME }}"
@@ -56,7 +55,6 @@ jobs:
           SUFFIX="${{ matrix.arch_suffix }}"
 
           echo "branch=${BRANCH}"      >> $GITHUB_OUTPUT
-          echo "sha=${SHORT_SHA}"      >> $GITHUB_OUTPUT
           echo "version=${VERSION}"    >> $GITHUB_OUTPUT
           echo "owner=${OWNER}"        >> $GITHUB_OUTPUT
           echo "image=${IMAGE}"        >> $GITHUB_OUTPUT
@@ -64,18 +62,12 @@ jobs:
 
           TAGS=""
           if [ "${BRANCH}" = "main" ] || [[ "${BRANCH}" =~ ^v[0-9] ]]; then
-            TAGS="${IMAGE}:${VERSION}-${SUFFIX}"
-            TAGS="${TAGS},${IMAGE}:v${VERSION}-${SUFFIX}"
-            TAGS="${TAGS},${IMAGE}:${VERSION}-${SHORT_SHA}-${SUFFIX}"
-            TAGS="${TAGS},${GHCR}:${VERSION}-${SUFFIX}"
-            TAGS="${TAGS},${GHCR}:v${VERSION}-${SUFFIX}"
-            TAGS="${TAGS},${GHCR}:${VERSION}-${SHORT_SHA}-${SUFFIX}"
+            # Enterprise Tagging Policy: Only canonical arch slices are pushed to assemble manifests
+            TAGS="${IMAGE}:${VERSION}-${SUFFIX},${GHCR}:${VERSION}-${SUFFIX}"
             echo "channel=stable" >> $GITHUB_OUTPUT
           elif [ "${BRANCH}" = "beta" ]; then
-            TAGS="${IMAGE}:beta-${VERSION}-${SUFFIX}"
-            TAGS="${TAGS},${IMAGE}:beta-${VERSION}-${SHORT_SHA}-${SUFFIX}"
-            TAGS="${TAGS},${GHCR}:beta-${VERSION}-${SUFFIX}"
-            TAGS="${TAGS},${GHCR}:beta-${VERSION}-${SHORT_SHA}-${SUFFIX}"
+            # Beta channel arch slices
+            TAGS="${IMAGE}:beta-${VERSION}-${SUFFIX},${GHCR}:beta-${VERSION}-${SUFFIX}"
             echo "channel=beta" >> $GITHUB_OUTPUT
           else
             echo "⚠️  Unknown branch pattern '${BRANCH}' — skipping Docker push."
@@ -161,29 +153,38 @@ jobs:
       - name: Merge and Push Multi-Arch Manifests
         run: |
           BRANCH="${{ github.ref_name }}"
-          SHORT_SHA=$(git rev-parse --short HEAD)
           VERSION="${{ steps.version.outputs.version }}"
           OWNER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
           IMAGE="zyrabitcore/${{ env.IMAGE_NAME }}"
           GHCR="ghcr.io/${OWNER}/${{ env.IMAGE_NAME }}"
 
           if [ "${BRANCH}" = "main" ] || [[ "${BRANCH}" =~ ^v[0-9] ]]; then
-            echo "Creating Unified Multi-Arch Manifest for Docker Hub..."
-            docker buildx imagetools create -t ${IMAGE}:${VERSION} ${IMAGE}:${VERSION}-amd64 ${IMAGE}:${VERSION}-arm64
-            docker buildx imagetools create -t ${IMAGE}:v${VERSION} ${IMAGE}:${VERSION}-amd64 ${IMAGE}:${VERSION}-arm64
-            docker buildx imagetools create -t ${IMAGE}:${VERSION}-${SHORT_SHA} ${IMAGE}:${VERSION}-amd64 ${IMAGE}:${VERSION}-arm64
+            echo "Creating Unified Multi-Arch Manifest for Docker Hub (${IMAGE}:${VERSION}, v${VERSION}, latest)..."
+            docker buildx imagetools create \
+              -t ${IMAGE}:${VERSION} \
+              -t ${IMAGE}:v${VERSION} \
+              -t ${IMAGE}:latest \
+              ${IMAGE}:${VERSION}-amd64 ${IMAGE}:${VERSION}-arm64
             
-            echo "Creating Unified Multi-Arch Manifest for GHCR..."
-            docker buildx imagetools create -t ${GHCR}:${VERSION} ${GHCR}:${VERSION}-amd64 ${GHCR}:${VERSION}-arm64
-            docker buildx imagetools create -t ${GHCR}:v${VERSION} ${GHCR}:${VERSION}-amd64 ${GHCR}:${VERSION}-arm64
-            docker buildx imagetools create -t ${GHCR}:${VERSION}-${SHORT_SHA} ${GHCR}:${VERSION}-amd64 ${GHCR}:${VERSION}-arm64
+            echo "Creating Unified Multi-Arch Manifest for GHCR (${GHCR}:${VERSION}, v${VERSION}, latest)..."
+            docker buildx imagetools create \
+              -t ${GHCR}:${VERSION} \
+              -t ${GHCR}:v${VERSION} \
+              -t ${GHCR}:latest \
+              ${GHCR}:${VERSION}-amd64 ${GHCR}:${VERSION}-arm64
 
           elif [ "${BRANCH}" = "beta" ]; then
-            echo "Creating Beta Multi-Arch Manifest for Docker Hub & GHCR..."
-            docker buildx imagetools create -t ${IMAGE}:beta-${VERSION} ${IMAGE}:beta-${VERSION}-amd64 ${IMAGE}:beta-${VERSION}-arm64
-            docker buildx imagetools create -t ${IMAGE}:beta-${VERSION}-${SHORT_SHA} ${IMAGE}:beta-${VERSION}-amd64 ${IMAGE}:beta-${VERSION}-arm64
-            docker buildx imagetools create -t ${GHCR}:beta-${VERSION} ${GHCR}:beta-${VERSION}-amd64 ${GHCR}:beta-${VERSION}-arm64
-            docker buildx imagetools create -t ${GHCR}:beta-${VERSION}-${SHORT_SHA} ${GHCR}:beta-${VERSION}-amd64 ${GHCR}:beta-${VERSION}-arm64
+            echo "Creating Beta Multi-Arch Manifest for Docker Hub (${IMAGE}:beta, beta-${VERSION})..."
+            docker buildx imagetools create \
+              -t ${IMAGE}:beta \
+              -t ${IMAGE}:beta-${VERSION} \
+              ${IMAGE}:beta-${VERSION}-amd64 ${IMAGE}:beta-${VERSION}-arm64
+
+            echo "Creating Beta Multi-Arch Manifest for GHCR (${GHCR}:beta, beta-${VERSION})..."
+            docker buildx imagetools create \
+              -t ${GHCR}:beta \
+              -t ${GHCR}:beta-${VERSION} \
+              ${GHCR}:beta-${VERSION}-amd64 ${GHCR}:beta-${VERSION}-arm64
           fi
 
       - name: Create GitHub Release
