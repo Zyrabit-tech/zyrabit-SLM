@@ -1,4 +1,4 @@
-name: zyrabit-slm
+name: zyrabit-platform
 
 services:
   traefik:
@@ -204,6 +204,7 @@ services:
   zyrabit-prometheus:
     image: prom/prometheus:v2.53.0
     container_name: zyrabit-prometheus
+    profiles: ["monitoring", "production"]
     command:
       - --config.file=/etc/prometheus/prometheus.yml
       - --storage.tsdb.path=/prometheus
@@ -229,6 +230,7 @@ services:
   zyrabit-grafana:
     image: grafana/grafana:11.1.0
     container_name: zyrabit-grafana
+    profiles: ["monitoring", "production"]
     environment:
       - GF_SERVER_ROOT_URL=${GRAFANA_ROOT_URL:-%(protocol)s://%(domain)s:%(http_port)s/}
       - GF_SERVER_SERVE_FROM_SUB_PATH=${GRAFANA_SERVE_FROM_SUB_PATH:-false}

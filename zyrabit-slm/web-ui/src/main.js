@@ -15,11 +15,43 @@ import { getSession, getProfile } from "./services/api";
 const originalFetch = window.fetch;
 window.fetch = async function (resource, init) {
     init = init || {};
-    if (typeof resource === 'string' && resource.startsWith('/v1')) {
-        init.headers = {
-            ...init.headers,
-            'Authorization': `Bearer ${window.ZYRABIT_RUNTIME_CONFIG?.apiToken || ''}`
-        };
+    const url = typeof resource === 'string' ? resource : (resource?.url || '');
+    if (url.includes('/v1') || url.startsWith('/v1')) {
+        let token = window.ZYRABIT_RUNTIME_CONFIG?.apiToken
+            || (typeof localStorage !== 'undefined' ? localStorage.getItem('zyrabit_api_token') : '')
+            || '';
+
+        if (!token) {
+            try {
+                const res = await originalFetch('/runtime-config.js', { cache: 'no-store' });
+                if (res.ok) {
+                    const text = await res.text();
+                    const match = text.match(/apiToken:\s*["']([^"']+)["']/);
+                    if (match && match[1]) {
+                        token = match[1];
+                        window.ZYRABIT_RUNTIME_CONFIG = { apiToken: token };
+                        try { localStorage.setItem('zyrabit_api_token', token); } catch (_) {}
+                    }
+                }
+            } catch (_) {}
+        }
+
+        if (token) {
+            if (init.headers instanceof Headers) {
+                if (!init.headers.has('Authorization')) {
+                    init.headers.set('Authorization', `Bearer ${token}`);
+                }
+            } else if (Array.isArray(init.headers)) {
+                if (!init.headers.some(([k]) => k.toLowerCase() === 'authorization')) {
+                    init.headers.push(['Authorization', `Bearer ${token}`]);
+                }
+            } else {
+                init.headers = {
+                    'Authorization': `Bearer ${token}`,
+                    ...(init.headers || {})
+                };
+            }
+        }
     }
     return originalFetch(resource, init);
 };

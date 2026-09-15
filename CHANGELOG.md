@@ -7,6 +7,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.4.4] - 2026-09-14
+
+### Added
+
+- **Dockerfile Integrity Lock & Invariant Tests**: Introduced `test_dockerfile_integrity.py` and `dockerfiles.lock.json` cryptographic guardrail enforcing strict build invariants (pinned `pnpm@10.34.5`, `uv sync --frozen`, `CMAKE_BUILD_PARALLEL_LEVEL=2`, `USER nonroot`, BuildKit cache mounts) to prevent unapproved Dockerfile drift across commits.
+- **Self-Healing Container Management in `zyra.sh`**: Integrated `cleanup_stale_containers()` into `run_start()` to automatically purge dead, exited, or created collision containers before stack launch.
+
+### Changed
+
+- **Docker Multi-Stage Build Optimization**: Slashed container build times by over 80% (from ~410s to ~74s) via safe multicore C++ compilation (`CMAKE_BUILD_PARALLEL_LEVEL=2`, `MAKEFLAGS="-j2"`), persistent BuildKit cache mounts (`/root/.cache/uv`, `/root/.local/share/pnpm/store`, `/var/cache/apt`), and layer optimization (`COPY --chown`).
+- **Tenstorrent P150 Model Spec Alignment**: Aligned `.env` and runtime configs to officially certified `Qwen/Qwen2.5-1.5B-Instruct` model spec (`model_spec_qwen25_1.5b_p150.json`) for the Tenstorrent Blackhole accelerator.
+
+### Fixed
+
+- **Container Name Collisions**: Resolved Docker Compose daemon conflicts caused by orphaned containers sharing explicit static names (`zyrabit-vllm-tt`, `zyrabit-mcp`).
+- **Nginx DNS Upstream Stale IP**: Fixed 502 Bad Gateway during container recreation by aligning upstream resolution.
+
 ## [2.4.0] - 2026-08-19
 
 ### Added

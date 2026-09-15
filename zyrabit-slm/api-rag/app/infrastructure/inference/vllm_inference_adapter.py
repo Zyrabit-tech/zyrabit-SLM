@@ -172,6 +172,7 @@ class VllmInferenceAdapter(InferenceProviderPort):
                 "endpoint": self.endpoint,
                 "ok": True,
                 "available_models": models,
+                "model": models[0] if models else None,
                 "status": "READY" if models else "WARMING_UP"
             }
         except requests.exceptions.RequestException:

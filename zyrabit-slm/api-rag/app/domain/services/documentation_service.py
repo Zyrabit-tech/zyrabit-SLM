@@ -40,7 +40,7 @@ class DocumentationService:
         fallback = """
 # 🚀 QUICK START GUIDE
 Clone the repository and run:
-$ ./zyra-up.sh start
+$ ./zyra.sh start
 """
         return cls._read_file_content("docs-portal/docs/getting-started/fundamentals.md", fallback)
 

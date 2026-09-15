@@ -1,6 +1,7 @@
 {
   "name": "zyrabit-slm-ui",
   "version": "2.1.0",
+  "packageManager": "pnpm@10.34.5",
   "private": true,
   "type": "module",
   "scripts": {
