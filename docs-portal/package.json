@@ -51,8 +51,7 @@
       "baseline-browser-mapping": ">=2.11.0",
       "colord": ">=2.9.4",
       "qs": ">=6.16.0",
-      "shell-quote": ">=1.9.0",
-      "js-yaml": ">=4.3.2"
+      "shell-quote": ">=1.9.0"
     }
   }
 }
