@@ -1,6 +1,6 @@
 # ──────────────────────────────────────────────────────────────────────────────
-#   ZYRABIT PLATFORM — Official Container Distribution
-#   Zero-Trust Multi-Stage: SPA Web UI + FastAPI RAG Core in ~450MB image
+#   ZYRABIT PLATFORM — Official Container Distribution (Production Stable)
+#   Zero-Trust Multi-Stage: SPA Web UI + FastAPI RAG Core
 # ──────────────────────────────────────────────────────────────────────────────
 
 # STAGE 1: Frontend SPA Builder ───────────────────────────────────────────────
@@ -8,10 +8,15 @@ FROM node:22-alpine AS web-builder
 
 WORKDIR /app
 RUN apk add --no-cache libc6-compat
+
+# Explicit and stable installation of pnpm (pinned version without relying on corepack)
+ENV PNPM_HOME="/root/.local/share/pnpm"
+ENV PATH="${PNPM_HOME}:${PATH}"
 RUN npm install -g pnpm@10.34.5 && npm cache clean --force
 
 COPY zyrabit-slm/web-ui/package.json zyrabit-slm/web-ui/pnpm-lock.yaml ./
-RUN pnpm install --frozen-lockfile
+RUN --mount=type=cache,target=/root/.local/share/pnpm/store \
+    pnpm install --frozen-lockfile
 
 COPY zyrabit-slm/web-ui .
 RUN pnpm run build
@@ -25,13 +30,18 @@ COPY --from=ghcr.io/astral-sh/uv:0.6.5 /uv /uvx /bin/
 WORKDIR /app
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    UV_LINK_MODE=copy
+    UV_LINK_MODE=copy \
+    UV_COMPILE_BYTECODE=1 \
+    # Safe parallel C++ compilation (2 threads safe limit for GitHub Actions runners)
+    CMAKE_BUILD_PARALLEL_LEVEL=2 \
+    MAKEFLAGS="-j2"
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt,sharing=locked \
+    apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     cmake \
-    curl \
-    && rm -rf /var/lib/apt/lists/*
+    curl
 
 ENV CFLAGS="-Wno-stringop-overflow -Wno-array-bounds -O2"
 ENV CXXFLAGS="-Wno-stringop-overflow -Wno-array-bounds -O2"
@@ -54,40 +64,32 @@ FROM python:3.12-slim-bookworm
 
 WORKDIR /app
 
-RUN apt-get update && apt-get upgrade -y && apt-get install -y --no-install-recommends \
+RUN groupadd -g 10001 nonroot && \
+    useradd -m -d /home/nonroot -r -u 10001 -g nonroot nonroot && \
+    mkdir -p /app/db_data && \
+    chown -R nonroot:nonroot /app /home/nonroot
+
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt,sharing=locked \
+    apt-get update && apt-get install -y --no-install-recommends \
     libgomp1 \
     libcurl4 \
     curl \
     tesseract-ocr \
     tesseract-ocr-eng \
-    tesseract-ocr-spa \
-    && rm -rf /var/lib/apt/lists/*
+    tesseract-ocr-spa
 
-# Copy pre-built virtual environment from Python builder
-COPY --from=py-builder /app/.venv /app/.venv
+COPY --chown=nonroot:nonroot --from=py-builder /app/.venv /app/.venv
+COPY --chown=nonroot:nonroot zyrabit-slm/api-rag/app ./app
+COPY --chown=nonroot:nonroot --from=web-builder /app/dist ./static_ui
+COPY --chown=nonroot:nonroot --from=py-builder /app/document_source /app/document_source
 
-# Copy API backend application code
-COPY zyrabit-slm/api-rag/app ./app
-
-# Copy built SPA frontend from Node builder
-COPY --from=web-builder /app/dist ./static_ui
-
-# Copy placeholder document directory
-COPY --from=py-builder /app/document_source /app/document_source
-
-# Environment configuration
 ENV PYTHONPATH="/app/.venv/lib/python3.12/site-packages:/app" \
     PATH="/app/.venv/bin:$PATH" \
     PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     STATIC_UI_PATH="/app/static_ui" \
     SLM_URL="http://host.docker.internal:11434"
-
-# Non-root user isolation
-RUN groupadd -g 10001 nonroot && \
-    useradd -m -d /home/nonroot -r -u 10001 -g nonroot nonroot && \
-    mkdir -p /app/db_data && \
-    chown -R nonroot:nonroot /app /home/nonroot
 
 USER nonroot
 

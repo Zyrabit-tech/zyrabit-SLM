@@ -721,8 +721,18 @@ validate_production_env() {
 # ─────────────────────────────────────────────────────────────────────────────
 # START — re-launch existing stack without reconfiguring
 # ─────────────────────────────────────────────────────────────────────────────
+cleanup_stale_containers() {
+    # Self-healing: Detect and silently remove stale, created, or dead containers
+    local stale
+    stale=$(docker ps -aq --filter "name=zyrabit" --filter "status=exited" --filter "status=created" --filter "status=dead" 2>/dev/null || true)
+    if [[ -n "${stale}" ]]; then
+        docker rm -f ${stale} >/dev/null 2>&1 || true
+    fi
+}
+
 run_start() {
     require_docker
+    cleanup_stale_containers
     local compose_file compose_args
     compose_file="$(active_compose_file)"
     compose_args=("-f" "${compose_file}")

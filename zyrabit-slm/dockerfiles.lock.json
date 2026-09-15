@@ -1,0 +1,16 @@
+{
+  "_comment": "INTEGRITY LOCK: This manifest guards against unwanted Dockerfile modifications. If changes are deliberate and verified, update these hashes.",
+  "rules": {
+    "pnpm_version": "10.34.5",
+    "python_version": "3.12-slim-bookworm",
+    "node_version": "22-alpine",
+    "cmake_parallel_level": 2,
+    "user": "nonroot"
+  },
+  "hashes": {
+    "Dockerfile": "fe0b52ee2589a461dd18e6b714543be62032b84fd17d461ab349bb32e7c03ee8",
+    "Dockerfile.platform": "fe0b52ee2589a461dd18e6b714543be62032b84fd17d461ab349bb32e7c03ee8",
+    "zyrabit-slm/api-rag/Dockerfile": "3cf95916add3ce74c5c14554d4788028f91ddfd7af21c2b5ed8015eb916b6dec",
+    "zyrabit-slm/web-ui/Dockerfile": "97bc79f0f293e0c3e8d1d634f146f53872a32b104ece79d281afe57f7eb0d6ef"
+  }
+}
