@@ -24,6 +24,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Container Name Collisions**: Resolved Docker Compose daemon conflicts caused by orphaned containers sharing explicit static names (`zyrabit-vllm-tt`, `zyrabit-mcp`).
 - **Nginx DNS Upstream Stale IP**: Fixed 502 Bad Gateway during container recreation by aligning upstream resolution.
 
+### Security
+
+- **Path Traversal Confinement in `import_to_vault` (GHSA-r4q8-hjfc-ggp2)**: Enforced strict basename isolation for destination filenames under `DOCS_DIR` and restricted source file paths to the root vault or explicit `VAULT_IMPORT_ALLOWLIST` directories (CWE-22).
+- **Authentication on Legacy `/mcp` Router**: Bound `Depends(get_current_user)` to all endpoints under `/mcp` to ensure strict authentication parity with `/v1/chat` and `/v1/documents` (CWE-306).
+
 ## [2.4.0] - 2026-08-19
 
 ### Added

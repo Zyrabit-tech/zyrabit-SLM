@@ -7,9 +7,10 @@
 **The Open Infrastructure Platform for Sovereign AI. Run, govern and verify AI on your own infrastructure.**
 
 [![Docker Pulls](https://img.shields.io/docker/pulls/zyrabitcore/zyrabit-slm?style=flat-square&color=4ecdc4&logo=docker&logoColor=white)](https://hub.docker.com/r/zyrabitcore/zyrabit-slm)
-[![CI](https://github.com/Zyrabit-tech/zyrabit-SLM/actions/workflows/ci.yml/badge.svg)](https://github.com/Zyrabit-tech/zyrabit-SLM/actions/workflows/ci.yml)
-[![Security](https://github.com/Zyrabit-tech/zyrabit-SLM/actions/workflows/security.yml/badge.svg)](https://github.com/Zyrabit-tech/zyrabit-SLM/actions/workflows/security.yml)
-[![Version](https://img.shields.io/badge/v3.0.0--rc.1-Beta-3f5a6d?style=flat-square&labelColor=e2ecf4)](CHANGELOG.md)
+[![Docker Image Version](https://img.shields.io/docker/v/zyrabitcore/zyrabit-slm?sort=semver&style=flat-square&color=2496ED&logo=docker&logoColor=white)](https://hub.docker.com/r/zyrabitcore/zyrabit-slm)
+[![CI](https://github.com/Zyrabit-tech/zyrabit-SLM/actions/workflows/ci.yml/badge.svg?branch=beta)](https://github.com/Zyrabit-tech/zyrabit-SLM/actions/workflows/ci.yml)
+[![Security](https://github.com/Zyrabit-tech/zyrabit-SLM/actions/workflows/security.yml/badge.svg?branch=beta)](https://github.com/Zyrabit-tech/zyrabit-SLM/actions/workflows/security.yml)
+[![Version](https://img.shields.io/github/v/tag/Zyrabit-tech/zyrabit-SLM?style=flat-square&color=3f5a6d&label=Version)](CHANGELOG.md)
 [![License: MIT](https://img.shields.io/badge/License-MIT-6090b4?style=flat-square)](LICENSE)
 [![Python 3.12](https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white&style=flat-square)](https://python.org)
 
@@ -370,7 +371,7 @@ uv run pytest zyrabit-slm/api-rag/tests/unit -q
 
 Read [CONTRIBUTING.md](CONTRIBUTING.md) before opening a PR. The core requirements:
 
-1. Fork → branch from `main` → PR with tests.
+1. Fork → branch from `beta` → PR targeting `beta` with tests.
 2. No network calls in tests — strictly offline execution.
 3. Prefer small, auditable changes over large refactors.
 
