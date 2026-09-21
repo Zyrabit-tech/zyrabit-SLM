@@ -1,104 +1,200 @@
 ---
 sidebar_position: 1
 title: 'API Reference'
-description: 'REST API endpoints for chat, document ingestion, and model management'
+description: 'REST API endpoints for chat, document ingestion, structured extraction, and health diagnostics'
 ---
 
 # API Reference
 
-Zyrabit SLM provides a robust REST API for document ingestion and inference. It is designed to be partially compatible with the OpenAI API specification to simplify integration with existing AI tools and libraries.
+Zyrabit Platform exposes a hardened, evidence-bound REST API for local document ingestion, private inference, structured JSON extraction, and runtime diagnostics.
+
+All endpoints are hosted under `/v1` and enforce local Bearer token authentication.
+
+---
+
+## Authentication
+
+All protected requests must include a valid service token in the `Authorization` header:
+
+```http
+Authorization: Bearer <YOUR_API_TOKEN>
+```
+
+In the standard platform container distribution, this corresponds to the token set via `API_KEY` (or the dynamic runtime token provided to the web UI).
+
+---
 
 ## Core Endpoints
 
 ### 1. Chat Completion (`POST /v1/chat`)
 
-Generates a response based on a prompt and context retrieved from the vector database.
+Primary inference and RAG endpoint. Sanitizes PII before inference, searches local BM25/vector indexes, and formats evidence-bound responses.
 
-**Request Body:**
+**Request Body (`application/json`):**
+
 ```json
 {
-  "model": "qwen2.5:7b",
-  "messages": [
+  "text": "What is our internal travel policy?",
+  "session_id": "optional-session-id",
+  "document_id": "optional-document-id",
+  "history": []
+}
+```
+
+| Parameter | Type | Required | Description |
+| :--- | :--- | :---: | :--- |
+| `text` | `string` | **Yes** | User question or command. |
+| `session_id` | `string` | No | ID for conversation session context and SQLite WAL persistence. |
+| `document_id` | `string` | No | Scope query to a specific document index. |
+| `history` | `array` | No | Previous turns in the conversation. |
+
+**Success Response (`200 OK`):**
+
+```json
+{
+  "response": "According to the travel policy, all flights over 4 hours must be approved...",
+  "metadata": {
+    "decision": "hybrid-rag",
+    "sources": ["travel_policy.pdf"],
+    "rag_hits": 2,
+    "provider": "ollama",
+    "latency_seconds": 0.84,
+    "tps": 88.5
+  }
+}
+```
+
+---
+
+### 2. Document Ingestion (`POST /v1/sources/import` or `POST /v1/ingest`)
+
+Uploads and vectorizes documents (PDF, DOCX, TXT, MD, CSV, Audio) into the sovereign vault.
+
+**Request Body (`multipart/form-data`):**
+- `file`: The binary document file to import.
+
+**Success Response (`200 OK`):**
+
+```json
+{
+  "status": "accepted",
+  "document_id": "doc_9f8e7d",
+  "job_id": "job_1a2b3c",
+  "filename": "travel_policy.pdf",
+  "message": "File accepted. Poll the job until it is indexed and ready for retrieval."
+}
+```
+
+---
+
+### 3. List Documents (`GET /v1/documents`)
+
+Lists all documents currently indexed in the sovereign vault.
+
+**Success Response (`200 OK`):**
+
+```json
+{
+  "documents": [
     {
-      "role": "user",
-      "content": "What is our internal travel policy?"
+      "id": "doc_9f8e7d",
+      "filename": "travel_policy.pdf",
+      "chunks": 18,
+      "created_at": "2026-09-14T10:00:00Z"
     }
+  ]
+}
+```
+
+---
+
+### 4. Structured Extraction (`POST /v1/extract`)
+
+Extracts schema-conforming JSON entities from unstructured text with automatic schema validation.
+
+**Request Body (`application/json`):**
+
+```json
+{
+  "text": "Invoice #10293 for ACME Corp, amount $4,500.00 USD dated 2026-09-12.",
+  "schema_definition": {
+    "type": "object",
+    "properties": {
+      "invoice_number": { "type": "string" },
+      "vendor": { "type": "string" },
+      "amount": { "type": "number" },
+      "currency": { "type": "string" }
+    },
+    "required": ["invoice_number", "vendor", "amount"]
+  }
+}
+```
+
+**Success Response (`200 OK`):**
+
+```json
+{
+  "data": {
+    "invoice_number": "10293",
+    "vendor": "ACME Corp",
+    "amount": 4500.0,
+    "currency": "USD"
+  },
+  "valid": true,
+  "errors": [],
+  "raw_response": "{\"invoice_number\": \"10293\", ...}",
+  "model": "qwen2.5:1.5b"
+}
+```
+
+---
+
+### 5. Health & Diagnostic Receipt (`GET /v1/health`)
+
+Returns an operational verification receipt of the platform, vector database, and local inference engine.
+
+**Success Response (`200 OK`):**
+
+```json
+{
+  "status": "OPERATIONAL",
+  "timestamp": "2026-09-20T18:00:00.000000",
+  "metadata": {
+    "project": "Zyrabit SLM",
+    "version": "2.4.4",
+    "uptime": "1:23:45",
+    "system": {
+      "cpu_usage": "12.5%",
+      "ram_usage": "45.2%",
+      "platform": "Darwin",
+      "arch": "arm64"
+    }
+  },
+  "infrastructure": [
+    { "id": "core-api", "name": "Zyrabit Core API", "status": "ONLINE", "type": "Runtime" },
+    { "id": "vector-db", "name": "ChromaDB Vector Index", "status": "ONLINE", "type": "Persistence", "metrics": { "documents": 5 } },
+    { "id": "slm-engine", "name": "Ollama (qwen2.5:1.5b)", "status": "ONLINE", "type": "Inference" }
   ],
-  "stream": false,
-  "temperature": 0.7
+  "capabilities": []
 }
 ```
 
-**Success Response (200 OK):**
-```json
-{
-  "id": "chat-123",
-  "object": "chat.completion",
-  "created": 1677652288,
-  "choices": [
-    {
-      "message": {
-        "role": "assistant",
-        "content": "Our internal travel policy requires..."
-      },
-      "finish_reason": "stop"
-    }
-  ]
-}
-```
-
-### 2. Document Ingestion (`POST /v1/ingest`)
-
-Uploads and vectorizes documents for future RAG queries.
-
-**Request Body (Multipart Form Data):**
-- `file`: The document file (PDF, TXT, MD).
-- `collection`: (Optional) The name of the vector collection. Defaults to `zyrabit-default`.
-
-**Success Response (201 Created):**
-```json
-{
-  "status": "success",
-  "document_id": "doc-456",
-  "chunks": 42
-}
-```
-
-### 3. Model Management (`GET /v1/models`)
-
-Lists all models currently available in the local inference engine.
-
-**Success Response (200 OK):**
-```json
-{
-  "object": "list",
-  "data": [
-    {
-      "id": "qwen2.5:7b",
-      "object": "model",
-      "owned_by": "zyrabit"
-    }
-  ]
-}
-```
+---
 
 ## Error Codes
 
-| HTTP Status | Code | Description |
+| HTTP Status | Detail | Description |
 | :--- | :--- | :--- |
-| 400 | `bad_request` | The request payload is malformed or missing required fields. |
-| 401 | `unauthorized` | Missing or invalid authentication token. |
-| 404 | `not_found` | The requested model or document does not exist. |
-| 500 | `internal_error` | An unexpected error occurred on the server (e.g., inference engine crash). |
+| `400 Bad Request` | `Invalid payload` | Missing required fields or unparseable input. |
+| `401 Unauthorized` | `Not authenticated: Bearer token required` | Missing or invalid API key in `Authorization` header. |
+| `404 Not Found` | `Resource not found` | The requested document, job, or session does not exist. |
+| `422 Unprocessable` | `Validation Error` | Pydantic schema validation failure on request payload. |
+| `503 Service Unavailable` | `Inference provider is offline` | The local SLM engine (Ollama/vLLM/llama.cpp) is unreachable. |
 
-## Authentication
-
-All requests must include a valid service token in the Authorization header:
-
-```bash
-Authorization: Bearer <YOUR_SERVICE_TOKEN>
-```
+---
 
 ## Related Documentation
+
 - [Integration Playbook](./integration-playbook.md)
 - [Hexagonal Architecture](./architecture/hexagonal.md)
+- [Production Hardening](./production-hardening.md)
