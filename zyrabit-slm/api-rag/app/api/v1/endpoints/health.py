@@ -163,8 +163,9 @@ async def detect_inference_engines(request: Request):
                         "models": models
                     })
                     break
-            except Exception:
-                pass
+            except Exception as exc:
+                # Candidate engine endpoint is unreachable or inactive in current environment
+                logger.debug("Ollama candidate %s is inactive: %s", base_url, exc)
 
         # 2. Check vLLM / Tenstorrent NPU
         vllm_candidates = [
@@ -185,8 +186,9 @@ async def detect_inference_engines(request: Request):
                         "models": models
                     })
                     break
-            except Exception:
-                pass
+            except Exception as exc:
+                # Candidate engine endpoint is unreachable or inactive in current environment
+                logger.debug("vLLM candidate %s is inactive: %s", base_url, exc)
 
         # 3. Check llama.cpp server
         llama_candidates = [
@@ -206,8 +208,9 @@ async def detect_inference_engines(request: Request):
                         "models": models
                     })
                     break
-            except Exception:
-                pass
+            except Exception as exc:
+                # Candidate engine endpoint is unreachable or inactive in current environment
+                logger.debug("llama.cpp candidate %s is inactive: %s", base_url, exc)
 
     # 4. Check Native Metal / Apple Silicon
     is_mac = platform.system() == "Darwin"

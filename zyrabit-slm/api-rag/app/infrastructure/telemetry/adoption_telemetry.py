@@ -16,7 +16,6 @@ import json
 import uuid
 import logging
 import platform
-import asyncio
 from pathlib import Path
 from typing import Any, Dict
 
@@ -50,7 +49,9 @@ class AdoptionTelemetry:
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text(new_id)
             return new_id
-        except Exception:
+        except Exception as exc:
+            # Ephemeral fallback if filesystem is read-only or inaccessible
+            logger.debug("Failed to read/create persistent telemetry ID: %s", exc)
             return "ephemeral-" + str(uuid.uuid4())[:8]
 
     @classmethod
@@ -91,8 +92,9 @@ class AdoptionTelemetry:
             audit_path = Path(storage_dir) / "telemetry_audit.json"
             audit_path.parent.mkdir(parents=True, exist_ok=True)
             audit_path.write_text(json.dumps(payload, indent=2))
-        except Exception:
-            pass
+        except Exception as exc:
+            # Writing local audit log is best-effort and non-fatal for telemetry dispatch
+            logger.debug("Failed to write local telemetry audit log: %s", exc)
 
         # Send heartbeat with very strict timeout (2.0s max)
         try:
