@@ -1,7 +1,6 @@
 import pytest
 import asyncio
 from pathlib import Path
-from app.node.domain import EvidenceUnit
 from app.node.parsers import LocalDocumentParser
 from app.node.service import NodeService
 from app.node.sqlite_store import SQLiteNodeStore

@@ -11,7 +11,6 @@ This test suite acts as an automated lock to prevent:
 import hashlib
 import json
 from pathlib import Path
-import pytest
 
 
 def get_repo_root() -> Path:
