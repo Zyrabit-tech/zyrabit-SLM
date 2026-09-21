@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 💬 Community Discussions & Q&A
+    url: https://github.com/Zyrabit-tech/zyrabit-SLM/discussions
+    about: Ask questions, share hardware setups, and connect with the community.
+  - name: 📖 Official Documentation & Guides
+    url: https://docs.zyrabit.com
+    about: Explore tutorials, architecture specifications, and API documentation.
+  - name: 🔒 Report a Security Vulnerability
+    url: https://github.com/Zyrabit-tech/zyrabit-SLM/security/advisories/new
+    about: Privately disclose sensitive vulnerabilities.

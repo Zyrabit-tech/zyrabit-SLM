@@ -1,0 +1,36 @@
+name: "✨ Feature Request / Good First Proposal"
+description: "Suggest an idea, integration, or improvement for Zyrabit Platform"
+title: "[FEAT]: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        We welcome community ideas for Model Context Protocol (MCP) servers, hardware engines, and developer tooling!
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem or Opportunity
+      description: Is your feature request related to a problem or a new capability?
+      placeholder: I'm always frustrated when... / It would be great if Zyrabit could...
+    validations:
+      required: true
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed Solution
+      description: A clear description of how you envision this working.
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Alternatives or Additional Context
+      description: Any other context, API references, or mockups.
+  - type: checkboxes
+    id: contribution
+    attributes:
+      label: Contribution Intent
+      options:
+        - label: "I am willing to submit a Pull Request to implement this feature!"
+          required: false

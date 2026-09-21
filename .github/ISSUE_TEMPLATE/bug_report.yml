@@ -1,0 +1,56 @@
+name: "🐛 Bug Report"
+description: "Report an issue or unexpected behavior in Zyrabit Platform"
+title: "[BUG]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for helping improve Zyrabit Platform! Before submitting, please ensure you have tested on the latest `beta` or stable release.
+  - type: textarea
+    id: description
+    attributes:
+      label: Bug Description
+      description: A clear and concise description of what the bug is.
+      placeholder: When I execute...
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to Reproduce
+      description: Exact steps to reproduce the behavior.
+      placeholder: |
+        1. Run `./zyra.sh start`
+        2. Send query via Web UI or curl: ...
+        3. See error ...
+    validations:
+      required: true
+  - type: dropdown
+    id: hardware
+    attributes:
+      label: Hardware & Environment
+      options:
+        - "Apple Silicon (M1/M2/M3/M4) - macOS"
+        - "Linux x86_64 (NVIDIA GPU / CUDA)"
+        - "Linux x86_64 (CPU / AVX2)"
+        - "Tenstorrent Blackhole / Wormhole NPU"
+        - "WSL2 (Windows)"
+        - "Other (specify below)"
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant Logs & Output
+      description: Please paste terminal output or `docker logs zyrabit-platform`.
+      render: shell
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Verification Checks
+      options:
+        - label: "I have verified this issue is reproducible on the latest version."
+          required: true
+        - label: "My report contains no confidential credentials, API keys, or private document data."
+          required: true

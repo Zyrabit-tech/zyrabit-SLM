@@ -90,6 +90,16 @@ The inference engine (`zyrabit-engine`) is intentionally isolated with no extern
 
 ---
 
+## 🏆 Security Hall of Fame (Responsible Disclosure)
+
+We extend our sincere gratitude to security researchers who practice responsible disclosure to protect the sovereign AI ecosystem:
+
+| Date | Researcher | Vulnerability (Advisory) | Severity | Resolution |
+|---|---|---|---|---|
+| 2026-09-14 | [@bebold6133](https://github.com/bebold6133) | Path Traversal in `import_to_vault` (GHSA-r4q8-hjfc-ggp2) | High | Patched in v2.4.4 |
+
+---
+
 ## Security Validation Checklist
 
 Before merging any PR:
