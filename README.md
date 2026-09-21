@@ -1,18 +1,20 @@
 <div align="center">
 
-<img src="https://assets.zyrabit.com/logo_zyrabit.png" alt="Zyrabit SLM" width="120" />
+<img src="https://assets.zyrabit.com/logo_zyrabit.png" alt="Zyrabit Platform" width="120" />
 
-# Zyrabit SLM
+# Zyrabit Platform
 
-**Local-first sovereign AI runtime for private document retrieval, agentic workflows & local inference.**
+**The Open Infrastructure Platform for Sovereign AI. Run, govern and verify AI on your own infrastructure.**
 
-[![CI](https://github.com/Zyrabit-tech/zyrabit-SLM/actions/workflows/ci.yml/badge.svg)](https://github.com/Zyrabit-tech/zyrabit-SLM/actions/workflows/ci.yml)
-[![Security](https://github.com/Zyrabit-tech/zyrabit-SLM/actions/workflows/security.yml/badge.svg)](https://github.com/Zyrabit-tech/zyrabit-SLM/actions/workflows/security.yml)
-[![Version](https://img.shields.io/badge/v3.0.0--rc.1-Beta-3f5a6d?style=flat-square&labelColor=e2ecf4)](CHANGELOG.md)
+[![Docker Pulls](https://img.shields.io/docker/pulls/zyrabitcore/zyrabit-slm?style=flat-square&color=4ecdc4&logo=docker&logoColor=white)](https://hub.docker.com/r/zyrabitcore/zyrabit-slm)
+[![Docker Image Version](https://img.shields.io/docker/v/zyrabitcore/zyrabit-slm?sort=semver&style=flat-square&color=2496ED&logo=docker&logoColor=white)](https://hub.docker.com/r/zyrabitcore/zyrabit-slm)
+[![CI](https://github.com/Zyrabit-tech/zyrabit-SLM/actions/workflows/ci.yml/badge.svg?branch=beta)](https://github.com/Zyrabit-tech/zyrabit-SLM/actions/workflows/ci.yml)
+[![Security](https://github.com/Zyrabit-tech/zyrabit-SLM/actions/workflows/security.yml/badge.svg?branch=beta)](https://github.com/Zyrabit-tech/zyrabit-SLM/actions/workflows/security.yml)
+[![Version](https://img.shields.io/github/v/tag/Zyrabit-tech/zyrabit-SLM?style=flat-square&color=3f5a6d&label=Version)](CHANGELOG.md)
 [![License: MIT](https://img.shields.io/badge/License-MIT-6090b4?style=flat-square)](LICENSE)
 [![Python 3.12](https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white&style=flat-square)](https://python.org)
 
-[Quickstart](#-quickstart) · [Hardware Sizing](#-hardware-requirements--sizing) · [Benchmarks](#-inference--performance-baselines) · [Endpoints](#-service-endpoints--ports) · [Architecture](#-architecture) · [Security](SECURITY.md)
+[⚡ Quickstart](#-quickstart) · [🐳 Docker Hub](https://hub.docker.com/r/zyrabitcore/zyrabit-slm) · [Hardware Sizing](#-hardware-requirements--sizing) · [Benchmarks](#-inference--performance-baselines) · [Architecture](#-architecture) · [Security](SECURITY.md)
 
 </div>
 
@@ -20,7 +22,7 @@
 
 ## 📌 Overview & Sovereign Scope
 
-Zyrabit SLM is an enterprise-ready, **local-first AI runtime** designed for teams evaluating private document analysis, Retrieval-Augmented Generation (RAG), and autonomous ReAct agent execution without data egress. 
+Zyrabit Platform is an enterprise-ready, **local-first AI infrastructure layer** designed for organizations deploying private document analysis, Retrieval-Augmented Generation (RAG), and autonomous ReAct agent workflows without data egress. 
 
 - **FastAPI Inference Gateway:** Real-time chat, streaming responses, and document retrieval.
 - **Evidence-Bound RAG:** Ingests PDF, DOCX, CSV, audio (Whisper), and text into ChromaDB vector collections + BM25 keyword search.
@@ -118,6 +120,27 @@ All traffic, embeddings, vector transformations, and inference tokens remain str
 ---
 
 ## ⚡ Quickstart
+
+### Option A: Instant Docker (60 Seconds — Zero Build)
+
+If you already have Docker and a local inference engine (Ollama, vLLM, or LM Studio):
+
+```bash
+docker run -d \
+  --name zyrabit-platform \
+  -p 8080:8080 \
+  --add-host=host.docker.internal:host-gateway \
+  -e INFERENCE_PROVIDER=ollama \
+  -e SLM_URL=http://host.docker.internal:11434 \
+  -v zyrabit_vault:/app/db_data \
+  zyrabitcore/zyrabit-slm:latest
+```
+
+Open **[http://localhost:8080](http://localhost:8080)** in your browser to access the workspace.
+
+---
+
+### Option B: Full Source Deployment (Enterprise Profiles)
 
 **Prerequisites:** Python 3.12, [uv](https://github.com/astral-sh/uv), Docker & Docker Compose.
 
@@ -348,7 +371,7 @@ uv run pytest zyrabit-slm/api-rag/tests/unit -q
 
 Read [CONTRIBUTING.md](CONTRIBUTING.md) before opening a PR. The core requirements:
 
-1. Fork → branch from `main` → PR with tests.
+1. Fork → branch from `beta` → PR targeting `beta` with tests.
 2. No network calls in tests — strictly offline execution.
 3. Prefer small, auditable changes over large refactors.
 

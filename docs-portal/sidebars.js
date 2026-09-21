@@ -63,6 +63,7 @@ module.exports = {
         "data-portability",
         "compliance-report",
         "benchmarks",
+        "telemetry-and-adoption",
       ],
     },
 

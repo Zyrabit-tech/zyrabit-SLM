@@ -69,6 +69,21 @@ class ApiKeyStore:
         return None
 
     @classmethod
+    def get_client_key(cls, client_name: str) -> Optional[str]:
+        """
+        Retrieves the first key matching a client name (e.g. 'webui', 'web').
+        Useful for zero-config local UI bootstrapping.
+        """
+        if not cls._loaded:
+            cls.load()
+
+        target = client_name.lower().strip()
+        for token, name in cls._keys.items():
+            if name.lower() == target:
+                return token
+        return None
+
+    @classmethod
     def is_empty(cls) -> bool:
         """Returns True if no API keys are configured."""
         return len(cls._keys) == 0

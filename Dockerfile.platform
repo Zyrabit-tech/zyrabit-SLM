@@ -1,10 +1,29 @@
 # ──────────────────────────────────────────────────────────────────────────────
-#   ZYRABIT API-RAG — Multi-Stage Dockerfile (Production Stable)
-#   Zero-Trust: Safe CI-compatible multi-core build, non-root user isolation.
+#   ZYRABIT PLATFORM — Official Container Distribution (Production Stable)
+#   Zero-Trust Multi-Stage: SPA Web UI + FastAPI RAG Core
 # ──────────────────────────────────────────────────────────────────────────────
 
-# STAGE 1: Builder ─────────────────────────────────────────────────────────────
-FROM python:3.12-slim-bookworm AS builder
+# STAGE 1: Frontend SPA Builder ───────────────────────────────────────────────
+FROM node:22-alpine AS web-builder
+
+WORKDIR /app
+RUN apk add --no-cache libc6-compat
+
+# Explicit and stable installation of pnpm (pinned version without relying on corepack)
+ENV PNPM_HOME="/root/.local/share/pnpm"
+ENV PATH="${PNPM_HOME}:${PATH}"
+RUN npm install -g pnpm@10.34.5 && npm cache clean --force
+
+COPY zyrabit-slm/web-ui/package.json zyrabit-slm/web-ui/pnpm-lock.yaml ./
+RUN --mount=type=cache,target=/root/.local/share/pnpm/store \
+    pnpm install --frozen-lockfile
+
+COPY zyrabit-slm/web-ui .
+RUN pnpm run build
+
+
+# STAGE 2: Python Environment Builder ─────────────────────────────────────────
+FROM python:3.12-slim-bookworm AS py-builder
 
 COPY --from=ghcr.io/astral-sh/uv:0.6.5 /uv /uvx /bin/
 
@@ -40,7 +59,7 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 RUN mkdir -p /app/document_source && touch /app/document_source/.keep
 
 
-# STAGE 2: Runtime (Hardened Slim Python) ──────────────────────────────────────
+# STAGE 3: Hardened Runtime Container ─────────────────────────────────────────
 FROM python:3.12-slim-bookworm
 
 WORKDIR /app
@@ -60,14 +79,17 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     tesseract-ocr-eng \
     tesseract-ocr-spa
 
-COPY --chown=nonroot:nonroot --from=builder /app/.venv /app/.venv
+COPY --chown=nonroot:nonroot --from=py-builder /app/.venv /app/.venv
 COPY --chown=nonroot:nonroot zyrabit-slm/api-rag/app ./app
-COPY --chown=nonroot:nonroot --from=builder /app/document_source /app/document_source
+COPY --chown=nonroot:nonroot --from=web-builder /app/dist ./static_ui
+COPY --chown=nonroot:nonroot --from=py-builder /app/document_source /app/document_source
 
 ENV PYTHONPATH="/app/.venv/lib/python3.12/site-packages:/app" \
     PATH="/app/.venv/bin:$PATH" \
     PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1
+    PYTHONUNBUFFERED=1 \
+    STATIC_UI_PATH="/app/static_ui" \
+    SLM_URL="http://host.docker.internal:11434"
 
 USER nonroot
 
