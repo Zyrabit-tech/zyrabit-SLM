@@ -57,6 +57,56 @@ def test_sqlite_query_select_returns_rows(client, sqlite_db):
         ["Bob", 90],
     ]
     assert result["row_count"] == 2
+    assert result["truncated"] is False
+    assert result["warning"] is None
+
+
+def test_sqlite_query_truncates_rows_at_default_limit(client, sqlite_db):
+    connection = sqlite3.connect(sqlite_db)
+    try:
+        connection.executemany(
+            "INSERT INTO students (name, marks) VALUES (?, ?)",
+            [(f"Student {index}", index) for index in range(598)],
+        )
+        connection.commit()
+    finally:
+        connection.close()
+
+    result = client.execute_query(
+        str(sqlite_db),
+        "SELECT id, name, marks FROM students ORDER BY id",
+    )
+
+    assert result["row_count"] == 500
+    assert len(result["rows"]) == 500
+    assert result["truncated"] is True
+    assert result["warning"] == (
+        "Query exceeded max limit of 500 rows and was truncated."
+    )
+
+
+def test_sqlite_query_supports_custom_row_limit(client, sqlite_db):
+    result = client.execute_query(
+        str(sqlite_db),
+        "SELECT name, marks FROM students ORDER BY id",
+        max_rows=1,
+    )
+
+    assert result["rows"] == [["Alice", 85]]
+    assert result["row_count"] == 1
+    assert result["truncated"] is True
+    assert result["warning"] == (
+        "Query exceeded max limit of 1 rows and was truncated."
+    )
+
+
+def test_sqlite_query_rejects_non_positive_row_limit(client, sqlite_db):
+    with pytest.raises(ValueError, match="max_rows must be greater than zero"):
+        client.execute_query(
+            str(sqlite_db),
+            "SELECT * FROM students",
+            max_rows=0,
+        )
 
 
 def test_sqlite_query_allows_explain(client, sqlite_db):
