@@ -16,6 +16,7 @@ class SQLiteMCPClient:
     """
 
     ALLOWED_SUFFIXES = {".db", ".sqlite", ".sqlite3"}
+    MAX_ROW_LIMIT = 500
 
     def __init__(self, workspace_root: str | Path = DOCS_DIR):
         self.workspace_root = Path(workspace_root).resolve()
@@ -184,8 +185,12 @@ class SQLiteMCPClient:
         self,
         db_path: str,
         sql_query: str,
+        max_rows: int = MAX_ROW_LIMIT,
     ) -> dict[str, Any]:
-        """Execute a read-only SELECT or EXPLAIN query."""
+        """Execute a bounded read-only SELECT or EXPLAIN query."""
+
+        if max_rows < 1:
+            raise ValueError("max_rows must be greater than zero.")
 
         path = self._validate_db_path(db_path)
         query = self._validate_query(sql_query)
@@ -196,7 +201,9 @@ class SQLiteMCPClient:
             cursor = connection.cursor()
             cursor.execute(query)
 
-            rows = cursor.fetchall()
+            fetched_rows = cursor.fetchmany(max_rows + 1)
+            truncated = len(fetched_rows) > max_rows
+            rows = fetched_rows[:max_rows]
 
             columns = (
                 [description[0] for description in cursor.description]
@@ -208,6 +215,12 @@ class SQLiteMCPClient:
                 "columns": columns,
                 "rows": [list(row) for row in rows],
                 "row_count": len(rows),
+                "truncated": truncated,
+                "warning": (
+                    f"Query exceeded max limit of {max_rows} rows and was truncated."
+                    if truncated
+                    else None
+                ),
             }
 
         finally:

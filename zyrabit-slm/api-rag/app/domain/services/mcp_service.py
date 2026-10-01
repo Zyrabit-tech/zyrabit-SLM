@@ -529,17 +529,20 @@ async def sqlite_schema(db_path: str) -> dict:
 async def sqlite_query(
     db_path: str,
     sql_query: str,
+    max_rows: int = sqlite_client.MAX_ROW_LIMIT,
 ) -> dict:
     """
     Execute a strictly read-only SQLite query.
 
-    Only SELECT and EXPLAIN queries are allowed.
+    Only SELECT and EXPLAIN queries are allowed. Results are bounded by
+    max_rows and report whether additional rows were truncated.
     """
 
     try:
         result = sqlite_client.execute_query(
             db_path,
             sql_query,
+            max_rows=max_rows,
         )
 
         return {
