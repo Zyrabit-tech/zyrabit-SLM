@@ -251,6 +251,43 @@ class ZyrabitApp {
             bus.emit('UI:CLEAR_CHAT');
             this.showNotification('Conversation cleared.', 'success');
         });
+
+        bind('export-conversation', 'onclick', () => {
+    if (!this.history || this.history.length === 0) {
+        this.showNotification('No conversation to export.', 'warning');
+        return;
+    }
+
+    const today = new Date().toISOString().split('T')[0];
+
+    const markdown = [
+        `# Zyrabit Chat Export - ${today}`,
+        '',
+        ...this.history.map((message) => {
+            const role = message.role === 'assistant' ? 'Zyra' : 'User';
+
+            return `**${role}:**\n\n${message.content || ''}`;
+        })
+    ].join('\n\n');
+
+    const blob = new Blob([markdown], {
+        type: 'text/markdown;charset=utf-8'
+    });
+
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+
+    link.href = url;
+    link.download = `zyrabit-chat-${today}.md`;
+
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+
+    URL.revokeObjectURL(url);
+
+    this.showNotification('Conversation exported as Markdown.', 'success');
+});
         getSafeElement('toggle-settings').onclick = () => this.togglePanel('settings-panel');
         getSafeElement('close-gdpr').onclick = () => this.togglePanel(null);
         bind('close-ingest', 'onclick', () => this.togglePanel(null));

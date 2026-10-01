@@ -33,8 +33,23 @@
       <header class="topbar">
         <button id="open-library" class="icon-button mobile-only" aria-label="Open documents">☰</button>
         <div class="document-context"><span class="context-dot"></span><span id="active-document-title">All documents</span><span id="active-document-description">Your local workspace</span></div>
-        <div class="topbar-actions"><button id="clear-conversation" class="quiet-action" type="button">Clear conversation</button><span id="status-pill" class="connection-status"><i></i><span>Connecting</span></span><button id="toggle-docs" class="icon-button" aria-label="Help">?</button></div>
-      </header>
+       <div class="topbar-actions">
+    <button id="clear-conversation" class="quiet-action" type="button">Clear conversation</button>
+    <button
+        id="export-conversation"
+        class="quiet-action"
+        type="button"
+        title="Export conversation as Markdown"
+        aria-label="Export conversation as Markdown">
+        Export Markdown
+    </button>
+    <span id="status-pill" class="connection-status">
+        <i></i>
+        <span>Connecting</span>
+    </span>
+    <button id="toggle-docs" class="icon-button" aria-label="Help">?</button>
+</div>
+</header>
 
       <div id="chat-container" class="chat-scroll" aria-live="polite">
         <section id="floating-suggestions" class="welcome">

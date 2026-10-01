@@ -99,6 +99,19 @@ Zyrabit SLM is designed as a **single-tenant sovereign AI node**.
 
 ---
 
+## 🏆 Security Hall of Fame (Responsible Disclosure)
+
+We extend our sincere gratitude to security researchers who practice responsible disclosure to protect the sovereign AI ecosystem:
+
+| Date | Researcher | Vulnerability (Advisory) | Severity | Resolution |
+|---|---|---|---|---|
+| 2026-09-21 | [@jfgg](https://github.com/jfgg) | Authorization check on document scope & tenancy model ([GHSA-2cwj-m6g5-8f69](https://github.com/Zyrabit-tech/zyrabit-SLM/security/advisories/GHSA-2cwj-m6g5-8f69)) | High | Patched in v2.4.5 |
+| 2026-09-21 | [@jfgg](https://github.com/jfgg) | Hardcoded test-token authentication bypass ([GHSA-p5j7-785r-2wg6](https://github.com/Zyrabit-tech/zyrabit-SLM/security/advisories/GHSA-p5j7-785r-2wg6)) | High | Patched in v2.4.5 |
+| 2026-09-21 | [@jfgg](https://github.com/jfgg) | Path Traversal in `session_id` reflective memory ([GHSA-x5v6-gwgg-7vf8](https://github.com/Zyrabit-tech/zyrabit-SLM/security/advisories/GHSA-x5v6-gwgg-7vf8)) | High | Patched in v2.4.5 |
+| 2026-09-14 | [@bebold6133](https://github.com/bebold6133) | Path Traversal in `import_to_vault` ([GHSA-r4q8-hjfc-ggp2](https://github.com/Zyrabit-tech/zyrabit-SLM/security/advisories/GHSA-r4q8-hjfc-ggp2)) | High | Patched in v2.4.4 |
+
+---
+
 ## Security Validation Checklist
 
 Before merging any PR:

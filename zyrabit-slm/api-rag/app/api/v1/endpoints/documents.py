@@ -104,7 +104,7 @@ async def ingest_document(
         with os.fdopen(fd, "wb") as output:
             while chunk := await file.read(1024 * 1024): output.write(chunk)
         result = await node_service.import_file(Path(file.filename or "upload").name, staged)
-        return {**result, "filename": file.filename, "message": "File accepted. Poll the job until it is indexed and ready for retrieval."}
+        return {**result, "filename": file.filename, "message": result.get("message") or "File accepted. Poll the job until it is indexed and ready for retrieval.",}
     except Exception as e:
         logger.error(f"Failed to initiate ingestion for {file.filename}: {e}")
         raise HTTPException(status_code=500, detail="Internal server error.")

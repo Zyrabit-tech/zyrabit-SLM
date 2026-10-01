@@ -8,6 +8,8 @@ import logging
 import shutil
 from pathlib import Path
 
+from app.infrastructure.mcp.sqlite_mcp_client import sqlite_client
+
 try:
     from mcp.server.fastmcp import FastMCP
 except ImportError:
@@ -174,16 +176,16 @@ if os.getenv("TELEGRAM_BOT_TOKEN") and os.getenv("TELEGRAM_CHAT_ID"):
         Intercepts and masks PII via Gatekeeper before transmission.
         """
         from app.domain.services.gatekeeper import Gatekeeper
-        
+
         token = os.getenv("TELEGRAM_BOT_TOKEN", "").strip('"').strip("'")
         chat_id = os.getenv("TELEGRAM_CHAT_ID", "").strip('"').strip("'")
-        
+
         if not token or not chat_id:
             return "Error: Telegram integration not configured. Missing TOKEN or CHAT_ID."
-        
+
         # SECURITY SHIELD: Mask PII before it leaves the sovereign environment
         safe_message, _ = Gatekeeper.mask_pii(message)
-        
+
         import requests
         url = f"https://api.telegram.org/bot{token}/sendMessage"
         try:
@@ -191,7 +193,7 @@ if os.getenv("TELEGRAM_BOT_TOKEN") and os.getenv("TELEGRAM_CHAT_ID"):
                 "chat_id": chat_id,
                 "text": f"🛡️ Zyrabit Sovereign Alert:\n\n{safe_message}"
             }, timeout=10)
-            
+
             if res.status_code == 200:
                 logger.info("📤 Telegram: Notification sent securely (PII Masked).")
                 return "Success: Telegram notification sent (Secure Mode)."
@@ -200,7 +202,7 @@ if os.getenv("TELEGRAM_BOT_TOKEN") and os.getenv("TELEGRAM_CHAT_ID"):
             logger.error(f"❌ Telegram Connection Error: {e}")
             return f"Error connecting to Telegram: {e}"
 
-# Note: The actual Chat logic is still handled by ChatUseCase, 
+# Note: The actual Chat logic is still handled by ChatUseCase,
 # but we can expose it as a tool if needed for external clients.
 @mcp.tool()
 async def secure_query(prompt: str) -> str:
@@ -501,3 +503,57 @@ def set_mcp_app_state(state):
     """Legacy shim for V1.0 compatibility."""
     pass
 
+
+@mcp.tool()
+async def sqlite_schema(db_path: str) -> dict:
+    """Return the schema of a local SQLite database."""
+
+    src_or_err = _confine_source(db_path)
+
+    if isinstance(src_or_err, str):
+        return {"error": src_or_err}
+
+    try:
+        tables = sqlite_client.get_schema(str(src_or_err))
+
+        return {
+            "db_path": str(src_or_err),
+            "tables": tables,
+        }
+
+    except Exception as e:
+        logger.exception("SQLite schema error")
+        return {"error": str(e)}
+
+@mcp.tool()
+async def sqlite_query(
+    db_path: str,
+    sql_query: str,
+    max_rows: int = sqlite_client.MAX_ROW_LIMIT,
+) -> dict:
+    """
+    Execute a strictly read-only SQLite query.
+
+    Only SELECT and EXPLAIN queries are allowed. Results are bounded by
+    max_rows and report whether additional rows were truncated.
+    """
+
+    try:
+        result = sqlite_client.execute_query(
+            db_path,
+            sql_query,
+            max_rows=max_rows,
+        )
+
+        return {
+            "db_path": db_path,
+            "query": sql_query,
+            "result": result,
+        }
+
+    except Exception as e:
+        logger.exception("SQLite query error")
+
+        return {
+            "error": str(e),
+        }

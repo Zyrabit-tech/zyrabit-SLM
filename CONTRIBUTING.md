@@ -1,6 +1,17 @@
 # Contributing to Zyrabit SLM
 
-Thank you for your interest in contributing. This document explains the branching model, commit conventions, and review process for this project.
+Thank you for your interest in contributing to the sovereign AI ecosystem. Zyrabit SLM is built for organizations, engineers, and researchers seeking high-performance, air-gapped local AI. Whether you're fixing a typo in documentation, expanding MCP tool adapters, or benchmarking specialized hardware, your contributions are welcome!
+
+---
+
+## 🌟 Where to Start (Good First Issues)
+
+If you are new to Zyrabit SLM or looking for a fast way to get involved:
+
+1. **Browse Good First Issues**: Filter our issue tracker by the [`good first issue`](https://github.com/Zyrabit-tech/zyrabit-SLM/labels/good%20first%20issue) or [`help wanted`](https://github.com/Zyrabit-tech/zyrabit-SLM/labels/help%20wanted) labels.
+2. **Claim an Issue**: Comment on the issue stating that you'd like to work on it so the community can avoid duplicate work.
+3. **Need Guidance?**: Feel free to ask questions directly in the issue or in [GitHub Discussions](https://github.com/Zyrabit-tech/zyrabit-SLM/discussions). Maintainers are happy to provide architectural context and review draft PRs.
+4. **Security Researcher?**: See [SECURITY.md](SECURITY.md) for our private disclosure guidelines and our **Security Hall of Fame**.
 
 ---
 

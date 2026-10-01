@@ -7,6 +7,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.4.6] - 2026-10-01
+
+### Added
+
+- **Conversation Markdown Export**: Export chat sessions as durable Markdown notes directly from the web interface (#112).
+- **Security Hall of Fame Updates**: Added responsible disclosure recognition for security researcher `@jfgg` covering GHSA-2cwj-m6g5-8f69, GHSA-p5j7-785r-2wg6, and GHSA-x5v6-gwgg-7vf8 (`SECURITY.md`).
+
+### Security
+
+- **Critical Dependency Vulnerability Remediations**: Upgraded `pyjwt` from 2.13.0 to 2.15.1, remediating critical CVE-2026-102268; upgraded `urllib3` from 2.7.0 to 2.8.0 (CVE-2026-97687, CVE-2026-97688, CVE-2026-97689); and upgraded `oauthlib` from 3.3.1 to 4.0.0 (CVE-2026-49265).
+- **Sovereign Dependency Audit Gate**: Validated and enforced full pip-audit compliance in `docs/security/DEPENDENCY_RISKS.md` (#110).
+
+### Changed
+
+- **Web UI Dependencies Refresh**: Bumped `lucide-static` to 1.49.0, `socket.io-client` to 4.8.4, `postcss` to 8.5.28, and `autoprefixer` to 10.6.1 in `zyrabit-slm/web-ui`.
+
 ## [2.4.4] - 2026-09-14
 
 ### Added
