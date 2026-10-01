@@ -1,7 +1,9 @@
 """Integration checks for the real, authorized Zyrabit CIO review document."""
 from __future__ import annotations
 
+import hashlib
 import asyncio
+import threading
 from pathlib import Path
 
 import pytest
@@ -43,9 +45,170 @@ class CapturingInference(OfflineInference):
         return super().answer(prompt)
 
 
+class BlockingParser:
+    def __init__(self):
+        self.started = threading.Event()
+        self.release = threading.Event()
+        self.parser = LocalDocumentParser()
+
+    def parse(self, source, document_id):
+        self.started.set()
+        self.release.wait(timeout=5)
+        return self.parser.parse(source, document_id)
+
+
 def test_ingestion_etl_normalizes_extractor_artifacts():
     dirty = "\ufeffTítulo\u00a0con\u200b ruido\u00ad\n\n\nTexto\x00 final"
     assert LocalDocumentParser._clean_text(dirty) == "Título con ruido\n\nTexto final"
+
+
+@pytest.mark.asyncio
+async def test_new_upload_stores_sha256(tmp_path: Path):
+    content = b"same document content"
+
+    first_file = tmp_path / "report.pdf"
+    first_file.write_bytes(content)
+
+    service = NodeService(
+        SQLiteNodeStore(str(tmp_path / "node.db")),
+        LocalSourceStore(str(tmp_path / "sources")),
+        LocalDocumentParser(),
+        OfflineInference(),
+        vector_index=InMemoryVectorIndex(),
+    )
+
+    accepted = await service.import_file(first_file.name, str(first_file))
+
+    assert accepted["status"] == "queued"
+
+    source = service.metadata.source_for_document(accepted["document_id"])
+
+    expected_hash = hashlib.sha256(content).hexdigest()
+
+    assert source["sha256"] == expected_hash
+
+
+@pytest.mark.asyncio
+async def test_identical_content_with_different_filename_is_deduplicated(tmp_path: Path):
+    source_pdf = Path(__file__).parents[2] / "docs" / "zyrabit-cioreview-en.pdf"
+    content = source_pdf.read_bytes()
+
+    first_file = tmp_path / "report.pdf"
+    second_file = tmp_path / "report_copy.pdf"
+
+    first_file.write_bytes(content)
+    second_file.write_bytes(content)
+
+    service = NodeService(
+        SQLiteNodeStore(str(tmp_path / "node.db")),
+        LocalSourceStore(str(tmp_path / "sources")),
+        LocalDocumentParser(),
+        OfflineInference(),
+        vector_index=InMemoryVectorIndex(),
+    )
+
+    first = await service.import_file(first_file.name, str(first_file))
+
+    for _ in range(100):
+        job = service.job(first["job_id"])
+        if job and job["status"] == "ready":
+            break
+        await asyncio.sleep(0.01)
+
+    assert job["status"] == "ready"
+
+    second = await service.import_file(second_file.name, str(second_file))
+
+    assert second["status"] == "already_indexed"
+    assert second["message"] == "Document already indexed as report.pdf"
+    assert second["document_id"] == first["document_id"]
+
+    documents = service.documents()
+    assert len(documents) == 1
+
+
+@pytest.mark.asyncio
+async def test_failed_upload_can_be_retried(tmp_path: Path):
+    source_pdf = Path(__file__).parents[2] / "docs" / "zyrabit-cioreview-en.pdf"
+
+    service = NodeService(
+        SQLiteNodeStore(str(tmp_path / "node.db")),
+        LocalSourceStore(str(tmp_path / "sources")),
+        LocalDocumentParser(),
+        OfflineInference(),
+        vector_index=None,
+    )
+
+    first = await service.import_file(source_pdf.name, str(source_pdf))
+
+    for _ in range(100):
+        job = service.job(first["job_id"])
+        if job and job["status"] == "failed":
+            break
+        await asyncio.sleep(0.01)
+
+    assert job["status"] == "failed"
+
+    retry = await service.import_file(source_pdf.name, str(source_pdf))
+
+    assert retry["status"] == "queued"
+    assert retry["job_id"] != first["job_id"]
+    assert retry["document_id"] != first["document_id"]
+    assert retry["source_id"] == first["source_id"]
+
+
+@pytest.mark.asyncio
+async def test_duplicate_upload_while_processing_returns_active_job(tmp_path: Path):
+    source_pdf = Path(__file__).parents[2] / "docs" / "zyrabit-cioreview-en.pdf"
+    content = source_pdf.read_bytes()
+
+    first_file = tmp_path / "report.pdf"
+    second_file = tmp_path / "report_copy.pdf"
+    first_file.write_bytes(content)
+    second_file.write_bytes(content)
+
+    parser = BlockingParser()
+
+    service = NodeService(
+        SQLiteNodeStore(str(tmp_path / "node.db")),
+        LocalSourceStore(str(tmp_path / "sources")),
+        parser,
+        OfflineInference(),
+        vector_index=InMemoryVectorIndex(),
+    )
+
+    first = await service.import_file(first_file.name, str(first_file))
+
+    for _ in range(200):
+        if parser.started.is_set():
+            break
+        await asyncio.sleep(0.01)
+
+    assert parser.started.is_set()
+
+    for _ in range(100):
+        document = service.document(first["document_id"])
+        if document["status"] == "processing":
+            break
+        await asyncio.sleep(0.01)
+
+    assert document["status"] == "processing"
+
+    second = await service.import_file(second_file.name, str(second_file))
+
+    assert second["status"] == "in_progress"
+    assert second["job_id"] == first["job_id"]
+    assert second["document_id"] == first["document_id"]
+
+    parser.release.set()
+
+    for _ in range(100):
+        job = service.job(first["job_id"])
+        if job and job["status"] in {"ready", "failed"}:
+            break
+        await asyncio.sleep(0.01)
+
+    assert job["status"] == "ready"
 
 
 @pytest.mark.asyncio
