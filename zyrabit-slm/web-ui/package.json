@@ -10,12 +10,12 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "lucide-static": "^0.344.0",
-    "socket.io-client": "^4.8.3"
+    "lucide-static": "^1.49.0",
+    "socket.io-client": "^4.8.4"
   },
   "devDependencies": {
-    "autoprefixer": "^10.5.0",
-    "postcss": "^8.5.26",
+    "autoprefixer": "^10.6.1",
+    "postcss": "^8.5.28",
     "tailwindcss": "^3.4.19",
     "vite": "^6.4.3"
   },
@@ -25,7 +25,7 @@
     ],
     "overrides": {
       "ws": ">=8.21.0",
-      "postcss": ">=8.5.26",
+      "postcss": ">=8.5.28",
       "nanoid": ">=3.3.18",
       "socket.io-parser": ">=4.2.7",
       "browserslist": ">=4.28.7",
