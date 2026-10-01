@@ -131,6 +131,20 @@ class SQLiteNodeStore:
             if not row: return None
             result = dict(row); result["metrics"] = json.loads(result.pop("metrics_json")); return result
 
+    def active_job_for_source(self, source_id: str) -> dict | None:
+        with self._connect() as conn:
+            row = conn.execute(
+                """SELECT * FROM node_jobs
+                   WHERE source_id = ? AND status IN ('queued', 'processing')
+                   ORDER BY created_at DESC LIMIT 1""",
+                (source_id,),
+            ).fetchone()
+            if not row:
+                return None
+            result = dict(row)
+            result["metrics"] = json.loads(result.pop("metrics_json"))
+            return result
+
     def get_document(self, document_id: str) -> dict | None:
         with self._connect() as conn:
             row = conn.execute("""SELECT d.*, s.filename, s.media_type, s.size_bytes, s.sha256, s.owner_id

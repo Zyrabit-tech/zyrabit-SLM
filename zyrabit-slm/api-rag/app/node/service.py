@@ -30,7 +30,44 @@ class NodeService:
         source = self.source_store.persist(filename, Path(staged_path))
         existing = self.metadata.source_by_hash(source.sha256)
         if existing:
-            return {"status": "ready", "deduplicated": True, "source_id": existing["id"], "document_id": self._existing_document(existing["id"])}
+            existing_document_id = self._existing_document(existing["id"])
+            existing_document = (
+                self.metadata.get_document(existing_document_id)
+                if existing_document_id
+                else None
+            )
+
+            if existing_document and existing_document["status"] == "ready":
+                return {
+                    "status": "already_indexed",
+                    "message": f"Document already indexed as {existing['filename']}",
+                    "document_id": existing_document_id,
+                }
+
+            if existing_document and existing_document["status"] in {"queued", "processing"}:
+                active_job = self.metadata.active_job_for_source(existing["id"])
+                if active_job:
+                    return {
+                        "status": "in_progress",
+                        "message": f"Document '{existing['filename']}' is still being indexed.",
+                        "job_id": active_job["id"],
+                        "document_id": existing_document_id,
+                    }
+
+            if existing_document and existing_document["status"] == "failed":
+                document_id, job_id = str(uuid.uuid4()), str(uuid.uuid4())
+                retry_source = source.__class__(**{**source.__dict__, "id": existing["id"]})
+                self.metadata.create_document(document_id, retry_source.id, type(self.parser).__name__)
+                self.metadata.create_job(IngestionJob(job_id, retry_source.id, "queued", "accepted"))
+                task = asyncio.create_task(self._process(job_id, document_id, retry_source))
+                self._tasks.add(task)
+                task.add_done_callback(self._tasks.discard)
+                return {
+                    "status": "queued",
+                    "job_id": job_id,
+                    "source_id": retry_source.id,
+                    "document_id": document_id,
+                }
         self.metadata.create_source(source)
         document_id, job_id = str(uuid.uuid4()), str(uuid.uuid4())
         self.metadata.create_document(document_id, source.id, type(self.parser).__name__)
