@@ -1,6 +1,6 @@
 [project]
 name = "zyrabit-platform"
-version = "2.4.5"
+version = "2.4.6"
 description = "The Open Platform for Sovereign AI"
 readme = "README.md"
 requires-python = ">=3.12,<3.13"
