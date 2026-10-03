@@ -72,6 +72,7 @@ NO_CACHE="false"
 E2E_SECURITY="false"
 REPORT_MODE="false"
 SKIP_PROMPTS="false"   # --yes / -y skips interactive prompts when .env already exists
+STATUS_JSON="false"    # --json / -j with status: machine-readable output
 COMMANDS=()
 
 # ─── Docker compose detection ─────────────────────────────────────────────────
@@ -97,6 +98,7 @@ usage() {
     echo -e "  install      Setup & launch  (guided configuration on first run, smart on re-runs)"
     echo -e "  stop         Tear down all containers"
     echo -e "  verify       Health check: container status + API probe"
+    echo -e "  status       Platform & engine status  (add --json for machine-readable output)"
     echo -e "  validate     Sovereign QA: unit tests, PII, air-gap, architecture"
     echo -e "  benchmark    Live performance metrics  (--report for 4-engine matrix)"
     echo -e "  audit        Proof-of-Control: compliance & 0-egress report"
@@ -109,7 +111,8 @@ usage() {
     echo -e "  --model <name>   Override AI model (e.g. mixtral:8x7b, qwen2.5:3b, deepseek-r1:7b)"
     echo -e "  --no-cache       Force Docker build without cache"
     echo -e "  --report         With benchmark: run 4-engine comparison matrix"
-    echo -e "  --e2e-security   With validate: run full PII + air-gap + memory pipeline\n"
+    echo -e "  --e2e-security   With validate: run full PII + air-gap + memory pipeline"
+    echo -e "  --json / -j      With status: print JSON instead of colored text\n"
     echo -e "${BOLD}Examples:${NC}"
     echo -e "  ./zyra.sh                      # Display commands & system status"
     echo -e "  ./zyra.sh install              # Run guided setup (Hardware, MoE/Model, ReAct → .env)"
@@ -139,6 +142,31 @@ check_local_ollama() {
 
 api_base_url() {
     [[ "${PRODUCTION_MODE}" == "true" ]] && echo "https://${DOMAIN:-localhost}/v1" || echo "http://localhost:${ZYRABIT_LOCAL_PORT:-8080}/v1"
+}
+
+zyra_version() {
+    local v=""
+    if [[ -f "${SCRIPT_DIR}/VERSION" ]]; then
+        v=$(tr -d '[:space:]' < "${SCRIPT_DIR}/VERSION")
+    fi
+    [[ -n "${v}" ]] || v="unknown"
+    echo "${v}"
+}
+
+docker_container_status() {
+    local c="$1"
+    docker inspect --format='{{.State.Status}}' "$c" 2>/dev/null | tr -d '[:space:]' || echo "not_found"
+}
+
+docker_published_ports_csv() {
+    local c="$1"
+    docker inspect "$c" >/dev/null 2>&1 || return 0
+    docker inspect -f '{{range $p, $bindings := .NetworkSettings.Ports}}{{range $bindings}}{{.HostPort}}{{"\n"}}{{end}}{{end}}' "$c" 2>/dev/null \
+        | { grep -E '^[0-9]+$' || true; } | sort -nu | { paste -sd, - 2>/dev/null || true; }
+}
+
+status_wants_json() {
+    [[ "${COMMANDS[0]:-}" == "status" && "${STATUS_JSON}" == "true" ]]
 }
 
 web_api_key() {
@@ -888,6 +916,93 @@ run_verify() {
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
+# STATUS — platform & engine summary (optional --json)
+# ─────────────────────────────────────────────────────────────────────────────
+run_status() {
+    local json="${STATUS_JSON}"
+    local arg
+    for arg in "${COMMANDS[@]:1}"; do
+        log_err "Unknown argument for status: ${arg}"; exit 1
+    done
+
+    local platform_docker="zyrabit-web"
+    local platform_name="zyrabit-platform"
+    local engine_docker="zyrabit-engine"
+    local engine_name="zyrabit-engine"
+
+    local platform_status engine_status
+    platform_status=$(docker_container_status "${platform_docker}")
+    engine_status=$(docker_container_status "${engine_docker}")
+    if [[ "${engine_status}" == "not_found" ]] && check_local_ollama; then
+        engine_status="running"
+    fi
+
+    local platform_ports engine_ports
+    platform_ports=$(docker_published_ports_csv "${platform_docker}")
+    if [[ -z "${platform_ports}" && "${platform_status}" == "running" ]]; then
+        platform_ports="${ZYRABIT_LOCAL_PORT:-8080}"
+    fi
+    engine_ports=$(docker_published_ports_csv "${engine_docker}")
+    if [[ -z "${engine_ports}" && "${engine_status}" == "running" ]]; then
+        engine_ports="11434"
+    fi
+
+    local version healthy=false
+    version=$(zyra_version)
+    if [[ "${platform_status}" == "running" && "${engine_status}" == "running" ]]; then
+        healthy=true
+    fi
+
+    if [[ "${json}" == "true" ]]; then
+        PLATFORM_STATUS="${platform_status}" ENGINE_STATUS="${engine_status}" \
+        PLATFORM_NAME="${platform_name}" ENGINE_NAME="${engine_name}" \
+        PLATFORM_PORTS="${platform_ports}" ENGINE_PORTS="${engine_ports}" \
+        ZYRA_VERSION="${version}" ZYRA_HEALTHY="${healthy}" \
+        python3 -c '
+import json, os
+
+def ports_csv(raw):
+    raw = (raw or "").strip()
+    if not raw:
+        return []
+    return [int(p) for p in raw.split(",") if p.isdigit()]
+
+healthy = os.environ.get("ZYRA_HEALTHY") == "true"
+print(json.dumps({
+    "platform": {
+        "container": os.environ["PLATFORM_NAME"],
+        "status": os.environ["PLATFORM_STATUS"],
+        "ports": ports_csv(os.environ.get("PLATFORM_PORTS")),
+    },
+    "engine": {
+        "container": os.environ["ENGINE_NAME"],
+        "status": os.environ["ENGINE_STATUS"],
+        "ports": ports_csv(os.environ.get("ENGINE_PORTS")),
+    },
+    "version": os.environ["ZYRA_VERSION"],
+    "healthy": healthy,
+}))
+'
+        if [[ "${healthy}" == "true" ]]; then exit 0; else exit 1; fi
+    fi
+
+    log_header "SYSTEM STATUS"
+    local plat_color="${RED}" engine_color="${RED}"
+    [[ "${platform_status}" == "running" ]] && plat_color="${GREEN}"
+    [[ "${engine_status}" == "running" ]] && engine_color="${GREEN}"
+    printf "  ${BOLD}%-12s %-22s %-12s %s${NC}\n" "SERVICE" "CONTAINER" "STATUS" "PORTS"
+    printf "  ${plat_color}%-12s %-22s %-12s %s${NC}\n" "Platform" "${platform_name}" "${platform_status}" "${platform_ports:-—}"
+    printf "  ${engine_color}%-12s %-22s %-12s %s${NC}\n" "Engine" "${engine_name}" "${engine_status}" "${engine_ports:-—}"
+    echo -e "\n  ${BOLD}Version:${NC} ${version}"
+    if [[ "${healthy}" == "true" ]]; then
+        log_ok "All core services are healthy."
+        exit 0
+    fi
+    log_warn "One or more core services are not running."
+    exit 1
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
 # DEV — uvicorn hot-reload, no Docker
 # ─────────────────────────────────────────────────────────────────────────────
 run_dev() {
@@ -1307,6 +1422,7 @@ while [[ "$#" -gt 0 ]]; do
         --no-cache)          NO_CACHE="true";        shift ;;
         --e2e-security)      E2E_SECURITY="true";    shift ;;
         --report)            REPORT_MODE="true";     shift ;;
+        --json|-j)           STATUS_JSON="true";     shift ;;
         help|--help|-h) usage; exit 0 ;;
         -*) log_err "Unknown flag: $1  (run './zyra.sh help')"; exit 1 ;;
         *)  COMMANDS+=("$1"); shift ;;
@@ -1322,7 +1438,9 @@ fi
 # ─────────────────────────────────────────────────────────────────────────────
 # DISPATCH
 # ─────────────────────────────────────────────────────────────────────────────
-print_banner
+if ! status_wants_json; then
+    print_banner
+fi
 
 for CMD in "${COMMANDS[@]}"; do
     case "${CMD}" in
@@ -1331,6 +1449,7 @@ for CMD in "${COMMANDS[@]}"; do
         start|up)  run_start     ;;
         stop)      run_stop      ;;
         verify)    run_verify    ;;
+        status)    run_status; break ;;
         validate)  run_validate  ;;
         benchmark) run_benchmark ;;
         audit)     run_audit     ;;
