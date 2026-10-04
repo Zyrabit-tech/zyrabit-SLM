@@ -31,7 +31,7 @@ def test_build_shards():
     assert build_shards("", 160, 40) == []
 
 def test_detect_entities_in_shard():
-    text = "My name is John Doe, email john@example.com, card 4242424242424242 phone 123-456-7890 amount $1,000 ssn 123-45-6789"
+    text = "email john@example.com, card 4242424242424242 phone 123-456-7890 amount $1,000 ssn 123-45-6789"
     entities = detect_entities(text, offset=0)
     
     label_set = {e.label for e in entities}
@@ -40,8 +40,7 @@ def test_detect_entities_in_shard():
     assert "phone" in label_set
     assert "amount" in label_set
     assert "ssn" in label_set
-    assert "name" in label_set
-
+    
 def test_dedupe_entities():
     # Overlapping entities testing longest match wins
     e1 = EntitySpan(start=0, end=10, label="amount", value="$1,000,000")
@@ -54,9 +53,39 @@ def test_dedupe_entities():
     # Empty dedupe
     assert dedupe_entities([]) == []
 
+
 def test_anonymize_text_and_deanonymize():
+    import os
+    import importlib
+    import app.core.security.pii_pipeline as pii_pipeline
+    
+    # Test that by default, it does NOT mask arbitrary names
+    os.environ["PII_CUSTOM_NAMES"] = ""
+    importlib.reload(pii_pipeline)
+    
     original = "My name is Abraham Gomez. My email is abraham@example.com."
-    result = anonymize_text(original)
+    result = pii_pipeline.anonymize_text(original)
+    
+    # Should NOT mask Abraham Gomez anymore by default
+    assert "Abraham Gomez" in result.sanitized_text
+    # Should mask email
+    assert "<USER_EMAIL_1>" in result.sanitized_text
+    
+    # Reconstruct
+    restored = pii_pipeline.deanonymize_text(result.sanitized_text, result.token_map)
+    assert restored == original
+
+def test_anonymize_text_with_custom_names():
+    import os
+    import importlib
+    import app.core.security.pii_pipeline as pii_pipeline
+    
+    # Set custom names
+    os.environ["PII_CUSTOM_NAMES"] = "Abraham Gomez"
+    importlib.reload(pii_pipeline)
+    
+    original = "My name is Abraham Gomez. My email is abraham@example.com."
+    result = pii_pipeline.anonymize_text(original)
     
     # Check that placeholders are inserted
     assert "<USER_NAME_1>" in result.sanitized_text
@@ -65,7 +94,7 @@ def test_anonymize_text_and_deanonymize():
     assert "abraham@example.com" not in result.sanitized_text
 
     # Reconstruct
-    restored = deanonymize_text(result.sanitized_text, result.token_map)
+    restored = pii_pipeline.deanonymize_text(result.sanitized_text, result.token_map)
     assert restored == original
 
 def test_anonymize_text_empty():

@@ -186,7 +186,7 @@ else:
     # Customize via PII_CUSTOM_NAMES env var (comma-separated).
     # Example: PII_CUSTOM_NAMES="John Doe,Jane Doe,Alice Smith"
     import os as _os
-    _custom_names_str = _os.getenv("PII_CUSTOM_NAMES", "John Doe,Alice Doe,Abraham Gomez,Alice,John,Jane Doe")
+    _custom_names_str = _os.getenv("PII_CUSTOM_NAMES", "")
     _custom_names = [n.strip() for n in _custom_names_str.split(",") if n.strip()]
     if _custom_names:
         _name_pattern = r'(?i)\b(' + '|'.join(re.escape(n) for n in _custom_names) + r')\b'
