@@ -140,6 +140,10 @@ check_local_ollama() {
     curl -s -m 2 http://localhost:11434/api/tags  >/dev/null 2>&1
 }
 
+check_local_llama() {
+    curl -s -m 2 "http://127.0.0.1:${LLAMA_SERVER_PORT}/v1/models" >/dev/null 2>&1
+}
+
 api_base_url() {
     [[ "${PRODUCTION_MODE}" == "true" ]] && echo "https://${DOMAIN:-localhost}/v1" || echo "http://localhost:${ZYRABIT_LOCAL_PORT:-8080}/v1"
 }
@@ -930,11 +934,32 @@ run_status() {
     local engine_docker="zyrabit-engine"
     local engine_name="zyrabit-engine"
 
-    local platform_status engine_status
+    local current_provider
+    current_provider=$(grep '^INFERENCE_PROVIDER=' "${ENV_FILE}" 2>/dev/null | cut -d= -f2 || echo "ollama_host")
+
+    local platform_status engine_status engine_native=false native_engine_port=""
     platform_status=$(docker_container_status "${platform_docker}")
     engine_status=$(docker_container_status "${engine_docker}")
-    if [[ "${engine_status}" == "not_found" ]] && check_local_ollama; then
-        engine_status="running"
+    # Native providers have no engine container: embedded_metal/mlx run the engine
+    # inside the platform process, while llama.cpp and host Ollama expose a host
+    # service. Mirror run_start's provider handling: report the engine as running
+    # only when its native service is expected and reachable, and leave a missing
+    # container an error for the providers that do run one.
+    if [[ "${engine_status}" == "not_found" ]]; then
+        case "${current_provider}" in
+            embedded_metal|mlx)
+                engine_status="running"; engine_native=true ;;
+            llama_cpp_server)
+                if check_local_llama; then
+                    engine_status="running"; engine_native=true; native_engine_port="${LLAMA_SERVER_PORT}"
+                fi ;;
+            tenstorrent|vllm|ollama_docker|ollama)
+                : ;; # these providers own a dedicated engine container
+            *)
+                if check_local_ollama; then
+                    engine_status="running"; engine_native=true; native_engine_port="11434"
+                fi ;;
+        esac
     fi
 
     local platform_ports engine_ports
@@ -944,7 +969,11 @@ run_status() {
     fi
     engine_ports=$(docker_published_ports_csv "${engine_docker}")
     if [[ -z "${engine_ports}" && "${engine_status}" == "running" ]]; then
-        engine_ports="11434"
+        if [[ "${engine_native}" == "true" ]]; then
+            if [[ -n "${native_engine_port}" ]]; then engine_ports="${native_engine_port}"; fi
+        else
+            engine_ports="11434"
+        fi
     fi
 
     local version healthy=false
