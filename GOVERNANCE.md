@@ -1,69 +1,59 @@
 # Governance Model: Zyrabit SLM
 
-This document outlines the governance model, decision-making framework, contributor roles, and release cadence for **Zyrabit SLM** and the **Zyrabit Platform**.
+This document describes how **Zyrabit SLM** is maintained today. It names the people and the money channels that exist, and it does not describe roles or funds that are not there yet.
 
 ---
 
-## 1. Principles and Vision
+## 1. Principles
 
-Zyrabit SLM is dedicated to building **100% sovereign, private, and air-gapped AI infrastructure**. Our governance is guided by four foundational tenets:
-
-1. **Sovereignty First:** User data must never leave the local boundary without explicit cryptographic authorization. No telemetry with PII; no covert network egress.
-2. **Open-Core Transparency:** Architectural decisions, security threat models, and code validation standards are public and verifiable.
-3. **Meritocratic Community:** Contributions are welcomed from all engineers, researchers, and hobbyists. Quality, test coverage, and security invariants determine technical acceptance.
-4. **Hardware Democratization:** High-performance SLM execution on commodity CPUs, open accelerators (e.g., RISC-V / Tenstorrent), and personal workstations—not just multi-GPU hyperscale clusters.
+1. **Sovereignty First:** User data stays inside the deployment boundary. Telemetry carries no prompts, documents, or personal identifiers. A test that reaches the network is a bug.
+2. **Public Code:** Architecture, threat notes, and validation rules live in this repository. The license is MIT.
+3. **Acceptance by Evidence:** A change is accepted when tests pass, security invariants hold, and the project lead merges it. There is no vote.
+4. **Hardware Reach:** The software should run on commodity CPUs, personal workstations, and the accelerators we can actually test (Apple Silicon, NVIDIA, Tenstorrent).
 
 ---
 
-## 2. Roles and Responsibilities
+## 2. Roles
 
-### 👑 Project Lead / Benevolent Maintainer
-* **Lead:** Abraham Gómez ([@Abraham1432](https://github.com/Abraham1432))
-* **Responsibilities:**
-  - Overall architectural direction and strategic alignment.
-  - Final arbitration on contested technical decisions and design trade-offs.
-  - Release management and cryptographic signing of production tags (`main` branch).
-  - Administration of organization repositories, CI secrets, and container registries.
+### Project Lead
 
-### 🛡️ Core Maintainers
-* Community members with sustained, high-quality contributions across domains (Inference, Security, RAG, Frontend).
-* **Responsibilities:**
-  - Triage issues, review pull requests, and maintain test/CI health.
-  - Ensure strict adherence to [SECURITY.md](SECURITY.md) and [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md).
-  - Guide and mentor new contributors on `good first issue` and `help wanted` tasks.
+* **Lead:** Abraham Gómez ([@Abraham1432](https://github.com/Abraham1432)), ZYRABIT LTD.
+* **Decides:** architecture, what gets merged, releases, and the `main` branch.
+* **Operates:** organization repositories, CI secrets, and container registries.
 
-### 🤝 Contributors
-* Anyone who submits code, documentation, benchmarks, bug reports, or translations via Pull Requests or Issues.
-* Contributors who practice responsible security disclosure are honored in the **Security Hall of Fame** ([SECURITY.md](SECURITY.md)).
+### Maintainers
+
+None yet. A maintainer seat opens when someone has merged several pull requests that touch tests and security, and the lead adds them here by name. Until that line has a name, review and triage sit with the lead.
+
+### Contributors
+
+Anyone who sends code, documentation, benchmarks, or a bug report. Security reports that follow [SECURITY.md](SECURITY.md) are credited in the Security Hall of Fame.
 
 ---
 
-## 3. Decision-Making Process
+## 3. How Decisions Are Made
 
-### Consensus-Driven Development
-We follow a rough consensus model. Technical proposals and feature requests should begin as a GitHub Issue or GitHub Discussion.
+Proposals start as a GitHub issue.
 
-* **Minor Changes & Bug Fixes:** Require approval from at least one Maintainer and a passing CI suite before merging to `beta`.
-* **Major Architectural Changes (ADRs):** New services, core pipeline refactors, or telemetry modifications require an RFC (Request for Comments) discussion and approval from the Project Lead.
-* **Deadlock Resolution:** If consensus cannot be reached, the Project Lead holds final deciding authority.
+* **Bug fixes and small changes** need a passing CI run and the lead's merge.
+* **A new service, a trust-boundary change, or a telemetry change** starts as an issue. The lead has to accept that issue before the corresponding pull request is merged.
+* **Disagreement** is resolved by the lead. There is no second committee.
 
 ---
 
-## 4. Pull Request & Review SLA
+## 4. Review
 
-To ensure a welcoming, dynamic experience for external contributors:
+The lead reviews pull requests. There is no published response deadline.
 
-* **First Response SLA:** Maintainers strive to review and provide initial feedback on all incoming Pull Requests within **5 business days**.
-* **Review Criteria:**
-  - **Clean CI:** Zero lint errors, 100% test pass rate in pytest, Docker build verification, and clean security audits (`pip-audit` + Trivy).
-  - **Zero Regression:** Invariant tests (`dockerfiles.lock.json`, PII abstention gates) must remain uncompromised.
-  - **Documentation:** Any modified public interface must be documented in `docs-portal` or README.
+A pull request is mergeable when:
+
+- CI is green: tests, Docker build, and the security audit (`pip-audit`).
+- Invariant checks still hold (`dockerfiles.lock.json`, PII and abstention tests).
+- A changed public interface is described in `docs-portal` or the README.
 
 ---
 
 ## 5. Branching and Release Cadence
-
-We adhere to a strict **Dual-Channel Git Flow**:
 
 ```mermaid
 gitGraph
@@ -79,29 +69,27 @@ gitGraph
    commit id: "Next cycle"
 ```
 
-1. **`beta` Branch (Staging / Integration Channel):**
-   - All feature and chore PRs target `beta`.
-   - Rapid iteration, pre-release container builds (`:beta`, `:beta-<version>`), and integration smoke testing happen here.
-2. **`main` Branch (Production Stable Channel):**
-   - Merges to `main` strictly originate from `beta` via formal release PRs.
-   - Enforces even-minor semantic versioning (`v2.4.x`, `v2.6.x`).
-   - Automatically builds immutable production multi-arch container images (`amd64` + `arm64`) on Docker Hub and GitHub Container Registry (GHCR).
+1. **`beta`** is the integration branch. Feature and chore pull requests target `beta`.
+2. **`main`** receives merges from `beta` through a release pull request. A release builds immutable multi-arch images (`amd64` and `arm64`) on Docker Hub and GHCR.
 
 ---
 
-## 6. Sponsoring and Financial Transparency
+## 6. Money
 
-Zyrabit operates under a transparent open-core financial model:
-* Financial sponsorships via **GitHub Sponsors** and **OpenCollective** directly support:
-  - CI/CD runner infrastructure (native ARM64 / GPU runners).
-  - Community bounties for critical `help wanted` issues.
-  - Hardware testing labs (Apple Silicon, Tenstorrent Blackhole, RISC-V devboards).
-* Financial accounting is maintained with public transparency for all institutional and individual backers.
+The project does not pay bounties and does not run a hardware lab on donated funds.
+
+The public ledger is [Open Collective: Zyrabit Open Source](https://opencollective.com/zyrabit). As of 3 October 2026 that collective shows a balance of $0, yearly income of $0, and 0 backers. Expenses, if any arrive, will show on that page.
+
+GitHub Sponsors is not an active channel. Neither [@Abraham1432](https://github.com/Abraham1432) nor the `Zyrabit-tech` organization has a Sponsors listing. The repository does not advertise one.
+
+If money is received later, it is for CI minutes and for hardware used to test this repository. That sentence becomes true only after a transaction exists on the Open Collective page.
+
+Commercial contact for the company is separate from project donations: **contact@zyrabit.com**.
 
 ---
 
-## 7. Conflict Resolution & Code of Conduct
+## 7. Conduct
 
-All interactions within the Zyrabit ecosystem are governed by our [Contributor Covenant Code of Conduct](CODE_OF_CONDUCT.md).
+Interaction in this repository follows the [Contributor Covenant Code of Conduct](CODE_OF_CONDUCT.md).
 
-For moderation concerns or private reporting of conduct violations, contact the leadership team at **gomezabraham1432@gmail.com**.
+Report conduct problems to **contact@zyrabit.com**. The project lead reads that mailbox.

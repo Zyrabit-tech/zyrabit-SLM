@@ -1,6 +1,4 @@
-# GitHub Sponsors & Project Funding Configuration
-# See: https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/displaying-a-sponsor-button-in-your-repository
-
-github: [Zyrabit-tech]
+# Public ledger only. GitHub Sponsors is omitted until Zyrabit-tech
+# has an approved Sponsors listing. The collective balance is public
+# at https://opencollective.com/zyrabit
 open_collective: zyrabit
-custom: ['https://zyrabit.com/enterprise']
