@@ -52,7 +52,7 @@ The **driving side** — triggers that start the application's work.
 Runs **before** domain logic on every inbound request. This is not a middleware — it is a deliberate interception layer.
 
 - `pii_pipeline.py` — detects and replaces PII with typed tokens (`<USER_EMAIL_1>`, `<PHONE_1>`, etc.).
-- Uses **Luhn validation** for credit cards, regex for emails/phones/SSN/amounts, and contextual name detection.
+- Uses **Luhn validation** for credit cards, checksum validation for Mexican CURP/RFC/CLABE identifiers, regex for emails/phones/SSN/amounts, and contextual name detection. For an 18-digit collision, a valid CLABE takes precedence; a Luhn-valid card is retained when the CLABE checksum fails, while values failing both checks remain unchanged.
 - **De-anonymization** is applied to the model response before returning to the user.
 
 ### 3. Domain Layer (`app/domain/`)
