@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Governance and funding**: Added `GOVERNANCE.md` and `.github/FUNDING.yml` (Open Collective only). Conduct reports go to `contact@zyrabit.com`.
 - **Conversation Markdown Export**: Export chat sessions as durable Markdown notes directly from the web interface (#112).
 - **Security Hall of Fame Updates**: Added responsible disclosure recognition for security researcher `@jfgg` covering GHSA-2cwj-m6g5-8f69, GHSA-p5j7-785r-2wg6, and GHSA-x5v6-gwgg-7vf8 (`SECURITY.md`).
 
