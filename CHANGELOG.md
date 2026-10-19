@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
+- **aiohttp request exhaustion**: Upgraded `aiohttp` from 3.14.3 to 3.14.5, remediating CVE-2026-111063, CVE-2026-111064, and GHSA-2g87-pp6c-29x5.
 - **MCP SDK session exhaustion**: Upgraded `mcp` from 1.29.0 to 1.30.0, remediating CVE-2026-59951 (unbounded Streamable HTTP session accumulation).
 - **Critical Dependency Vulnerability Remediations**: Upgraded `pyjwt` from 2.13.0 to 2.15.1, remediating critical CVE-2026-102268; upgraded `urllib3` from 2.7.0 to 2.8.0 (CVE-2026-97687, CVE-2026-97688, CVE-2026-97689); and upgraded `oauthlib` from 3.3.1 to 4.0.0 (CVE-2026-49265).
 - **Sovereign Dependency Audit Gate**: Validated and enforced full pip-audit compliance in `docs/security/DEPENDENCY_RISKS.md` (#110).

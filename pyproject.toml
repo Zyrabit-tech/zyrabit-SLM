@@ -19,6 +19,7 @@ dependencies = [
     "python-dotenv>=1.2.2",
     "spacy>=3.8.7",
     "httpx>=0.27.2",
+    "aiohttp>=3.14.4",
     "pymupdf>=1.25.5",
     "pymupdf4llm>=0.0.22",
     "rank-bm25>=0.2.2",
