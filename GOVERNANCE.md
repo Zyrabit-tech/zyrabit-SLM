@@ -6,7 +6,7 @@ This document describes how **Zyrabit SLM** is maintained today. It names the pe
 
 ## 1. Principles
 
-1. **Sovereignty First:** User data stays inside the deployment boundary. Telemetry carries no prompts, documents, or personal identifiers. A test that reaches the network is a bug.
+1. **Sovereignty First:** User data stays inside the deployment boundary. Telemetry carries no prompts, documents, or personal identifiers. Offline tests do not call the network.
 2. **Public Code:** Architecture, threat notes, and validation rules live in this repository. The license is MIT.
 3. **Acceptance by Evidence:** A change is accepted when tests pass, security invariants hold, and the project lead merges it. There is no vote.
 4. **Hardware Reach:** The software should run on commodity CPUs, personal workstations, and the accelerators we can actually test (Apple Silicon, NVIDIA, Tenstorrent).
@@ -17,7 +17,7 @@ This document describes how **Zyrabit SLM** is maintained today. It names the pe
 
 ### Project Lead
 
-* **Lead:** Abraham Gómez ([@Abraham1432](https://github.com/Abraham1432)), ZYRABIT LTD.
+* **Lead:** Abraham Gómez ([@Abraham1432](https://github.com/Abraham1432)), Zyrabit-tech.
 * **Decides:** architecture, what gets merged, releases, and the `main` branch.
 * **Operates:** organization repositories, CI secrets, and container registries.
 
@@ -43,34 +43,21 @@ Proposals start as a GitHub issue.
 
 ## 4. Review
 
-The lead reviews pull requests. There is no published response deadline.
+The lead reviews pull requests. There is no response deadline.
 
 A pull request is mergeable when:
 
-- CI is green: tests, Docker build, and the security audit (`pip-audit`).
+- The required checks are green: tests, the production build gate, Trivy, the version check, and `pip-audit`.
 - Invariant checks still hold (`dockerfiles.lock.json`, PII and abstention tests).
 - A changed public interface is described in `docs-portal` or the README.
+- Someone other than the author has approved it. GitHub does not accept the author's own approval. An organization admin can bypass that rule.
 
 ---
 
 ## 5. Branching and Release Cadence
 
-```mermaid
-gitGraph
-   commit id: "Initial"
-   branch beta
-   checkout beta
-   commit id: "feat(ingest)"
-   commit id: "feat(mcp)"
-   commit id: "chore(deps)"
-   checkout main
-   merge beta id: "Release v2.4.6"
-   checkout beta
-   commit id: "Next cycle"
-```
-
-1. **`beta`** is the integration branch. Feature and chore pull requests target `beta`.
-2. **`main`** receives merges from `beta` through a release pull request. A release builds immutable multi-arch images (`amd64` and `arm64`) on Docker Hub and GHCR.
+1. **`beta`** is the integration branch. Feature and chore pull requests target `beta`. Direct pull requests to `main` are rejected.
+2. **`main`** receives a release pull request whose head is `beta`. That pull request is squashed. The version in `VERSION` must change. After it lands, a `v*` tag publishes the images to Docker Hub and GHCR.
 
 ---
 
@@ -82,9 +69,9 @@ The public ledger is [Open Collective: Zyrabit Open Source](https://opencollecti
 
 GitHub Sponsors is not an active channel. Neither [@Abraham1432](https://github.com/Abraham1432) nor the `Zyrabit-tech` organization has a Sponsors listing. The repository does not advertise one.
 
-If money is received later, it is for CI minutes and for hardware used to test this repository. That sentence becomes true only after a transaction exists on the Open Collective page.
+If money arrives later, it pays for CI minutes and for hardware used to test this repository. Say that only after the transaction is visible on the Open Collective page.
 
-Commercial contact for the company is separate from project donations: **contact@zyrabit.com**.
+Commercial contact is separate from donations: **contact@zyrabit.com**.
 
 ---
 
@@ -92,4 +79,4 @@ Commercial contact for the company is separate from project donations: **contact
 
 Interaction in this repository follows the [Contributor Covenant Code of Conduct](CODE_OF_CONDUCT.md).
 
-Report conduct problems to **contact@zyrabit.com**. The project lead reads that mailbox.
+Report conduct problems to **opensource@zyrabit.com**. Report vulnerabilities to **security@zyrabit.com**, as [SECURITY.md](SECURITY.md) already says. **contact@zyrabit.com** is the commercial address, not the security or conduct inbox.
