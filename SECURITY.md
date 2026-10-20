@@ -8,7 +8,7 @@ If you discover a security vulnerability in Zyrabit SLM, **do not open a public 
 
 Report privately through one of these channels:
 - **GitHub Security Advisory:** [Create a private advisory](https://github.com/Zyrabit-tech/zyrabit-SLM/security/advisories/new)
-- **Email:** `security@zyrabit.com`
+- **Email:** `contact@zyrabit.com`
 
 Please include:
 - Description of the vulnerability

@@ -71,7 +71,7 @@ GitHub Sponsors is not an active channel. Neither [@Abraham1432](https://github.
 
 If money arrives later, it pays for CI minutes and for hardware used to test this repository. Say that only after the transaction is visible on the Open Collective page.
 
-Commercial contact is separate from donations: **contact@zyrabit.com**.
+Donations, conduct, security, and commercial mail all go to **contact@zyrabit.com**.
 
 ---
 
@@ -79,4 +79,4 @@ Commercial contact is separate from donations: **contact@zyrabit.com**.
 
 Interaction in this repository follows the [Contributor Covenant Code of Conduct](CODE_OF_CONDUCT.md).
 
-Report conduct problems to **opensource@zyrabit.com**. Report vulnerabilities to **security@zyrabit.com**, as [SECURITY.md](SECURITY.md) already says. **contact@zyrabit.com** is the commercial address, not the security or conduct inbox.
+Report conduct problems and vulnerabilities to **contact@zyrabit.com**. That is the only mailbox. Private vulnerability reports can also use a [GitHub Security Advisory](https://github.com/Zyrabit-tech/zyrabit-SLM/security/advisories/new).
