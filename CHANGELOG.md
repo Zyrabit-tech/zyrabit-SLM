@@ -24,6 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Canonical container tags**: Release images are published only as multi-arch tags (`2.4.6`, `latest`, `beta`, `beta-2.4.6`). Architecture slices stay untagged digests, and the registry no longer receives a `v`-prefixed alias (#113).
 - **Web UI Dependencies Refresh**: Bumped `lucide-static` to 1.49.0, `socket.io-client` to 4.8.4, `postcss` to 8.5.28, and `autoprefixer` to 10.6.1 in `zyrabit-slm/web-ui`.
 
 ## [2.4.4] - 2026-09-14
