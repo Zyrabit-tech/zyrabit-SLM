@@ -26,7 +26,7 @@ Zyrabit Platform is an enterprise-ready, **local-first AI infrastructure layer**
 
 - **FastAPI Inference Gateway:** Real-time chat, streaming responses, and document retrieval.
 - **Evidence-Bound RAG:** Ingests PDF, DOCX, CSV, audio (Whisper), and text into ChromaDB vector collections + BM25 keyword search.
-- **Bi-directional PII Sanitization:** Masks sensitive data (names, IDs, credit cards, emails) before prompts reach inference engines and restores tokens on return.
+- **Bi-directional PII Sanitization:** Masks sensitive data (names, IDs, credit cards, emails) before prompts reach inference engines and restores tokens on return. Mexican CURP, RFC, and CLABE values are checksum-validated; valid CLABE takes precedence over an 18-digit card match.
 - **Hardware-Agnostic Acceleration:** Seamlessly runs on Apple Silicon Metal, Tenstorrent Blackhole NPUs, NVIDIA CUDA GPUs, or multi-core x86/ARM CPUs.
 - **Zero-Egress Air-Gap Profile:** Operates completely offline with 0 public DNS or outbound internet dependencies.
 

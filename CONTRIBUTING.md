@@ -10,7 +10,7 @@ If you are new to Zyrabit SLM or looking for a fast way to get involved:
 
 1. **Browse Good First Issues**: Filter our issue tracker by the [`good first issue`](https://github.com/Zyrabit-tech/zyrabit-SLM/labels/good%20first%20issue) or [`help wanted`](https://github.com/Zyrabit-tech/zyrabit-SLM/labels/help%20wanted) labels.
 2. **Claim an Issue**: Comment on the issue stating that you'd like to work on it so the community can avoid duplicate work.
-3. **Need Guidance?**: Feel free to ask questions directly in the issue or in [GitHub Discussions](https://github.com/Zyrabit-tech/zyrabit-SLM/discussions). Maintainers are happy to provide architectural context and review draft PRs.
+3. **Need Guidance?**: Ask in the issue or in [GitHub Discussions](https://github.com/Zyrabit-tech/zyrabit-SLM/discussions). The project lead reviews pull requests. See [GOVERNANCE.md](GOVERNANCE.md) for who decides.
 4. **Security Researcher?**: See [SECURITY.md](SECURITY.md) for our private disclosure guidelines and our **Security Hall of Fame**.
 
 ---

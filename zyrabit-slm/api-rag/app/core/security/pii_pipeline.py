@@ -24,7 +24,7 @@ class AnonymizationResult:
 
 class PipelineContext:
     def __init__(self):
-        self.detected_entities = {"email": 0, "card": 0, "phone": 0, "amount": 0, "ssn": 0, "name": 0}
+        self.detected_entities = {"email": 0, "card": 0, "phone": 0, "amount": 0, "ssn": 0, "name": 0, "curp": 0, "rfc": 0, "clabe": 0}
         self.token_map = {}
 
 # --- Utility Functions ---
@@ -45,6 +45,26 @@ def is_luhn_valid(card_number: str) -> bool:
                 digit -= 9
         total += digit
     return total % 10 == 0
+
+def is_curp_valid(value: str) -> bool:
+    alphabet = "0123456789ABCDEFGHIJKLMNÑOPQRSTUVWXYZ"
+    values = {char: index for index, char in enumerate(alphabet)}
+    checksum = sum(values[char] * weight for char, weight in zip(value[:17], range(18, 1, -1)))
+    return (10 - checksum % 10) % 10 == int(value[-1])
+
+def is_rfc_valid(value: str) -> bool:
+    # SAT uses a leading space for the 12-character persona moral RFC.
+    alphabet = "0123456789ABCDEFGHIJKLMN&OPQRSTUVWXYZ Ñ"
+    values = {char: index for index, char in enumerate(alphabet)}
+    payload = value[:-1].rjust(12)
+    checksum = sum(values[char] * weight for char, weight in zip(payload, range(13, 1, -1)))
+    digit = 11 - checksum % 11
+    expected = "0" if digit == 11 else "A" if digit == 10 else str(digit)
+    return value[-1] == expected
+
+def is_clabe_valid(value: str) -> bool:
+    checksum = sum(int(char) * (3, 7, 1)[index % 3] for index, char in enumerate(value[:17]))
+    return (10 - checksum % 10) % 10 == int(value[-1])
 
 def build_shards(text: str, shard_size: int = 1000, overlap: int = 100) -> List[Tuple[int, str]]:
     if not text: return []
@@ -84,6 +104,19 @@ class RegexDetector:
     def detect(self, text: str, offset: int = 0) -> List[EntitySpan]:
         entities = []
         for match in self.pattern.finditer(text):
+            # An 18-digit run may be both a CLABE candidate and a card.
+            # Prefer a valid CLABE; otherwise preserve a full Luhn-valid card.
+            # Never classify a substring of that run as a phone or card.
+            if self.label in ("card", "phone"):
+                run_start = match.start()
+                while run_start > 0 and text[run_start - 1].isdigit():
+                    run_start -= 1
+                run_end = match.end()
+                while run_end < len(text) and text[run_end].isdigit():
+                    run_end += 1
+                if run_end - run_start == 18:
+                    if self.label == "phone" or match.start() != run_start or match.end() != run_end or is_clabe_valid(text[run_start:run_end]):
+                        continue
             val = match.group()
             if self.validation_func and not self.validation_func(val):
                 continue
@@ -149,7 +182,7 @@ class PiiEngine:
         deduped = dedupe_entities(all_entities)
         
         token_map = {}
-        detected_counts = {"email": 0, "card": 0, "phone": 0, "amount": 0, "ssn": 0, "name": 0}
+        detected_counts = {"email": 0, "card": 0, "phone": 0, "amount": 0, "ssn": 0, "name": 0, "curp": 0, "rfc": 0, "clabe": 0}
         sanitized = text
         
         for e in sorted(deduped, key=lambda x: x.start, reverse=True):
@@ -175,6 +208,9 @@ _DEFAULT_DETECTERS = [
     RegexDetector("email", r'[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}'),
     RegexDetector("card", r'\b(?:\d[ -]*?){13,19}\b', is_luhn_valid),
     RegexDetector("phone", r'\b(?:\+?\d{1,3}[- ]?)?(?:\(?\d{3}\)?[- ]?)?\d{3}[- ]?\d{4}\b'),
+    RegexDetector("curp", r'(?<![A-Z0-9Ñ&])[A-Z][AEIOU][A-Z]{2}\d{6}[HM](?:AS|BC|BS|CC|CL|CM|CS|CH|DF|DG|GT|GR|HG|JC|MC|MN|MS|NT|NL|OC|PL|QT|QR|SP|SL|SR|TC|TS|TL|VZ|YN|ZS)[B-DF-HJ-NP-TV-Z]{3}[A-Z0-9]\d(?![A-Z0-9Ñ&])', is_curp_valid),
+    RegexDetector("rfc", r'(?<![A-Z0-9Ñ&])(?:[A-ZÑ&]{3}|[A-ZÑ&]{4})\d{6}[A-Z0-9]{2}[A-Z0-9](?![A-Z0-9Ñ&])', is_rfc_valid),
+    RegexDetector("clabe", r'(?<!\d)\d{18}(?!\d)', is_clabe_valid),
     RegexDetector("ssn", r'\b\d{3}-\d{2}-\d{4}\b'),
     RegexDetector("amount", r'\$\d{1,3}(?:,\d{3})*(?:\.\d{2})?')
 ]
