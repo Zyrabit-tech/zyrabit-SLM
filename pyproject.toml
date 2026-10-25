@@ -1,6 +1,6 @@
 [project]
 name = "zyrabit-platform"
-version = "2.4.6"
+version = "2.4.7"
 description = "The Open Platform for Sovereign AI"
 readme = "README.md"
 requires-python = ">=3.12,<3.13"
@@ -19,6 +19,7 @@ dependencies = [
     "python-dotenv>=1.2.2",
     "spacy>=3.8.7",
     "httpx>=0.27.2",
+    "aiohttp>=3.14.4",
     "pymupdf>=1.25.5",
     "pymupdf4llm>=0.0.22",
     "rank-bm25>=0.2.2",
@@ -28,11 +29,11 @@ dependencies = [
     "python-socketio[asyncio_client]>=5.14.0",
     "python-engineio>=4.11.0",
     "markdown>=3.8.1",
-    "fastmcp>=3.2.0",
+    "fastmcp>=3.4.10,<4",
     "docker>=7.1.0",
     "psutil>=6.1.1",
     "tiktoken>=0.7.0",
-    "mcp>=1.0.0",
+    "mcp>=1.30.0,<2",
     "pyjwt>=2.14.0",
     "ag-ui-protocol>=0.1.19",
     "python-docx>=1.1.2",
@@ -51,7 +52,7 @@ dev = [
     "pip-audit>=2.8.0",
     "autopep8>=2.3.2",
     "reportlab>=4.0.0",  # E2E validation: PDF generator for PII testing
-    "pillow>=12.3.0",    # Pinned to fix CVEs (PYSEC-2026-2253 etc)
+    "pillow>=13.0.0",    # Pinned above the 12.x critical image CVEs
 ]
 
 [tool.uv]

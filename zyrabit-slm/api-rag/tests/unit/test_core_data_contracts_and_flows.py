@@ -82,6 +82,8 @@ def test_inference_provider_factory_hardware_resolution():
     vllm_provider = InferenceProviderFactory.create_sync_provider("vllm", endpoint="http://localhost:8000/v1/chat/completions")
     assert isinstance(vllm_provider, VllmInferenceAdapter)
 
-    # Ollama provider resolution
+    # Ollama provider resolution, including the NVIDIA label from zyra.sh
     ollama_provider = InferenceProviderFactory.create_sync_provider("ollama_host", endpoint="http://localhost:11434/api/generate")
     assert isinstance(ollama_provider, OllamaInferenceAdapter)
+    cuda_provider = InferenceProviderFactory.create_sync_provider("cuda", endpoint="http://localhost:11434/api/generate")
+    assert isinstance(cuda_provider, OllamaInferenceAdapter)

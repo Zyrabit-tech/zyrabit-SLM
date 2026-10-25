@@ -3,10 +3,12 @@ from app.domain.use_cases.chat_use_case import ChatUseCase
 from app.domain.use_cases.ingest_use_case import IngestUseCase
 
 def get_vector_store(request: Request):
-    return request.app.state.vector_store
+    return getattr(request.app.state, "vector_store", None)
 
 def get_inference_provider(request: Request):
-    return request.app.state.inference_provider
+    # Startup logs and continues when the provider cannot be built. Health must
+    # report DEGRADED in that case instead of raising AttributeError as HTTP 500.
+    return getattr(request.app.state, "inference_provider", None)
 
 def get_chat_use_case(request: Request) -> ChatUseCase:
     """

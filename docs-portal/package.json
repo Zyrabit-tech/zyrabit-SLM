@@ -37,7 +37,7 @@
       "http-proxy-middleware": ">=3.0.4",
       "uuid": ">=9.0.2",
       "mermaid": ">=11.16.1",
-      "dompurify": ">=3.4.12",
+      "dompurify": ">=3.4.17",
       "webpack-dev-server": ">=5.2.6",
       "joi": ">=17.13.4",
       "body-parser": ">=1.20.6",
@@ -51,7 +51,9 @@
       "baseline-browser-mapping": ">=2.11.0",
       "colord": ">=2.9.4",
       "qs": ">=6.16.0",
-      "shell-quote": ">=1.9.0"
+      "shell-quote": ">=1.11.0",
+      "proxy-addr": ">=2.0.8",
+      "tinypool": ">=2.1.2"
     }
   }
 }
