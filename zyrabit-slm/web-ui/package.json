@@ -10,12 +10,12 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "lucide-static": "^1.49.0",
+    "lucide-static": "^1.59.0",
     "socket.io-client": "^4.8.4"
   },
   "devDependencies": {
     "autoprefixer": "^10.6.1",
-    "postcss": "^8.5.28",
+    "postcss": "^8.5.30",
     "tailwindcss": "^3.4.19",
     "vite": "^6.4.3"
   },
