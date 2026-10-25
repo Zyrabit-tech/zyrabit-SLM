@@ -9,7 +9,7 @@ This document defines the official container registry tagging policy for **Zyrab
 1. **Zero Catalog Pollution:** Public registries expose only canonical multi-arch tags. They do not expose commit SHAs, architecture slices, or a second tag that only adds a `v` prefix.
 2. **Multi-Arch First:** Every public tag is an OCI manifest list for `linux/amd64` and `linux/arm64`.
 3. **Digests for Assembly:** Each architecture is built on a native runner and pushed by digest. The digest is not a public tag. The publish job assembles those digests into the manifest list.
-4. **Predictability:** Operators pull `2.4.6`, `latest`, `beta`, or `beta-2.4.6`. Git release tags keep the `v` prefix (`v2.4.6`). Container tags do not.
+4. **Predictability:** Operators pull `2.4.7`, `latest`, `beta`, or `beta-2.4.7`. Git release tags keep the `v` prefix (`v2.4.7`). Container tags do not.
 
 ---
 
@@ -17,15 +17,15 @@ This document defines the official container registry tagging policy for **Zyrab
 
 ### A. Stable Release Channel (`main` or a `v*` git tag)
 
-When a release tag is pushed (for example `v2.4.6`):
+When a release tag is pushed (for example `v2.4.7`):
 
 | Registry Tag | Type | Target Architectures | Purpose |
 | :--- | :--- | :--- | :--- |
-| `:2.4.6` | **Multi-Arch Manifest** | `amd64`, `arm64` | Canonical SemVer release tag |
+| `:2.4.7` | **Multi-Arch Manifest** | `amd64`, `arm64` | Canonical SemVer release tag |
 | `:latest` | **Multi-Arch Manifest** | `amd64`, `arm64` | Production default pointer |
 
 > **Public tags:** exactly **2**.
-> **Forbidden:** `:v2.4.6`, `:2.4.6-amd64`, `:2.4.6-arm64`, `:2.4.6-<sha>`.
+> **Forbidden:** `:v2.4.7`, `:2.4.7-amd64`, `:2.4.7-arm64`, `:2.4.7-<sha>`.
 
 ---
 
@@ -34,10 +34,10 @@ When a release tag is pushed (for example `v2.4.6`):
 | Registry Tag | Type | Target Architectures | Purpose |
 | :--- | :--- | :--- | :--- |
 | `:beta` | **Multi-Arch Manifest** | `amd64`, `arm64` | Rolling preview |
-| `:beta-2.4.6` | **Multi-Arch Manifest** | `amd64`, `arm64` | Version-pinned preview |
+| `:beta-2.4.7` | **Multi-Arch Manifest** | `amd64`, `arm64` | Version-pinned preview |
 
 > **Public tags:** exactly **2**.
-> **Forbidden:** `:beta-2.4.6-amd64`, `:beta-2.4.6-arm64`.
+> **Forbidden:** `:beta-2.4.7-amd64`, `:beta-2.4.7-arm64`.
 
 ---
 

@@ -7,30 +7,45 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.4.7] - 2026-10-24
+
+### Added
+
+- **Governance and funding**: Added `GOVERNANCE.md` and `.github/FUNDING.yml` (Open Collective only). All project mail goes to `contact@zyrabit.com` (#154).
+- **zyra status JSON**: `zyra status --json` prints platform and engine status for scripts (#141).
+- **Mexican identifier masking**: RFC, CURP, and CLABE are masked before inference when the checksum is valid, and restored on the way out (#149).
+
+### Security
+
+- **Critical dependency bumps**: Upgraded `pillow` to 13.0.0, `certifi` to 2026.10.23 (GHSA-6q48-6c7w-9gw2), `dompurify` to 3.4.17 (GHSA-cg2g-xh64-v4q7), `fastmcp` to 3.4.11 (GHSA-7xgj-8392-5q4r), `filelock` to 4.2.4, `opentelemetry-api` to 1.45.1 (CVE-2026-114603), and `setuptools` to 84.2.1 (GHSA-xmj3-9gf7-h52w) (#160).
+- **aiohttp request exhaustion**: Upgraded `aiohttp` from 3.14.3 to 3.14.5, remediating CVE-2026-111063, CVE-2026-111064, and GHSA-2g87-pp6c-29x5 (#153).
+- **MCP SDK session exhaustion**: Upgraded `mcp` from 1.29.0 to 1.30.0, remediating CVE-2026-59951 (unbounded Streamable HTTP session accumulation) (#151).
+- **Docs portal library CVEs**: Remediated Trivy findings in `proxy-addr`, `shell-quote`, and `tinypool`, and bumped `langgraph-sdk` and `multidict` (#144).
+
+### Changed
+
+- **Canonical container tags**: Release images are published only as multi-arch tags (`2.4.7`, `latest`, `beta`, `beta-2.4.7`). Architecture slices stay untagged digests, and the registry no longer receives a `v`-prefixed alias (#152).
+- **Web UI patch bumps**: Bumped `lucide-static` to 1.59.0 and `postcss` to 8.5.30 in `zyrabit-slm/web-ui` (#157, #156).
+
+### Fixed
+
+- **CUDA inference provider**: `INFERENCE_PROVIDER=cuda`, written by `zyra.sh` on NVIDIA hosts, now uses the Ollama engine. A failed provider init no longer turns `/v1/health` into HTTP 500 (#155, #160).
+
 ## [2.4.6] - 2026-10-01
 
 ### Added
 
-- **Governance and funding**: Added `GOVERNANCE.md` and `.github/FUNDING.yml` (Open Collective only). All project mail goes to `contact@zyrabit.com`.
 - **Conversation Markdown Export**: Export chat sessions as durable Markdown notes directly from the web interface (#112).
 - **Security Hall of Fame Updates**: Added responsible disclosure recognition for security researcher `@jfgg` covering GHSA-2cwj-m6g5-8f69, GHSA-p5j7-785r-2wg6, and GHSA-x5v6-gwgg-7vf8 (`SECURITY.md`).
 
 ### Security
 
-- **Critical dependency bumps**: Upgraded `pillow` to 13.0.0, `certifi` to 2026.10.23 (GHSA-6q48-6c7w-9gw2), `dompurify` to 3.4.17 (GHSA-cg2g-xh64-v4q7), `fastmcp` to 3.4.11 (GHSA-7xgj-8392-5q4r), `filelock` to 4.2.4, `opentelemetry-api` to 1.45.1 (CVE-2026-114603), and `setuptools` to 84.2.1 (GHSA-xmj3-9gf7-h52w).
-- **aiohttp request exhaustion**: Upgraded `aiohttp` from 3.14.3 to 3.14.5, remediating CVE-2026-111063, CVE-2026-111064, and GHSA-2g87-pp6c-29x5.
-- **MCP SDK session exhaustion**: Upgraded `mcp` from 1.29.0 to 1.30.0, remediating CVE-2026-59951 (unbounded Streamable HTTP session accumulation).
 - **Critical Dependency Vulnerability Remediations**: Upgraded `pyjwt` from 2.13.0 to 2.15.1, remediating critical CVE-2026-102268; upgraded `urllib3` from 2.7.0 to 2.8.0 (CVE-2026-97687, CVE-2026-97688, CVE-2026-97689); and upgraded `oauthlib` from 3.3.1 to 4.0.0 (CVE-2026-49265).
 - **Sovereign Dependency Audit Gate**: Validated and enforced full pip-audit compliance in `docs/security/DEPENDENCY_RISKS.md` (#110).
 
 ### Changed
 
-- **Canonical container tags**: Release images are published only as multi-arch tags (`2.4.6`, `latest`, `beta`, `beta-2.4.6`). Architecture slices stay untagged digests, and the registry no longer receives a `v`-prefixed alias (#113).
 - **Web UI Dependencies Refresh**: Bumped `lucide-static` to 1.49.0, `socket.io-client` to 4.8.4, `postcss` to 8.5.28, and `autoprefixer` to 10.6.1 in `zyrabit-slm/web-ui`.
-
-### Fixed
-
-- **CUDA inference provider**: `INFERENCE_PROVIDER=cuda`, written by `zyra.sh` on NVIDIA hosts, now uses the Ollama engine. A failed provider init no longer turns `/v1/health` into HTTP 500 (#155).
 
 ## [2.4.4] - 2026-09-14
 
@@ -46,7 +61,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- **CUDA inference provider**: `INFERENCE_PROVIDER=cuda`, written by `zyra.sh` on NVIDIA hosts, now uses the Ollama engine. A failed provider init no longer turns `/v1/health` into HTTP 500 (#155).
 - **Container Name Collisions**: Resolved Docker Compose daemon conflicts caused by orphaned containers sharing explicit static names (`zyrabit-vllm-tt`, `zyrabit-mcp`).
 - **Nginx DNS Upstream Stale IP**: Fixed 502 Bad Gateway during container recreation by aligning upstream resolution.
 
