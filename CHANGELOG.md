@@ -27,6 +27,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Canonical container tags**: Release images are published only as multi-arch tags (`2.4.6`, `latest`, `beta`, `beta-2.4.6`). Architecture slices stay untagged digests, and the registry no longer receives a `v`-prefixed alias (#113).
 - **Web UI Dependencies Refresh**: Bumped `lucide-static` to 1.49.0, `socket.io-client` to 4.8.4, `postcss` to 8.5.28, and `autoprefixer` to 10.6.1 in `zyrabit-slm/web-ui`.
 
+### Fixed
+
+- **CUDA inference provider**: `INFERENCE_PROVIDER=cuda`, written by `zyra.sh` on NVIDIA hosts, now uses the Ollama engine. A failed provider init no longer turns `/v1/health` into HTTP 500 (#155).
+
 ## [2.4.4] - 2026-09-14
 
 ### Added
@@ -41,6 +45,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **CUDA inference provider**: `INFERENCE_PROVIDER=cuda`, written by `zyra.sh` on NVIDIA hosts, now uses the Ollama engine. A failed provider init no longer turns `/v1/health` into HTTP 500 (#155).
 - **Container Name Collisions**: Resolved Docker Compose daemon conflicts caused by orphaned containers sharing explicit static names (`zyrabit-vllm-tt`, `zyrabit-mcp`).
 - **Nginx DNS Upstream Stale IP**: Fixed 502 Bad Gateway during container recreation by aligning upstream resolution.
 

@@ -654,7 +654,7 @@ _pull_models() {
             return 0
         fi
         log_warn "Missing GGUF model: ${LLAMA_MODEL_PATH}. Place your .gguf in zyrabit-slm/models/ or download one."
-    elif [[ "${provider}" == "tenstorrent" || "${provider}" == "vllm" || "${provider}" == "mlx" || "${provider}" == "cuda" ]]; then
+    elif [[ "${provider}" == "tenstorrent" || "${provider}" == "vllm" || "${provider}" == "mlx" ]]; then
         local hf_cache
         hf_cache=$(grep '^ZYRABIT_HF_CACHE_DIR=' "${ENV_FILE}" 2>/dev/null | cut -d= -f2 || echo "${HOME}/.cache/huggingface")
         hf_cache="${hf_cache:-${HOME}/.cache/huggingface}"
@@ -681,7 +681,7 @@ _pull_models() {
                 log_warn "Neither 'huggingface-cli' nor 'huggingface_hub' python package found. If needed, download weights manually into ${hf_cache}/hub."
             fi
         fi
-    elif [[ "${provider}" == ollama* ]]; then
+    elif [[ "${provider}" == ollama* || "${provider}" == "cuda" ]]; then
         log_info "Verifying Ollama models for '${model_name}'..."
         if check_local_ollama; then
             if ollama list 2>/dev/null | grep -q "${model_name}"; then
@@ -819,7 +819,7 @@ run_start() {
             log_info "Provider is '${current_provider}' (Native Metal) — skipping zyrabit-engine container."
             $DOCKER_COMPOSE_CMD "${compose_args[@]}" up -d --remove-orphans --scale zyrabit-engine=0 2>/dev/null ||
             $DOCKER_COMPOSE_CMD "${compose_args[@]}" up -d --remove-orphans
-        elif check_local_ollama && [[ "${current_provider}" != "ollama_docker" && "${current_provider}" != "ollama" ]]; then
+        elif check_local_ollama && [[ "${current_provider}" != "ollama_docker" && "${current_provider}" != "ollama" && "${current_provider}" != "cuda" ]]; then
             log_info "Ollama detected on host (Metal) — skipping zyrabit-engine container."
             $DOCKER_COMPOSE_CMD "${compose_args[@]}" up -d --remove-orphans --scale zyrabit-engine=0 2>/dev/null ||
             $DOCKER_COMPOSE_CMD "${compose_args[@]}" up -d --remove-orphans
@@ -878,7 +878,7 @@ run_verify() {
     fi
     if [[ "${current_provider}" == "tenstorrent" || "${current_provider}" == "vllm" ]]; then
         containers+=("zyrabit-vllm-tt")
-    elif [[ "${current_provider}" == "ollama_docker" || "${current_provider}" == "ollama" ]]; then
+    elif [[ "${current_provider}" == "ollama_docker" || "${current_provider}" == "ollama" || "${current_provider}" == "cuda" ]]; then
         containers+=("zyrabit-engine")
     fi
 
@@ -953,7 +953,7 @@ run_status() {
                 if check_local_llama; then
                     engine_status="running"; engine_native=true; native_engine_port="${LLAMA_SERVER_PORT}"
                 fi ;;
-            tenstorrent|vllm|ollama_docker|ollama)
+            tenstorrent|vllm|ollama_docker|ollama|cuda)
                 : ;; # these providers own a dedicated engine container
             *)
                 if check_local_ollama; then
