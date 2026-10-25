@@ -14,7 +14,12 @@ from unittest.mock import MagicMock, patch
 import pytest
 import requests
 
+from types import SimpleNamespace
+
+from app.api.v1.dependencies import get_inference_provider, get_vector_store
+from app.infrastructure.inference.factory import InferenceProviderFactory
 from app.infrastructure.inference.ollama_inference_adapter import OllamaInferenceAdapter
+from app.infrastructure.inference.ollama_stream_adapter import OllamaStreamAdapter
 from app.infrastructure.inference.gemini_inference_adapter import GeminiInferenceAdapter
 from app.inference_factory import create_inference_provider
 from app.ports.inference_port import InferenceProviderError, InferenceRequest
@@ -43,6 +48,21 @@ def test_factory_builds_gemini_provider():
     assert isinstance(provider, GeminiInferenceAdapter)
     assert provider.api_key == "secret-key"
     assert provider.model == "gemini-1.5-flash-test"
+
+
+@patch.dict("os.environ", {"INFERENCE_PROVIDER": "cuda"}, clear=True)
+def test_factory_maps_cuda_to_ollama_engine():
+    provider = create_inference_provider()
+    assert isinstance(provider, OllamaInferenceAdapter)
+    stream = InferenceProviderFactory.create_stream_provider("cuda")
+    assert isinstance(stream, OllamaStreamAdapter)
+    assert stream.endpoint == provider.endpoint
+
+
+def test_missing_provider_state_does_not_raise():
+    request = SimpleNamespace(app=SimpleNamespace(state=SimpleNamespace()))
+    assert get_inference_provider(request) is None
+    assert get_vector_store(request) is None
 
 
 @patch.dict("os.environ", {"INFERENCE_PROVIDER": "unknown_provider"}, clear=True)

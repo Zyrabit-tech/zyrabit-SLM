@@ -100,6 +100,30 @@ def test_stopped_containers_stay_not_found_and_unhealthy(tmp_path: Path) -> None
     assert code == 1
 
 
+def test_cuda_reports_a_running_engine_container(tmp_path: Path) -> None:
+    payload, code = _run_status(
+        tmp_path,
+        "cuda",
+        "zyrabit-web=running\nzyrabit-web:ports=8080\n"
+        "zyrabit-engine=running\nzyrabit-engine:ports=11434\n",
+    )
+    assert payload["engine"]["status"] == "running"
+    assert payload["engine"]["ports"] == [11434]
+    assert payload["healthy"] is True
+    assert code == 0
+
+
+def test_cuda_without_engine_container_stays_unhealthy(tmp_path: Path) -> None:
+    payload, code = _run_status(
+        tmp_path,
+        "cuda",
+        "zyrabit-web=running\nzyrabit-web:ports=8080\n",
+    )
+    assert payload["engine"]["status"] == "not_found"
+    assert payload["healthy"] is False
+    assert code == 1
+
+
 def test_running_engine_container_reports_its_published_port(tmp_path: Path) -> None:
     payload, code = _run_status(
         tmp_path,

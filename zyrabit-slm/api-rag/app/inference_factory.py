@@ -8,6 +8,8 @@ def create_inference_provider():
     INFERENCE_PROVIDER options:
       - ollama        → Docker container (http://zyrabit-engine:11434)
       - ollama_host   → Native Ollama on Mac Metal (http://host.docker.internal:11434)
+      - ollama_docker → Ollama container
+      - cuda          → NVIDIA host; same Ollama HTTP API as ollama
       - embedded_metal→ Embedded Llama.cpp directly on Metal GPU
       - mlx           → Apple MLX Framework directly on Metal
       - gemini        → Google Gemini API (requires GEMINI_API_KEY)

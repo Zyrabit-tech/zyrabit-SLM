@@ -17,7 +17,9 @@ class InferenceProviderFactory:
     def create_sync_provider(provider_name: str = "ollama", **kwargs) -> InferenceProviderPort:
         """Creates a synchronous inference provider."""
         provider_lower = provider_name.lower()
-        if provider_lower in ("ollama", "ollama_host", "ollama_docker"):
+        # cuda is the NVIDIA label zyra.sh writes. The engine is still Ollama;
+        # the GPU is used by that process, not by a separate HTTP protocol.
+        if provider_lower in ("ollama", "ollama_host", "ollama_docker", "cuda"):
             endpoint = kwargs.get("endpoint", f"{SLM_URL}/api/generate")
             return OllamaInferenceAdapter(endpoint=endpoint)
         elif provider_lower == "embedded_metal":
@@ -49,7 +51,7 @@ class InferenceProviderFactory:
     def create_stream_provider(provider_name: str = "ollama", **kwargs) -> StreamingInferencePort:
         """Creates a streaming inference provider."""
         provider_lower = provider_name.lower()
-        if provider_lower in ("ollama", "ollama_host", "ollama_docker"):
+        if provider_lower in ("ollama", "ollama_host", "ollama_docker", "cuda"):
             endpoint = kwargs.get("endpoint", f"{SLM_URL}/api/generate")
             return OllamaStreamAdapter(endpoint=endpoint)
         elif provider_lower in ("vllm", "llama_cpp_server", "tenstorrent"):
