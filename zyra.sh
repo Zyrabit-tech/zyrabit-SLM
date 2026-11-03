@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # ──────────────────────────────────────────────────────────────────────────────
 #   ZYRABIT SLM — Unified CLI
-#   Version: 2.4.7
+#   Version: 2.3.1
 #   Usage: ./zyra.sh [command] [options]
 # ──────────────────────────────────────────────────────────────────────────────
 
@@ -987,12 +987,8 @@ run_start() {
         if [[ "${current_provider}" == "tenstorrent" || "${current_provider}" == "vllm" ]]; then
             echo -e "  ${CYAN}➜ NPU Engine (vLLM)${NC}   http://localhost:8090"
         fi
-        if [[ "$(docker_container_status zyrabit-grafana)" == "running" ]]; then
-            echo -e "  ${CYAN}➜ Grafana Dashboard${NC}    http://localhost:3000"
-        fi
-        if [[ "$(docker_container_status zyrabit-prometheus)" == "running" ]]; then
-            echo -e "  ${CYAN}➜ Prometheus Metrics${NC}   http://localhost:9090"
-        fi
+        echo -e "  ${CYAN}➜ Grafana Dashboard${NC}    http://localhost:3000"
+        echo -e "  ${CYAN}➜ Prometheus Metrics${NC}   http://localhost:9090"
         echo -e "  ${CYAN}➜ Vector DB (Chroma)${NC}   http://localhost:8000"
         echo -e "  ${CYAN}➜ MCP Agent Server${NC}     http://localhost:8001"
     else
