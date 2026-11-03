@@ -40,7 +40,7 @@ services:
       dockerfile: zyrabit-slm/api-rag/Dockerfile
     container_name: zyrabit-api
     ports:
-      - "8088:8080"
+      - "${ZYRABIT_BIND_IP:-127.0.0.1}:${PORT_API:-8088}:8080"
     expose:
       - "8080"
     env_file:
@@ -111,7 +111,7 @@ services:
 
   # 2. THE MUSCLE: SLM Server
   zyrabit-engine:
-    image: ollama/ollama:0.5.12
+    image: ollama/ollama:${OLLAMA_VERSION:-latest}
     container_name: zyrabit-engine
     environment:
       - OLLAMA_NUM_PARALLEL=${OLLAMA_NUM_PARALLEL:-1}
@@ -174,7 +174,7 @@ services:
       - /dev/hugepages-1G:/dev/hugepages-1G
       - ./api-rag/app/infrastructure/engine/tenstorrent/${TT_MODEL_SPEC:-model_spec_qwen25_3b_p150.json}:/model_spec.json:ro
     ports:
-      - "8090:8000"
+      - "${ZYRABIT_BIND_IP:-127.0.0.1}:8090:8000"
     networks:
       - zyrabit-sovereign-net
 
@@ -188,7 +188,7 @@ services:
       - CHROMA_OTEL_SERVICE_NAME=zyrabit-vector-db
       - ORT_LOGGING_LEVEL=3
     ports:
-      - "8000:8000"
+      - "${ZYRABIT_BIND_IP:-127.0.0.1}:8000:8000"
     volumes:
       - ./chroma-data:/data
     networks:
@@ -208,7 +208,7 @@ services:
       - --config.file=/etc/prometheus/prometheus.yml
       - --storage.tsdb.path=/prometheus
     ports:
-      - "9090:9090"
+      - "${ZYRABIT_BIND_IP:-127.0.0.1}:9090:9090"
     volumes:
       - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
       - prometheus-data:/prometheus
@@ -239,7 +239,7 @@ services:
       - GF_SECURITY_ADMIN_USER=admin
       - GF_SECURITY_ADMIN_PASSWORD=admin
     ports:
-      - "3000:3000"
+      - "${ZYRABIT_BIND_IP:-127.0.0.1}:3000:3000"
     volumes:
       - grafana-data:/var/lib/grafana
       - ./grafana/datasources:/etc/grafana/provisioning/datasources
@@ -264,7 +264,7 @@ services:
     command: -config.file=/etc/loki/local-config.yaml
     profiles: [ "observability-extra" ]
     ports:
-      - "3100:3100"
+      - "${ZYRABIT_BIND_IP:-127.0.0.1}:3100:3100"
     networks:
       - zyrabit-sovereign-net
 
@@ -305,7 +305,7 @@ services:
       - ../README.md:/app/README.md:ro
       - ../CONTRIBUTING.md:/app/CONTRIBUTING.md:ro
     ports:
-      - "8001:8001"
+      - "${ZYRABIT_BIND_IP:-127.0.0.1}:8001:8001"
     networks:
       - zyrabit-sovereign-net
 
@@ -330,7 +330,7 @@ services:
 
   # 8. BARE INFERENCE: Standalone Engine without Web UI / RAG (profile: bare)
   zyrabit-bare-engine:
-    image: ollama/ollama:0.5.12
+    image: ollama/ollama:${OLLAMA_VERSION:-latest}
     container_name: zyrabit-bare-engine
     profiles: [ "bare" ]
     environment:
@@ -338,7 +338,7 @@ services:
     volumes:
       - ~/.ollama:/root/.ollama
     ports:
-      - "8088:11434"
+      - "${ZYRABIT_BIND_IP:-127.0.0.1}:8088:11434"
     networks:
       - zyrabit-sovereign-net
     healthcheck:
