@@ -111,7 +111,7 @@ services:
 
   # 2. THE MUSCLE: SLM Server
   zyrabit-engine:
-    image: ollama/ollama:${OLLAMA_VERSION:-latest}
+    image: ollama/ollama:${OLLAMA_VERSION}
     container_name: zyrabit-engine
     environment:
       - OLLAMA_NUM_PARALLEL=${OLLAMA_NUM_PARALLEL:-1}
@@ -330,7 +330,7 @@ services:
 
   # 8. BARE INFERENCE: Standalone Engine without Web UI / RAG (profile: bare)
   zyrabit-bare-engine:
-    image: ollama/ollama:${OLLAMA_VERSION:-latest}
+    image: ollama/ollama:${OLLAMA_VERSION}
     container_name: zyrabit-bare-engine
     profiles: [ "bare" ]
     environment:

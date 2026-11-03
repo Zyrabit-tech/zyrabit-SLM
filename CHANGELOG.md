@@ -7,6 +7,32 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.4.8] - 2026-11-03
+
+### Added
+
+- **Document smoke test**: Added automated end-to-end document ingestion, status verification, and deletion check to `zyra.sh verify`, catching storage and permission regressions during setup.
+- **Document deletion endpoint**: Added `DELETE /v1/documents/{document_id}` with cascading cleanup across SQLite metadata, source files, and vector index.
+- **Multi-OS documentation**: Added comprehensive guide in `docs/installation/MULTI_OS_INSTALLATION.md` for Linux, macOS (Apple Silicon), and Windows WSL2 (#178).
+
+### Security
+
+- **Local port security binding**: Defaulted exposed ports (3000, 8080, 8088, 9090) to bind strictly to `${ZYRABIT_BIND_IP:-127.0.0.1}`, preventing inadvertent network exposure on multi-homed hosts (#178).
+- **CodeQL path injection patch**: Sanitized Obsidian import paths with strict path resolution and confinement to vault boundaries (#183).
+- **Vulnerability remediation bumps**: Upgraded `authlib` to 1.6.11 (CVE-2026-39884), `vite` to 6.4.5 (GHSA-3452-799q-v9hx / CVE-2026-27606), `dnspython` to 2.8.0, and `msgpack` to 1.1.2 (#183).
+
+### Changed
+
+- **Pinned Ollama version**: Replaced unpinned `latest` with explicit `0.5.12` in `zyrabit-slm/example.env` and `docker-compose.yml`.
+- **Installer log cleanliness**: Suppressed inactive Grafana and Prometheus service endpoints from startup logs when running in local development mode.
+- **Repository line endings**: Enforced consistent LF line endings via `.gitattributes` (#178).
+
+### Fixed
+
+- **Linux volume permissions & host GID 2770**: Passed host GID as environment variable `-e HOST_GID="$(id -g)"` to auxiliary container in `ensure_data_directories` and set permissions to 2770 (`u+rwX,g+rwX,o-rwx` with SGID) so non-root host users can manage data volumes without sudo (#177).
+- **Unconditional permission enforcement**: Removed `find` conditional bypass on Linux so permission adjustments run idempotently and fail fast if container execution encounters errors.
+- **Docker RAG embeddings**: Resolved embedding endpoint routing when running Ollama within Docker (`http://zyrabit-engine:11434`) (#177).
+
 ## [2.4.7] - 2026-10-24
 
 ### Added

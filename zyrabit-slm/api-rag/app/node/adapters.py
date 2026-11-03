@@ -114,6 +114,15 @@ class ChromaEvidenceIndex:
                     {key: metadata[key] for key in ("page", "sheet", "range", "slide", "paragraph", "table") if key in metadata}, metadata))
         return output
 
+    def delete(self, document_id: str) -> None:
+        try:
+            if hasattr(self.vector_store, "_collection") and self.vector_store._collection:
+                self.vector_store._collection.delete(where={"document_id": document_id})
+            elif hasattr(self.vector_store, "delete"):
+                self.vector_store.delete(where={"document_id": document_id})
+        except Exception:
+            pass
+
     def health(self) -> tuple[bool, str]:
         try: return bool(self.vector_store.heartbeat()), "connected"
         except Exception as exc: return False, str(exc)

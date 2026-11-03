@@ -125,6 +125,21 @@ class NodeService:
     def job(self, job_id: str) -> dict | None: return self.metadata.get_job(job_id)
     def document(self, document_id: str) -> dict | None: return self.metadata.get_document(document_id)
     def documents(self) -> list[dict]: return self.metadata.list_documents()
+
+    async def delete_document(self, document_id: str) -> bool:
+        result = self.metadata.delete_document(document_id)
+        if not result:
+            return False
+        stored_path = result.get("stored_path")
+        if stored_path:
+            self.source_store.delete(stored_path)
+        if self.vector_index:
+            try:
+                self.vector_index.delete(document_id)
+            except Exception:
+                pass
+        return True
+
     def clear_session(self, session_id: str) -> None: self.metadata.clear_history(session_id)
     def session(self, session_id: str) -> dict:
         return {"messages": self.metadata.session_history(session_id), "context": self.metadata.get_session_context(session_id)}

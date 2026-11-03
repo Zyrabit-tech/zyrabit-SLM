@@ -22,5 +22,8 @@ class InMemoryVectorIndex:
     def search(self, query, limit=8, document_id=None):
         return []
 
+    def delete(self, document_id):
+        self.evidence = [e for e in self.evidence if getattr(e, "document_id", None) != document_id]
+
     def health(self):
         return True, "test-index"

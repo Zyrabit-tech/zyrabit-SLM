@@ -51,6 +51,13 @@ async def get_document(document_id: str, service=Depends(get_node_service)):
     return result
 
 
+@router.delete("/documents/{document_id}", status_code=204)
+async def delete_document(document_id: str, service=Depends(get_node_service)):
+    deleted = await service.delete_document(document_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Document not found")
+
+
 @router.post("/documents/{document_id}/reindex", status_code=202)
 async def reindex_document(document_id: str, service=Depends(get_node_service)):
     try:
