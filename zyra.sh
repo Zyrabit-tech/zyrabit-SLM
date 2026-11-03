@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # ──────────────────────────────────────────────────────────────────────────────
 #   ZYRABIT SLM — Unified CLI
-#   Version: 2.3.1
+#   Version: 2.4.7
 #   Usage: ./zyra.sh [command] [options]
 # ──────────────────────────────────────────────────────────────────────────────
 
@@ -923,8 +923,12 @@ run_start() {
         if [[ "${current_provider}" == "tenstorrent" || "${current_provider}" == "vllm" ]]; then
             echo -e "  ${CYAN}➜ NPU Engine (vLLM)${NC}   http://localhost:8090"
         fi
-        echo -e "  ${CYAN}➜ Grafana Dashboard${NC}    http://localhost:3000"
-        echo -e "  ${CYAN}➜ Prometheus Metrics${NC}   http://localhost:9090"
+        if [[ "$(docker_container_status zyrabit-grafana)" == "running" ]]; then
+            echo -e "  ${CYAN}➜ Grafana Dashboard${NC}    http://localhost:3000"
+        fi
+        if [[ "$(docker_container_status zyrabit-prometheus)" == "running" ]]; then
+            echo -e "  ${CYAN}➜ Prometheus Metrics${NC}   http://localhost:9090"
+        fi
         echo -e "  ${CYAN}➜ Vector DB (Chroma)${NC}   http://localhost:8000"
         echo -e "  ${CYAN}➜ MCP Agent Server${NC}     http://localhost:8001"
     else
@@ -955,10 +959,10 @@ run_verify() {
     local current_provider
     current_provider=$(grep '^INFERENCE_PROVIDER=' "${ENV_FILE}" 2>/dev/null | cut -d= -f2 || echo "ollama_host")
 
-    local containers=("zyrabit-traefik" "zyrabit-api" "zyrabit-web" "zyrabit-db" "zyrabit-mcp")
+    local containers=("zyrabit-api" "zyrabit-web" "zyrabit-db" "zyrabit-mcp")
 
     if [[ "${PRODUCTION_MODE}" == "true" ]]; then
-        containers+=("zyrabit-prometheus" "zyrabit-grafana" "zyrabit-loki")
+        containers=("zyrabit-traefik" "${containers[@]}" "zyrabit-prometheus" "zyrabit-grafana" "zyrabit-loki")
     fi
     if [[ "${current_provider}" == "tenstorrent" || "${current_provider}" == "vllm" ]]; then
         containers+=("zyrabit-vllm-tt")
@@ -995,17 +999,24 @@ run_verify() {
 
     echo -e "\n  ${BOLD}Containers:${NC} ${GREEN}${pass} up${NC}  ${RED}${fail} down${NC}"
     local base_url; base_url="$(api_base_url)"
-    log_info "Probing ${base_url}/health ..."
+    log_info "Probing ${base_url}/health (waiting for ready state)..."
     local health_resp=""
-    if health_resp=$(curl -sk -m 5 "${base_url}/health" 2>/dev/null); then
-        if echo "${health_resp}" | grep -q '"status":[[:space:]]*"OPERATIONAL"'; then
-            log_ok "API is fully operational."
-        elif echo "${health_resp}" | grep -q '"status":[[:space:]]*"DEGRADED"'; then
-            log_warn "API is in DEGRADED state. Some services (database, node or model) are not ready."
-        else
-            log_ok "API is responding."
+    local ready=false
+    for _ in {1..8}; do
+        if health_resp=$(curl -sk -m 4 "${base_url}/health" 2>/dev/null); then
+            if echo "${health_resp}" | grep -q '"status":[[:space:]]*"OPERATIONAL"'; then
+                log_ok "API is fully operational."
+                ready=true
+                break
+            elif echo "${health_resp}" | grep -q '"status":[[:space:]]*"DEGRADED"'; then
+                log_warn "API is in DEGRADED state. Some services (database, node or model) are not ready."
+                ready=true
+                break
+            fi
         fi
-    else
+        sleep 2
+    done
+    if [[ "${ready}" == "false" ]]; then
         log_warn "API not responding yet (may still be initializing). Check: docker logs zyrabit-api --tail 30"
     fi
 
