@@ -142,15 +142,14 @@ La síntesis mediante IA falló, pero la memoria de la conversación se mantiene
 
         # 4. Save to Vault under "Reflective Notes"
         date_str = datetime.now().strftime("%Y-%m-%d_%H%M%S")
-        safe_session_id = re.sub(r"[^A-Za-z0-9_-]", "_", session_id or "")[:64] or "default"
-        note_name = f"reflective_{safe_session_id}_{date_str}.md"
+        sanitized_id = re.sub(r"[^A-Za-z0-9_-]", "_", str(session_id or ""))[:64] or "default"
+        safe_session_id = os.path.basename(sanitized_id)
+        note_name = os.path.basename(f"reflective_{safe_session_id}_{date_str}.md")
         notes_dir = (cls.VAULT_PATH / "Reflective Notes").resolve()
         notes_dir.mkdir(parents=True, exist_ok=True)
         note_path = (notes_dir / note_name).resolve()
 
-        try:
-            note_path.relative_to(notes_dir)
-        except ValueError:
+        if not note_path.is_relative_to(notes_dir):
             logger.error(f"🛡️ Path traversal attempt blocked in session_id: {session_id}")
             return "Security Alert: invalid session_id"
         
