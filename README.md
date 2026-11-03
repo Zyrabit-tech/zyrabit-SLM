@@ -160,6 +160,45 @@ curl -X POST http://localhost:8088/v1/chat \
   -d '{"text": "Summarize our sovereign architecture capabilities"}'
 ```
 
+#### 🐧 Platform Guides
+
+<details>
+<summary><b>Linux (Ubuntu / Debian / RHEL)</b></summary>
+
+- **Docker permissions:** Ensure your user is in the `docker` group so you do not need `sudo`:
+  ```bash
+  sudo usermod -aG docker $USER && newgrp docker
+  ```
+- **Execution:** Run `./zyra.sh install`. Directory permissions for `./db_data` and `./document_source` (UID 10001) are automatically configured.
+</details>
+
+<details>
+<summary><b>macOS (Apple Silicon M-Series)</b></summary>
+
+- **Hardware Acceleration:** Native Metal acceleration is auto-detected.
+- **Ollama Host:** If Ollama is installed on your Mac (`brew install ollama`), the installer automatically connects to your host Ollama engine.
+</details>
+
+<details>
+<summary><b>Windows (WSL2)</b></summary>
+
+- **File System:** Clone the repository inside your WSL2 Linux home directory (e.g. `~/zyrabit-SLM`), **never** in `/mnt/c/` (Windows NTFS) to avoid SQLite file locking issues.
+- **Line Endings (CRLF vs LF):** Ensure Git preserves Unix line endings before cloning:
+  ```bash
+  git config --global core.autocrlf input
+  ```
+- **NVIDIA GPU Acceleration:** Ensure the [NVIDIA Container Toolkit](https://docs.nvidia.com/cuda/wsl-user-guide/index.html) is installed inside WSL2 for CUDA acceleration.
+</details>
+
+#### 🧠 Document RAG & Embedding Models
+By default, the installer pulls and configures `mxbai-embed-large` for document embeddings and retrieval in ChromaDB.
+- **Customization:** You can switch the embedding model anytime by updating `zyrabit-slm/.env`:
+  ```bash
+  # For multilingual / Spanish optimization:
+  EMBEDDING_MODEL=bge-m3
+  ```
+- **Network routing:** In Docker mode, embeddings resolve internally via `http://zyrabit-engine:11434`.
+
 > [!TIP]
 > **Avoid using `sudo ./zyra.sh`**: Running scripts with `sudo` creates root-owned files that disrupt user permissions. If you encounter Docker permission issues, add your user to the docker group: `sudo usermod -aG docker $USER && newgrp docker`.
 

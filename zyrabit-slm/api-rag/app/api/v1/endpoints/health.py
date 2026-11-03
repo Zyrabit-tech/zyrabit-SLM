@@ -71,6 +71,8 @@ async def health_check(
             required.update({"embeddings", "vector-index"})
         if any(item["name"] in required and item["status"] != "ready" for item in node_capabilities):
             overall_status = "DEGRADED"
+    else:
+        overall_status = "DEGRADED"
 
     # Ordered Hard Data
     return {
