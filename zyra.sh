@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # ──────────────────────────────────────────────────────────────────────────────
 #   ZYRABIT SLM — Unified CLI
-#   Version: 2.4.7
+#   Version: 2.3.1
 #   Usage: ./zyra.sh [command] [options]
 # ──────────────────────────────────────────────────────────────────────────────
 
@@ -210,25 +210,32 @@ ensure_data_directories() {
 
     # Ensure UID 10001 (nonroot inside zyrabit-api container) has write permissions
     # on Linux and WSL2 hosts without requiring root/sudo
-    if [[ "$(uname -s)" != "Darwin" ]]; then
-        chmod -R 777 "${base}/db_data" "${base}/document_source" 2>/dev/null || true
-    else
-        chmod -R 755 "${base}/db_data" "${base}/document_source" 2>/dev/null || true
+    [[ "$(uname -s)" == "Darwin" ]] && return 0
+
+    if find "${base}/db_data" "${base}/document_source" ! -user 10001 ! -name .gitkeep -print -quit 2>/dev/null | grep -q .; then
+        log_info "Ajustando propiedad y permisos de volúmenes de datos a UID 10001..."
+        if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then
+            docker run --rm -v "${base}/db_data:/d1" -v "${base}/document_source:/d2" busybox \
+                sh -c "chown -R 10001:\$(id -g) /d1 /d2 && chmod -R u+rwX,g+rwX,o-rwx /d1 /d2 && find /d1 /d2 -type d -exec chmod g+s {} +" \
+                || { log_err "No se pudieron ajustar permisos de db_data/document_source con contenedor auxiliar."; return 1; }
+        else
+            chmod -R u+rwX,g+rwX,o-rwx "${base}/db_data" "${base}/document_source" 2>/dev/null || true
+        fi
     fi
 }
 
 is_chat_llm_model() {
     local lower="$1"
     # Exclude embeddings and rerankers
-    if [[ "$lower" == *embed* || "$lower" == *bge-* || "$lower" == *minilm* || "$lower" == *bert* || "$lower" == *rerank* ]]; then
+    if echo "$lower" | grep -qiE '(^|[-_/:])(embed|embedding|bge|minilm|bert|rerank)([-_/:0-9]|$)'; then
         return 1
     fi
     # Exclude speech, audio, transcription, vocoder, and TTS
-    if [[ "$lower" == *whisper* || "$lower" == *stt* || "$lower" == *tts* || "$lower" == *speech* || "$lower" == *audio* || "$lower" == *vocoder* || "$lower" == *wav2vec* ]]; then
+    if echo "$lower" | grep -qiE '(^|[-_/:])(whisper|stt|tts|speech|audio|vocoder|wav2vec)([-_/:0-9]|$)'; then
         return 1
     fi
     # Exclude image generation / vision-only models
-    if [[ "$lower" == *stable-diffusion* || "$lower" == *sdxl* || "$lower" == *flux* ]]; then
+    if echo "$lower" | grep -qiE '(^|[-_/:])(stable-diffusion|sdxl|flux)([-_/:0-9]|$)'; then
         return 1
     fi
     return 0
@@ -458,6 +465,19 @@ run_setup_config() {
     for item in "${cat_models[@]}"; do
         local c_val; c_val="$(echo "$item" | cut -d'|' -f1)"
         local c_lbl; c_lbl="$(echo "$item" | cut -d'|' -f2)"
+
+        # Avoid duplicate entries if model was already detected locally
+        local already_in_menu=0
+        for mv in "${menu_values[@]}"; do
+            if [[ "$mv" == "$c_val" ]]; then
+                already_in_menu=1
+                break
+            fi
+        done
+        if [[ $already_in_menu -eq 1 ]]; then
+            continue
+        fi
+
         local tag_rec=""
         if [[ $found_top_rec -eq 0 ]]; then
             if [[ "${INFERENCE_PROVIDER}" == "tenstorrent" ]]; then
@@ -556,7 +576,7 @@ run_setup_config() {
         case "${INFERENCE_PROVIDER}" in
             tenstorrent|vllm)
                 target_slm_url="http://zyrabit-vllm-tt:8000"
-                target_embedding_url="http://zyrabit-engine:11434"
+                target_embedding_url="http://host.docker.internal:11434"
                 case "${OVERRIDE_MODEL}" in
                     "qwen2.5:7b")     target_tt_model="Qwen2.5-7B-Instruct" ;;
                     "qwen2.5:3b")     target_tt_model="Qwen2.5-3B-Instruct" ;;
@@ -565,9 +585,13 @@ run_setup_config() {
                     *) target_tt_model="${OVERRIDE_MODEL}" ;;
                 esac
                 ;;
-            ollama_host)
+            ollama_host|embedded_metal|mlx|llama_cpp_server)
                 target_slm_url="http://host.docker.internal:11434"
                 target_embedding_url="http://host.docker.internal:11434"
+                ;;
+            ollama_docker|ollama|cuda)
+                target_slm_url="http://zyrabit-engine:11434"
+                target_embedding_url="http://zyrabit-engine:11434"
                 ;;
             *)
                 target_slm_url="http://zyrabit-engine:11434"
@@ -630,6 +654,7 @@ run_install() {
         fi
     fi
 
+    migrate_env_config
     ensure_local_secrets
 
     # At this point OVERRIDE_MODEL may have been set during configuration
@@ -647,11 +672,28 @@ run_install() {
     run_start
     if ! _pull_models "${model_name}"; then
         log_err "Model preparation failed. Stack may not be fully operational."
-        log_warn "You can retry later with: ./zyra.sh start"
+        log_warn "You can retry later with: ./zyra.sh install --yes"
+        exit 1
+    fi
+    if ! run_verify; then
+        log_err "Installation incomplete: verification detected errors. Check 'docker logs zyrabit-api' and retry with: ./zyra.sh install --yes"
         exit 1
     fi
     log_ok "✅ Installation complete."
-    run_verify
+}
+
+migrate_env_config() {
+    [[ -f "${ENV_FILE}" ]] || return 0
+    local provider
+    provider=$(grep '^INFERENCE_PROVIDER=' "${ENV_FILE}" 2>/dev/null | cut -d= -f2 || true)
+    case "${provider}" in
+        ollama_docker|ollama|cuda)
+            if grep -q '^EMBEDDING_URL=http://host\.docker\.internal' "${ENV_FILE}" 2>/dev/null; then
+                log_info "Migrando EMBEDDING_URL obsoleto en upgrade (host.docker.internal -> http://zyrabit-engine:11434)..."
+                sed -i.bak 's|^EMBEDDING_URL=.*|EMBEDDING_URL=http://zyrabit-engine:11434|' "${ENV_FILE}" 2>/dev/null && rm -f "${ENV_FILE}.bak"
+            fi
+            ;;
+    esac
 }
 
 ensure_local_secrets() {
@@ -712,7 +754,8 @@ _pull_models() {
             LLAMA_MODEL_PATH="${discovered_gguf}"
             return 0
         fi
-        log_warn "Missing GGUF model: ${LLAMA_MODEL_PATH}. Place your .gguf in zyrabit-slm/models/ or download one."
+        log_err "Missing GGUF model: ${LLAMA_MODEL_PATH}. Place your .gguf in zyrabit-slm/models/ or download one."
+        return 1
     elif [[ "${provider}" == "tenstorrent" || "${provider}" == "vllm" || "${provider}" == "mlx" ]]; then
         local hf_cache
         hf_cache=$(grep '^ZYRABIT_HF_CACHE_DIR=' "${ENV_FILE}" 2>/dev/null | cut -d= -f2 || echo "${HOME}/.cache/huggingface")
@@ -733,9 +776,15 @@ _pull_models() {
             [[ "${tt_model}" == *"Mistral"* ]] && hf_repo="mistralai/${tt_model}"
             log_info "Downloading weights for ${hf_repo} to ${hf_cache}..."
             if command -v huggingface-cli >/dev/null 2>&1; then
-                HF_HUB_ENABLE_HF_TRANSFER=0 HF_HOME="${hf_cache}" huggingface-cli download "${hf_repo}" || log_warn "Download failed. Ensure internet connection or place weights manually in ${hf_cache}."
+                if ! HF_HUB_ENABLE_HF_TRANSFER=0 HF_HOME="${hf_cache}" huggingface-cli download "${hf_repo}"; then
+                    log_err "Download failed for ${hf_repo}. Check internet connection."
+                    return 1
+                fi
             elif python3 -c "import huggingface_hub" >/dev/null 2>&1; then
-                python3 -c "import os; from huggingface_hub import snapshot_download; snapshot_download(repo_id='${hf_repo}', cache_dir='${hf_cache}/hub')" || log_warn "Download failed."
+                if ! python3 -c "import os; from huggingface_hub import snapshot_download; snapshot_download(repo_id='${hf_repo}', cache_dir='${hf_cache}/hub')"; then
+                    log_err "Download failed for ${hf_repo}."
+                    return 1
+                fi
             else
                 log_warn "Neither 'huggingface-cli' nor 'huggingface_hub' python package found. If needed, download weights manually into ${hf_cache}/hub."
             fi
@@ -747,7 +796,7 @@ _pull_models() {
 
         log_info "Verifying Ollama models for chat ('${model_name}') and embeddings ('${embedding_model}')..."
         if check_local_ollama && [[ "${provider}" == "ollama_host" ]]; then
-            if ollama list 2>/dev/null | grep -q "${model_name}"; then
+            if ollama list 2>/dev/null | grep -qE "^${model_name}(:latest)?[[:space:]]"; then
                 log_ok "Model '${model_name}' already exists in Ollama. Skipping pull."
             else
                 log_info "Pulling '${model_name}' into Ollama..."
@@ -756,7 +805,7 @@ _pull_models() {
                     return 1
                 fi
             fi
-            if ! ollama list 2>/dev/null | grep -q "${embedding_model}"; then
+            if ! ollama list 2>/dev/null | grep -qE "^${embedding_model}(:latest)?[[:space:]]"; then
                 log_info "Pulling default embedding model '${embedding_model}' into Ollama..."
                 if ! ollama pull "${embedding_model}"; then
                     log_warn "Failed to pull embedding model '${embedding_model}'. Document RAG may be degraded."
@@ -765,7 +814,21 @@ _pull_models() {
                 log_ok "Embedding model '${embedding_model}' already exists in Ollama."
             fi
         else
-            if $DOCKER_COMPOSE_CMD -f "$(active_compose_file)" exec -T zyrabit-engine ollama list 2>/dev/null | grep -q "${model_name}"; then
+            log_info "Waiting for zyrabit-engine container to respond..."
+            local engine_ready=false
+            for ((attempt=1; attempt<=30; attempt++)); do
+                if $DOCKER_COMPOSE_CMD -f "$(active_compose_file)" exec -T zyrabit-engine ollama list >/dev/null 2>&1; then
+                    engine_ready=true
+                    break
+                fi
+                sleep 1
+            done
+            if [[ "$engine_ready" != "true" ]]; then
+                log_err "zyrabit-engine container is not responding. Check: docker logs zyrabit-engine"
+                return 1
+            fi
+
+            if $DOCKER_COMPOSE_CMD -f "$(active_compose_file)" exec -T zyrabit-engine ollama list 2>/dev/null | grep -qE "^${model_name}(:latest)?[[:space:]]"; then
                 log_ok "Model '${model_name}' already loaded in container."
             else
                 log_info "Pulling chat model '${model_name}' into container engine..."
@@ -774,7 +837,7 @@ _pull_models() {
                     return 1
                 fi
             fi
-            if ! $DOCKER_COMPOSE_CMD -f "$(active_compose_file)" exec -T zyrabit-engine ollama list 2>/dev/null | grep -q "${embedding_model}"; then
+            if ! $DOCKER_COMPOSE_CMD -f "$(active_compose_file)" exec -T zyrabit-engine ollama list 2>/dev/null | grep -qE "^${embedding_model}(:latest)?[[:space:]]"; then
                 log_info "Pulling default embedding model '${embedding_model}' into container engine..."
                 if ! $DOCKER_COMPOSE_CMD -f "$(active_compose_file)" exec -T zyrabit-engine ollama pull "${embedding_model}"; then
                     log_warn "Failed to pull embedding model '${embedding_model}'. Document RAG may be degraded."
@@ -848,6 +911,7 @@ cleanup_stale_containers() {
 run_start() {
     require_docker
     ensure_data_directories
+    migrate_env_config
     cleanup_stale_containers
     local compose_file compose_args
     compose_file="$(active_compose_file)"
@@ -923,12 +987,8 @@ run_start() {
         if [[ "${current_provider}" == "tenstorrent" || "${current_provider}" == "vllm" ]]; then
             echo -e "  ${CYAN}➜ NPU Engine (vLLM)${NC}   http://localhost:8090"
         fi
-        if [[ "$(docker_container_status zyrabit-grafana)" == "running" ]]; then
-            echo -e "  ${CYAN}➜ Grafana Dashboard${NC}    http://localhost:3000"
-        fi
-        if [[ "$(docker_container_status zyrabit-prometheus)" == "running" ]]; then
-            echo -e "  ${CYAN}➜ Prometheus Metrics${NC}   http://localhost:9090"
-        fi
+        echo -e "  ${CYAN}➜ Grafana Dashboard${NC}    http://localhost:3000"
+        echo -e "  ${CYAN}➜ Prometheus Metrics${NC}   http://localhost:9090"
         echo -e "  ${CYAN}➜ Vector DB (Chroma)${NC}   http://localhost:8000"
         echo -e "  ${CYAN}➜ MCP Agent Server${NC}     http://localhost:8001"
     else
@@ -998,47 +1058,68 @@ run_verify() {
     done
 
     echo -e "\n  ${BOLD}Containers:${NC} ${GREEN}${pass} up${NC}  ${RED}${fail} down${NC}"
+    local rc=0
+    if [[ $fail -gt 0 ]]; then
+        rc=1
+    fi
+
     local base_url; base_url="$(api_base_url)"
-    log_info "Probing ${base_url}/health (waiting for ready state)..."
+    log_info "Probing ${base_url}/health (waiting up to 60s for initialization)..."
     local health_resp=""
-    local ready=false
-    for _ in {1..8}; do
-        if health_resp=$(curl -sk -m 4 "${base_url}/health" 2>/dev/null); then
-            if echo "${health_resp}" | grep -q '"status":[[:space:]]*"OPERATIONAL"'; then
-                log_ok "API is fully operational."
-                ready=true
-                break
-            elif echo "${health_resp}" | grep -q '"status":[[:space:]]*"DEGRADED"'; then
-                log_warn "API is in DEGRADED state. Some services (database, node or model) are not ready."
-                ready=true
-                break
+    local api_ready=false
+    for ((i=1; i<=20; i++)); do
+        health_resp=$(curl -sk -m 5 "${base_url}/health" 2>/dev/null || true)
+        if echo "${health_resp}" | grep -q '"status":[[:space:]]*"OPERATIONAL"'; then
+            api_ready=true
+            log_ok "API is fully operational."
+            break
+        elif echo "${health_resp}" | grep -q '"status":[[:space:]]*"DEGRADED"'; then
+            if [[ $i -eq 20 ]]; then
+                local degraded_caps
+                degraded_caps=$(echo "${health_resp}" | grep -o '"name":[[:space:]]*"[^"]*",[[:space:]]*"status":[[:space:]]*"[^"]*"' | grep -v '"status":"ready"' | tr -d '"{},' || true)
+                if [[ -n "$degraded_caps" ]]; then
+                    log_warn "API is in DEGRADED state (${degraded_caps})."
+                else
+                    log_warn "API is in DEGRADED state. Some services (database, node or model) are not ready."
+                fi
+                rc=1
             fi
         fi
-        sleep 2
+        sleep 3
     done
-    if [[ "${ready}" == "false" ]]; then
-        log_warn "API not responding yet (may still be initializing). Check: docker logs zyrabit-api --tail 30"
+
+    if [[ "$api_ready" != "true" ]]; then
+        if ! echo "${health_resp}" | grep -q '"status":[[:space:]]*"DEGRADED"'; then
+            log_err "API not responding. Check: docker logs zyrabit-api --tail 30"
+            rc=1
+        fi
     fi
 
     # Smoke test: verify that chat completions work
     local api_key; api_key=$(web_api_key)
     if [[ -n "${api_key}" ]]; then
-        log_info "Running chat smoke test on ${base_url}/chat ..."
+        log_info "Running chat smoke test on ${base_url}/chat (timeout 60s)..."
         local chat_code
-        chat_code=$(curl -sk -o /dev/null -w "%{http_code}" -m 15 -X POST "${base_url}/chat" \
+        chat_code=$(curl -sk -o /dev/null -w "%{http_code}" -m 60 -X POST "${base_url}/chat" \
             -H "Content-Type: application/json" \
             -H "Authorization: Bearer ${api_key}" \
-            -d '{"text":"ping"}' 2>/dev/null || echo "000")
+            -d '{"text":"ping"}' 2>/dev/null) || true
+        chat_code="${chat_code:-000}"
         if [[ "${chat_code}" == "200" ]]; then
             log_ok "Chat smoke test passed (HTTP 200)."
         elif [[ "${chat_code}" == "503" ]]; then
             log_err "Chat smoke test FAILED (HTTP 503: Document node not initialized). Check permissions and logs: docker logs zyrabit-api --tail 40"
+            rc=1
         elif [[ "${chat_code}" == "000" ]]; then
-            log_warn "Chat smoke test timed out or connection refused."
+            log_err "Chat smoke test timed out or connection refused (HTTP 000)."
+            rc=1
         else
             log_warn "Chat smoke test returned HTTP ${chat_code}."
+            rc=1
         fi
     fi
+
+    return $rc
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
