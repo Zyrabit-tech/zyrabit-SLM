@@ -165,11 +165,12 @@ curl -X POST http://localhost:8088/v1/chat \
 <details>
 <summary><b>Linux (Ubuntu / Debian / RHEL)</b></summary>
 
-- **Docker permissions:** Ensure your user is in the `docker` group so you do not need `sudo`:
+- **Docker permissions:** Ensure your user is in the `docker` group so you do not need `sudo` *(Note: membership in the `docker` group provides administrative privileges equivalent to root)*:
   ```bash
   sudo usermod -aG docker $USER && newgrp docker
   ```
-- **Execution:** Run `./zyra.sh install`. Directory permissions for `./db_data` and `./document_source` (UID 10001) are automatically configured.
+- **Execution:** Run `./zyra.sh install`. Directory permissions for `./db_data` and `./document_source` (UID 10001) are automatically and securely adjusted without leaving files world-writable.
+- **Host Ollama on Linux:** If using host Ollama instead of Docker, ensure Ollama listens on `0.0.0.0` (e.g. `OLLAMA_HOST=0.0.0.0:11434 systemctl restart ollama`) so containers can reach the host interface.
 </details>
 
 <details>
@@ -183,7 +184,7 @@ curl -X POST http://localhost:8088/v1/chat \
 <summary><b>Windows (WSL2)</b></summary>
 
 - **File System:** Clone the repository inside your WSL2 Linux home directory (e.g. `~/zyrabit-SLM`), **never** in `/mnt/c/` (Windows NTFS) to avoid SQLite file locking issues.
-- **Line Endings (CRLF vs LF):** Ensure Git preserves Unix line endings before cloning:
+- **Line Endings (CRLF vs LF):** Ensure Git preserves Unix line endings before cloning (enforced via `.gitattributes` or global config):
   ```bash
   git config --global core.autocrlf input
   ```
@@ -197,7 +198,8 @@ By default, the installer pulls and configures `mxbai-embed-large` for document 
   # For multilingual / Spanish optimization:
   EMBEDDING_MODEL=bge-m3
   ```
-- **Network routing:** In Docker mode, embeddings resolve internally via `http://zyrabit-engine:11434`.
+  *(Remember to pull the new model with `ollama pull bge-m3` and re-index documents so vector dimensions remain consistent).*
+- **Network routing:** In Docker mode, embeddings resolve internally via `http://zyrabit-engine:11434` (and `http://host.docker.internal:11434` for host/Metal providers). All endpoints are bound to `127.0.0.1` by default via `ZYRABIT_BIND_IP` for security.
 
 > [!TIP]
 > **Avoid using `sudo ./zyra.sh`**: Running scripts with `sudo` creates root-owned files that disrupt user permissions. If you encounter Docker permission issues, add your user to the docker group: `sudo usermod -aG docker $USER && newgrp docker`.

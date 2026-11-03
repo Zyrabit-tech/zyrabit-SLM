@@ -972,7 +972,7 @@ run_start() {
             $DOCKER_COMPOSE_CMD "${compose_args[@]}" up -d --remove-orphans --scale zyrabit-engine=0 2>/dev/null ||
             $DOCKER_COMPOSE_CMD "${compose_args[@]}" up -d --remove-orphans
         else
-            log_info "Starting local services (Web UI, API RAG, Vector DB, Grafana, Prometheus)..."
+            log_info "Starting local services (Web UI, API RAG, Vector DB)..."
             $DOCKER_COMPOSE_CMD "${compose_args[@]}" up -d --remove-orphans
         fi
     fi
