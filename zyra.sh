@@ -401,22 +401,22 @@ run_setup_config() {
         if [[ "${INFERENCE_PROVIDER}" == "tenstorrent" ]]; then
             if [[ "$val" == *"1.5"* || "$val" == *"1.5b"* || "$val" == *"1.5B"* || "$val" == *"3b"* || "$val" == *"3B"* ]]; then
                 if [[ $found_top_rec -eq 0 ]]; then
-                    tag_rec=" ${BOLD}${GREEN}★ RECOMENDADO (Nativo Tenstorrent NPU — <80ms TTFT)${NC}"
+                    tag_rec=" ${BOLD}${GREEN}★ RECOMMENDED (Native Tenstorrent NPU — <80ms TTFT)${NC}"
                     found_top_rec=1
                 fi
             elif [[ "$val" == *"7b"* || "$val" == *"7B"* || "$val" == *"8x7b"* ]]; then
-                tag_note=" ${YELLOW}(7B+ requiere multi-tarjeta en NPU o CPU)${NC}"
+                tag_note=" ${YELLOW}(7B+ requires multi-card on NPU or CPU)${NC}"
             fi
         else
             if [[ $found_top_rec -eq 0 ]]; then
                 if [[ "$val" == *"deepseek-r1:7b"* || "$val" == *"deepseek-r1"* ]] && [[ "$ram" -ge 8 ]]; then
-                    tag_rec=" ${BOLD}${GREEN}★ RECOMENDADO (${hw_rec_prefix}, Razonamiento Avanzado)${NC}"
+                    tag_rec=" ${BOLD}${GREEN}★ RECOMMENDED (${hw_rec_prefix}, Advanced Reasoning)${NC}"
                     found_top_rec=1
                 elif [[ "$val" == *"qwen2.5:7b"* ]] && [[ "$ram" -ge 8 ]]; then
-                    tag_rec=" ${BOLD}${GREEN}★ RECOMENDADO (${hw_rec_prefix}, Producción Balanceada)${NC}"
+                    tag_rec=" ${BOLD}${GREEN}★ RECOMMENDED (${hw_rec_prefix}, Balanced Production)${NC}"
                     found_top_rec=1
                 elif [[ "$val" == *"qwen2.5:3b"* || "$val" == *"qwen2.5:1.5b"* ]]; then
-                    tag_rec=" ${BOLD}${GREEN}★ RECOMENDADO (${hw_rec_prefix}, Ultra Rápido)${NC}"
+                    tag_rec=" ${BOLD}${GREEN}★ RECOMMENDED (${hw_rec_prefix}, Ultra-fast)${NC}"
                     found_top_rec=1
                 fi
             fi
@@ -433,7 +433,7 @@ run_setup_config() {
     echo ""
     local opt_num=1
     if [[ ${#raw_detected[@]} -gt 0 ]]; then
-        echo -e "   ${GREEN}⚡ Modelos Locales Detectados (Listos, sin descargas):${NC}"
+        echo -e "   ${GREEN}⚡ Local Models Detected (Ready, no download):${NC}"
         for lbl in "${menu_labels[@]}"; do
             echo -e "   ${BOLD}${opt_num})${NC} ${lbl}"
             ((opt_num++))
@@ -442,15 +442,15 @@ run_setup_config() {
     fi
 
     # Standard Catalogue additions
-    echo -e "   ${CYAN}🌐 O Descargar un Modelo del Catálogo:${NC}"
+    echo -e "   ${CYAN}🌐 Or Download a Model from the Catalogue:${NC}"
 
     local cat_models=()
     if [[ "${INFERENCE_PROVIDER}" == "tenstorrent" ]]; then
         cat_models=(
-            "qwen2.5:3b|qwen2.5:3b     ~3 GB  — Ultra-fast (<81ms TTFT, Nativo 1x Tenstorrent p150)"
-            "deepseek-r1:1.5b|deepseek-r1:1.5b ~2 GB  — Reasoning CoT (Nativo 1x Tenstorrent p150)"
-            "qwen2.5:7b|qwen2.5:7b     ~8 GB  — Balanced production (Requiere multi-tarjeta en NPU)"
-            "mixtral:8x7b-instruct|mixtral:8x7b   ~26 GB — Mixture of Experts (Requiere multi-tarjeta en NPU)"
+            "qwen2.5:3b|qwen2.5:3b     ~3 GB  — Ultra-fast (<81ms TTFT, Native 1x Tenstorrent p150)"
+            "deepseek-r1:1.5b|deepseek-r1:1.5b ~2 GB  — Reasoning CoT (Native 1x Tenstorrent p150)"
+            "qwen2.5:7b|qwen2.5:7b     ~8 GB  — Balanced production (Requires multi-card on NPU)"
+            "mixtral:8x7b-instruct|mixtral:8x7b   ~26 GB — Mixture of Experts (Requires multi-card on NPU)"
         )
     else
         cat_models=(
@@ -481,15 +481,15 @@ run_setup_config() {
         if [[ $found_top_rec -eq 0 ]]; then
             if [[ "${INFERENCE_PROVIDER}" == "tenstorrent" ]]; then
                 if [[ "$c_val" == "qwen2.5:3b" || "$c_val" == "deepseek-r1:1.5b" ]]; then
-                    tag_rec=" ${BOLD}${GREEN}★ RECOMENDADO (Nativo Tenstorrent NPU)${NC}"
+                    tag_rec=" ${BOLD}${GREEN}★ RECOMMENDED (Native Tenstorrent NPU)${NC}"
                     found_top_rec=1
                 fi
             else
                 if [[ "$c_val" == "qwen2.5:7b" && "$ram" -ge 8 ]]; then
-                    tag_rec=" ${BOLD}${GREEN}★ RECOMENDADO para ${hw_rec_prefix}${NC}"
+                    tag_rec=" ${BOLD}${GREEN}★ RECOMMENDED for ${hw_rec_prefix}${NC}"
                     found_top_rec=1
                 elif [[ "$c_val" == "qwen2.5:3b" ]]; then
-                    tag_rec=" ${BOLD}${GREEN}★ RECOMENDADO para ${hw_rec_prefix}${NC}"
+                    tag_rec=" ${BOLD}${GREEN}★ RECOMMENDED for ${hw_rec_prefix}${NC}"
                     found_top_rec=1
                 fi
             fi
@@ -506,12 +506,12 @@ run_setup_config() {
 
     # Custom model option
     local custom_idx=${opt_num}
-    echo -e "   ${BOLD}${custom_idx})${NC} Escribir nombre de modelo personalizado o ruta a .gguf\n"
+    echo -e "   ${BOLD}${custom_idx})${NC} Custom model name or path to .gguf\n"
 
-    read -rp "   Selecciona una opción [${best_rec_idx}]: " _c; _c="${_c:-${best_rec_idx}}"
+    read -rp "   Select an option [${best_rec_idx}]: " _c; _c="${_c:-${best_rec_idx}}"
 
     if [[ "$_c" == "${custom_idx}" ]]; then
-        read -rp "   Introduce el nombre o ruta del modelo: " OVERRIDE_MODEL
+        read -rp "   Enter model name or file path: " OVERRIDE_MODEL
     elif [[ "$_c" =~ ^[0-9]+$ ]] && [[ "$_c" -ge 1 && "$_c" -le ${#menu_values[@]} ]]; then
         local chosen_arr_idx=$(( _c - 1 ))
         OVERRIDE_MODEL="${menu_values[$chosen_arr_idx]}"
@@ -523,7 +523,7 @@ run_setup_config() {
         OVERRIDE_MODEL="${menu_values[$(( best_rec_idx - 1 ))]}"
     fi
 
-    log_ok "Modelo seleccionado: ${OVERRIDE_MODEL}"
+    log_ok "Selected model: ${OVERRIDE_MODEL}"
 
     # ── 3. Autonomous ReAct Agent & MCP Tools ──────────────────────────────────
     log_step "3/4  Agentic Loop & Tool Execution (ReAct)"
@@ -1456,7 +1456,7 @@ except Exception:
             bench_prompt="Explain the key mechanisms and consensus model in ${target_doc} with evidence."
             log_info "Targeting indexed document evidence: [${target_doc}]"
         else
-            bench_prompt="Resume los puntos clave de los documentos indexados en el repositorio."
+            bench_prompt="Summarize the key points from the indexed repository documents."
         fi
 
         log_info "Running warm benchmark (RAG search + Inference) via ${base_url}/chat ..."
@@ -1725,7 +1725,7 @@ fi
 for CMD in "${COMMANDS[@]}"; do
     case "${CMD}" in
         install)   run_install   ;;
-        wizard)    log_warn "El comando 'wizard' ha sido eliminado. Usa './zyra.sh install' para instalar y configurar."; run_install ;;
+        wizard)    log_warn "The 'wizard' command has been removed. Use './zyra.sh install' to install and configure."; run_install ;;
         start|up)  run_start     ;;
         stop)      run_stop      ;;
         verify)    run_verify    ;;
