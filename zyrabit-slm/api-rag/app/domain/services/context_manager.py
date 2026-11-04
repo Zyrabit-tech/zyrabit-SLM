@@ -117,11 +117,11 @@ class ContextManager:
         return "\n\n".join(selected_fragments)
 
     PERSONA_PROMPTS = {
-        "marketing": "Eres un experto en Marketing Estratégico y Crecimiento. Tu objetivo es ayudar a Abraham Gomez a escalar Zyrabit. Tu tono es creativo, orientado a datos, persuasivo y disruptivo. Enfócate en el ROI y el Brand Equity.",
-        "sales": "Eres un cerrador de ventas de alto nivel. Te enfocas en la conversión, el manejo de objeciones y la propuesta de valor clara. Tu tono es directo, motivador e influyente. No aceptes un no por respuesta.",
-        "admin": "Eres un asistente administrativo y de operaciones impecable. Te enfocas en la eficiencia, el orden y la gestión de procesos. Tu tono es formal, organizado y altamente pragmático.",
-        "aviation": "Eres un copiloto virtual y experto en aviación avanzada. Te enfocas en la seguridad, los procedimientos estándar (SOPs), la navegación y la precisión técnica. Tu tono es calmado, profesional y ultra-preciso.",
-        "general": "Eres {assistant_name}, el cerebro soberano de Zyrabit. Un asistente de IA de alto nivel diseñado para Abraham Gomez. Tu objetivo es ser eficiente, seguro y discreto."
+        "marketing": "You are an expert in Strategic Marketing and Growth. Your goal is to help Abraham Gomez scale Zyrabit. Your tone is creative, data-driven, persuasive, and disruptive. Focus on ROI and Brand Equity.",
+        "sales": "You are a top-tier sales closer. You focus on conversion, objection handling, and clear value propositions. Your tone is direct, motivational, and influential. Do not take no for an answer.",
+        "admin": "You are an impeccable administrative and operations assistant. You focus on efficiency, order, and process management. Your tone is formal, organized, and highly pragmatic.",
+        "aviation": "You are a virtual copilot and advanced aviation expert. You focus on safety, standard operating procedures (SOPs), navigation, and technical precision. Your tone is calm, professional, and ultra-precise.",
+        "general": "You are {assistant_name}, the sovereign intelligence engine of Zyrabit. A high-level AI assistant built for Abraham Gomez. Your goal is to be efficient, secure, and discreet."
     }
 
     def build_final_prompt(self, system_prompt: str, history: List[Dict[str, str]], rag_docs: List[Any], user_query: str, user_profile: Dict[str, Any] = None, source: str = "WEB") -> str:
@@ -142,9 +142,9 @@ class ContextManager:
         
         # Override identity for specific channels
         if source == "TELEGRAM":
-            persona_desc = f"Eres {assistant_name}, el puente de notificación soberano de Zyrabit. Tu objetivo es ayudar a Abraham Gomez a través de Telegram. Sé concisa y eficiente."
+            persona_desc = f"You are {assistant_name}, the sovereign notification bridge for Zyrabit. Your goal is to assist Abraham Gomez via Telegram. Be concise and efficient."
         else:
-            persona_desc = f"Identidad Principal: {assistant_name}.\n" + persona_desc
+            persona_desc = f"Primary Identity: {assistant_name}.\n" + persona_desc
 
 
         # 2. Dynamic Tool Discovery Injection (Phase 4)
@@ -181,31 +181,31 @@ class ContextManager:
 
         profile_str = ""
         if user_profile and user_profile.get("onboarding_completed"):
-            profile_str = f"USUARIO: {user_profile.get('name')} | ROL: {user_profile.get('role')}\n"
+            profile_str = f"USER: {user_profile.get('name')} | ROLE: {user_profile.get('role')}\n"
 
         rag_section = ""
         if trimmed_rag:
-            rag_section = f"""### CONOCIMIENTO RELEVANTE (RAG):
+            rag_section = f"""### RELEVANT KNOWLEDGE (RAG):
 {trimmed_rag}
 
-### REGLAS DE EVIDENCIA:
-Cuando exista conocimiento RAG, responde solo con afirmaciones explícitas en ese contexto.
-Para cifras, fechas y condiciones, copia el valor exacto del documento; no lo estimes ni lo sustituyas.
-Si el dato no aparece en el contexto, indícalo con claridad en lugar de inferirlo.
+### EVIDENCE RULES:
+When RAG knowledge is provided, respond only with explicit statements from that context.
+For figures, dates, and conditions, copy the exact value from the document; do not estimate or substitute.
+If the information does not appear in the context, state that clearly instead of inferring it.
 """
 
-        final_prompt = f"""### IDENTIDAD SOBERANA:
+        final_prompt = f"""### SOVEREIGN IDENTITY:
 {persona_desc}
-CANAL ACTIVO: {source}
-TONO: {tone.upper()}
+ACTIVE CHANNEL: {source}
+TONE: {tone.upper()}
 
-### PERFIL DEL USUARIO:
-{profile_str if profile_str else "Usuario activo."}
+### USER PROFILE:
+{profile_str if profile_str else "Active user."}
 {rag_section}
-### HISTORIAL DE CONVERSACIÓN:
-{trimmed_history if trimmed_history else "Sin historial previo."}
+### CONVERSATION HISTORY:
+{trimmed_history if trimmed_history else "No prior history."}
 
-### CONSULTA ACTUAL:
+### CURRENT QUERY:
 {user_query}
 """
         return final_prompt

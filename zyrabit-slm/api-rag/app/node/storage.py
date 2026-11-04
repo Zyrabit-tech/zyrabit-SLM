@@ -30,3 +30,11 @@ class LocalSourceStore:
             media_type=mimetypes.guess_type(filename)[0] or "application/octet-stream",
             sha256=sha256, size_bytes=target.stat().st_size, stored_path=str(target),
         )
+
+    def delete(self, stored_path: str) -> None:
+        target = Path(stored_path)
+        if target.exists() and target.is_file():
+            try:
+                target.unlink()
+            except OSError:
+                pass

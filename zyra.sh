@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # ──────────────────────────────────────────────────────────────────────────────
 #   ZYRABIT SLM — Unified CLI
-#   Version: 2.3.1
+#   Version: 2.4.8
 #   Usage: ./zyra.sh [command] [options]
 # ──────────────────────────────────────────────────────────────────────────────
 
@@ -212,15 +212,14 @@ ensure_data_directories() {
     # on Linux and WSL2 hosts without requiring root/sudo
     [[ "$(uname -s)" == "Darwin" ]] && return 0
 
-    if find "${base}/db_data" "${base}/document_source" ! -user 10001 ! -name .gitkeep -print -quit 2>/dev/null | grep -q .; then
-        log_info "Ajustando propiedad y permisos de volúmenes de datos a UID 10001..."
-        if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then
-            docker run --rm -v "${base}/db_data:/d1" -v "${base}/document_source:/d2" busybox \
-                sh -c "chown -R 10001:\$(id -g) /d1 /d2 && chmod -R u+rwX,g+rwX,o-rwx /d1 /d2 && find /d1 /d2 -type d -exec chmod g+s {} +" \
-                || { log_err "No se pudieron ajustar permisos de db_data/document_source con contenedor auxiliar."; return 1; }
-        else
-            chmod -R u+rwX,g+rwX,o-rwx "${base}/db_data" "${base}/document_source" 2>/dev/null || true
-        fi
+    log_info "Adjusting data volume ownership and permissions to UID 10001..."
+    if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then
+        docker run --rm -e HOST_GID="$(id -g)" \
+            -v "${base}/db_data:/d1" -v "${base}/document_source:/d2" busybox \
+            sh -c 'chown -R 10001:"$HOST_GID" /d1 /d2 && chmod -R u+rwX,g+rwX,o-rwx /d1 /d2 && find /d1 /d2 -type d -exec chmod g+s {} +' \
+            || { log_err "Failed to adjust permissions on db_data/document_source with helper container."; return 1; }
+    else
+        chmod -R u+rwX,g+rwX,o-rwx "${base}/db_data" "${base}/document_source" 2>/dev/null || true
     fi
 }
 
@@ -667,7 +666,7 @@ run_install() {
     fi
 
     log_info "Model: ${model_name}"
-    ensure_data_directories
+    ensure_data_directories || { log_err "Failed to configure data directory permissions."; exit 1; }
     _build
     run_start
     if ! _pull_models "${model_name}"; then
@@ -689,11 +688,14 @@ migrate_env_config() {
     case "${provider}" in
         ollama_docker|ollama|cuda)
             if grep -q '^EMBEDDING_URL=http://host\.docker\.internal' "${ENV_FILE}" 2>/dev/null; then
-                log_info "Migrando EMBEDDING_URL obsoleto en upgrade (host.docker.internal -> http://zyrabit-engine:11434)..."
+                log_info "Migrating obsolete EMBEDDING_URL during upgrade (host.docker.internal -> http://zyrabit-engine:11434)..."
                 sed -i.bak 's|^EMBEDDING_URL=.*|EMBEDDING_URL=http://zyrabit-engine:11434|' "${ENV_FILE}" 2>/dev/null && rm -f "${ENV_FILE}.bak"
             fi
             ;;
     esac
+    if ! grep -q '^OLLAMA_VERSION=' "${ENV_FILE}" 2>/dev/null; then
+        echo "OLLAMA_VERSION=0.5.12" >> "${ENV_FILE}"
+    fi
 }
 
 ensure_local_secrets() {
@@ -910,7 +912,7 @@ cleanup_stale_containers() {
 
 run_start() {
     require_docker
-    ensure_data_directories
+    ensure_data_directories || return 1
     migrate_env_config
     cleanup_stale_containers
     local compose_file compose_args
@@ -987,8 +989,6 @@ run_start() {
         if [[ "${current_provider}" == "tenstorrent" || "${current_provider}" == "vllm" ]]; then
             echo -e "  ${CYAN}➜ NPU Engine (vLLM)${NC}   http://localhost:8090"
         fi
-        echo -e "  ${CYAN}➜ Grafana Dashboard${NC}    http://localhost:3000"
-        echo -e "  ${CYAN}➜ Prometheus Metrics${NC}   http://localhost:9090"
         echo -e "  ${CYAN}➜ Vector DB (Chroma)${NC}   http://localhost:8000"
         echo -e "  ${CYAN}➜ MCP Agent Server${NC}     http://localhost:8001"
     else
@@ -1116,6 +1116,54 @@ run_verify() {
         else
             log_warn "Chat smoke test returned HTTP ${chat_code}."
             rc=1
+        fi
+
+        # Smoke test: verify that document ingestion, storage, and deletion work
+        log_info "Running document ingestion smoke test on ${base_url}/sources/import (timeout 45s)..."
+        local doc_tmp; doc_tmp=$(mktemp "/tmp/zyrabit-smoke-XXXXXX.txt")
+        echo "Zyrabit sovereign node document verification test token $(date +%s)" > "${doc_tmp}"
+        local upload_out upload_code upload_body doc_id
+        upload_out=$(curl -sk -m 30 -w "\n%{http_code}" -X POST "${base_url}/sources/import" \
+            -H "Authorization: Bearer ${api_key}" \
+            -F "file=@${doc_tmp}" 2>/dev/null) || true
+        rm -f "${doc_tmp}"
+        upload_code=$(echo "${upload_out}" | tail -n1)
+        upload_body=$(echo "${upload_out}" | sed '$d')
+        doc_id=$(echo "${upload_body}" | grep -o '"document_id":[[:space:]]*"[^"]*"' | head -n1 | cut -d'"' -f4 || true)
+
+        if [[ "${upload_code}" != "200" && "${upload_code}" != "202" ]] || [[ -z "${doc_id}" ]]; then
+            log_err "Document smoke test upload FAILED (HTTP ${upload_code}). Check permissions and logs: docker logs zyrabit-api --tail 40"
+            rc=1
+        else
+            local doc_ready=false
+            local doc_status=""
+            for ((j=1; j<=15; j++)); do
+                local doc_resp
+                doc_resp=$(curl -sk -m 10 "${base_url}/documents/${doc_id}" \
+                    -H "Authorization: Bearer ${api_key}" 2>/dev/null || true)
+                doc_status=$(echo "${doc_resp}" | grep -o '"status":[[:space:]]*"[^"]*"' | head -n1 | cut -d'"' -f4 || true)
+                if [[ "${doc_status}" == "ready" ]]; then
+                    doc_ready=true
+                    break
+                elif [[ "${doc_status}" == "failed" ]]; then
+                    local doc_err
+                    doc_err=$(echo "${doc_resp}" | grep -o '"error":[[:space:]]*"[^"]*"' | head -n1 | cut -d'"' -f4 || true)
+                    log_err "Document smoke test failed processing: ${doc_err}"
+                    break
+                fi
+                sleep 2
+            done
+
+            if [[ "${doc_ready}" == "true" ]]; then
+                log_ok "Document smoke test passed (document ready)."
+            else
+                log_err "Document smoke test FAILED (status: ${doc_status:-timeout}). Check logs: docker logs zyrabit-api --tail 40"
+                rc=1
+            fi
+
+            # Clean up smoke test document
+            curl -sk -m 10 -X DELETE "${base_url}/documents/${doc_id}" \
+                -H "Authorization: Bearer ${api_key}" >/dev/null 2>&1 || true
         fi
     fi
 

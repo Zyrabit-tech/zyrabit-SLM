@@ -154,6 +154,33 @@ class SQLiteNodeStore:
             result["evidence_count"] = conn.execute("SELECT count(*) FROM node_evidence WHERE document_id=?", (document_id,)).fetchone()[0]
             return result
 
+    def delete_document(self, document_id: str) -> dict | None:
+        with self._connect() as conn:
+            doc = conn.execute("SELECT * FROM node_documents WHERE id=?", (document_id,)).fetchone()
+            if not doc:
+                return None
+            doc_dict = dict(doc)
+            source_id = doc_dict["source_id"]
+
+            conn.execute("DELETE FROM node_evidence_fts WHERE document_id=?", (document_id,))
+            conn.execute("DELETE FROM node_evidence WHERE document_id=?", (document_id,))
+            conn.execute("DELETE FROM node_documents WHERE id=?", (document_id,))
+
+            other_docs = conn.execute("SELECT count(*) FROM node_documents WHERE source_id=?", (source_id,)).fetchone()[0]
+            stored_path = None
+            if other_docs == 0:
+                source = conn.execute("SELECT stored_path FROM node_sources WHERE id=?", (source_id,)).fetchone()
+                if source:
+                    stored_path = source["stored_path"]
+                conn.execute("DELETE FROM node_jobs WHERE source_id=?", (source_id,))
+                conn.execute("DELETE FROM node_sources WHERE id=?", (source_id,))
+
+            conn.execute("UPDATE node_session_context SET active_document_id=NULL WHERE active_document_id=?", (document_id,))
+            if other_docs == 0:
+                conn.execute("UPDATE node_session_context SET active_source_id=NULL WHERE active_source_id=?", (source_id,))
+
+            return {"document": doc_dict, "source_id": source_id, "stored_path": stored_path}
+
     def list_documents(self) -> list[dict]:
         with self._connect() as conn:
             # The library represents sources, not every failed/reindexed attempt.

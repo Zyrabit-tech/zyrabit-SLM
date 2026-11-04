@@ -1,13 +1,13 @@
 # ==============================================================================
-# JUSTIFICACIÓN DE MOCKS EN PRUEBAS (TEST INFRASTRUCTURE ISOLATION)
+# TEST DOUBLES RATIONALE (TEST INFRASTRUCTURE ISOLATION)
 # ==============================================================================
-# Propósito: Aislar las pruebas unitarias y de integración de la infraestructura real.
-# Justificación:
-# 1. Permite ejecutar la suite completa en entornos CI/CD sin requerir hardware
-#    acelerador físico (Tenstorrent P150, GPU NVIDIA o Apple Silicon).
-# 2. Evita dependencias de red externas (cero llamadas salientes) garantizando el
-#    principio de soberanía y determinismo de pruebas offline.
-# 3. Protege bases de datos persistentes locales simulando ChromaDB en memoria.
+# Purpose: Isolate unit and integration tests from physical infrastructure.
+# Rationale:
+# 1. Allows running the complete test suite in CI/CD environments without requiring
+#    physical hardware accelerators (Tenstorrent P150, NVIDIA GPU, or Apple Silicon).
+# 2. Avoids external network dependencies (zero egress calls), enforcing sovereign
+#    and deterministic offline testing.
+# 3. Protects persistent local databases by simulating ChromaDB in memory.
 # ==============================================================================
 
 import pytest

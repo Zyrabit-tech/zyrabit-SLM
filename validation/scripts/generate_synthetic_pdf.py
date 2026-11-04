@@ -1,23 +1,23 @@
 #!/usr/bin/env python3
 """
-Script de Validación QA - Generador de PDF Sintético con PII.
+QA Validation Script - Synthetic PDF Generator with PII.
 
-Genera un PDF que contiene:
-- Datos técnicos reales (presiones de válvulas, etc.)
-- PII sintético: tarjetas de crédito, correos, números de seguridad social
+Generates a PDF containing:
+- Technical plant data (valve pressures, etc.)
+- Synthetic PII: credit cards, emails, RFC, CURP, SSN
 
-Uso:
+Usage:
     python validation/scripts/generate_synthetic_pdf.py [output_path]
 """
 import sys
 import os
 
-# Dependencia mínima: reportlab (ya en el entorno o instalar con `uv pip install reportlab`)
+# Minimal dependency: reportlab (already in env or install with `uv pip install reportlab`)
 try:
     from reportlab.pdfgen import canvas
     from reportlab.lib.pagesizes import A4
 except ImportError:
-    print("❌ reportlab no encontrado. Instalar con: uv pip install reportlab")
+    print("❌ reportlab not found. Install with: uv pip install reportlab")
     sys.exit(1)
 
 
@@ -64,15 +64,15 @@ El acceso al panel está restringido al personal con credenciales nivel 3.
 
 
 def generate_pdf(output_path: str) -> None:
-    """Genera el PDF con datos técnicos y PII sintético."""
+    """Generates PDF with technical data and synthetic PII."""
     p = canvas.Canvas(output_path, pagesize=A4)
     width, height = A4
     
-    # Título
+    # Title
     p.setFont("Helvetica-Bold", 16)
-    p.drawString(72, height - 72, "Informe Técnico - Validación PII Zyrabit SLM")
+    p.drawString(72, height - 72, "Technical Report - Zyrabit SLM PII Validation")
     
-    # Contenido línea por línea
+    # Content line by line
     p.setFont("Courier", 9)
     y_pos = height - 110
     for line in SYNTHETIC_CONTENT.strip().split("\n"):
@@ -84,14 +84,14 @@ def generate_pdf(output_path: str) -> None:
         y_pos -= 14
 
     p.save()
-    print(f"✅ PDF generado en: {output_path}")
-    print(f"   Tamaño: {os.path.getsize(output_path):,} bytes")
-    print("\n🔍 El PDF contiene:")
-    print("   - 2 correos electrónicos")
-    print("   - 2 números de tarjeta de crédito")
+    print(f"✅ PDF generated at: {output_path}")
+    print(f"   Size: {os.path.getsize(output_path):,} bytes")
+    print("\n🔍 PDF contains:")
+    print("   - 2 emails")
+    print("   - 2 credit card numbers")
     print("   - 1 SSN (Social Security Number)")
     print("   - 1 RFC, 1 CURP")
-    print("   - Datos técnicos: presiones de válvulas, temperaturas")
+    print("   - Technical data: valve pressures, temperatures")
 
 
 if __name__ == "__main__":

@@ -49,7 +49,7 @@ async def background_ingestion_task(file_path: str, filename: str, ingest_use_ca
         status = res.get("status")
         if status == "success":
             await sio.emit("chat_response", {
-                "response": f"¡Listo! He procesado el documento '{filename}' y ya está disponible en mi Vault. ¿Qué te gustaría que analicemos de él?",
+                "response": f"Ready! Document '{filename}' has been processed and is now available in Vault. What would you like to analyze?",
                 "metadata": {
                     "decision": "ingest-proactive",
                     "latency_ms": 0,
@@ -61,9 +61,9 @@ async def background_ingestion_task(file_path: str, filename: str, ingest_use_ca
         elif status == "skipped":
             logger.info(f"⏩ Document {filename} is already up to date. Skipping user notification.")
         else:
-            error_msg = res.get("message", "Error desconocido durante la ingesta.")
+            error_msg = res.get("message", "Unknown error during ingestion.")
             await sio.emit("chat_response", {
-                "response": f"❌ Lo siento, no he podido procesar el documento '{filename}'. Razón: {error_msg}",
+                "response": f"❌ Sorry, could not process document '{filename}'. Reason: {error_msg}",
                 "metadata": {
                     "decision": "ingest-error",
                     "latency_ms": 0,
@@ -77,7 +77,7 @@ async def background_ingestion_task(file_path: str, filename: str, ingest_use_ca
         logger.error(f"❌ Background ingestion failed for {filename}: {e}")
         if sio:
             await sio.emit("chat_response", {
-                "response": f"❌ Ocurrió un error inesperado al procesar el documento '{filename}'. Razón: {str(e)}",
+                "response": f"❌ An unexpected error occurred while processing document '{filename}'. Reason: {str(e)}",
                 "metadata": {
                     "decision": "ingest-error",
                     "latency_ms": 0,
