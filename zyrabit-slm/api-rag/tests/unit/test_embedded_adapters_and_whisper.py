@@ -1,13 +1,13 @@
 # ==============================================================================
-# JUSTIFICACIÓN DE MOCKS EN PRUEBAS (EMBEDDED C-BINDINGS ISOLATION)
+# TEST DOUBLES RATIONALE (EMBEDDED C-BINDINGS ISOLATION)
 # ==============================================================================
-# Propósito: Verificar el parseo de respuestas, formateo de tokens y cálculo de TTFT
-# en adaptadores embebidos (llama.cpp y MLX).
-# Justificación:
-# Los adaptadores embebidos interactúan con bibliotecas C++ / Metal nativas que requieren
-# modelos GGUF de varios gigabytes cargados en VRAM. Se utiliza aislamiento por mocks
-# exclusivamente en estos tests unitarios para verificar la lógica de adaptación sin
-# requerir descargar archivos GGUF de 4GB+ ni disponer de GPU Apple Metal en máquinas CI Linux.
+# Purpose: Verify response parsing, token formatting, and TTFT calculation
+# across embedded adapters (llama.cpp and MLX).
+# Rationale:
+# Embedded adapters interact with native C++ / Metal libraries requiring
+# multi-gigabyte GGUF models loaded in VRAM. Mock isolation is used exclusively
+# in these unit tests to verify adapter logic without downloading 4GB+ GGUF files
+# or requiring Apple Metal GPUs on Linux CI runners.
 # ==============================================================================
 
 from unittest.mock import MagicMock, patch

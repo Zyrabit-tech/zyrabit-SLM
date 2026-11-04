@@ -1,12 +1,12 @@
 # ==============================================================================
-# JUSTIFICACIÓN DE MOCKS EN PRUEBAS (PROVIDER FACTORY ISOLATION)
+# TEST DOUBLES RATIONALE (PROVIDER FACTORY ISOLATION)
 # ==============================================================================
-# Propósito: Validar que la fábrica de inferencia construye e instancia los adaptadores
-# correctos (Ollama, vLLM, Tenstorrent, Gemini) según las variables de entorno.
-# Justificación:
-# Se utiliza `unittest.mock.patch` sobre el entorno y llamadas HTTP de sondeo para
-# verificar la lógica de selección de adaptadores sin necesidad de conexión física
-# a endpoints remotos durante la ejecución de los tests.
+# Purpose: Validate that the inference factory builds and instantiates the
+# correct adapters (Ollama, vLLM, Tenstorrent, Gemini) according to environment variables.
+# Rationale:
+# Uses `unittest.mock.patch` on environment and probe HTTP calls to verify
+# adapter selection logic without requiring physical connections to remote endpoints
+# during test execution.
 # ==============================================================================
 
 from unittest.mock import MagicMock, patch

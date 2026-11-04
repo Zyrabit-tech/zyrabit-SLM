@@ -212,12 +212,12 @@ ensure_data_directories() {
     # on Linux and WSL2 hosts without requiring root/sudo
     [[ "$(uname -s)" == "Darwin" ]] && return 0
 
-    log_info "Ajustando propiedad y permisos de volúmenes de datos a UID 10001..."
+    log_info "Adjusting data volume ownership and permissions to UID 10001..."
     if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then
         docker run --rm -e HOST_GID="$(id -g)" \
             -v "${base}/db_data:/d1" -v "${base}/document_source:/d2" busybox \
             sh -c 'chown -R 10001:"$HOST_GID" /d1 /d2 && chmod -R u+rwX,g+rwX,o-rwx /d1 /d2 && find /d1 /d2 -type d -exec chmod g+s {} +' \
-            || { log_err "No se pudieron ajustar permisos de db_data/document_source con contenedor auxiliar."; return 1; }
+            || { log_err "Failed to adjust permissions on db_data/document_source with helper container."; return 1; }
     else
         chmod -R u+rwX,g+rwX,o-rwx "${base}/db_data" "${base}/document_source" 2>/dev/null || true
     fi
@@ -666,7 +666,7 @@ run_install() {
     fi
 
     log_info "Model: ${model_name}"
-    ensure_data_directories || { log_err "Fallo al configurar permisos de los directorios de datos."; exit 1; }
+    ensure_data_directories || { log_err "Failed to configure data directory permissions."; exit 1; }
     _build
     run_start
     if ! _pull_models "${model_name}"; then
@@ -688,7 +688,7 @@ migrate_env_config() {
     case "${provider}" in
         ollama_docker|ollama|cuda)
             if grep -q '^EMBEDDING_URL=http://host\.docker\.internal' "${ENV_FILE}" 2>/dev/null; then
-                log_info "Migrando EMBEDDING_URL obsoleto en upgrade (host.docker.internal -> http://zyrabit-engine:11434)..."
+                log_info "Migrating obsolete EMBEDDING_URL during upgrade (host.docker.internal -> http://zyrabit-engine:11434)..."
                 sed -i.bak 's|^EMBEDDING_URL=.*|EMBEDDING_URL=http://zyrabit-engine:11434|' "${ENV_FILE}" 2>/dev/null && rm -f "${ENV_FILE}.bak"
             fi
             ;;

@@ -1,11 +1,11 @@
 # ==============================================================================
-# JUSTIFICACIÓN DE TEST DOUBLES (SECURITY SERVICE ISOLATION)
+# TEST DOUBLES RATIONALE (SECURITY SERVICE ISOLATION)
 # ==============================================================================
-# Propósito: Verificar que la capa de servicios y gatekeeper sanitizan información
-# PII (nombres, correos, etc.) ANTES de despachar la petición al motor de inferencia.
-# Justificación:
-# Se utiliza un DummyProvider en memoria para capturar el payload exacto que recibiría
-# el motor físico y comprobar de forma determinista que no contiene datos sensibles sin enmascarar.
+# Purpose: Verify that the service layer and gatekeeper sanitize PII (names,
+# emails, etc.) BEFORE dispatching the request to the inference engine.
+# Rationale:
+# Uses an in-memory DummyProvider to capture the exact payload dispatched to
+# the physical engine and deterministically verify that it contains no unmasked sensitive data.
 # ==============================================================================
 
 from unittest.mock import patch

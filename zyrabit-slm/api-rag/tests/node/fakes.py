@@ -1,13 +1,13 @@
 from __future__ import annotations
 
 # ==============================================================================
-# JUSTIFICACIÓN DE TEST DOUBLE (IN-MEMORY VECTOR INDEX CONTRACT DOUBLE)
+# TEST DOUBLE RATIONALE (IN-MEMORY VECTOR INDEX CONTRACT DOUBLE)
 # ==============================================================================
-# Propósito: Simular almacenamiento de vectores en memoria para validar el flujo
-# de ingesta, aislamiento de scopes y contratos de la API Node.
-# Justificación:
-# Permite validar la lógica de índices y extracción de evidencias sin depender
-# de un servidor ChromaDB activo ni escribir archivos temporales en disco.
+# Purpose: Simulate in-memory vector storage to validate ingestion flow,
+# scope isolation, and Node API contracts.
+# Rationale:
+# Validates indexing logic and evidence extraction without depending on an
+# active ChromaDB server or writing temporary files to disk.
 # ==============================================================================
 
 

@@ -1,30 +1,30 @@
 #!/usr/bin/env bash
 # =============================================================================
-# monitor_memory.sh — Monitor de Memoria Docker para Zyrabit SLM
+# monitor_memory.sh — Docker Memory Monitor for Zyrabit SLM
 #
-# Uso:
+# Usage:
 #   ./validation/scripts/monitor_memory.sh [duration_seconds] [interval_seconds]
 #
-# Ejemplos:
-#   ./validation/scripts/monitor_memory.sh 60 2      # 60s total, muestrea c/2s
-#   ./validation/scripts/monitor_memory.sh 300 5     # 5 min total, c/5s
+# Examples:
+#   ./validation/scripts/monitor_memory.sh 60 2      # 60s total, sample every 2s
+#   ./validation/scripts/monitor_memory.sh 300 5     # 5 min total, every 5s
 #
-# Salida: CSV en validation/reports/memory_<timestamp>.csv
-# Alerta: Si algún contenedor supera 14GB, muestra advertencia en rojo.
+# Output: CSV in validation/reports/memory_<timestamp>.csv
+# Alert: If any container exceeds 14GB, displays warning in red.
 # =============================================================================
 
 set -euo pipefail
 
-# ────────────────── Configuración ──────────────────
-DURATION=${1:-120}          # segundos totales de monitoreo
-INTERVAL=${2:-5}            # segundos entre muestras
-THRESHOLD_GB=14             # límite de alerta en GB
+# ────────────────── Configuration ──────────────────
+DURATION=${1:-120}          # total monitoring seconds
+INTERVAL=${2:-5}            # seconds between samples
+THRESHOLD_GB=14             # alert threshold in GB
 REPORT_DIR="$(dirname "$(dirname "$0")")/reports"
 TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
 OUTPUT_FILE="${REPORT_DIR}/memory_${TIMESTAMP}.csv"
 ALERT_TRIGGERED=false
 
-# Colores para terminal
+# Terminal colors
 RED='\033[0;31m'
 YELLOW='\033[1;33m'
 GREEN='\033[0;32m'
@@ -36,14 +36,14 @@ mkdir -p "$REPORT_DIR"
 
 echo "container_name,timestamp,mem_usage_mb,mem_limit_mb,mem_percent,cpu_percent" > "$OUTPUT_FILE"
 
-echo -e "${CYAN}🔍 Monitor de Memoria Zyrabit SLM${NC}"
-echo -e "   Duración:  ${DURATION}s"
-echo -e "   Intervalo: ${INTERVAL}s"
-echo -e "   Umbral:    ${THRESHOLD_GB}GB"
-echo -e "   Reporte:   ${OUTPUT_FILE}"
+echo -e "${CYAN}🔍 Zyrabit SLM Memory Monitor${NC}"
+echo -e "   Duration:  ${DURATION}s"
+echo -e "   Interval:  ${INTERVAL}s"
+echo -e "   Threshold: ${THRESHOLD_GB}GB"
+echo -e "   Report:    ${OUTPUT_FILE}"
 echo ""
 
-# ────────────────── Loop de monitoreo ──────────────────
+# ────────────────── Monitoring Loop ──────────────────
 START=$(date +%s)
 END=$((START + DURATION))
 SAMPLE=0
@@ -52,10 +52,10 @@ while [ "$(date +%s)" -lt "$END" ]; do
     SAMPLE=$((SAMPLE + 1))
     NOW=$(date +"%Y-%m-%dT%H:%M:%S")
 
-    # Obtiene stats de Docker para todos los contenedores Zyrabit
-    # Formato: NAME, MEM USAGE / LIMIT, MEM %, CPU %
+    # Fetch Docker stats for all Zyrabit containers
+    # Format: NAME, MEM USAGE / LIMIT, MEM %, CPU %
     while IFS='|' read -r name mem_raw mem_limit_raw mem_pct cpu_pct; do
-        # Parsear valores (e.g. "1.23GiB" -> MB)
+        # Parse values (e.g. "1.23GiB" -> MB)
         parse_to_mb() {
             local val="$1"
             if [[ "$val" == *GiB ]]; then
@@ -73,42 +73,42 @@ while [ "$(date +%s)" -lt "$END" ]; do
         mem_limit_mb=$(parse_to_mb "$mem_limit_raw")
         mem_gb=$(echo "scale=2; $mem_mb / 1024" | bc)
 
-        # Verificar umbral
+        # Check threshold
         if (( $(echo "$mem_gb > $THRESHOLD_GB" | bc -l) )); then
-            echo -e "${RED}⚠️  ALERTA: ${name} usa ${mem_gb}GB (>${THRESHOLD_GB}GB)!${NC}"
+            echo -e "${RED}⚠️  ALERT: ${name} uses ${mem_gb}GB (>${THRESHOLD_GB}GB)!${NC}"
             ALERT_TRIGGERED=true
         fi
 
-        # Escribir al CSV
+        # Write to CSV
         echo "${name},${NOW},${mem_mb},${mem_limit_mb},${mem_pct%\%},${cpu_pct%\%}" >> "$OUTPUT_FILE"
 
     done < <(docker stats --no-stream --format "{{.Name}}|{{.MemUsage}}" \
         2>/dev/null | \
         awk -F'[|/]' '{gsub(/ /,""); print $1"|"$2"|"$3"|50%|0%"}' || echo "")
 
-    # Output en terminal cada 5 muestras
+    # Terminal output every 5 samples
     if (( SAMPLE % 5 == 1 )) || (( SAMPLE == 1 )); then
-        echo -e "${CYAN}[${NOW}] Muestra #${SAMPLE}${NC}"
+        echo -e "${CYAN}[${NOW}] Sample #${SAMPLE}${NC}"
         docker stats --no-stream --format \
             "  📦 {{.Name}}: {{.MemUsage}} ({{.MemPerc}}) CPU: {{.CPUPerc}}" \
-            2>/dev/null || echo "  (No hay contenedores activos)"
+            2>/dev/null || echo "  (No active containers)"
     fi
 
     sleep "$INTERVAL"
 done
 
-# ────────────────── Resumen ──────────────────
+# ────────────────── Summary ──────────────────
 echo ""
 echo -e "${CYAN}═══════════════════════════════════════${NC}"
-echo -e "${CYAN}  RESUMEN DE MONITOREO${NC}"
+echo -e "${CYAN}  MONITORING SUMMARY${NC}"
 echo -e "${CYAN}═══════════════════════════════════════${NC}"
-echo -e "  Muestras capturadas: ${SAMPLE}"
-echo -e "  Archivo CSV: ${OUTPUT_FILE}"
+echo -e "  Samples captured: ${SAMPLE}"
+echo -e "  CSV output: ${OUTPUT_FILE}"
 
 if [ "$ALERT_TRIGGERED" = true ]; then
-    echo -e "${RED}  ❌ RESULTADO: Se superó el umbral de ${THRESHOLD_GB}GB${NC}"
+    echo -e "${RED}  ❌ RESULT: Exceeded threshold of ${THRESHOLD_GB}GB${NC}"
     exit 1
 else
-    echo -e "${GREEN}  ✅ RESULTADO: Memoria dentro del límite (< ${THRESHOLD_GB}GB)${NC}"
+    echo -e "${GREEN}  ✅ RESULT: Memory within limits (< ${THRESHOLD_GB}GB)${NC}"
     exit 0
 fi
