@@ -562,22 +562,22 @@ class NodeService:
                 if content:
                     recent_items.append(f"{item['role']}: {content[:350]}")
             recent = "\n".join(recent_items)
-            history_block = f"\nConversación previa:\n{recent}\n" if recent else ""
-            return f"""Eres {identity['assistant_name']}, un asistente soberano inteligente, útil y claro con tono {identity['tone']}.
-Responde de manera natural, amable y directa a la consulta o conversación del usuario en su idioma.{history_block}
-Usuario: {question}
+            history_block = f"\nPrevious conversation:\n{recent}\n" if recent else ""
+            return f"""You are {identity['assistant_name']}, an intelligent, helpful, and clear sovereign assistant with a {identity['tone']} tone.
+Respond naturally, helpfully, and directly to the user's inquiry or conversation in their language.{history_block}
+User: {question}
 {identity['assistant_name']}:"""
 
         recent = "\n".join(f"{item['role']}: {str(item['content'])[:450]}" for item in history[-3:])
-        evidence_rule = """Si la consulta del usuario se refiere a los documentos o a la evidencia local provista, fundamenta tu respuesta en ella y añade el identificador [EVIDENCE:uuid] correspondiente.
-Si el usuario solo saluda, agradece, charla de forma casual o hace preguntas generales, responde de manera natural, amable y directa en su idioma sin inventar citas."""
-        return f"""Eres {identity['assistant_name']}, un {identity['persona']} local con tono {identity['tone']}.
+        evidence_rule = """If the user's query refers to the documents or provided local evidence, ground your answer in it and cite the corresponding [EVIDENCE:uuid] identifier.
+If the user is only greeting, thanking, chatting casually, or asking general questions, respond naturally, pleasantly, and directly in their language without inventing citations."""
+        return f"""You are {identity['assistant_name']}, a local {identity['persona']} with a {identity['tone']} tone.
 {evidence_rule}
 
-Conversación reciente:
+Recent conversation:
 {recent}
 
-Evidencia local disponible:
+Available local evidence:
 {evidence}
 
-Pregunta: {question}"""
+Question: {question}"""

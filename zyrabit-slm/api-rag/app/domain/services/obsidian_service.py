@@ -106,13 +106,13 @@ Ensure you use Obsidian tags and standard frontmatter.
 {chat_str}
 
 ### INSTRUCTIONS:
-Create a beautiful, highly structured Markdown note in Spanish.
+Create a beautiful, highly structured Markdown note.
 Include:
-1. Frontmatter (tags: [zyrabit, auto-learning, reflexiones], date, session_id)
-2. Executive Summary (Resumen Ejecutivo)
-3. Key Technical Decisions (Decisiones Técnicas Clave)
-4. Knowledge Graph Connections (Conceptos clave con enlaces [[Obsidian]])
-5. Action Items (Próximos Pasos en formato - [ ] )
+1. Frontmatter (tags: [zyrabit, auto-learning, reflections], date, session_id)
+2. Executive Summary
+3. Key Technical Decisions
+4. Knowledge Graph Connections (Key concepts with [[Obsidian]] links)
+5. Action Items (Next steps in - [ ] format)
 """
 
         # 3. Request LLM Inference
@@ -133,11 +133,11 @@ tags: [zyrabit, auto-learning, fallback]
 date: {datetime.now().strftime('%Y-%m-%d')}
 session: {session_id}
 ---
-# Reflexión de Sesión (Fallback)
-- **Usuario**: {user_name}
-- **Asistente**: {assistant_name}
+# Session Reflection (Fallback)
+- **User**: {user_name}
+- **Assistant**: {assistant_name}
 
-La síntesis mediante IA falló, pero la memoria de la conversación se mantiene intacta en SQLite.
+AI synthesis failed, but conversation memory remains intact in SQLite.
 """
 
         # 4. Save to Vault under "Reflective Notes"

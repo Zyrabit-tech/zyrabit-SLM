@@ -120,7 +120,7 @@ class ChatUseCase:
             # 4. Inference
             # Load system prompt from user profile, fallback to default
             user_profile = SovereignStateManager.get_user_profile()
-            system_prompt = (user_profile.get("system_prompt") or "").strip() or "Eres Zyra, un asistente soberano inteligente, útil y conciso. Responde siempre de manera natural y clara en el idioma del usuario."
+            system_prompt = (user_profile.get("system_prompt") or "").strip() or "You are Zyra, an intelligent, sovereign, helpful, and concise assistant. Always respond naturally and clearly in the user's language."
 
             # 4. Memory Recovery
             if history is None:
@@ -190,7 +190,7 @@ class ChatUseCase:
                 system_instruction = system_prompt
                 if decision == "rag" and results:
                     rag_text = self.context_manager.trim_rag_context(results)
-                    system_instruction += f"\n\n### CONOCIMIENTO RELEVANTE (RAG):\n{rag_text}\n\n### REGLAS DE EVIDENCIA:\nResponde únicamente con base en el conocimiento relevante."
+                    system_instruction += f"\n\n### RELEVANT KNOWLEDGE (RAG):\n{rag_text}\n\n### EVIDENCE RULES:\nRespond strictly based on the relevant knowledge provided."
 
                 chat_messages = [{"role": "system", "content": system_instruction}]
                 if history:
