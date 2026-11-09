@@ -702,12 +702,16 @@ ensure_local_secrets() {
     [[ -f "${ENV_FILE}" ]] || { log_err "Missing ${ENV_FILE}; run './zyra.sh install' to configure."; exit 1; }
 
     local key generated=0 value
-    for key in ZYRABIT_API_KEY_WEB ZYRABIT_API_KEY_MCP; do
+    for key in ZYRABIT_API_KEY_WEB ZYRABIT_API_KEY_MCP ZYRABIT_API_KEY_ADMIN; do
         value=$(grep "^${key}=" "${ENV_FILE}" 2>/dev/null | cut -d= -f2- || true)
         if [[ -z "${value}" || "${value}" == replace-with-* || "${value}" == zyrabit-*-token ]]; then
             command -v openssl >/dev/null 2>&1 || { log_err "openssl is required to generate local API keys."; exit 1; }
             value=$(openssl rand -hex 32)
-            sed -i.bak "s|^${key}=.*|${key}=${value}|" "${ENV_FILE}"
+            if grep -q "^${key}=" "${ENV_FILE}"; then
+                sed -i.bak "s|^${key}=.*|${key}=${value}|" "${ENV_FILE}"
+            else
+                echo "${key}=${value}" >> "${ENV_FILE}"
+            fi
             generated=1
         fi
     done
@@ -1142,11 +1146,17 @@ run_verify() {
 
         # Smoke test: verify that document ingestion, storage, and deletion work
         log_info "Running document ingestion smoke test on ${base_url}/sources/import..."
+        local admin_key
+        admin_key=$(grep '^ZYRABIT_API_KEY_ADMIN=' "${ENV_FILE}" 2>/dev/null | cut -d= -f2- || true)
+        if [[ -z "${admin_key}" || "${admin_key}" == replace-with-* ]]; then
+            log_err "ZYRABIT_API_KEY_ADMIN is not configured. Document deletion cannot be verified."
+            rc=1
+        else
         local doc_tmp; doc_tmp=$(mktemp "/tmp/zyrabit-smoke-XXXXXX.txt")
         echo "Zyrabit sovereign node document verification test token $(date +%s)" > "${doc_tmp}"
         local upload_out upload_code upload_body doc_id
         upload_out=$(curl -sk -m 30 -w "\n%{http_code}" -X POST "${base_url}/sources/import" \
-            -H "Authorization: Bearer ${api_key}" \
+            -H "Authorization: Bearer ${admin_key}" \
             -F "file=@${doc_tmp}" 2>/dev/null) || true
         rm -f "${doc_tmp}"
         upload_code=$(echo "${upload_out}" | tail -n1)
@@ -1157,10 +1167,10 @@ run_verify() {
             local id="$1"
             local del_code get_code
             del_code=$(curl -sk -m 10 -o /dev/null -w "%{http_code}" -X DELETE "${base_url}/documents/${id}" \
-                -H "Authorization: Bearer ${api_key}" 2>/dev/null) || true
+                -H "Authorization: Bearer ${admin_key}" 2>/dev/null) || true
             del_code="${del_code:-000}"
             get_code=$(curl -sk -m 10 -o /dev/null -w "%{http_code}" "${base_url}/documents/${id}" \
-                -H "Authorization: Bearer ${api_key}" 2>/dev/null) || true
+                -H "Authorization: Bearer ${admin_key}" 2>/dev/null) || true
             get_code="${get_code:-000}"
             if [[ "${del_code}" != "204" && "${del_code}" != "404" ]]; then
                 log_err "Document cleanup DELETE failed (HTTP ${del_code}) for ${id}."
@@ -1186,7 +1196,7 @@ run_verify() {
             for ((j=1; j<=doc_attempts; j++)); do
                 local doc_resp
                 doc_resp=$(curl -sk -m 10 "${base_url}/documents/${doc_id}" \
-                    -H "Authorization: Bearer ${api_key}" 2>/dev/null || true)
+                    -H "Authorization: Bearer ${admin_key}" 2>/dev/null || true)
                 doc_status=$(echo "${doc_resp}" | grep -o '"status":[[:space:]]*"[^"]*"' | head -n1 | cut -d'"' -f4 || true)
                 if [[ "${doc_status}" == "ready" ]]; then
                     doc_ready=true
@@ -1207,6 +1217,7 @@ run_verify() {
                 rc=1
             fi
             cleanup_smoke_doc "${doc_id}"
+        fi
         fi
     fi
 
