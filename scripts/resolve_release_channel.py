@@ -126,11 +126,13 @@ def read_digests(digest_dir: Path) -> dict[str, str]:
 
 
 def write_github_output(plan: dict, path: Path | None) -> None:
+    """Append channel keys. Replacing the file would drop image names already written."""
     lines = [f"{key}={value}" for key, value in plan.items()]
     text = "\n".join(lines) + "\n"
     sys.stdout.write(text)
     if path is not None:
-        path.write_text(text, encoding="utf-8")
+        with path.open("a", encoding="utf-8") as handle:
+            handle.write(text)
 
 
 def main(argv: list[str] | None = None) -> int:

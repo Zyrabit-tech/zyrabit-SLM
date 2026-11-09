@@ -43,6 +43,17 @@ def test_branch_push_does_not_select_a_channel():
     assert plan["mutable_tags"] == ""
 
 
+def test_github_output_appends_to_existing_image_names(tmp_path: Path):
+    output = tmp_path / "github-output.txt"
+    output.write_text("image=zyrabitcore/zyrabit-slm\nghcr=ghcr.io/zyrabit-tech/zyrabit-slm\n", encoding="utf-8")
+    plan = module.resolve_release_channel("v2.4.8-beta.1", "2.4.8", commit_on_main=False)
+    module.write_github_output(plan, output)
+    text = output.read_text(encoding="utf-8")
+    assert "image=zyrabitcore/zyrabit-slm" in text
+    assert "ghcr=ghcr.io/zyrabit-tech/zyrabit-slm" in text
+    assert "channel=beta" in text
+
+
 def test_beta_branch_does_not_mint_a_stable_tag():
     existing = {"v2.4.8", "v2.4.7"}
     assert module.next_beta_tag("2.4.8", existing) == "v2.4.8-beta.1"
