@@ -8,7 +8,7 @@ services:
     environment:
       - DOCKER_API_VERSION=1.40
     command:
-      - --api.dashboard=true
+      - --api.dashboard=false
       - --providers.docker=true
       - --providers.docker.apiVersion=1.40
       - --providers.docker.exposedbydefault=false
@@ -20,12 +20,10 @@ services:
       - --entryPoints.web.http.redirections.entryPoint.scheme=https
       - --entryPoints.websecure.address=:443
       - --entryPoints.websecure.http.tls=true
-      - --api.insecure=true
       - --log.level=${TRAEFIK_LOG_LEVEL:-INFO}
     ports:
       - "80:80"
       - "443:443"
-      - "8081:8080" # Dashboard access
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - ./traefik:/etc/traefik/dynamic:ro

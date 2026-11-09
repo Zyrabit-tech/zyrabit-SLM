@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+
+- **Traefik dashboard is off by default**: `api.insecure=true` and the published dashboard port are gone from the default compose file. `ZYRABIT_TRAEFIK_DASHBOARD=true` is refused unless `TRAEFIK_DASHBOARD_AUTH` is `user:htpasswd_hash`. The optional listener is `127.0.0.1:8082`.
+
 ### Changed
 
 - **`verify` reports real failures**: A missing or unhealthy required container, a chat response that is not HTTP 200 with a non-empty `response` string, a missing API key, or a document that does not reach `ready` and then disappear now makes `./zyra.sh verify` exit non-zero. `VERIFY_DOC_TIMEOUT_SECONDS` bounds the document wait.

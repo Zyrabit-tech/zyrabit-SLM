@@ -931,6 +931,19 @@ run_start() {
 
     if [[ "${PRODUCTION_MODE}" == "true" ]]; then
         validate_production_env
+        local dashboard_flag="false"
+        local dashboard_auth=""
+        if [[ "${ZYRABIT_TRAEFIK_DASHBOARD:-}" == "true" ]] || grep -q '^ZYRABIT_TRAEFIK_DASHBOARD=true' "${ENV_FILE}" 2>/dev/null; then
+            dashboard_flag="true"
+            dashboard_auth=$(grep '^TRAEFIK_DASHBOARD_AUTH=' "${ENV_FILE}" 2>/dev/null | cut -d= -f2- || true)
+            compose_args+=("-f" "${SCRIPT_DIR}/zyrabit-slm/docker-compose.dashboard.yml")
+        fi
+        if ! python3 "${SCRIPT_DIR}/scripts/check_traefik_dashboard.py" \
+            --compose "${SCRIPT_DIR}/zyrabit-slm/docker-compose.yml" \
+            --enabled "${dashboard_flag}" \
+            --auth "${dashboard_auth}"; then
+            exit 1
+        fi
         compose_args+=("--profile" "production")
         log_header "ZYRABIT — PRODUCTION"
         log_info "Domain: ${DOMAIN:-localhost}"
