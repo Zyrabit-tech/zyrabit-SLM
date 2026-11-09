@@ -127,16 +127,16 @@ If you already have Docker and a local inference engine (Ollama, vLLM, or LM Stu
 
 ```bash
 docker run -d \
-  --name zyrabit-platform \
-  -p 8080:8080 \
+  --name zyrabit-api \
+  -p 127.0.0.1:8088:8080 \
   --add-host=host.docker.internal:host-gateway \
   -e INFERENCE_PROVIDER=ollama \
   -e SLM_URL=http://host.docker.internal:11434 \
   -v zyrabit_vault:/app/db_data \
-  zyrabitcore/zyrabit-slm:latest
+  zyrabitcore/zyrabit-slm:2.4.8
 ```
 
-Open **[http://localhost:8080](http://localhost:8080)** in your browser to access the workspace.
+The API container listens on port 8080 inside the container. This command publishes it on the host at `127.0.0.1:8088`. Check it with `curl http://127.0.0.1:8088/v1/health`. The document workspace is the web container from Option B, at `http://127.0.0.1:8080`. Pin a version tag. `:latest` moves only when a stable release is published from `main`.
 
 ---
 
