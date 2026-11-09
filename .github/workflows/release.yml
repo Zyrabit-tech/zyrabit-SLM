@@ -16,8 +16,24 @@ env:
   IMAGE_NAME: zyrabit-slm
 
 jobs:
+  security-gate:
+    name: Security Vulnerability Scan (Trivy)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run Trivy vulnerability scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: './zyrabit-slm/api-rag'
+          severity: 'CRITICAL'
+          exit-code: '1'
+
   build-arch:
     name: Build Arch Image
+    needs: security-gate
     runs-on: ${{ matrix.runner }}
     strategy:
       fail-fast: false
@@ -90,15 +106,6 @@ jobs:
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_PAT }}
-
-      - name: Run Trivy vulnerability scan
-        if: steps.meta.outputs.channel == 'stable' || steps.meta.outputs.channel == 'beta'
-        uses: aquasecurity/trivy-action@master
-        with:
-          scan-type: 'fs'
-          scan-ref: './zyrabit-slm/api-rag'
-          severity: 'CRITICAL'
-          exit-code: '1'
 
       - name: Build and push image by digest
         id: build
