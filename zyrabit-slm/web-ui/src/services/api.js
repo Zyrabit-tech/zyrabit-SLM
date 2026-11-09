@@ -1,21 +1,19 @@
 const DEFAULT_TIMEOUT_MS = 30000;
 
-export function getRuntimeToken() {
-    return (
-        window.ZYRABIT_RUNTIME_CONFIG?.apiToken
-        || (typeof localStorage !== 'undefined' ? localStorage.getItem('zyrabit_api_token') : '')
-        || ''
-    );
+function csrfToken() {
+    const match = document.cookie.match(/(?:^|; )zyrabit_csrf=([^;]*)/);
+    return match ? decodeURIComponent(match[1]) : "";
 }
 
 async function fetchWithTimeout(url, options = {}, timeoutMs = DEFAULT_TIMEOUT_MS) {
     const signal = options.signal || (typeof AbortSignal !== 'undefined' && AbortSignal.timeout ? AbortSignal.timeout(timeoutMs) : undefined);
-    const token = getRuntimeToken();
-    const headers = {
-        ...(options.headers || {}),
-        ...(token ? { 'Authorization': `Bearer ${token}` } : {})
-    };
-    return fetch(url, { ...options, headers, signal });
+    const method = (options.method || "GET").toUpperCase();
+    const headers = { ...(options.headers || {}) };
+    if (method !== "GET" && method !== "HEAD" && !headers["X-CSRF-Token"]) {
+        const csrf = csrfToken();
+        if (csrf) headers["X-CSRF-Token"] = csrf;
+    }
+    return fetch(url, { ...options, headers, signal, credentials: "include" });
 }
 
 export async function sendChat({ text, client_msg_id = null, history = null, provider = null, session_id = null, document_id = null } = {}) {

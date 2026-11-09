@@ -11,6 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
+- **The web UI no longer embeds the service Bearer token**: The browser signs in once. The API stores the session and sets an `HttpOnly` cookie. Mutable cookie requests require the matching CSRF token. `SameSite` defaults to `Lax`; production HTTPS should set `ZYRABIT_COOKIE_SECURE=true` and `ZYRABIT_COOKIE_SAMESITE=strict`. See `docs/engineering/WEB_SESSION.md`.
+- **Document deletion requires an administrator**: A valid API key is no longer enough to call `DELETE /v1/documents/{id}`. Only identities in `ZYRABIT_ADMIN_CLIENTS` (default `admin`) may delete, and a stored `owner_id` must match the caller. The deployment stays single-tenant.
 - **Traefik dashboard is off by default**: `api.insecure=true` and the published dashboard port are gone from the default compose file. `ZYRABIT_TRAEFIK_DASHBOARD=true` is refused unless `TRAEFIK_DASHBOARD_AUTH` is `user:htpasswd_hash`. The optional listener is `127.0.0.1:8082`.
 
 ### Changed

@@ -34,12 +34,14 @@ def configure_test_keys(monkeypatch, tmp_path):
     if saved_override:
         app.dependency_overrides[get_current_user] = saved_override
 
-def test_runtime_config_endpoint_returns_javascript_with_token():
+def test_runtime_config_endpoint_does_not_publish_the_service_credential():
     client = TestClient(app)
     response = client.get("/runtime-config.js")
     assert response.status_code == 200
     assert "application/javascript" in response.headers.get("content-type", "")
-    assert 'window.ZYRABIT_RUNTIME_CONFIG = { apiToken: "test-webui-token-xyz" };' in response.text
+    assert "test-webui-token-xyz" not in response.text
+    assert "apiToken" not in response.text
+    assert "localStorage" not in response.text
 
 def test_token_from_runtime_config_authenticates_protected_endpoints():
     client = TestClient(app)
