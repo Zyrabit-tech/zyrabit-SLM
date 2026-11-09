@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
+- **oauthlib 4.0.1**: The locked 4.0.0 release accepts a bogus device-code grant (CVE-2026-49272, GHSA-3jp2-3mrg-2vxc). The lock now requires 4.0.1.
 - **The web UI no longer embeds the service Bearer token**: The browser signs in once. The API stores the session and sets an `HttpOnly` cookie. Mutable cookie requests require the matching CSRF token. `SameSite` defaults to `Lax`; production HTTPS should set `ZYRABIT_COOKIE_SECURE=true` and `ZYRABIT_COOKIE_SAMESITE=strict`. See `docs/engineering/WEB_SESSION.md`.
 - **Document deletion requires an administrator**: A valid API key is no longer enough to call `DELETE /v1/documents/{id}`. Only identities in `ZYRABIT_ADMIN_CLIENTS` (default `admin`) may delete, and a stored `owner_id` must match the caller. The deployment stays single-tenant.
 - **Traefik dashboard is off by default**: `api.insecure=true` and the published dashboard port are gone from the default compose file. `ZYRABIT_TRAEFIK_DASHBOARD=true` is refused unless `TRAEFIK_DASHBOARD_AUTH` is `user:htpasswd_hash`. The optional listener is `127.0.0.1:8082`.
@@ -20,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Install refuses an unpinned upgrade**: `OLLAMA_VERSION=latest` stops installation. An existing `zyrabit-api` image tagged `:latest` continues only after `ZYRABIT_ACCEPT_LATEST=yes` or an interactive yes, and that choice does not rewrite `.env` or data volumes. Embedding pull failures and permission failures exit non-zero.
 - **`verify` reports real failures**: A missing or unhealthy required container, a chat response that is not HTTP 200 with a non-empty `response` string, a missing API key, or a document that does not reach `ready` and then disappear now makes `./zyra.sh verify` exit non-zero. `VERIFY_DOC_TIMEOUT_SECONDS` bounds the document wait.
 
+- **Release image names survive channel resolution**: The channel script appends to `$GITHUB_OUTPUT` so the Docker build still receives the Docker Hub and GHCR names.
 - **Beta images stay off `latest`**: Pushes to `beta` create `vX.Y.Z-beta.1` and publish `:beta` plus that immutable prerelease. `:latest` moves only for a `vX.Y.Z` tag whose commit is on `main`, after both amd64 and arm64 digests exist. Published version tags are not moved. `v2.4.8` is left as published.
 
 ## [2.4.8] - 2026-11-03
