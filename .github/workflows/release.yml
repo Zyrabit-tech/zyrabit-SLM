@@ -37,6 +37,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Read VERSION
         id: version
@@ -58,21 +60,24 @@ jobs:
           echo "image=${IMAGE}"     >> $GITHUB_OUTPUT
           echo "ghcr=${GHCR}"       >> $GITHUB_OUTPUT
 
-          if [ "${BRANCH}" = "main" ] || [[ "${BRANCH}" =~ ^v[0-9] ]]; then
-            echo "channel=stable" >> $GITHUB_OUTPUT
-          elif [ "${BRANCH}" = "beta" ]; then
-            echo "channel=beta" >> $GITHUB_OUTPUT
+          git fetch origin main
+          if git merge-base --is-ancestor HEAD origin/main; then
+            ON_MAIN=true
           else
-            echo "⚠️  Unknown branch pattern '${BRANCH}' — skipping Docker push."
-            echo "channel=skip" >> $GITHUB_OUTPUT
+            ON_MAIN=false
           fi
+          python3 scripts/resolve_release_channel.py \
+            --ref "${BRANCH}" \
+            --version "$(cat VERSION | tr -d '\n' | xargs)" \
+            --on-main "${ON_MAIN}" \
+            --github-output "$GITHUB_OUTPUT"
 
       - name: Set up Docker Buildx
-        if: steps.meta.outputs.channel != 'skip'
+        if: steps.meta.outputs.channel == 'stable' || steps.meta.outputs.channel == 'beta'
         uses: docker/setup-buildx-action@v3
 
       - name: Log in to GHCR
-        if: steps.meta.outputs.channel != 'skip'
+        if: steps.meta.outputs.channel == 'stable' || steps.meta.outputs.channel == 'beta'
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
@@ -80,14 +85,14 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Log in to Docker Hub
-        if: steps.meta.outputs.channel != 'skip'
+        if: steps.meta.outputs.channel == 'stable' || steps.meta.outputs.channel == 'beta'
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_PAT }}
 
       - name: Run Trivy vulnerability scan
-        if: steps.meta.outputs.channel != 'skip'
+        if: steps.meta.outputs.channel == 'stable' || steps.meta.outputs.channel == 'beta'
         uses: aquasecurity/trivy-action@master
         with:
           scan-type: 'fs'
@@ -97,7 +102,7 @@ jobs:
 
       - name: Build and push image by digest
         id: build
-        if: steps.meta.outputs.channel != 'skip'
+        if: steps.meta.outputs.channel == 'stable' || steps.meta.outputs.channel == 'beta'
         uses: docker/build-push-action@v5
         with:
           context: .
@@ -108,14 +113,14 @@ jobs:
           cache-to: type=gha,mode=max
 
       - name: Export digest
-        if: steps.meta.outputs.channel != 'skip'
+        if: steps.meta.outputs.channel == 'stable' || steps.meta.outputs.channel == 'beta'
         run: |
           mkdir -p "${{ runner.temp }}/digests"
           digest="${{ steps.build.outputs.digest }}"
-          touch "${{ runner.temp }}/digests/${digest#sha256:}"
+          printf '%s\n' "$digest" > "${{ runner.temp }}/digests/${{ matrix.arch_suffix }}.digest"
 
       - name: Upload digest
-        if: steps.meta.outputs.channel != 'skip'
+        if: steps.meta.outputs.channel == 'stable' || steps.meta.outputs.channel == 'beta'
         uses: actions/upload-artifact@v4
         with:
           name: digests-${{ matrix.arch_suffix }}
@@ -135,6 +140,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Read VERSION
         id: version
@@ -162,14 +169,17 @@ jobs:
       - name: Resolve release channel
         id: channel
         run: |
-          BRANCH="${{ github.ref_name }}"
-          if [ "${BRANCH}" = "main" ] || [[ "${BRANCH}" =~ ^v[0-9] ]]; then
-            echo "channel=stable" >> "$GITHUB_OUTPUT"
-          elif [ "${BRANCH}" = "beta" ]; then
-            echo "channel=beta" >> "$GITHUB_OUTPUT"
+          git fetch origin main
+          if git merge-base --is-ancestor HEAD origin/main; then
+            ON_MAIN=true
           else
-            echo "channel=skip" >> "$GITHUB_OUTPUT"
+            ON_MAIN=false
           fi
+          python3 scripts/resolve_release_channel.py \
+            --ref "${{ github.ref_name }}" \
+            --version "${{ steps.version.outputs.version }}" \
+            --on-main "${ON_MAIN}" \
+            --github-output "$GITHUB_OUTPUT"
 
       - name: Download architecture digests
         if: steps.channel.outputs.channel != 'skip'
@@ -180,56 +190,64 @@ jobs:
           merge-multiple: true
 
       - name: Merge and Push Multi-Arch Manifests
-        if: steps.channel.outputs.channel != 'skip'
+        if: steps.channel.outputs.channel == 'stable' || steps.channel.outputs.channel == 'beta'
         run: |
           set -eu
-          VERSION="${{ steps.version.outputs.version }}"
           OWNER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
           IMAGE="zyrabitcore/${{ env.IMAGE_NAME }}"
           GHCR="ghcr.io/${OWNER}/${{ env.IMAGE_NAME }}"
-          CHANNEL="${{ steps.channel.outputs.channel }}"
+          IMMUTABLE="${{ steps.channel.outputs.immutable_tags }}"
+          MUTABLE="${{ steps.channel.outputs.mutable_tags }}"
 
-          shopt -s nullglob
-          files=(/tmp/digests/*)
-          if [ "${#files[@]}" -ne 2 ]; then
-            echo "Expected 2 architecture digests, found ${#files[@]}."
-            exit 1
-          fi
+          python3 scripts/resolve_release_channel.py \
+            --ref "${{ github.ref_name }}" \
+            --version "${{ steps.version.outputs.version }}" \
+            --on-main "${{ steps.channel.outputs.channel == 'stable' && 'true' || 'false' }}" \
+            --sha "${{ github.sha }}" \
+            --digest-dir /tmp/digests \
+            --ledger "${{ runner.temp }}/release-ledger.json" \
+            --github-output /dev/null
+
+          refuse_existing() {
+            local image="$1" tag="$2"
+            if docker buildx imagetools inspect "${image}:${tag}" >/dev/null 2>&1; then
+              echo "Refusing to move published tag ${image}:${tag}."
+              exit 1
+            fi
+          }
+          for tag in ${IMMUTABLE}; do
+            refuse_existing "${IMAGE}" "${tag}"
+            refuse_existing "${GHCR}" "${tag}"
+          done
+
+          publish() {
+            local image="$1"
+            shift
+            local sources=("$@")
+            local args=()
+            for tag in ${IMMUTABLE} ${MUTABLE}; do
+              args+=(-t "${image}:${tag}")
+            done
+            echo "Publishing ${args[*]}"
+            docker buildx imagetools create "${args[@]}" "${sources[@]}"
+          }
 
           hub_sources=()
           ghcr_sources=()
-          for f in "${files[@]}"; do
-            hex="$(basename "$f")"
-            hub_sources+=("${IMAGE}@sha256:${hex}")
-            ghcr_sources+=("${GHCR}@sha256:${hex}")
+          for arch in amd64 arm64; do
+            digest="$(tr -d '[:space:]' < "/tmp/digests/${arch}.digest")"
+            hub_sources+=("${IMAGE}@${digest}")
+            ghcr_sources+=("${GHCR}@${digest}")
           done
-
-          if [ "${CHANNEL}" = "stable" ]; then
-            echo "Publishing ${IMAGE}:${VERSION} and ${IMAGE}:latest"
-            docker buildx imagetools create \
-              -t "${IMAGE}:${VERSION}" \
-              -t "${IMAGE}:latest" \
-              "${hub_sources[@]}"
-            docker buildx imagetools create \
-              -t "${GHCR}:${VERSION}" \
-              -t "${GHCR}:latest" \
-              "${ghcr_sources[@]}"
-          else
-            echo "Publishing ${IMAGE}:beta and ${IMAGE}:beta-${VERSION}"
-            docker buildx imagetools create \
-              -t "${IMAGE}:beta" \
-              -t "${IMAGE}:beta-${VERSION}" \
-              "${hub_sources[@]}"
-            docker buildx imagetools create \
-              -t "${GHCR}:beta" \
-              -t "${GHCR}:beta-${VERSION}" \
-              "${ghcr_sources[@]}"
-          fi
+          publish "${IMAGE}" "${hub_sources[@]}"
+          publish "${GHCR}" "${ghcr_sources[@]}"
 
       - name: Create GitHub Release
-        if: github.ref_name == 'main' || startsWith(github.ref_name, 'v')
+        if: steps.channel.outputs.channel == 'stable' || steps.channel.outputs.channel == 'beta'
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ steps.version.outputs.tag }}
-          name: Release ${{ steps.version.outputs.tag }}
-          generate_release_notes: true
+          tag_name: ${{ github.ref_name }}
+          name: ${{ github.ref_name }}
+          prerelease: ${{ steps.channel.outputs.prerelease == 'true' }}
+          body_path: ${{ runner.temp }}/release-ledger.json
+          generate_release_notes: false

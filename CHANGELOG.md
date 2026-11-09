@@ -7,6 +7,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- **Beta images stay off `latest`**: Pushes to `beta` create `vX.Y.Z-beta.1` and publish `:beta` plus that immutable prerelease. `:latest` moves only for a `vX.Y.Z` tag whose commit is on `main`, after both amd64 and arm64 digests exist. Published version tags are not moved. `v2.4.8` is left as published.
+
 ## [2.4.8] - 2026-11-03
 
 ### Added
