@@ -383,3 +383,33 @@ async def test_followup_keeps_backend_session_context_without_frontend_document_
     assert followup["metadata"]["sources"]
     assert {source["document_id"] for source in followup["metadata"]["sources"]} == {accepted["document_id"]}
     assert "What operation is crucial?" in inference.prompts[-1]
+
+
+@pytest.mark.asyncio
+async def test_delete_document_cleans_metadata_storage_and_vector_index(tmp_path: Path):
+    source_pdf = Path(__file__).parents[2] / "docs" / "zyrabit-cioreview-en.pdf"
+    inference = CapturingInference()
+    store = SQLiteNodeStore(str(tmp_path / "node.db"))
+    sources = LocalSourceStore(str(tmp_path / "sources"))
+    vector_index = InMemoryVectorIndex()
+    service = NodeService(store, sources, LocalDocumentParser(), inference, vector_index=vector_index)
+
+    accepted = await service.import_file(source_pdf.name, str(source_pdf))
+    while (job := service.job(accepted["job_id"]))["status"] not in {"ready", "failed"}:
+        await asyncio.sleep(0.05)
+    assert job["status"] == "ready", job
+    doc_id = accepted["document_id"]
+
+    assert service.document(doc_id) is not None
+    assert len(vector_index.evidence) > 0
+    raw_files = list((tmp_path / "sources").glob("*"))
+    assert len(raw_files) > 0
+
+    deleted = await service.delete_document(doc_id)
+    assert deleted is True
+    assert service.document(doc_id) is None
+    assert len(vector_index.evidence) == 0
+    assert len(list((tmp_path / "sources").glob("*"))) == 0
+
+    # Second delete returns False
+    assert await service.delete_document(doc_id) is False

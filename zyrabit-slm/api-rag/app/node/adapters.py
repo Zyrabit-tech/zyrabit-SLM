@@ -16,22 +16,26 @@ class ExistingInferenceAdapter:
 
     def answer(self, prompt: str) -> tuple[str, dict]:
         messages = None
-        if "\nUsuario: " in prompt:
-            sys_part, user_part = prompt.rsplit("\nUsuario: ", 1)
+        if "\nUser: " in prompt or "\nUsuario: " in prompt:
+            sep = "\nUser: " if "\nUser: " in prompt else "\nUsuario: "
+            sys_part, user_part = prompt.rsplit(sep, 1)
             # Remove any trailing assistant prefix from user part if present
             user_part = user_part.split("\nZyra:")[0].split("\nAssistant:")[0].strip()
             messages = [
                 {"role": "system", "content": sys_part.strip()},
                 {"role": "user", "content": user_part}
             ]
-        elif "\nPregunta: " in prompt:
-            sys_part, user_part = prompt.rsplit("\nPregunta: ", 1)
+        elif "\nQuestion: " in prompt or "\nPregunta: " in prompt:
+            sep = "\nQuestion: " if "\nQuestion: " in prompt else "\nPregunta: "
+            sys_part, user_part = prompt.rsplit(sep, 1)
             messages = [
                 {"role": "system", "content": sys_part.strip()},
                 {"role": "user", "content": user_part.strip()}
             ]
-        elif "### IDENTIDAD SOBERANA:" in prompt and "### CONSULTA ACTUAL:" in prompt:
-            sys_part, user_part = prompt.rsplit("### CONSULTA ACTUAL:", 1)
+        elif ("### SOVEREIGN IDENTITY:" in prompt and "### CURRENT QUERY:" in prompt) or \
+             ("### IDENTIDAD SOBERANA:" in prompt and "### CONSULTA ACTUAL:" in prompt):
+            sep = "### CURRENT QUERY:" if "### CURRENT QUERY:" in prompt else "### CONSULTA ACTUAL:"
+            sys_part, user_part = prompt.rsplit(sep, 1)
             messages = [
                 {"role": "system", "content": sys_part.strip()},
                 {"role": "user", "content": user_part.strip()}
@@ -113,6 +117,15 @@ class ChromaEvidenceIndex:
                 output.append(EvidenceUnit(evidence_id, metadata.get("document_id", ""), item.page_content, ordinal,
                     {key: metadata[key] for key in ("page", "sheet", "range", "slide", "paragraph", "table") if key in metadata}, metadata))
         return output
+
+    def delete(self, document_id: str) -> None:
+        try:
+            if hasattr(self.vector_store, "_collection") and self.vector_store._collection:
+                self.vector_store._collection.delete(where={"document_id": document_id})
+            elif hasattr(self.vector_store, "delete"):
+                self.vector_store.delete(where={"document_id": document_id})
+        except Exception:
+            pass
 
     def health(self) -> tuple[bool, str]:
         try: return bool(self.vector_store.heartbeat()), "connected"

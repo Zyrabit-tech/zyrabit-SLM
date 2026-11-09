@@ -236,15 +236,18 @@ jobs:
         id: tag_check
         run: |
           VERSION=$(cat VERSION | tr -d '\n' | xargs)
-          TAG="v${VERSION}"
-          echo "Target tag: ${TAG}"
-          echo "tag=${TAG}" >> $GITHUB_OUTPUT
-
-          if git rev-parse "${TAG}" >/dev/null 2>&1; then
-            echo "ℹ️ Tag ${TAG} already exists. Skipping auto-tag."
+          EXISTING=$(git tag -l "v${VERSION}" "v${VERSION}-beta.*" | tr '\n' ' ')
+          TAG=$(python3 scripts/resolve_release_channel.py \
+            --next-beta-tag \
+            --ref beta \
+            --version "${VERSION}" \
+            --existing-tags "${EXISTING}")
+          if [ -z "${TAG}" ]; then
+            echo "Prerelease for ${VERSION} already exists. Stable tags are not created from beta."
             echo "should_tag=false" >> $GITHUB_OUTPUT
           else
-            echo "🚀 New version detected! Tag ${TAG} does not exist yet."
+            echo "Target prerelease: ${TAG}"
+            echo "tag=${TAG}" >> $GITHUB_OUTPUT
             echo "should_tag=true" >> $GITHUB_OUTPUT
           fi
 

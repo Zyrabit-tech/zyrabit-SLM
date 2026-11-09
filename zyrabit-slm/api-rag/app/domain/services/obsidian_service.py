@@ -106,13 +106,13 @@ Ensure you use Obsidian tags and standard frontmatter.
 {chat_str}
 
 ### INSTRUCTIONS:
-Create a beautiful, highly structured Markdown note in Spanish.
+Create a beautiful, highly structured Markdown note.
 Include:
-1. Frontmatter (tags: [zyrabit, auto-learning, reflexiones], date, session_id)
-2. Executive Summary (Resumen Ejecutivo)
-3. Key Technical Decisions (Decisiones Técnicas Clave)
-4. Knowledge Graph Connections (Conceptos clave con enlaces [[Obsidian]])
-5. Action Items (Próximos Pasos en formato - [ ] )
+1. Frontmatter (tags: [zyrabit, auto-learning, reflections], date, session_id)
+2. Executive Summary
+3. Key Technical Decisions
+4. Knowledge Graph Connections (Key concepts with [[Obsidian]] links)
+5. Action Items (Next steps in - [ ] format)
 """
 
         # 3. Request LLM Inference
@@ -133,24 +133,23 @@ tags: [zyrabit, auto-learning, fallback]
 date: {datetime.now().strftime('%Y-%m-%d')}
 session: {session_id}
 ---
-# Reflexión de Sesión (Fallback)
-- **Usuario**: {user_name}
-- **Asistente**: {assistant_name}
+# Session Reflection (Fallback)
+- **User**: {user_name}
+- **Assistant**: {assistant_name}
 
-La síntesis mediante IA falló, pero la memoria de la conversación se mantiene intacta en SQLite.
+AI synthesis failed, but conversation memory remains intact in SQLite.
 """
 
         # 4. Save to Vault under "Reflective Notes"
         date_str = datetime.now().strftime("%Y-%m-%d_%H%M%S")
-        safe_session_id = re.sub(r"[^A-Za-z0-9_-]", "_", session_id or "")[:64] or "default"
-        note_name = f"reflective_{safe_session_id}_{date_str}.md"
+        sanitized_id = re.sub(r"[^A-Za-z0-9_-]", "_", str(session_id or ""))[:64] or "default"
+        safe_session_id = os.path.basename(sanitized_id)
+        note_name = os.path.basename(f"reflective_{safe_session_id}_{date_str}.md")
         notes_dir = (cls.VAULT_PATH / "Reflective Notes").resolve()
         notes_dir.mkdir(parents=True, exist_ok=True)
         note_path = (notes_dir / note_name).resolve()
 
-        try:
-            note_path.relative_to(notes_dir)
-        except ValueError:
+        if not note_path.is_relative_to(notes_dir):
             logger.error(f"🛡️ Path traversal attempt blocked in session_id: {session_id}")
             return "Security Alert: invalid session_id"
         

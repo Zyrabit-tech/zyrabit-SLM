@@ -9,6 +9,7 @@ from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from pydantic import BaseModel, Field
 
 from app.api.v1.dependencies import get_node_service
+from app.core.security.auth import User, get_current_user, require_document_admin
 
 router = APIRouter()
 
@@ -49,6 +50,23 @@ async def get_document(document_id: str, service=Depends(get_node_service)):
     result = service.document(document_id)
     if not result: raise HTTPException(status_code=404, detail="Document not found")
     return result
+
+
+@router.delete("/documents/{document_id}", status_code=204)
+async def delete_document(
+    document_id: str,
+    service=Depends(get_node_service),
+    current_user: User = Depends(get_current_user),
+):
+    require_document_admin(current_user)
+    existing = service.document(document_id)
+    if existing:
+        owner = existing.get("owner_id")
+        if owner is not None and owner != current_user.client:
+            raise HTTPException(status_code=403, detail="Document deletion requires the owning identity")
+    deleted = await service.delete_document(document_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Document not found")
 
 
 @router.post("/documents/{document_id}/reindex", status_code=202)

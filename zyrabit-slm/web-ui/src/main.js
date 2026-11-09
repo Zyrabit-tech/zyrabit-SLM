@@ -9,52 +9,70 @@ import { getSession, getProfile } from "./services/api";
 
 
 /**
- * Auth Interceptor
- * Injects the token provided to the local container at startup.
+ * Browser calls use the same-origin session cookie. The service Bearer
+ * token is not read from the page or from localStorage.
  */
 const originalFetch = window.fetch;
+
+function csrfToken() {
+    const match = document.cookie.match(/(?:^|; )zyrabit_csrf=([^;]*)/);
+    return match ? decodeURIComponent(match[1]) : "";
+}
+
 window.fetch = async function (resource, init) {
     init = init || {};
     const url = typeof resource === 'string' ? resource : (resource?.url || '');
     if (url.includes('/v1') || url.startsWith('/v1')) {
-        let token = window.ZYRABIT_RUNTIME_CONFIG?.apiToken
-            || (typeof localStorage !== 'undefined' ? localStorage.getItem('zyrabit_api_token') : '')
-            || '';
-
-        if (!token) {
-            try {
-                const res = await originalFetch('/runtime-config.js', { cache: 'no-store' });
-                if (res.ok) {
-                    const text = await res.text();
-                    const match = text.match(/apiToken:\s*["']([^"']+)["']/);
-                    if (match && match[1]) {
-                        token = match[1];
-                        window.ZYRABIT_RUNTIME_CONFIG = { apiToken: token };
-                        try { localStorage.setItem('zyrabit_api_token', token); } catch (_) {}
-                    }
-                }
-            } catch (_) {}
-        }
-
-        if (token) {
+        const method = (init.method || 'GET').toUpperCase();
+        init.credentials = init.credentials || 'include';
+        const csrf = csrfToken();
+        if (csrf && method !== 'GET' && method !== 'HEAD') {
             if (init.headers instanceof Headers) {
-                if (!init.headers.has('Authorization')) {
-                    init.headers.set('Authorization', `Bearer ${token}`);
-                }
+                if (!init.headers.has('X-CSRF-Token')) init.headers.set('X-CSRF-Token', csrf);
             } else if (Array.isArray(init.headers)) {
-                if (!init.headers.some(([k]) => k.toLowerCase() === 'authorization')) {
-                    init.headers.push(['Authorization', `Bearer ${token}`]);
+                if (!init.headers.some(([k]) => k.toLowerCase() === 'x-csrf-token')) {
+                    init.headers.push(['X-CSRF-Token', csrf]);
                 }
             } else {
-                init.headers = {
-                    'Authorization': `Bearer ${token}`,
-                    ...(init.headers || {})
-                };
+                init.headers = { 'X-CSRF-Token': csrf, ...(init.headers || {}) };
             }
         }
     }
     return originalFetch(resource, init);
 };
+
+async function ensureBrowserSession() {
+    try { localStorage.removeItem('zyrabit_api_token'); } catch (_) {}
+    const existing = await originalFetch('/v1/session', { credentials: 'include' });
+    if (existing.ok) return;
+    const gate = document.getElementById('session-gate');
+    const form = document.getElementById('session-form');
+    const input = document.getElementById('session-token');
+    if (!gate || !form || !input) return;
+    gate.classList.remove('hidden');
+    await new Promise((resolve) => {
+        form.addEventListener('submit', async (event) => {
+            event.preventDefault();
+            const response = await originalFetch('/v1/session', {
+                method: 'POST',
+                credentials: 'include',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ token: input.value }),
+            });
+            input.value = '';
+            if (!response.ok) {
+                form.querySelector('[data-session-error]')?.remove();
+                const error = document.createElement('p');
+                error.dataset.sessionError = 'true';
+                error.textContent = 'That key was rejected.';
+                form.appendChild(error);
+                return;
+            }
+            gate.classList.add('hidden');
+            resolve();
+        });
+    });
+}
 
 /**
  * Zyrabit App Orchestrator
@@ -74,6 +92,7 @@ class ZyrabitApp {
     }
 
     async init() {
+        await ensureBrowserSession();
         this.setupUIListeners();
         this.socket.connect();
         this.startHealthChecks();
@@ -152,6 +171,15 @@ class ZyrabitApp {
                 console.warn(`[SKIP] Optional or missing element skipped: #${id}`);
             }
         };
+
+        bind('sign-out', 'onclick', async () => {
+            await originalFetch('/v1/session', {
+                method: 'DELETE',
+                credentials: 'include',
+                headers: { 'X-CSRF-Token': csrfToken() },
+            });
+            window.location.reload();
+        });
 
         // 1. Onboarding (Safe because it's a modal)
         const obForm = document.getElementById('onboarding-form');

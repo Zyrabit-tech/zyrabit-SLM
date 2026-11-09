@@ -127,16 +127,16 @@ If you already have Docker and a local inference engine (Ollama, vLLM, or LM Stu
 
 ```bash
 docker run -d \
-  --name zyrabit-platform \
-  -p 8080:8080 \
+  --name zyrabit-api \
+  -p 127.0.0.1:8088:8080 \
   --add-host=host.docker.internal:host-gateway \
   -e INFERENCE_PROVIDER=ollama \
   -e SLM_URL=http://host.docker.internal:11434 \
   -v zyrabit_vault:/app/db_data \
-  zyrabitcore/zyrabit-slm:latest
+  zyrabitcore/zyrabit-slm:2.4.8
 ```
 
-Open **[http://localhost:8080](http://localhost:8080)** in your browser to access the workspace.
+The API container listens on port 8080 inside the container. This command publishes it on the host at `127.0.0.1:8088`. Check it with `curl http://127.0.0.1:8088/v1/health`. The document workspace is the web container from Option B, at `http://127.0.0.1:8080`. Pin a version tag. `:latest` moves only when a stable release is published from `main`.
 
 ---
 
@@ -159,6 +159,47 @@ curl -X POST http://localhost:8088/v1/chat \
   -H "Authorization: Bearer $(grep '^ZYRABIT_API_KEY_WEB=' zyrabit-slm/.env | cut -d= -f2-)" \
   -d '{"text": "Summarize our sovereign architecture capabilities"}'
 ```
+
+#### 🐧 Platform Guides
+
+<details>
+<summary><b>Linux (Ubuntu / Debian / RHEL)</b></summary>
+
+- **Docker permissions:** Ensure your user is in the `docker` group so you do not need `sudo` *(Note: membership in the `docker` group provides administrative privileges equivalent to root)*:
+  ```bash
+  sudo usermod -aG docker $USER && newgrp docker
+  ```
+- **Execution:** Run `./zyra.sh install`. Directory permissions for `./db_data` and `./document_source` (UID 10001) are automatically and securely adjusted without leaving files world-writable.
+- **Host Ollama on Linux:** If using host Ollama instead of Docker, ensure Ollama listens on `0.0.0.0` (e.g. `OLLAMA_HOST=0.0.0.0:11434 systemctl restart ollama`) so containers can reach the host interface.
+</details>
+
+<details>
+<summary><b>macOS (Apple Silicon M-Series)</b></summary>
+
+- **Hardware Acceleration:** Native Metal acceleration is auto-detected.
+- **Ollama Host:** If Ollama is installed on your Mac (`brew install ollama`), the installer automatically connects to your host Ollama engine.
+</details>
+
+<details>
+<summary><b>Windows (WSL2)</b></summary>
+
+- **File System:** Clone the repository inside your WSL2 Linux home directory (e.g. `~/zyrabit-SLM`), **never** in `/mnt/c/` (Windows NTFS) to avoid SQLite file locking issues.
+- **Line Endings (CRLF vs LF):** Ensure Git preserves Unix line endings before cloning (enforced via `.gitattributes` or global config):
+  ```bash
+  git config --global core.autocrlf input
+  ```
+- **NVIDIA GPU Acceleration:** Ensure the [NVIDIA Container Toolkit](https://docs.nvidia.com/cuda/wsl-user-guide/index.html) is installed inside WSL2 for CUDA acceleration.
+</details>
+
+#### 🧠 Document RAG & Embedding Models
+By default, the installer pulls and configures `mxbai-embed-large` for document embeddings and retrieval in ChromaDB.
+- **Customization:** You can switch the embedding model anytime by updating `zyrabit-slm/.env`:
+  ```bash
+  # For multilingual / Spanish optimization:
+  EMBEDDING_MODEL=bge-m3
+  ```
+  *(Remember to pull the new model with `ollama pull bge-m3` and re-index documents so vector dimensions remain consistent).*
+- **Network routing:** In Docker mode, embeddings resolve internally via `http://zyrabit-engine:11434` (and `http://host.docker.internal:11434` for host/Metal providers). All endpoints are bound to `127.0.0.1` by default via `ZYRABIT_BIND_IP` for security.
 
 > [!TIP]
 > **Avoid using `sudo ./zyra.sh`**: Running scripts with `sudo` creates root-owned files that disrupt user permissions. If you encounter Docker permission issues, add your user to the docker group: `sudo usermod -aG docker $USER && newgrp docker`.

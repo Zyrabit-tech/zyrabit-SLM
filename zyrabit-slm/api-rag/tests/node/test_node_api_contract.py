@@ -54,3 +54,15 @@ def test_import_job_query_and_sources_over_http(node_api):
     assert [message["role"] for message in messages] == ["user", "assistant"]
     assert "What operation is crucial" in messages[0]["content"]
     assert session.json()["context"]["active_document_id"] == accepted["document_id"]
+
+    # Delete document
+    del_resp = node_api.delete(f"/v1/documents/{accepted['document_id']}")
+    assert del_resp.status_code == 204
+
+    # Verification: document now returns 404
+    get_del = node_api.get(f"/v1/documents/{accepted['document_id']}")
+    assert get_del.status_code == 404
+
+    # Deleting again returns 404
+    del_again = node_api.delete(f"/v1/documents/{accepted['document_id']}")
+    assert del_again.status_code == 404

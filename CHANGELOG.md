@@ -7,6 +7,50 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Security
+
+- **oauthlib 4.0.1**: The locked 4.0.0 release accepts a bogus device-code grant (CVE-2026-49272, GHSA-3jp2-3mrg-2vxc). The lock now requires 4.0.1.
+- **The web UI no longer embeds the service Bearer token**: The browser signs in once. The API stores the session and sets an `HttpOnly` cookie. Mutable cookie requests require the matching CSRF token. `SameSite` defaults to `Lax`; production HTTPS should set `ZYRABIT_COOKIE_SECURE=true` and `ZYRABIT_COOKIE_SAMESITE=strict`. See `docs/engineering/WEB_SESSION.md`.
+- **Document deletion requires an administrator**: A valid API key is no longer enough to call `DELETE /v1/documents/{id}`. Only identities in `ZYRABIT_ADMIN_CLIENTS` (default `admin`) may delete, and a stored `owner_id` must match the caller. The deployment stays single-tenant.
+- **Traefik dashboard is off by default**: `api.insecure=true` and the published dashboard port are gone from the default compose file. `ZYRABIT_TRAEFIK_DASHBOARD=true` is refused unless `TRAEFIK_DASHBOARD_AUTH` is `user:htpasswd_hash`. The optional listener is `127.0.0.1:8082`.
+
+### Changed
+
+- **Install refuses an unpinned upgrade**: `OLLAMA_VERSION=latest` stops installation. An existing `zyrabit-api` image tagged `:latest` continues only after `ZYRABIT_ACCEPT_LATEST=yes` or an interactive yes, and that choice does not rewrite `.env` or data volumes. Embedding pull failures and permission failures exit non-zero.
+- **`verify` reports real failures**: A missing or unhealthy required container, a chat response that is not HTTP 200 with a non-empty `response` string, a missing API key, or a document that does not reach `ready` and then disappear now makes `./zyra.sh verify` exit non-zero. `VERIFY_DOC_TIMEOUT_SECONDS` bounds the document wait.
+
+- **Release image names survive channel resolution**: The channel script appends to `$GITHUB_OUTPUT` so the Docker build still receives the Docker Hub and GHCR names.
+- **Moving tags follow Docker Hub immutability**: `:beta` and `:latest` are still published on GHCR. Docker Hub currently freezes every tag, so those pointers are not overwritten there. The version tag is still published on both registries.
+- **Beta images stay off `latest`**: Pushes to `beta` create `vX.Y.Z-beta.1` and publish `:beta` plus that immutable prerelease. `:latest` moves only for a `vX.Y.Z` tag whose commit is on `main`, after both amd64 and arm64 digests exist. Published version tags are not moved. `v2.4.8` is left as published.
+
+## [2.4.8] - 2026-11-03
+
+### Added
+
+- **Document smoke test**: Added automated end-to-end document ingestion, status verification, and deletion check to `zyra.sh verify`, catching storage and permission regressions during setup.
+- **Document deletion endpoint**: Added `DELETE /v1/documents/{document_id}` with cascading cleanup across SQLite metadata, source files, and vector index.
+- **Multi-OS documentation**: Added comprehensive guide in `docs/installation/MULTI_OS_INSTALLATION.md` for Linux, macOS (Apple Silicon), and Windows WSL2 (#178).
+
+### Security
+
+- **Local port security binding**: Defaulted exposed ports (3000, 8080, 8088, 9090) to bind strictly to `${ZYRABIT_BIND_IP:-127.0.0.1}`, preventing inadvertent network exposure on multi-homed hosts (#178).
+- **CodeQL path injection patch**: Sanitized Obsidian import paths with strict path resolution and confinement to vault boundaries (#183).
+- **Vulnerability remediation bumps**: Upgraded `authlib` to 1.6.11 (CVE-2026-39884), `vite` to 6.4.5 (GHSA-3452-799q-v9hx / CVE-2026-27606), `dnspython` to 2.8.0, and `msgpack` to 1.1.2 (#183).
+
+### Changed
+
+- **Pinned Ollama version**: Replaced unpinned `latest` with explicit `0.5.12` in `zyrabit-slm/example.env` and `docker-compose.yml`.
+- **Installer log cleanliness**: Suppressed inactive Grafana and Prometheus service endpoints from startup logs when running in local development mode.
+- **Repository line endings**: Enforced consistent LF line endings via `.gitattributes` (#178).
+
+### Fixed
+
+- **Linux volume permissions & host GID 2770**: Passed host GID as environment variable `-e HOST_GID="$(id -g)"` to auxiliary container in `ensure_data_directories` and set permissions to 2770 (`u+rwX,g+rwX,o-rwx` with SGID) so non-root host users can manage data volumes without sudo (#177).
+- **Unconditional permission enforcement**: Removed `find` conditional bypass on Linux so permission adjustments run idempotently and fail fast if container execution encounters errors.
+- **Docker RAG embeddings**: Resolved embedding endpoint routing when running Ollama within Docker (`http://zyrabit-engine:11434`) (#177).
+
 ## [2.4.7] - 2026-10-24
 
 ### Added

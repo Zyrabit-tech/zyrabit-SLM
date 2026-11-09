@@ -1,6 +1,6 @@
 [project]
 name = "zyrabit-platform"
-version = "2.4.7"
+version = "2.4.8"
 description = "The Open Platform for Sovereign AI"
 readme = "README.md"
 requires-python = ">=3.12,<3.13"
@@ -58,6 +58,8 @@ dev = [
 [tool.uv]
 managed = true
 package = false
+# requests-oauthlib pulls oauthlib. 4.0.0 accepts a bogus device-code grant (CVE-2026-49272).
+override-dependencies = ["oauthlib>=4.0.1"]
 
 [tool.pytest.ini_options]
 pythonpath = ["zyrabit-slm/api-rag"]

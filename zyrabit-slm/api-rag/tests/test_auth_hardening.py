@@ -2,7 +2,13 @@ import pytest
 from app.core.security.api_key_store import ApiKeyStore
 from app.core.security.auth import get_current_user
 from fastapi import HTTPException
+from types import SimpleNamespace
+
 from fastapi.security import HTTPAuthorizationCredentials
+
+
+def _request():
+    return SimpleNamespace(method="GET", cookies={}, headers={}, app=SimpleNamespace(state=SimpleNamespace()))
 
 def test_api_key_store_load_and_validate(monkeypatch):
     monkeypatch.setenv("ZYRABIT_API_KEY_WEBUI", "web-secret-key-123")
@@ -26,7 +32,7 @@ async def test_get_current_user_valid(monkeypatch):
     ApiKeyStore.load()
 
     creds = HTTPAuthorizationCredentials(scheme="Bearer", credentials="web-secret-key-123")
-    user = await get_current_user(creds)
+    user = await get_current_user(_request(), creds)
     assert user.name == "Admin"
     assert user.client == "webui"
 
@@ -37,7 +43,7 @@ async def test_get_current_user_invalid(monkeypatch):
 
     creds = HTTPAuthorizationCredentials(scheme="Bearer", credentials="wrong-key")
     with pytest.raises(HTTPException) as exc:
-        await get_current_user(creds)
+        await get_current_user(_request(), creds)
     assert exc.value.status_code == 401
 
 
@@ -53,5 +59,5 @@ async def test_get_current_user_rejects_ambient_test_token(monkeypatch):
 
     creds = HTTPAuthorizationCredentials(scheme="Bearer", credentials="test-token")
     with pytest.raises(HTTPException) as exc:
-        await get_current_user(creds)
+        await get_current_user(_request(), creds)
     assert exc.value.status_code == 401
