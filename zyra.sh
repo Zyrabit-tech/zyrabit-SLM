@@ -204,7 +204,7 @@ ensure_data_directories() {
     )
     for d in "${dirs[@]}"; do
         if [[ ! -d "$d" ]]; then
-            mkdir -p "$d" 2>/dev/null || true
+            mkdir -p "$d" || { log_err "Cannot create ${d}."; return 1; }
         fi
     done
 
@@ -219,7 +219,10 @@ ensure_data_directories() {
             sh -c 'chown -R 10001:"$HOST_GID" /d1 /d2 && chmod -R u+rwX,g+rwX,o-rwx /d1 /d2 && find /d1 /d2 -type d -exec chmod g+s {} +' \
             || { log_err "Failed to adjust permissions on db_data/document_source with helper container."; return 1; }
     else
-        chmod -R u+rwX,g+rwX,o-rwx "${base}/db_data" "${base}/document_source" 2>/dev/null || true
+        chmod -R u+rwX,g+rwX,o-rwx "${base}/db_data" "${base}/document_source" || {
+            log_err "Cannot set permissions on db_data or document_source."
+            return 1
+        }
     fi
 }
 
@@ -655,6 +658,7 @@ run_install() {
 
     migrate_env_config
     ensure_local_secrets
+    confirm_explicit_versions || exit 1
 
     # At this point OVERRIDE_MODEL may have been set during configuration
     local hw_info ram model_name
@@ -679,6 +683,42 @@ run_install() {
         exit 1
     fi
     log_ok "✅ Installation complete."
+}
+
+confirm_explicit_versions() {
+    [[ -f "${ENV_FILE}" ]] || return 0
+    local ollama_version
+    ollama_version=$(grep '^OLLAMA_VERSION=' "${ENV_FILE}" 2>/dev/null | cut -d= -f2- | tr -d '"' | tr -d "'" || true)
+    if [[ -z "${ollama_version}" || "${ollama_version}" == "latest" ]]; then
+        log_err "OLLAMA_VERSION must be an explicit release such as 0.5.12. latest is not accepted."
+        return 1
+    fi
+
+    local image_ref=""
+    if command -v docker >/dev/null 2>&1 && docker inspect zyrabit-api >/dev/null 2>&1; then
+        image_ref=$(docker inspect -f '{{.Config.Image}}' zyrabit-api 2>/dev/null || true)
+    fi
+    if [[ "${image_ref}" != *:latest ]]; then
+        return 0
+    fi
+
+    local accept
+    accept=$(grep '^ZYRABIT_ACCEPT_LATEST=' "${ENV_FILE}" 2>/dev/null | cut -d= -f2- | tr -d '"' | tr -d "'" || true)
+    if [[ "${accept}" == "yes" ]]; then
+        log_warn "Existing image ${image_ref} tracks latest. Continuing because ZYRABIT_ACCEPT_LATEST=yes. Volumes and .env were not rewritten."
+        return 0
+    fi
+    if [[ "${SKIP_PROMPTS}" == "true" ]]; then
+        log_err "Existing image ${image_ref} tracks latest. Set ZYRABIT_ACCEPT_LATEST=yes or pin a version before a non-interactive upgrade."
+        return 1
+    fi
+    local answer
+    read -rp "  Existing image tracks :latest. Continue without changing that tag? [y/N]: " answer
+    if [[ "$(echo "${answer:-n}" | tr '[:upper:]' '[:lower:]')" != "y" ]]; then
+        log_err "Upgrade stopped. Pin the image tag or set ZYRABIT_ACCEPT_LATEST=yes."
+        return 1
+    fi
+    log_warn "Continuing with ${image_ref}. Configuration and data volumes were left in place."
 }
 
 migrate_env_config() {
@@ -792,7 +832,8 @@ _pull_models() {
                     return 1
                 fi
             else
-                log_warn "Neither 'huggingface-cli' nor 'huggingface_hub' python package found. If needed, download weights manually into ${hf_cache}/hub."
+                log_err "Weights for '${tt_model}' are not cached, and neither huggingface-cli nor huggingface_hub is available."
+                return 1
             fi
         fi
     elif [[ "${provider}" == ollama* || "${provider}" == "cuda" ]]; then
@@ -814,7 +855,8 @@ _pull_models() {
             if ! ollama list 2>/dev/null | grep -qE "^${embedding_model}(:latest)?[[:space:]]"; then
                 log_info "Pulling default embedding model '${embedding_model}' into Ollama..."
                 if ! ollama pull "${embedding_model}"; then
-                    log_warn "Failed to pull embedding model '${embedding_model}'. Document RAG may be degraded."
+                    log_err "Failed to pull embedding model '${embedding_model}'."
+                    return 1
                 fi
             else
                 log_ok "Embedding model '${embedding_model}' already exists in Ollama."
@@ -846,7 +888,8 @@ _pull_models() {
             if ! $DOCKER_COMPOSE_CMD -f "$(active_compose_file)" exec -T zyrabit-engine ollama list 2>/dev/null | grep -qE "^${embedding_model}(:latest)?[[:space:]]"; then
                 log_info "Pulling default embedding model '${embedding_model}' into container engine..."
                 if ! $DOCKER_COMPOSE_CMD -f "$(active_compose_file)" exec -T zyrabit-engine ollama pull "${embedding_model}"; then
-                    log_warn "Failed to pull embedding model '${embedding_model}'. Document RAG may be degraded."
+                    log_err "Failed to pull embedding model '${embedding_model}'."
+                    return 1
                 fi
             else
                 log_ok "Embedding model '${embedding_model}' already loaded in container."
