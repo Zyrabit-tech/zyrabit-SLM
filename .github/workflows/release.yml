@@ -227,16 +227,11 @@ jobs:
             refuse_existing "${GHCR}" "${tag}"
           done
 
-          publish() {
-            local image="$1"
-            shift
-            local sources=("$@")
-            local args=()
-            for tag in ${IMMUTABLE} ${MUTABLE}; do
-              args+=(-t "${image}:${tag}")
-            done
-            echo "Publishing ${args[*]}"
-            docker buildx imagetools create "${args[@]}" "${sources[@]}"
+          publish_one() {
+            local image="$1" tag="$2"
+            shift 2
+            echo "Publishing ${image}:${tag}"
+            docker buildx imagetools create -t "${image}:${tag}" "$@"
           }
 
           hub_sources=()
@@ -246,8 +241,21 @@ jobs:
             hub_sources+=("${IMAGE}@${digest}")
             ghcr_sources+=("${GHCR}@${digest}")
           done
-          publish "${IMAGE}" "${hub_sources[@]}"
-          publish "${GHCR}" "${ghcr_sources[@]}"
+
+          for tag in ${IMMUTABLE}; do
+            publish_one "${IMAGE}" "${tag}" "${hub_sources[@]}"
+            publish_one "${GHCR}" "${tag}" "${ghcr_sources[@]}"
+          done
+
+          curl -fsSL "https://hub.docker.com/v2/repositories/${IMAGE}/" > /tmp/hub-repo.json
+          for tag in ${MUTABLE}; do
+            publish_one "${GHCR}" "${tag}" "${ghcr_sources[@]}"
+            if python3 -c 'import json,sys,importlib.util; spec=importlib.util.spec_from_file_location("channel","scripts/resolve_release_channel.py"); mod=importlib.util.module_from_spec(spec); spec.loader.exec_module(mod); settings=json.load(open("/tmp/hub-repo.json")).get("immutable_tags_settings") or {}; sys.exit(0 if mod.docker_hub_tag_is_immutable(sys.argv[1], settings) else 1)' "${tag}"; then
+              echo "Docker Hub freezes ${IMAGE}:${tag}. The moving tag is published on ${GHCR}:${tag}."
+              continue
+            fi
+            publish_one "${IMAGE}" "${tag}" "${hub_sources[@]}"
+          done
 
       - name: Create GitHub Release
         if: steps.channel.outputs.channel == 'stable' || steps.channel.outputs.channel == 'beta'

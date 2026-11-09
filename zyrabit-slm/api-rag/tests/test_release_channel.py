@@ -11,6 +11,14 @@ module = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(module)
 
 
+def test_docker_hub_wildcard_rule_freezes_moving_tags():
+    settings = {"enabled": True, "rules": [".*"]}
+    assert module.docker_hub_tag_is_immutable("beta", settings)
+    assert module.docker_hub_tag_is_immutable("latest", settings)
+    assert module.docker_hub_tag_is_immutable("2.4.8-beta.3", settings)
+    assert not module.docker_hub_tag_is_immutable("beta", {"enabled": False, "rules": [".*"]})
+
+
 def test_beta_tag_never_publishes_latest():
     plan = module.resolve_release_channel("v2.4.8-beta.1", "2.4.8", commit_on_main=False)
     assert plan["channel"] == "beta"

@@ -93,6 +93,13 @@ def resolve_release_channel(ref_name: str, version_file: str, commit_on_main: bo
     }
 
 
+def docker_hub_tag_is_immutable(tag: str, settings: dict) -> bool:
+    """Docker Hub can freeze every tag. A frozen tag cannot be a moving pointer."""
+    if not settings.get("enabled"):
+        return False
+    return any(re.fullmatch(rule, tag) for rule in settings.get("rules") or [])
+
+
 def format_ledger(plan: dict, sha: str, digests: dict[str, str]) -> str:
     """Render the version, tag, SHA, and image digests that were published."""
     missing = [arch for arch in ("amd64", "arm64") if arch not in digests]

@@ -22,7 +22,7 @@ A stable git tag such as `v2.4.9` publishes only when that commit is contained i
 | Registry Tag | Type | Target Architectures | Purpose |
 | :--- | :--- | :--- | :--- |
 | `:2.4.9` | **Multi-Arch Manifest** | `amd64`, `arm64` | Immutable SemVer release |
-| `:latest` | **Multi-Arch Manifest** | `amd64`, `arm64` | Moving production pointer |
+| `:latest` | **Multi-Arch Manifest** | `amd64`, `arm64` | Moving production pointer on GHCR. Docker Hub receives it only when the repository allows that tag to change. |
 
 Both architecture digests must exist before either tag is updated. A failed AMD64 or ARM64 build does not publish the stable manifest.
 
@@ -36,7 +36,7 @@ Both architecture digests must exist before either tag is updated. A failed AMD6
 
 | Registry Tag | Type | Target Architectures | Purpose |
 | :--- | :--- | :--- | :--- |
-| `:beta` | **Multi-Arch Manifest** | `amd64`, `arm64` | Moving preview pointer |
+| `:beta` | **Multi-Arch Manifest** | `amd64`, `arm64` | Moving preview pointer on GHCR. Docker Hub receives it only when the repository allows that tag to change. |
 | `:2.4.9-beta.1` | **Multi-Arch Manifest** | `amd64`, `arm64` | Immutable prerelease |
 
 > **Forbidden:** moving `:latest`, moving `:2.4.9-beta.1` after it exists, and architecture slice tags.
@@ -51,5 +51,7 @@ The policy is enforced in [`.github/workflows/release.yml`](../../.github/workfl
 2. **`publish-manifest`** downloads the two digests and creates the public manifest list:
 
 The publish job calls `scripts/resolve_release_channel.py`. Stable tags are checked against `main` before any manifest is created. The job writes a ledger with the git tag, full SHA, and the amd64 and arm64 digests. An existing immutable image tag stops the job.
+
+Docker Hub `zyrabitcore/zyrabit-slm` has tag immutability enabled for `.*`. A tag that already exists, including `:beta` and `:latest`, cannot be moved there. The workflow still publishes the new version tag on Docker Hub and publishes the moving tag on GHCR. Narrowing the Hub rule to version tags (and leaving `beta` and `latest` out of it) makes those two pointers move on Docker Hub again.
 
 Tags already published by older releases, including `2.4.8` and `v2.4.8`, stay where they are. This workflow does not create new slice tags or `v`-prefixed image tags.
