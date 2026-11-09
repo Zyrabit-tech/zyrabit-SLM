@@ -132,6 +132,10 @@ uv run pytest tests/test_mcp.py -v
 
 ---
 
+## Document deletion
+
+This repository is a single-tenant deployment. Holding any valid API key does not grant permission to delete documents. `DELETE /v1/documents/{id}` requires an identity listed in `ZYRABIT_ADMIN_CLIENTS` (default: `admin`, the `ZYRABIT_API_KEY_ADMIN` key). When a document has an `owner_id`, that owner must also match the caller. The project does not claim multi-tenant isolation.
+
 ## Additional Resources
 
 - [OWASP Top 10](https://owasp.org/www-project-top-ten/)

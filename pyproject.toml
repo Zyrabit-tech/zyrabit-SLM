@@ -58,6 +58,8 @@ dev = [
 [tool.uv]
 managed = true
 package = false
+# requests-oauthlib pulls oauthlib. 4.0.0 accepts a bogus device-code grant (CVE-2026-49272).
+override-dependencies = ["oauthlib>=4.0.1"]
 
 [tool.pytest.ini_options]
 pythonpath = ["zyrabit-slm/api-rag"]

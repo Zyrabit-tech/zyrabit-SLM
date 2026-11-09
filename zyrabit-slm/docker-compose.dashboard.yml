@@ -1,0 +1,31 @@
+# Optional Traefik dashboard. Do not merge this file unless
+# TRAEFIK_DASHBOARD_AUTH is user:htpasswd_hash. zyra.sh rejects the
+# combination when the secret is missing. The port is loopback-only and
+# is 8082 so it does not take the llama.cpp port.
+services:
+  traefik:
+    command:
+      - --api.dashboard=true
+      - --api.insecure=false
+      - --providers.docker=true
+      - --providers.docker.apiVersion=1.40
+      - --providers.docker.exposedbydefault=false
+      - --providers.file.directory=/etc/traefik/dynamic
+      - --metrics.prometheus=true
+      - --metrics.prometheus.buckets=0.1,0.3,1.2,5.0
+      - --entryPoints.web.address=:80
+      - --entryPoints.web.http.redirections.entryPoint.to=websecure
+      - --entryPoints.web.http.redirections.entryPoint.scheme=https
+      - --entryPoints.websecure.address=:443
+      - --entryPoints.websecure.http.tls=true
+      - --entryPoints.dashboard.address=:8080
+      - --log.level=${TRAEFIK_LOG_LEVEL:-INFO}
+    ports:
+      - "127.0.0.1:8082:8080"
+    labels:
+      - traefik.enable=true
+      - traefik.http.middlewares.dashboard-auth.basicauth.users=${TRAEFIK_DASHBOARD_AUTH}
+      - traefik.http.routers.dashboard.rule=PathPrefix(`/dashboard`) || PathPrefix(`/api`)
+      - traefik.http.routers.dashboard.entrypoints=dashboard
+      - traefik.http.routers.dashboard.service=api@internal
+      - traefik.http.routers.dashboard.middlewares=dashboard-auth

@@ -204,7 +204,7 @@ ensure_data_directories() {
     )
     for d in "${dirs[@]}"; do
         if [[ ! -d "$d" ]]; then
-            mkdir -p "$d" 2>/dev/null || true
+            mkdir -p "$d" || { log_err "Cannot create ${d}."; return 1; }
         fi
     done
 
@@ -219,7 +219,10 @@ ensure_data_directories() {
             sh -c 'chown -R 10001:"$HOST_GID" /d1 /d2 && chmod -R u+rwX,g+rwX,o-rwx /d1 /d2 && find /d1 /d2 -type d -exec chmod g+s {} +' \
             || { log_err "Failed to adjust permissions on db_data/document_source with helper container."; return 1; }
     else
-        chmod -R u+rwX,g+rwX,o-rwx "${base}/db_data" "${base}/document_source" 2>/dev/null || true
+        chmod -R u+rwX,g+rwX,o-rwx "${base}/db_data" "${base}/document_source" || {
+            log_err "Cannot set permissions on db_data or document_source."
+            return 1
+        }
     fi
 }
 
@@ -655,6 +658,7 @@ run_install() {
 
     migrate_env_config
     ensure_local_secrets
+    confirm_explicit_versions || exit 1
 
     # At this point OVERRIDE_MODEL may have been set during configuration
     local hw_info ram model_name
@@ -681,6 +685,42 @@ run_install() {
     log_ok "✅ Installation complete."
 }
 
+confirm_explicit_versions() {
+    [[ -f "${ENV_FILE}" ]] || return 0
+    local ollama_version
+    ollama_version=$(grep '^OLLAMA_VERSION=' "${ENV_FILE}" 2>/dev/null | cut -d= -f2- | tr -d '"' | tr -d "'" || true)
+    if [[ -z "${ollama_version}" || "${ollama_version}" == "latest" ]]; then
+        log_err "OLLAMA_VERSION must be an explicit release such as 0.5.12. latest is not accepted."
+        return 1
+    fi
+
+    local image_ref=""
+    if command -v docker >/dev/null 2>&1 && docker inspect zyrabit-api >/dev/null 2>&1; then
+        image_ref=$(docker inspect -f '{{.Config.Image}}' zyrabit-api 2>/dev/null || true)
+    fi
+    if [[ "${image_ref}" != *:latest ]]; then
+        return 0
+    fi
+
+    local accept
+    accept=$(grep '^ZYRABIT_ACCEPT_LATEST=' "${ENV_FILE}" 2>/dev/null | cut -d= -f2- | tr -d '"' | tr -d "'" || true)
+    if [[ "${accept}" == "yes" ]]; then
+        log_warn "Existing image ${image_ref} tracks latest. Continuing because ZYRABIT_ACCEPT_LATEST=yes. Volumes and .env were not rewritten."
+        return 0
+    fi
+    if [[ "${SKIP_PROMPTS}" == "true" ]]; then
+        log_err "Existing image ${image_ref} tracks latest. Set ZYRABIT_ACCEPT_LATEST=yes or pin a version before a non-interactive upgrade."
+        return 1
+    fi
+    local answer
+    read -rp "  Existing image tracks :latest. Continue without changing that tag? [y/N]: " answer
+    if [[ "$(echo "${answer:-n}" | tr '[:upper:]' '[:lower:]')" != "y" ]]; then
+        log_err "Upgrade stopped. Pin the image tag or set ZYRABIT_ACCEPT_LATEST=yes."
+        return 1
+    fi
+    log_warn "Continuing with ${image_ref}. Configuration and data volumes were left in place."
+}
+
 migrate_env_config() {
     [[ -f "${ENV_FILE}" ]] || return 0
     local provider
@@ -702,12 +742,16 @@ ensure_local_secrets() {
     [[ -f "${ENV_FILE}" ]] || { log_err "Missing ${ENV_FILE}; run './zyra.sh install' to configure."; exit 1; }
 
     local key generated=0 value
-    for key in ZYRABIT_API_KEY_WEB ZYRABIT_API_KEY_MCP; do
+    for key in ZYRABIT_API_KEY_WEB ZYRABIT_API_KEY_MCP ZYRABIT_API_KEY_ADMIN; do
         value=$(grep "^${key}=" "${ENV_FILE}" 2>/dev/null | cut -d= -f2- || true)
         if [[ -z "${value}" || "${value}" == replace-with-* || "${value}" == zyrabit-*-token ]]; then
             command -v openssl >/dev/null 2>&1 || { log_err "openssl is required to generate local API keys."; exit 1; }
             value=$(openssl rand -hex 32)
-            sed -i.bak "s|^${key}=.*|${key}=${value}|" "${ENV_FILE}"
+            if grep -q "^${key}=" "${ENV_FILE}"; then
+                sed -i.bak "s|^${key}=.*|${key}=${value}|" "${ENV_FILE}"
+            else
+                echo "${key}=${value}" >> "${ENV_FILE}"
+            fi
             generated=1
         fi
     done
@@ -788,7 +832,8 @@ _pull_models() {
                     return 1
                 fi
             else
-                log_warn "Neither 'huggingface-cli' nor 'huggingface_hub' python package found. If needed, download weights manually into ${hf_cache}/hub."
+                log_err "Weights for '${tt_model}' are not cached, and neither huggingface-cli nor huggingface_hub is available."
+                return 1
             fi
         fi
     elif [[ "${provider}" == ollama* || "${provider}" == "cuda" ]]; then
@@ -810,7 +855,8 @@ _pull_models() {
             if ! ollama list 2>/dev/null | grep -qE "^${embedding_model}(:latest)?[[:space:]]"; then
                 log_info "Pulling default embedding model '${embedding_model}' into Ollama..."
                 if ! ollama pull "${embedding_model}"; then
-                    log_warn "Failed to pull embedding model '${embedding_model}'. Document RAG may be degraded."
+                    log_err "Failed to pull embedding model '${embedding_model}'."
+                    return 1
                 fi
             else
                 log_ok "Embedding model '${embedding_model}' already exists in Ollama."
@@ -842,7 +888,8 @@ _pull_models() {
             if ! $DOCKER_COMPOSE_CMD -f "$(active_compose_file)" exec -T zyrabit-engine ollama list 2>/dev/null | grep -qE "^${embedding_model}(:latest)?[[:space:]]"; then
                 log_info "Pulling default embedding model '${embedding_model}' into container engine..."
                 if ! $DOCKER_COMPOSE_CMD -f "$(active_compose_file)" exec -T zyrabit-engine ollama pull "${embedding_model}"; then
-                    log_warn "Failed to pull embedding model '${embedding_model}'. Document RAG may be degraded."
+                    log_err "Failed to pull embedding model '${embedding_model}'."
+                    return 1
                 fi
             else
                 log_ok "Embedding model '${embedding_model}' already loaded in container."
@@ -931,6 +978,19 @@ run_start() {
 
     if [[ "${PRODUCTION_MODE}" == "true" ]]; then
         validate_production_env
+        local dashboard_flag="false"
+        local dashboard_auth=""
+        if [[ "${ZYRABIT_TRAEFIK_DASHBOARD:-}" == "true" ]] || grep -q '^ZYRABIT_TRAEFIK_DASHBOARD=true' "${ENV_FILE}" 2>/dev/null; then
+            dashboard_flag="true"
+            dashboard_auth=$(grep '^TRAEFIK_DASHBOARD_AUTH=' "${ENV_FILE}" 2>/dev/null | cut -d= -f2- || true)
+            compose_args+=("-f" "${SCRIPT_DIR}/zyrabit-slm/docker-compose.dashboard.yml")
+        fi
+        if ! python3 "${SCRIPT_DIR}/scripts/check_traefik_dashboard.py" \
+            --compose "${SCRIPT_DIR}/zyrabit-slm/docker-compose.yml" \
+            --enabled "${dashboard_flag}" \
+            --auth "${dashboard_auth}"; then
+            exit 1
+        fi
         compose_args+=("--profile" "production")
         log_header "ZYRABIT — PRODUCTION"
         log_info "Domain: ${DOMAIN:-localhost}"
@@ -1048,12 +1108,19 @@ run_verify() {
         fi
         if [[ "$status" == "running" ]]; then
             health=$(docker inspect --format='{{if .State.Health}}{{.State.Health.Status}}{{else}}N/A{{end}}' "$c" 2>/dev/null | tr -d '[:space:]')
-            printf "  ${GREEN}%-28s %-15s %-10s${NC}\n" "$c" "running" "$health"
-            pass=$((pass + 1))
-            [[ "$health" == "unhealthy" ]] && { log_warn "Container $c is unhealthy:"; docker logs --tail 10 "$c"; }
+            if [[ "$health" == "unhealthy" ]]; then
+                printf "  ${RED}%-28s %-15s %-10s${NC}\n" "$c" "running" "$health"
+                log_err "Container $c is unhealthy."
+                docker logs --tail 10 "$c" 2>/dev/null || true
+                fail=$((fail + 1))
+            else
+                printf "  ${GREEN}%-28s %-15s %-10s${NC}\n" "$c" "running" "$health"
+                pass=$((pass + 1))
+            fi
         else
             printf "  ${RED}%-28s %-15s %-10s${NC}\n" "$c" "$status" "—"
-            [[ "$status" != "not_found" ]] && fail=$((fail + 1))
+            log_err "Required container $c is ${status}."
+            fail=$((fail + 1))
         fi
     done
 
@@ -1097,39 +1164,68 @@ run_verify() {
 
     # Smoke test: verify that chat completions work
     local api_key; api_key=$(web_api_key)
-    if [[ -n "${api_key}" ]]; then
+    if [[ -z "${api_key}" ]]; then
+        log_err "ZYRABIT_API_KEY_WEB is not configured. Verification is incomplete."
+        rc=1
+    else
         log_info "Running chat smoke test on ${base_url}/chat (timeout 60s)..."
-        local chat_code
-        chat_code=$(curl -sk -o /dev/null -w "%{http_code}" -m 60 -X POST "${base_url}/chat" \
+        local chat_body chat_code
+        chat_body=$(mktemp "/tmp/zyrabit-chat-XXXXXX.json")
+        chat_code=$(curl -sk -o "${chat_body}" -w "%{http_code}" -m 60 -X POST "${base_url}/chat" \
             -H "Content-Type: application/json" \
             -H "Authorization: Bearer ${api_key}" \
             -d '{"text":"ping"}' 2>/dev/null) || true
         chat_code="${chat_code:-000}"
-        if [[ "${chat_code}" == "200" ]]; then
-            log_ok "Chat smoke test passed (HTTP 200)."
-        elif [[ "${chat_code}" == "503" ]]; then
-            log_err "Chat smoke test FAILED (HTTP 503: Document node not initialized). Check permissions and logs: docker logs zyrabit-api --tail 40"
+        if [[ "${chat_code}" != "200" ]]; then
+            log_err "Chat smoke test FAILED (HTTP ${chat_code}). Check: docker logs zyrabit-api --tail 40"
             rc=1
-        elif [[ "${chat_code}" == "000" ]]; then
-            log_err "Chat smoke test timed out or connection refused (HTTP 000)."
+        elif ! python3 -c 'import json,sys; body=json.load(open(sys.argv[1], encoding="utf-8")); text=body.get("response"); raise SystemExit(0 if isinstance(text, str) and text.strip() else 1)' "${chat_body}"; then
+            log_err "Chat smoke test FAILED: HTTP 200 did not include a non-empty response string."
             rc=1
         else
-            log_warn "Chat smoke test returned HTTP ${chat_code}."
-            rc=1
+            log_ok "Chat smoke test passed."
         fi
+        rm -f "${chat_body}"
 
         # Smoke test: verify that document ingestion, storage, and deletion work
-        log_info "Running document ingestion smoke test on ${base_url}/sources/import (timeout 45s)..."
+        log_info "Running document ingestion smoke test on ${base_url}/sources/import..."
+        local admin_key
+        admin_key=$(grep '^ZYRABIT_API_KEY_ADMIN=' "${ENV_FILE}" 2>/dev/null | cut -d= -f2- || true)
+        if [[ -z "${admin_key}" || "${admin_key}" == replace-with-* ]]; then
+            log_err "ZYRABIT_API_KEY_ADMIN is not configured. Document deletion cannot be verified."
+            rc=1
+        else
         local doc_tmp; doc_tmp=$(mktemp "/tmp/zyrabit-smoke-XXXXXX.txt")
         echo "Zyrabit sovereign node document verification test token $(date +%s)" > "${doc_tmp}"
         local upload_out upload_code upload_body doc_id
         upload_out=$(curl -sk -m 30 -w "\n%{http_code}" -X POST "${base_url}/sources/import" \
-            -H "Authorization: Bearer ${api_key}" \
+            -H "Authorization: Bearer ${admin_key}" \
             -F "file=@${doc_tmp}" 2>/dev/null) || true
         rm -f "${doc_tmp}"
         upload_code=$(echo "${upload_out}" | tail -n1)
         upload_body=$(echo "${upload_out}" | sed '$d')
         doc_id=$(echo "${upload_body}" | grep -o '"document_id":[[:space:]]*"[^"]*"' | head -n1 | cut -d'"' -f4 || true)
+
+        cleanup_smoke_doc() {
+            local id="$1"
+            local del_code get_code
+            del_code=$(curl -sk -m 10 -o /dev/null -w "%{http_code}" -X DELETE "${base_url}/documents/${id}" \
+                -H "Authorization: Bearer ${admin_key}" 2>/dev/null) || true
+            del_code="${del_code:-000}"
+            get_code=$(curl -sk -m 10 -o /dev/null -w "%{http_code}" "${base_url}/documents/${id}" \
+                -H "Authorization: Bearer ${admin_key}" 2>/dev/null) || true
+            get_code="${get_code:-000}"
+            if [[ "${del_code}" != "204" && "${del_code}" != "404" ]]; then
+                log_err "Document cleanup DELETE failed (HTTP ${del_code}) for ${id}."
+                rc=1
+            fi
+            if [[ "${get_code}" != "404" ]]; then
+                log_err "Document ${id} is still present after cleanup (HTTP ${get_code})."
+                rc=1
+            else
+                log_ok "Document smoke test removed ${id}."
+            fi
+        }
 
         if [[ "${upload_code}" != "200" && "${upload_code}" != "202" ]] || [[ -z "${doc_id}" ]]; then
             log_err "Document smoke test upload FAILED (HTTP ${upload_code}). Check permissions and logs: docker logs zyrabit-api --tail 40"
@@ -1137,10 +1233,13 @@ run_verify() {
         else
             local doc_ready=false
             local doc_status=""
-            for ((j=1; j<=15; j++)); do
+            local doc_wait="${VERIFY_DOC_TIMEOUT_SECONDS:-30}"
+            local doc_attempts=$(( doc_wait / 2 ))
+            [[ "${doc_attempts}" -lt 1 ]] && doc_attempts=1
+            for ((j=1; j<=doc_attempts; j++)); do
                 local doc_resp
                 doc_resp=$(curl -sk -m 10 "${base_url}/documents/${doc_id}" \
-                    -H "Authorization: Bearer ${api_key}" 2>/dev/null || true)
+                    -H "Authorization: Bearer ${admin_key}" 2>/dev/null || true)
                 doc_status=$(echo "${doc_resp}" | grep -o '"status":[[:space:]]*"[^"]*"' | head -n1 | cut -d'"' -f4 || true)
                 if [[ "${doc_status}" == "ready" ]]; then
                     doc_ready=true
@@ -1148,7 +1247,7 @@ run_verify() {
                 elif [[ "${doc_status}" == "failed" ]]; then
                     local doc_err
                     doc_err=$(echo "${doc_resp}" | grep -o '"error":[[:space:]]*"[^"]*"' | head -n1 | cut -d'"' -f4 || true)
-                    log_err "Document smoke test failed processing: ${doc_err}"
+                    log_err "Document smoke test failed processing: ${doc_err:-unknown}"
                     break
                 fi
                 sleep 2
@@ -1160,10 +1259,8 @@ run_verify() {
                 log_err "Document smoke test FAILED (status: ${doc_status:-timeout}). Check logs: docker logs zyrabit-api --tail 40"
                 rc=1
             fi
-
-            # Clean up smoke test document
-            curl -sk -m 10 -X DELETE "${base_url}/documents/${doc_id}" \
-                -H "Authorization: Bearer ${api_key}" >/dev/null 2>&1 || true
+            cleanup_smoke_doc "${doc_id}"
+        fi
         fi
     fi
 

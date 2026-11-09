@@ -35,6 +35,7 @@
         <div class="document-context"><span class="context-dot"></span><span id="active-document-title">All documents</span><span id="active-document-description">Your local workspace</span></div>
        <div class="topbar-actions">
     <button id="clear-conversation" class="quiet-action" type="button">Clear conversation</button>
+    <button id="sign-out" class="quiet-action" type="button">Sign out</button>
     <button
         id="export-conversation"
         class="quiet-action"
@@ -74,6 +75,7 @@
       </div>
     </section>
   </main>
+  <div id="session-gate" class="onboarding hidden"><form id="session-form" class="onboarding-card"><p class="kicker">LOCAL SIGN-IN</p><h1>Open this workspace</h1><p>Paste <code>ZYRABIT_API_KEY_WEB</code> or <code>ZYRABIT_API_KEY_ADMIN</code> from <code>zyrabit-slm/.env</code>. The browser stores a session cookie. The key is not saved. SameSite defaults to <code>Lax</code>. Set <code>ZYRABIT_COOKIE_SECURE=true</code> and <code>ZYRABIT_COOKIE_SAMESITE=strict</code> behind HTTPS.</p><label>API key<input id="session-token" type="password" required autocomplete="current-password"></label><button class="primary-action" type="submit">Continue</button></form></div>
   <div id="onboarding-modal" class="onboarding hidden"><form id="onboarding-form" class="onboarding-card"><p class="kicker">WELCOME</p><h1>Set up your workspace</h1><p>Two details, then you can start asking about your documents.</p><label>Your name<input id="ob-name" required placeholder="Your name"></label><label>Assistant name<input id="ob-assistant" required value="Zyra"></label><input id="ob-email" type="hidden" value="local@workspace"><input id="ob-role" type="hidden" value="Workspace owner"><input id="ob-interests" type="hidden" value="Document analysis"><input id="ob-persona" type="hidden" value="Precise"><input id="ob-tone" type="hidden" value="Clear"><button class="primary-action" type="submit">Continue</button><button id="ob-skip" class="quiet-action" type="button">Skip for now</button></form></div>
 
   <div id="gdpr-panel" class="side-panel"><div class="panel-header"><div><p class="kicker">SESSION</p><h2>Activity</h2></div><button id="close-gdpr" class="icon-button" type="button">×</button></div><div class="activity-summary"><span class="activity-pulse"></span><div><b>Live workspace events</b><p>Imports, searches, and replies from this session.</p></div></div><div id="gdpr-logs" class="activity-log"><div class="activity-empty"><span>○</span><p>No activity yet</p><small>Your session events will appear here.</small></div></div></div>

@@ -79,7 +79,7 @@ def mock_infrastructure():
     ):
         from app.main import app
         from app.core.security.auth import get_current_user, User
-        app.dependency_overrides[get_current_user] = lambda: User(id=1, name="Test User")
+        app.dependency_overrides[get_current_user] = lambda: User(id=1, name="Test User", client="admin")
         
         # Ensure state is set before each test
         app.state.vector_store = mock_chroma
