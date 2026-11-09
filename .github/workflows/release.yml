@@ -128,7 +128,7 @@ jobs:
 
       - name: Upload digest
         if: steps.meta.outputs.channel == 'stable' || steps.meta.outputs.channel == 'beta'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: digests-${{ matrix.arch_suffix }}
           path: ${{ runner.temp }}/digests/*
