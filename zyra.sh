@@ -1048,12 +1048,19 @@ run_verify() {
         fi
         if [[ "$status" == "running" ]]; then
             health=$(docker inspect --format='{{if .State.Health}}{{.State.Health.Status}}{{else}}N/A{{end}}' "$c" 2>/dev/null | tr -d '[:space:]')
-            printf "  ${GREEN}%-28s %-15s %-10s${NC}\n" "$c" "running" "$health"
-            pass=$((pass + 1))
-            [[ "$health" == "unhealthy" ]] && { log_warn "Container $c is unhealthy:"; docker logs --tail 10 "$c"; }
+            if [[ "$health" == "unhealthy" ]]; then
+                printf "  ${RED}%-28s %-15s %-10s${NC}\n" "$c" "running" "$health"
+                log_err "Container $c is unhealthy."
+                docker logs --tail 10 "$c" 2>/dev/null || true
+                fail=$((fail + 1))
+            else
+                printf "  ${GREEN}%-28s %-15s %-10s${NC}\n" "$c" "running" "$health"
+                pass=$((pass + 1))
+            fi
         else
             printf "  ${RED}%-28s %-15s %-10s${NC}\n" "$c" "$status" "—"
-            [[ "$status" != "not_found" ]] && fail=$((fail + 1))
+            log_err "Required container $c is ${status}."
+            fail=$((fail + 1))
         fi
     done
 
@@ -1097,29 +1104,31 @@ run_verify() {
 
     # Smoke test: verify that chat completions work
     local api_key; api_key=$(web_api_key)
-    if [[ -n "${api_key}" ]]; then
+    if [[ -z "${api_key}" ]]; then
+        log_err "ZYRABIT_API_KEY_WEB is not configured. Verification is incomplete."
+        rc=1
+    else
         log_info "Running chat smoke test on ${base_url}/chat (timeout 60s)..."
-        local chat_code
-        chat_code=$(curl -sk -o /dev/null -w "%{http_code}" -m 60 -X POST "${base_url}/chat" \
+        local chat_body chat_code
+        chat_body=$(mktemp "/tmp/zyrabit-chat-XXXXXX.json")
+        chat_code=$(curl -sk -o "${chat_body}" -w "%{http_code}" -m 60 -X POST "${base_url}/chat" \
             -H "Content-Type: application/json" \
             -H "Authorization: Bearer ${api_key}" \
             -d '{"text":"ping"}' 2>/dev/null) || true
         chat_code="${chat_code:-000}"
-        if [[ "${chat_code}" == "200" ]]; then
-            log_ok "Chat smoke test passed (HTTP 200)."
-        elif [[ "${chat_code}" == "503" ]]; then
-            log_err "Chat smoke test FAILED (HTTP 503: Document node not initialized). Check permissions and logs: docker logs zyrabit-api --tail 40"
+        if [[ "${chat_code}" != "200" ]]; then
+            log_err "Chat smoke test FAILED (HTTP ${chat_code}). Check: docker logs zyrabit-api --tail 40"
             rc=1
-        elif [[ "${chat_code}" == "000" ]]; then
-            log_err "Chat smoke test timed out or connection refused (HTTP 000)."
+        elif ! python3 -c 'import json,sys; body=json.load(open(sys.argv[1], encoding="utf-8")); text=body.get("response"); raise SystemExit(0 if isinstance(text, str) and text.strip() else 1)' "${chat_body}"; then
+            log_err "Chat smoke test FAILED: HTTP 200 did not include a non-empty response string."
             rc=1
         else
-            log_warn "Chat smoke test returned HTTP ${chat_code}."
-            rc=1
+            log_ok "Chat smoke test passed."
         fi
+        rm -f "${chat_body}"
 
         # Smoke test: verify that document ingestion, storage, and deletion work
-        log_info "Running document ingestion smoke test on ${base_url}/sources/import (timeout 45s)..."
+        log_info "Running document ingestion smoke test on ${base_url}/sources/import..."
         local doc_tmp; doc_tmp=$(mktemp "/tmp/zyrabit-smoke-XXXXXX.txt")
         echo "Zyrabit sovereign node document verification test token $(date +%s)" > "${doc_tmp}"
         local upload_out upload_code upload_body doc_id
@@ -1131,13 +1140,37 @@ run_verify() {
         upload_body=$(echo "${upload_out}" | sed '$d')
         doc_id=$(echo "${upload_body}" | grep -o '"document_id":[[:space:]]*"[^"]*"' | head -n1 | cut -d'"' -f4 || true)
 
+        cleanup_smoke_doc() {
+            local id="$1"
+            local del_code get_code
+            del_code=$(curl -sk -m 10 -o /dev/null -w "%{http_code}" -X DELETE "${base_url}/documents/${id}" \
+                -H "Authorization: Bearer ${api_key}" 2>/dev/null) || true
+            del_code="${del_code:-000}"
+            get_code=$(curl -sk -m 10 -o /dev/null -w "%{http_code}" "${base_url}/documents/${id}" \
+                -H "Authorization: Bearer ${api_key}" 2>/dev/null) || true
+            get_code="${get_code:-000}"
+            if [[ "${del_code}" != "204" && "${del_code}" != "404" ]]; then
+                log_err "Document cleanup DELETE failed (HTTP ${del_code}) for ${id}."
+                rc=1
+            fi
+            if [[ "${get_code}" != "404" ]]; then
+                log_err "Document ${id} is still present after cleanup (HTTP ${get_code})."
+                rc=1
+            else
+                log_ok "Document smoke test removed ${id}."
+            fi
+        }
+
         if [[ "${upload_code}" != "200" && "${upload_code}" != "202" ]] || [[ -z "${doc_id}" ]]; then
             log_err "Document smoke test upload FAILED (HTTP ${upload_code}). Check permissions and logs: docker logs zyrabit-api --tail 40"
             rc=1
         else
             local doc_ready=false
             local doc_status=""
-            for ((j=1; j<=15; j++)); do
+            local doc_wait="${VERIFY_DOC_TIMEOUT_SECONDS:-30}"
+            local doc_attempts=$(( doc_wait / 2 ))
+            [[ "${doc_attempts}" -lt 1 ]] && doc_attempts=1
+            for ((j=1; j<=doc_attempts; j++)); do
                 local doc_resp
                 doc_resp=$(curl -sk -m 10 "${base_url}/documents/${doc_id}" \
                     -H "Authorization: Bearer ${api_key}" 2>/dev/null || true)
@@ -1148,7 +1181,7 @@ run_verify() {
                 elif [[ "${doc_status}" == "failed" ]]; then
                     local doc_err
                     doc_err=$(echo "${doc_resp}" | grep -o '"error":[[:space:]]*"[^"]*"' | head -n1 | cut -d'"' -f4 || true)
-                    log_err "Document smoke test failed processing: ${doc_err}"
+                    log_err "Document smoke test failed processing: ${doc_err:-unknown}"
                     break
                 fi
                 sleep 2
@@ -1160,10 +1193,7 @@ run_verify() {
                 log_err "Document smoke test FAILED (status: ${doc_status:-timeout}). Check logs: docker logs zyrabit-api --tail 40"
                 rc=1
             fi
-
-            # Clean up smoke test document
-            curl -sk -m 10 -X DELETE "${base_url}/documents/${doc_id}" \
-                -H "Authorization: Bearer ${api_key}" >/dev/null 2>&1 || true
+            cleanup_smoke_doc "${doc_id}"
         fi
     fi
 
