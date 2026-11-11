@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.4.9] - 2026-11-10
+
 ### Security
 
 - **oauthlib 4.0.1**: The locked 4.0.0 release accepts a bogus device-code grant (CVE-2026-49272, GHSA-3jp2-3mrg-2vxc). The lock now requires 4.0.1.
@@ -20,7 +22,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Install refuses an unpinned upgrade**: `OLLAMA_VERSION=latest` stops installation. An existing `zyrabit-api` image tagged `:latest` continues only after `ZYRABIT_ACCEPT_LATEST=yes` or an interactive yes, and that choice does not rewrite `.env` or data volumes. Embedding pull failures and permission failures exit non-zero.
 - **`verify` reports real failures**: A missing or unhealthy required container, a chat response that is not HTTP 200 with a non-empty `response` string, a missing API key, or a document that does not reach `ready` and then disappear now makes `./zyra.sh verify` exit non-zero. `VERIFY_DOC_TIMEOUT_SECONDS` bounds the document wait.
-
 - **Release image names survive channel resolution**: The channel script appends to `$GITHUB_OUTPUT` so the Docker build still receives the Docker Hub and GHCR names.
 - **Moving tags follow Docker Hub immutability**: `:beta` and `:latest` are still published on GHCR. Docker Hub currently freezes every tag, so those pointers are not overwritten there. The version tag is still published on both registries.
 - **Beta images stay off `latest`**: Pushes to `beta` create `vX.Y.Z-beta.1` and publish `:beta` plus that immutable prerelease. `:latest` moves only for a `vX.Y.Z` tag whose commit is on `main`, after both amd64 and arm64 digests exist. Published version tags are not moved. `v2.4.8` is left as published.
