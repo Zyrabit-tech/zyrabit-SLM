@@ -133,7 +133,7 @@ docker run -d \
   -e INFERENCE_PROVIDER=ollama \
   -e SLM_URL=http://host.docker.internal:11434 \
   -v zyrabit_vault:/app/db_data \
-  zyrabitcore/zyrabit-slm:2.4.8
+  zyrabitcore/zyrabit-slm:2.4.9
 ```
 
 The API container listens on port 8080 inside the container. This command publishes it on the host at `127.0.0.1:8088`. Check it with `curl http://127.0.0.1:8088/v1/health`. The document workspace is the web container from Option B, at `http://127.0.0.1:8080`. Pin a version tag. `:latest` moves only when a stable release is published from `main`.
