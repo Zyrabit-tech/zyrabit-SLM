@@ -82,7 +82,7 @@ Abstract contracts that the domain depends on. Infrastructure must implement the
 |---|---|
 | `InferencePort` | `generate(request) → InferenceResult` |
 | `StreamingInferencePort` | `stream_generate(request) → AsyncIterator[str]` |
-| `VectorStorePort` | `similarity_search()`, `add_texts()`, `heartbeat()` |
+| `VectorStorePort` | `similarity_search(query_text, k=5, filter=None)`, `add_texts()`, `heartbeat()` |
 | `AutomationPort` | Webhook adapter contract for n8n and future integrations |
 | `McpClientPort` | `get_tools()`, `call_tool()` for interacting with MCP servers |
 

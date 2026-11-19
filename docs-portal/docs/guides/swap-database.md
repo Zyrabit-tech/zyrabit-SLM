@@ -17,13 +17,18 @@ This guide explains how to switch the default ChromaDB vector store to PostgreSQ
 Any vector database must implement this port:
 
 ```python
-from typing import Protocol, List
+from typing import Protocol, List, Dict, Any, Optional
 
 class VectorStorePort(Protocol):
-    def similarity_search(self, query: str, top_k: int = 5) -> List[dict]:
+    def similarity_search(
+        self,
+        query_text: str,
+        k: int = 5,
+        filter: Optional[Dict[str, Any]] = None,
+    ) -> List[Any]:
         ...
         
-    def add_texts(self, texts: List[str], metadatas: List[dict] = None) -> None:
+    def add_texts(self, texts: List[str], metadatas: List[Dict[str, Any]], ids: List[str]) -> None:
         ...
         
     def heartbeat(self) -> bool:
@@ -38,8 +43,8 @@ Create a new file `app/infrastructure/persistence/postgres_adapter.py` and imple
 2. **Implement Methods**
 ```python
 class PostgresAdapter:
-    def similarity_search(self, query: str, top_k: int = 5) -> List[dict]:
-        # Implement pgvector search
+    def similarity_search(self, query_text: str, k: int = 5, filter=None):
+        # Implement pgvector search; honor metadata filter when provided
         pass
         
     # implement other methods...
