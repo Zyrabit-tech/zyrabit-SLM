@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Docs: MCP `:8001` claims**: README and docs-portal now describe `:8001` as the installer diagnostic MCP server and ReAct tooling as in-process FastMCP; removed the broken `uv … run zyrabit-mcp` client snippet (#211).
+
 ## [2.4.9] - 2026-11-10
 
 ### Security
