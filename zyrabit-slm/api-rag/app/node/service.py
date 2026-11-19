@@ -87,7 +87,9 @@ class NodeService:
         new_document_id, job_id = str(uuid.uuid4()), str(uuid.uuid4())
         self.metadata.create_document(new_document_id, source.id, type(self.parser).__name__)
         self.metadata.create_job(IngestionJob(job_id, source.id, "queued", "reindex-accepted"))
-        task = asyncio.create_task(self._process(job_id, new_document_id, source))
+        task = asyncio.create_task(
+            self._process(job_id, new_document_id, source, previous_document_id=document_id)
+        )
         self._tasks.add(task); task.add_done_callback(self._tasks.discard)
         return {"status": "queued", "job_id": job_id, "source_id": source.id, "document_id": new_document_id, "reindexed_from": document_id}
 
@@ -98,7 +100,7 @@ class NodeService:
             row = conn.execute("SELECT id FROM node_documents WHERE source_id=? ORDER BY created_at DESC LIMIT 1", (source_id,)).fetchone()
         return row[0] if row else None
 
-    async def _process(self, job_id: str, document_id: str, source) -> None:
+    async def _process(self, job_id: str, document_id: str, source, previous_document_id: str | None = None) -> None:
         started = time.perf_counter()
         try:
             self.metadata.update_job(job_id, "processing", "extracting")
@@ -116,6 +118,11 @@ class NodeService:
             if self.retrieval_mode == "hybrid":
                 self.metadata.update_job(job_id, "processing", "indexing_vectors")
                 await asyncio.to_thread(self.vector_index.upsert, evidence)
+            if previous_document_id and self.vector_index:
+                # Drop the prior version's vectors only after the new index write
+                # succeeds so a failed reindex does not erase a still-usable copy.
+                self.metadata.update_job(job_id, "processing", "cleaning_previous_vectors")
+                await asyncio.to_thread(self.vector_index.delete, previous_document_id)
             self.metadata.set_document_status(document_id, "ready")
             self.metadata.update_job(job_id, "ready", "indexed", metrics={"evidence_units": len(evidence), "retrieval_mode": self.retrieval_mode, "elapsed_seconds": round(time.perf_counter() - started, 3)})
         except Exception as exc:
@@ -127,17 +134,18 @@ class NodeService:
     def documents(self) -> list[dict]: return self.metadata.list_documents()
 
     async def delete_document(self, document_id: str) -> bool:
+        if not self.metadata.get_document(document_id):
+            return False
+        # Privacy: remove vectors before dropping metadata so a failed vector
+        # delete never reports HTTP success while page_content remains in Chroma.
+        if self.vector_index:
+            self.vector_index.delete(document_id)
         result = self.metadata.delete_document(document_id)
         if not result:
             return False
         stored_path = result.get("stored_path")
         if stored_path:
             self.source_store.delete(stored_path)
-        if self.vector_index:
-            try:
-                self.vector_index.delete(document_id)
-            except Exception:
-                pass
         return True
 
     def clear_session(self, session_id: str) -> None: self.metadata.clear_history(session_id)
@@ -291,7 +299,15 @@ class NodeService:
                 }
             }
         grounded, cited = self._validate_grounding(answer, evidence)
-        decision = "model-with-evidence" if grounded else "model-knowledge"
+        if not grounded and document_id and evidence:
+            # Cite-or-abstain: when a document is selected but the model did not
+            # emit a verifiable citation, surface the retrieved excerpt instead of
+            # returning ungrounded prose as model-knowledge.
+            answer = self._extractive_fallback(evidence)
+            grounded, cited = self._validate_grounding(answer, evidence)
+            decision = "evidence-extractive-fallback"
+        else:
+            decision = "model-with-evidence" if grounded else "model-knowledge"
         metadata = {
             "sources": self._sources(cited),
             "rag_hits": len(cited),
@@ -416,11 +432,19 @@ class NodeService:
             "metadata": {**metadata, "decision": "evidence-not-found"},
         }
 
-    @staticmethod
-    def _validate_grounding(answer: str, evidence: list[EvidenceUnit]) -> tuple[bool, list[EvidenceUnit]]:
-        """Accept only model output that cites actual evidence IDs supplied to it."""
+    # Canonical citation is [EVIDENCE:uuid]. Small models often echo the prompt
+    # header variants (id=, uuid=, trailing locator fields); accept those when
+    # the UUID was actually supplied in the evidence set.
+    _EVIDENCE_CITE = re.compile(
+        r"\[EVIDENCE[:\s]*(?:id|uuid)?\s*[=:]?\s*([0-9a-fA-F-]{36})[^\]]*\]",
+        re.IGNORECASE,
+    )
+
+    @classmethod
+    def _validate_grounding(cls, answer: str, evidence: list[EvidenceUnit]) -> tuple[bool, list[EvidenceUnit]]:
+        """Accept model output that cites evidence IDs actually supplied to it."""
         allowed = {item.id: item for item in evidence}
-        cited_ids = re.findall(r"\[EVIDENCE:([0-9a-fA-F-]{36})\]", answer)
+        cited_ids = cls._EVIDENCE_CITE.findall(answer)
         if not cited_ids or any(identifier not in allowed for identifier in cited_ids):
             return False, []
         # A model must not disclose chain-of-thought as a side effect of trying
@@ -531,7 +555,7 @@ class NodeService:
             clean_answer = clean_answer.split("</think>")[-1]
         elif "<think>" in clean_answer:
             clean_answer = re.sub(r"<think>[\s\S]*?(?:<\/think>|$)", "", clean_answer)
-        clean_answer = re.sub(r"\s+", " ", re.sub(r"\[EVIDENCE:[0-9a-fA-F-]{36}\]", "", clean_answer)).strip()
+        clean_answer = re.sub(r"\s+", " ", NodeService._EVIDENCE_CITE.sub("", clean_answer)).strip()
         if len(clean_answer) > 220:
             clean_answer = f"{clean_answer[:217].rstrip()}..."
         entry = f"Usuario: {clean_question}. Respuesta: {clean_answer}"
@@ -560,7 +584,7 @@ class NodeService:
     @staticmethod
     def _render_evidence(item: EvidenceUnit) -> str:
         location = ", ".join(f"{key}={value}" for key, value in item.locator.items() if value not in (None, False)) or "document"
-        return f"[EVIDENCE id={item.id}; {item.metadata.get('filename', 'document')}; {location}]\n{item.content}"
+        return f"[EVIDENCE:{item.id}] ({item.metadata.get('filename', 'document')}; {location})\n{item.content}"
 
     @staticmethod
     def _sources(evidence: list[EvidenceUnit]) -> list[dict]:

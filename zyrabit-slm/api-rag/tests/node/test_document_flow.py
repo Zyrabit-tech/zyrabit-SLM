@@ -19,8 +19,7 @@ class OfflineInference:
     """The import test deliberately does not require a running model."""
     def health(self): return True, "test"
     def answer(self, prompt):
-        import re
-        evidence_id = re.search(r"id=([0-9a-f-]{36})", prompt).group(1)
+        evidence_id = NodeService._EVIDENCE_CITE.search(prompt).group(1)
         return f"Air-Gapped operation is described as crucial for regulated environments. [EVIDENCE:{evidence_id}]", {"provider": "offline-test"}
 
 
@@ -235,7 +234,7 @@ async def test_real_cio_review_pdf_is_durable_and_searchable(tmp_path: Path):
 
 
 @pytest.mark.asyncio
-async def test_query_keeps_model_answer_and_exposes_consulted_evidence(tmp_path: Path):
+async def test_query_uses_extractive_fallback_when_model_omits_citation(tmp_path: Path):
     class UngroundedInference(OfflineInference):
         def answer(self, prompt): return "A fluent answer without a source.", {"provider": "offline-test"}
     source_pdf = Path(__file__).parents[2] / "docs" / "zyrabit-cioreview-en.pdf"
@@ -243,10 +242,12 @@ async def test_query_keeps_model_answer_and_exposes_consulted_evidence(tmp_path:
     accepted = await service.import_file(source_pdf.name, str(source_pdf))
     while (job := service.job(accepted["job_id"]))["status"] not in {"ready", "failed"}: await asyncio.sleep(0.05)
     result = await service.query("What is Air-Gapped operation?", "test-session", accepted["document_id"])
-    assert result["metadata"]["decision"] == "model-knowledge"
-    assert result["response"] == "A fluent answer without a source."
+    # Cite-or-silence: with a selected document, ungrounded model prose is replaced.
+    assert result["metadata"]["decision"] == "evidence-extractive-fallback"
+    assert result["response"] != "A fluent answer without a source."
+    assert "[EVIDENCE:" in result["response"]
     assert result["metadata"]["context_hits"]
-    assert result["metadata"]["sources"] == []
+    assert result["metadata"]["sources"]
 
 
 @pytest.mark.asyncio
@@ -262,22 +263,27 @@ async def test_document_is_not_ready_when_vector_index_is_unavailable(tmp_path: 
 @pytest.mark.asyncio
 async def test_reindex_creates_a_new_ready_document_version(tmp_path: Path):
     source_pdf = Path(__file__).parents[2] / "docs" / "zyrabit-cioreview-en.pdf"
+    vector_index = InMemoryVectorIndex()
     service = NodeService(SQLiteNodeStore(str(tmp_path / "node.db")), LocalSourceStore(str(tmp_path / "sources")),
-                          LocalDocumentParser(), OfflineInference(), vector_index=InMemoryVectorIndex())
+                          LocalDocumentParser(), OfflineInference(), vector_index=vector_index)
     imported = await service.import_file(source_pdf.name, str(source_pdf))
     while (job := service.job(imported["job_id"]))["status"] not in {"ready", "failed"}:
         await asyncio.sleep(0.05)
     assert job["status"] == "ready"
+    old_id = imported["document_id"]
+    assert any(getattr(item, "document_id", None) == old_id for item in vector_index.evidence)
 
-    reindexed = await service.reindex_document(imported["document_id"])
+    reindexed = await service.reindex_document(old_id)
     while (job := service.job(reindexed["job_id"]))["status"] not in {"ready", "failed"}:
         await asyncio.sleep(0.05)
     assert job["status"] == "ready", job
-    assert reindexed["document_id"] != imported["document_id"]
+    assert reindexed["document_id"] != old_id
     assert service.document(reindexed["document_id"])["version"] == 2
+    assert not any(getattr(item, "document_id", None) == old_id for item in vector_index.evidence)
+    assert any(getattr(item, "document_id", None) == reindexed["document_id"] for item in vector_index.evidence)
     # An existing browser tab may still have version 1 selected. It must remain
     # scoped to this source by resolving to version 2, never query the corpus.
-    result = await service.query("What operation is crucial?", "stale-selection", imported["document_id"])
+    result = await service.query("What operation is crucial?", "stale-selection", old_id)
     assert {source["document_id"] for source in result["metadata"]["sources"]} == {reindexed["document_id"]}
 
 
