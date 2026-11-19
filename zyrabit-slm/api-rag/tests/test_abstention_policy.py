@@ -5,22 +5,15 @@ from app.node.parsers import LocalDocumentParser
 from app.node.service import NodeService
 from app.node.sqlite_store import SQLiteNodeStore
 from app.node.storage import LocalSourceStore
+from tests.node.fakes import InMemoryVectorIndex
 
 
 class MockInference:
     def answer(self, prompt):
         return "I will speculate on anything.", {"provider": "mock"}
 
-
-class InMemoryVectorIndex:
-    def __init__(self):
-        self.items = []
-
-    def upsert(self, evidence):
-        self.items.extend(evidence)
-
-    def search(self, query, limit=16, document_id=None):
-        return []
+    def health(self):
+        return True, "ok"
 
 
 @pytest.mark.asyncio

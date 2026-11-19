@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Hybrid RAG document filter**: `VectorStorePort.similarity_search` and `ChromaAdapter` now accept an optional metadata `filter`, so scoped vector search no longer raises `TypeError` and silently fall back to lexical-only retrieval. When vector search still fails, the query logs the degradation and sets `metadata.retrieval=lexical-fallback` (#205).
+
 ## [2.4.9] - 2026-11-10
 
 ### Security
