@@ -149,8 +149,16 @@ class ChromaAdapter(VectorStorePort):
     def __init__(self, langchain_chroma: Chroma):
         self.vector_store = langchain_chroma
 
-    def similarity_search(self, query_text: str, k: int = 5) -> List[Any]:
-        return self.vector_store.similarity_search(query_text, k=k)
+    def similarity_search(
+        self,
+        query_text: str,
+        k: int = 5,
+        filter: Optional[Dict[str, Any]] = None,
+    ) -> List[Any]:
+        kwargs: Dict[str, Any] = {"k": k}
+        if filter is not None:
+            kwargs["filter"] = filter
+        return self.vector_store.similarity_search(query_text, **kwargs)
 
     def add_texts(self, texts: List[str], metadatas: List[Dict[str, Any]], ids: List[str]) -> None:
         self.vector_store.add_texts(texts=texts, metadatas=metadatas, ids=ids)

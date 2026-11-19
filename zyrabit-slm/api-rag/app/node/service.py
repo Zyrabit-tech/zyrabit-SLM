@@ -181,7 +181,7 @@ class NodeService:
             session_context = self.update_session_context(session_id, document_id)
         effective_question = self._effective_question(question, session_context)
         rag_t0 = time.time()
-        retrieval = self.retrieval_mode
+        retrieval_degraded = False
         if not document_id and self._is_conversational(effective_question):
             selected = []
             rag_retrieval_ms = 0.0
@@ -193,9 +193,12 @@ class NodeService:
                     vector = await asyncio.to_thread(self.vector_index.search, effective_question, 16, document_id)
                 except Exception as exc:
                     # Do not silent-swallow: lexical still works, but the receipt must say so.
-                    logger.warning("Vector search failed; continuing with lexical retrieval only: %s", exc)
+                    retrieval_degraded = True
+                    logger.warning(
+                        "Vector search failed; degrading to lexical-only retrieval: %s",
+                        exc,
+                    )
                     vector = []
-                    retrieval = "lexical-fallback"
             selected = self._select_relevant_evidence(effective_question, lexical, vector, document_id)
             rag_retrieval_ms = round((time.time() - rag_t0) * 1000, 2)
             if document_id and not selected:
@@ -205,10 +208,11 @@ class NodeService:
                     "rag_hits": 0,
                     "context_hits": 0,
                     "rag_retrieval_ms": rag_retrieval_ms,
-                    "retrieval": retrieval,
                     "decision": "abstention-insufficient-evidence",
                     "abstention": True
                 }
+                if retrieval_degraded:
+                    metadata["retrieval"] = "lexical-fallback"
                 self.metadata.append_message(session_id, "user", question, document_id=document_id)
                 self.metadata.append_message(session_id, "assistant", answer, metadata=metadata, document_id=document_id)
                 return {"response": answer, "metadata": metadata}
@@ -219,7 +223,7 @@ class NodeService:
             document_id,
             session_context,
             rag_retrieval_ms=rag_retrieval_ms,
-            retrieval=retrieval,
+            retrieval="lexical-fallback" if retrieval_degraded else None,
         )
 
     @staticmethod
@@ -286,17 +290,19 @@ class NodeService:
             if not ready:
                 return self._no_evidence_response(question)
             err_msg = f"⚠️ Error en el motor de inferencia: No se pudo conectar al runtime ({exc}). Verifica que el motor configurado esté activo y escuchando."
+            error_metadata = {
+                "sources": [],
+                "rag_hits": 0,
+                "context_hits": len(evidence),
+                "rag_retrieval_ms": rag_retrieval_ms,
+                "decision": "engine-offline-error",
+                "error": str(exc),
+            }
+            if retrieval:
+                error_metadata["retrieval"] = retrieval
             return {
                 "response": err_msg,
-                "metadata": {
-                    "sources": [],
-                    "rag_hits": 0,
-                    "context_hits": len(evidence),
-                    "rag_retrieval_ms": rag_retrieval_ms,
-                    "retrieval": retrieval_mode,
-                    "decision": "engine-offline-error",
-                    "error": str(exc),
-                }
+                "metadata": error_metadata,
             }
         grounded, cited = self._validate_grounding(answer, evidence)
         if not grounded and document_id and evidence:
@@ -317,6 +323,8 @@ class NodeService:
             "decision": decision,
             **metrics
         }
+        if retrieval:
+            metadata["retrieval"] = retrieval
 
         # Record real-time Prometheus telemetry for Grafana dashboards
         try:
