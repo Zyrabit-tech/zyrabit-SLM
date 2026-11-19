@@ -234,7 +234,7 @@ async def test_real_cio_review_pdf_is_durable_and_searchable(tmp_path: Path):
 
 
 @pytest.mark.asyncio
-async def test_query_keeps_model_answer_and_exposes_consulted_evidence(tmp_path: Path):
+async def test_query_uses_extractive_fallback_when_model_omits_citation(tmp_path: Path):
     class UngroundedInference(OfflineInference):
         def answer(self, prompt): return "A fluent answer without a source.", {"provider": "offline-test"}
     source_pdf = Path(__file__).parents[2] / "docs" / "zyrabit-cioreview-en.pdf"
@@ -242,10 +242,12 @@ async def test_query_keeps_model_answer_and_exposes_consulted_evidence(tmp_path:
     accepted = await service.import_file(source_pdf.name, str(source_pdf))
     while (job := service.job(accepted["job_id"]))["status"] not in {"ready", "failed"}: await asyncio.sleep(0.05)
     result = await service.query("What is Air-Gapped operation?", "test-session", accepted["document_id"])
-    assert result["metadata"]["decision"] == "model-knowledge"
-    assert result["response"] == "A fluent answer without a source."
+    # Cite-or-silence: with a selected document, ungrounded model prose is replaced.
+    assert result["metadata"]["decision"] == "evidence-extractive-fallback"
+    assert result["response"] != "A fluent answer without a source."
+    assert "[EVIDENCE:" in result["response"]
     assert result["metadata"]["context_hits"]
-    assert result["metadata"]["sources"] == []
+    assert result["metadata"]["sources"]
 
 
 @pytest.mark.asyncio

@@ -271,7 +271,7 @@ class NodeService:
             # returning ungrounded prose as model-knowledge.
             answer = self._extractive_fallback(evidence)
             grounded, cited = self._validate_grounding(answer, evidence)
-            decision = "extractive-fallback"
+            decision = "evidence-extractive-fallback"
         else:
             decision = "model-with-evidence" if grounded else "model-knowledge"
         metadata = {

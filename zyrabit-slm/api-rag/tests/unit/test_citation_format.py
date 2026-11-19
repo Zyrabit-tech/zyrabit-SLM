@@ -88,7 +88,7 @@ async def test_extractive_fallback_when_document_selected_and_grounding_fails():
         evidence,
         document_id="doc-1",
     )
-    assert result["metadata"]["decision"] == "extractive-fallback"
+    assert result["metadata"]["decision"] == "evidence-extractive-fallback"
     assert result["metadata"]["rag_hits"] == 1
     assert result["metadata"]["sources"][0]["evidence_id"] == UUID
     assert "Ungrounded prose" not in result["response"]
