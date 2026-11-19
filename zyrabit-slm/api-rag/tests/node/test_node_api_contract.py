@@ -1,7 +1,6 @@
 """HTTP contract tests for the durable Node API using the approved PDF."""
 from __future__ import annotations
 
-import re
 import time
 from pathlib import Path
 
@@ -17,7 +16,7 @@ from tests.node.fakes import InMemoryVectorIndex
 class CitingInference:
     def health(self): return True, "test"
     def answer(self, prompt):
-        identifier = re.search(r"id=([0-9a-f-]{36})", prompt).group(1)
+        identifier = NodeService._EVIDENCE_CITE.search(prompt).group(1)
         return f"Air-Gapped operation is described in the supplied evidence. [EVIDENCE:{identifier}]", {"provider": "api-contract"}
 
 

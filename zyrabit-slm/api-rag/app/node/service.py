@@ -273,7 +273,15 @@ class NodeService:
                 }
             }
         grounded, cited = self._validate_grounding(answer, evidence)
-        decision = "model-with-evidence" if grounded else "model-knowledge"
+        if not grounded and document_id and evidence:
+            # Cite-or-abstain: when a document is selected but the model did not
+            # emit a verifiable citation, surface the retrieved excerpt instead of
+            # returning ungrounded prose as model-knowledge.
+            answer = self._extractive_fallback(evidence)
+            grounded, cited = self._validate_grounding(answer, evidence)
+            decision = "evidence-extractive-fallback"
+        else:
+            decision = "model-with-evidence" if grounded else "model-knowledge"
         metadata = {
             "sources": self._sources(cited),
             "rag_hits": len(cited),
@@ -397,11 +405,19 @@ class NodeService:
             "metadata": {**metadata, "decision": "evidence-not-found"},
         }
 
-    @staticmethod
-    def _validate_grounding(answer: str, evidence: list[EvidenceUnit]) -> tuple[bool, list[EvidenceUnit]]:
-        """Accept only model output that cites actual evidence IDs supplied to it."""
+    # Canonical citation is [EVIDENCE:uuid]. Small models often echo the prompt
+    # header variants (id=, uuid=, trailing locator fields); accept those when
+    # the UUID was actually supplied in the evidence set.
+    _EVIDENCE_CITE = re.compile(
+        r"\[EVIDENCE[:\s]*(?:id|uuid)?\s*[=:]?\s*([0-9a-fA-F-]{36})[^\]]*\]",
+        re.IGNORECASE,
+    )
+
+    @classmethod
+    def _validate_grounding(cls, answer: str, evidence: list[EvidenceUnit]) -> tuple[bool, list[EvidenceUnit]]:
+        """Accept model output that cites evidence IDs actually supplied to it."""
         allowed = {item.id: item for item in evidence}
-        cited_ids = re.findall(r"\[EVIDENCE:([0-9a-fA-F-]{36})\]", answer)
+        cited_ids = cls._EVIDENCE_CITE.findall(answer)
         if not cited_ids or any(identifier not in allowed for identifier in cited_ids):
             return False, []
         # A model must not disclose chain-of-thought as a side effect of trying
@@ -512,7 +528,7 @@ class NodeService:
             clean_answer = clean_answer.split("</think>")[-1]
         elif "<think>" in clean_answer:
             clean_answer = re.sub(r"<think>[\s\S]*?(?:<\/think>|$)", "", clean_answer)
-        clean_answer = re.sub(r"\s+", " ", re.sub(r"\[EVIDENCE:[0-9a-fA-F-]{36}\]", "", clean_answer)).strip()
+        clean_answer = re.sub(r"\s+", " ", NodeService._EVIDENCE_CITE.sub("", clean_answer)).strip()
         if len(clean_answer) > 220:
             clean_answer = f"{clean_answer[:217].rstrip()}..."
         entry = f"Usuario: {clean_question}. Respuesta: {clean_answer}"
@@ -541,7 +557,7 @@ class NodeService:
     @staticmethod
     def _render_evidence(item: EvidenceUnit) -> str:
         location = ", ".join(f"{key}={value}" for key, value in item.locator.items() if value not in (None, False)) or "document"
-        return f"[EVIDENCE id={item.id}; {item.metadata.get('filename', 'document')}; {location}]\n{item.content}"
+        return f"[EVIDENCE:{item.id}] ({item.metadata.get('filename', 'document')}; {location})\n{item.content}"
 
     @staticmethod
     def _sources(evidence: list[EvidenceUnit]) -> list[dict]:

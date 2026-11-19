@@ -6,7 +6,6 @@ that selecting Prospeo cannot return CIO Review evidence.
 from __future__ import annotations
 
 import asyncio
-import re
 from pathlib import Path
 
 import pytest
@@ -21,7 +20,7 @@ from tests.node.fakes import InMemoryVectorIndex
 class CitingInference:
     def health(self): return True, "test"
     def answer(self, prompt):
-        match = re.search(r"id=([0-9a-f-]{36})", prompt)
+        match = NodeService._EVIDENCE_CITE.search(prompt)
         if not match:
             return "Respuesta del modelo sin evidencia documental local.", {"provider": "contract-test"}
         evidence_id = match.group(1)
