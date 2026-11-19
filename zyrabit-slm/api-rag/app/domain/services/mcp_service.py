@@ -346,35 +346,6 @@ async def docker_inspect_container(container_name: str) -> str:
     return json.dumps(info, indent=2)
 
 
-# ---------------------------------------------------------
-# DOCKER DIAGNOSTICS MCP (Read-Only)
-# ---------------------------------------------------------
-
-@mcp.tool()
-async def docker_list_containers() -> str:
-    """List allowlisted local Docker containers and their status (DOCKER_MCP_CONTAINER_ALLOWLIST)."""
-    containers = docker_client.list_containers()
-    import json
-    return json.dumps(containers, indent=2)
-
-@mcp.tool()
-async def docker_get_logs(container_name: str, tail: int = 50) -> str:
-    """
-    Get the latest logs for an allowlisted Docker container.
-    Use this to diagnose failures or check application output.
-    """
-    return docker_client.get_container_logs(container_name, tail)
-
-@mcp.tool()
-async def docker_inspect_container(container_name: str) -> str:
-    """
-    Inspect an allowlisted Docker container to see its health, network ports, and restart count.
-    """
-    info = docker_client.inspect_container(container_name)
-    import json
-    return json.dumps(info, indent=2)
-
-
 @mcp.tool()
 async def generate_radar_report(send_email: bool = True) -> str:
     """

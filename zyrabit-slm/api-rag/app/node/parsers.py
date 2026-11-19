@@ -16,7 +16,7 @@ class TesseractOcrAdapter:
     def extract(self, path: str, page: int) -> str:
         """OCR one PDF page locally. Requires explicitly installed `tesseract`."""
         try:
-            import fitz
+            import pymupdf as fitz
             from PIL import Image
         except ImportError as exc:
             raise RuntimeError("OCR dependencies are not installed") from exc
@@ -60,7 +60,7 @@ class LocalDocumentParser:
         return text.strip()
 
     def _pdf(self, source: Source, document_id: str) -> Iterable[EvidenceUnit]:
-        import fitz
+        import pymupdf as fitz
         document = fitz.open(source.stored_path)
         for number, page in enumerate(document, start=1):
             text = page.get_text("text").strip()
