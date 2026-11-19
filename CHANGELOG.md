@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **MCP docker diagnostics**: Removed duplicate `docker_list_containers` / `docker_get_logs` / `docker_inspect_container` FastMCP registrations that triggered "Tool already exists" warnings on import (#210).
+- **PyMuPDF import**: PDF parsers now use `import pymupdf as fitz` instead of the deprecated bare `import fitz` (#210).
+
 ## [2.4.9] - 2026-11-10
 
 ### Security
