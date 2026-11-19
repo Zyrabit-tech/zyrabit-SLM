@@ -75,3 +75,4 @@ Low-footprint local execution using quantized GGUF weights. Recommended for edge
 For document vectorization, Zyrabit isolates generation from retrieval:
 - **Default:** `mxbai-embed-large` / `nomic-embed-text`
 - **Lexical Index:** SQLite FTS5 with BM25 scoring for deterministic exact keyword matching.
+- **Timeout:** Set `EMBEDDING_TIMEOUT_SECONDS` (default `60`) for `/api/embed`. CPU hosts often need more than a few seconds per call; health reflects recent embed failures rather than only model tag presence.

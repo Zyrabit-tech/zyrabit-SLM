@@ -299,6 +299,32 @@ async def test_explicit_lexical_mode_remains_honest_when_embeddings_are_absent(t
     assert job["metrics"]["retrieval_mode"] == "lexical"
     result = await service.query("What operation is crucial?", "lexical-session", accepted["document_id"])
     assert result["metadata"]["decision"] == "model-with-evidence"
+    assert result["metadata"]["retrieval"] == "lexical"
+
+
+@pytest.mark.asyncio
+async def test_vector_search_failure_marks_lexical_fallback(tmp_path: Path):
+    class FailingVectorIndex(InMemoryVectorIndex):
+        def search(self, query, limit=8, document_id=None):
+            raise RuntimeError("embedding timeout during query")
+
+    source_pdf = Path(__file__).parents[2] / "docs" / "zyrabit-cioreview-en.pdf"
+    service = NodeService(
+        SQLiteNodeStore(str(tmp_path / "node.db")),
+        LocalSourceStore(str(tmp_path / "sources")),
+        LocalDocumentParser(),
+        OfflineInference(),
+        vector_index=FailingVectorIndex(),
+        retrieval_mode="hybrid",
+    )
+    accepted = await service.import_file(source_pdf.name, str(source_pdf))
+    while (job := service.job(accepted["job_id"]))["status"] not in {"ready", "failed"}:
+        await asyncio.sleep(0.05)
+    assert job["status"] == "ready", job
+
+    result = await service.query("What operation is crucial?", "fallback-session", accepted["document_id"])
+    assert result["metadata"]["retrieval"] == "lexical-fallback"
+    assert result["metadata"]["decision"] == "model-with-evidence"
 
 
 @pytest.mark.asyncio
