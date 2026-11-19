@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Ollama honors token limits and skips ReadTimeout retries**: `OllamaInferenceAdapter` maps `max_tokens`→`num_predict` and `repetition_penalty`→`repeat_penalty`. Read timeouts fail once instead of retrying for up to ~15 minutes on a busy engine (#209).
+
 ## [2.4.9] - 2026-11-10
 
 ### Security
