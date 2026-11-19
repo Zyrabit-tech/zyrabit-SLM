@@ -11,8 +11,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
+- **dnspython 2.9.2 / opentelemetry-api 1.45.2**: Lock overrides clear CVE-2026-128089 and CVE-2026-126360 so `pip-audit` no longer fails on undocumented advisories.
 - **Docker socket hardening (#213)**: `zyrabit-api` no longer mounts the host `/var/run/docker.sock`. MCP `docker_*` tools reach a read-only `tecnativa/docker-socket-proxy` (`CONTAINERS` only) and filter containers with `DOCKER_MCP_CONTAINER_ALLOWLIST` (default `zyrabit-*`). Chroma (`zyrabit-db`) no longer publishes host port `8000` (compose-network only). Compose integrity tests reject a raw API sock mount or a published Chroma port.
 
+### Fixed
+
+- **Chroma document delete actually removes vectors**: `ChromaAdapter.delete` now deletes by `document_id` metadata filter instead of `pass`. `ChromaEvidenceIndex.delete` no longer swallows errors and fails if vectors remain. `DELETE /v1/documents/{id}` removes vectors before metadata so a failed index cleanup cannot report success. Reindex drops the previous document's vectors after the new version is indexed (#206).
+- **Citation format mismatch (#207)**: Evidence blocks rendered to the model now use canonical `[EVIDENCE:uuid]` (metadata stays outside the tag). Grounding validation accepts common small-model variants (`id=`, `uuid=`, locator suffixes) when the UUID was supplied. With a selected document, failed grounding uses the extractive fallback instead of returning ungrounded `model-knowledge`.
 ## [2.4.9] - 2026-11-10
 
 ### Security
