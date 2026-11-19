@@ -192,6 +192,7 @@ class NodeService:
                 try:
                     vector = await asyncio.to_thread(self.vector_index.search, effective_question, 16, document_id)
                 except Exception as exc:
+                    # Do not silent-swallow: lexical still works, but the receipt must say so.
                     retrieval_degraded = True
                     logger.warning(
                         "Vector search failed; degrading to lexical-only retrieval: %s",
@@ -280,6 +281,9 @@ class NodeService:
         history = self.metadata.get_history(session_id)
         session_context = session_context or self.metadata.get_session_context(session_id)
         prompt = self._prompt(question, context, history, session_context)
+        # Default matches NodeService.__init__; getattr keeps unit stubs that
+        # build via __new__ from crashing when they only exercise grounding.
+        retrieval_mode = retrieval or getattr(self, "retrieval_mode", "hybrid")
         try:
             answer, metrics = await asyncio.to_thread(self.inference.answer, prompt)
         except Exception as exc:
@@ -317,6 +321,7 @@ class NodeService:
             "rag_hits": len(cited),
             "context_hits": len(evidence),
             "rag_retrieval_ms": rag_retrieval_ms,
+            "retrieval": retrieval_mode,
             "decision": decision,
             **metrics
         }
