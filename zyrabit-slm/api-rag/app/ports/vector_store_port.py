@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 
 class VectorStorePort(ABC):
     """
@@ -8,8 +8,13 @@ class VectorStorePort(ABC):
     """
     
     @abstractmethod
-    def similarity_search(self, query_text: str, k: int = 5) -> List[Any]:
-        """Search for most similar documents."""
+    def similarity_search(
+        self,
+        query_text: str,
+        k: int = 5,
+        filter: Optional[Dict[str, Any]] = None,
+    ) -> List[Any]:
+        """Search for most similar documents, optionally scoped by metadata filter."""
         pass
 
     @abstractmethod

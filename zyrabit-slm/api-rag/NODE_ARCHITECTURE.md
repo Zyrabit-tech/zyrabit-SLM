@@ -31,9 +31,9 @@ MCP, Telegram, Obsidian, AutoLearner, and auto-ingest components are preserved a
 
 ## Local Operation
 
-1. Configure `INFERENCE_PROVIDER`, `SLM_URL`, `EMBEDDING_URL`, `MODEL_NAME`, and `EMBEDDING_MODEL` in `zyrabit-slm/.env`.
+1. Configure `INFERENCE_PROVIDER`, `SLM_URL`, `EMBEDDING_URL`, `MODEL_NAME`, `EMBEDDING_MODEL`, and optionally `EMBEDDING_TIMEOUT_SECONDS` (default 60) in `zyrabit-slm/.env`.
 2. Run `./zyra.sh install` or `./zyra.sh start`.
-3. Query `GET /v1/health/capabilities`.
-4. Import documents via `POST /v1/sources/import` and await `ready` state from `GET /v1/jobs/{job_id}`.
+3. Query `GET /v1/health` / capabilities. Hybrid mode reports embeddings degraded when recent embed calls failed or recovered only after a timeout retry—not merely when `/api/tags` is reachable.
+4. Import documents via `POST /v1/sources/import` and await `ready` state from `GET /v1/jobs/{job_id}`. When vector search fails at query time, the response receipt sets `metadata.retrieval=lexical-fallback` instead of silently dropping the error.
 
 The legacy `POST /v1/ingest` endpoint is maintained for backwards compatibility, returning a durable job status rather than reporting immediate ingestion before completion.
