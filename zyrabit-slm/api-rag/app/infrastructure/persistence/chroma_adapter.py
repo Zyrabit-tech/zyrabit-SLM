@@ -84,8 +84,22 @@ class ChromaAdapter(VectorStorePort):
         self.vector_store.add_documents(documents)
 
     def delete(self, where: Dict[str, Any]) -> None:
-        # Simplified delete for Chroma V0.5+
-        pass
+        """Delete vectors matching a metadata filter.
+
+        Refuses an empty filter so a bug cannot wipe the whole collection.
+        LangChain's Chroma.delete forwards ``where`` to the collection API.
+        """
+        if not where:
+            raise ValueError("Refusing unrestricted vector delete without a where filter")
+        self.vector_store.delete(where=where)
+
+    def count(self, where: Dict[str, Any] | None = None) -> int:
+        """Count vectors, optionally filtered by metadata."""
+        kwargs: Dict[str, Any] = {"include": []}
+        if where:
+            kwargs["where"] = where
+        result = self.vector_store.get(**kwargs)
+        return len(result.get("ids") or [])
 
     def heartbeat(self) -> bool:
         """

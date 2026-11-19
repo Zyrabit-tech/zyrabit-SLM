@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Chroma document delete actually removes vectors**: `ChromaAdapter.delete` now deletes by `document_id` metadata filter instead of `pass`. `ChromaEvidenceIndex.delete` no longer swallows errors and fails if vectors remain. `DELETE /v1/documents/{id}` removes vectors before metadata so a failed index cleanup cannot report success. Reindex drops the previous document's vectors after the new version is indexed (#206).
+
 ## [2.4.9] - 2026-11-10
 
 ### Security
