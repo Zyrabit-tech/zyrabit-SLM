@@ -9,11 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+
+- **dnspython 2.9.2 / opentelemetry-api 1.45.2**: Lock overrides clear CVE-2026-128089 and CVE-2026-126360 so `pip-audit` no longer fails on undocumented advisories.
+
 ### Fixed
 
+- **Chroma document delete actually removes vectors**: `ChromaAdapter.delete` now deletes by `document_id` metadata filter instead of `pass`. `ChromaEvidenceIndex.delete` no longer swallows errors and fails if vectors remain. `DELETE /v1/documents/{id}` removes vectors before metadata so a failed index cleanup cannot report success. Reindex drops the previous document's vectors after the new version is indexed (#206).
+- **Citation format mismatch (#207)**: Evidence blocks rendered to the model now use canonical `[EVIDENCE:uuid]` (metadata stays outside the tag). Grounding validation accepts common small-model variants (`id=`, `uuid=`, locator suffixes) when the UUID was supplied. With a selected document, failed grounding uses the extractive fallback instead of returning ungrounded `model-knowledge`.
 - **MCP docker diagnostics**: Removed duplicate `docker_list_containers` / `docker_get_logs` / `docker_inspect_container` FastMCP registrations that triggered "Tool already exists" warnings on import (#210).
 - **PyMuPDF import**: PDF parsers now use `import pymupdf as fitz` instead of the deprecated bare `import fitz` (#210).
-
 ## [2.4.9] - 2026-11-10
 
 ### Security
