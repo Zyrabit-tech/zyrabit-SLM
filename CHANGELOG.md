@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Chroma document delete actually removes vectors**: `ChromaAdapter.delete` now deletes by `document_id` metadata filter instead of `pass`. `ChromaEvidenceIndex.delete` no longer swallows errors and fails if vectors remain. `DELETE /v1/documents/{id}` removes vectors before metadata so a failed index cleanup cannot report success. Reindex drops the previous document's vectors after the new version is indexed (#206).
 - **Citation format mismatch (#207)**: Evidence blocks rendered to the model now use canonical `[EVIDENCE:uuid]` (metadata stays outside the tag). Grounding validation accepts common small-model variants (`id=`, `uuid=`, locator suffixes) when the UUID was supplied. With a selected document, failed grounding uses the extractive fallback instead of returning ungrounded `model-knowledge`.
 
 ## [2.4.9] - 2026-11-10

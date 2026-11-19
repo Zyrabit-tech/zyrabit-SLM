@@ -87,7 +87,9 @@ class NodeService:
         new_document_id, job_id = str(uuid.uuid4()), str(uuid.uuid4())
         self.metadata.create_document(new_document_id, source.id, type(self.parser).__name__)
         self.metadata.create_job(IngestionJob(job_id, source.id, "queued", "reindex-accepted"))
-        task = asyncio.create_task(self._process(job_id, new_document_id, source))
+        task = asyncio.create_task(
+            self._process(job_id, new_document_id, source, previous_document_id=document_id)
+        )
         self._tasks.add(task); task.add_done_callback(self._tasks.discard)
         return {"status": "queued", "job_id": job_id, "source_id": source.id, "document_id": new_document_id, "reindexed_from": document_id}
 
@@ -98,7 +100,7 @@ class NodeService:
             row = conn.execute("SELECT id FROM node_documents WHERE source_id=? ORDER BY created_at DESC LIMIT 1", (source_id,)).fetchone()
         return row[0] if row else None
 
-    async def _process(self, job_id: str, document_id: str, source) -> None:
+    async def _process(self, job_id: str, document_id: str, source, previous_document_id: str | None = None) -> None:
         started = time.perf_counter()
         try:
             self.metadata.update_job(job_id, "processing", "extracting")
@@ -116,6 +118,11 @@ class NodeService:
             if self.retrieval_mode == "hybrid":
                 self.metadata.update_job(job_id, "processing", "indexing_vectors")
                 await asyncio.to_thread(self.vector_index.upsert, evidence)
+            if previous_document_id and self.vector_index:
+                # Drop the prior version's vectors only after the new index write
+                # succeeds so a failed reindex does not erase a still-usable copy.
+                self.metadata.update_job(job_id, "processing", "cleaning_previous_vectors")
+                await asyncio.to_thread(self.vector_index.delete, previous_document_id)
             self.metadata.set_document_status(document_id, "ready")
             self.metadata.update_job(job_id, "ready", "indexed", metrics={"evidence_units": len(evidence), "retrieval_mode": self.retrieval_mode, "elapsed_seconds": round(time.perf_counter() - started, 3)})
         except Exception as exc:
@@ -127,17 +134,18 @@ class NodeService:
     def documents(self) -> list[dict]: return self.metadata.list_documents()
 
     async def delete_document(self, document_id: str) -> bool:
+        if not self.metadata.get_document(document_id):
+            return False
+        # Privacy: remove vectors before dropping metadata so a failed vector
+        # delete never reports HTTP success while page_content remains in Chroma.
+        if self.vector_index:
+            self.vector_index.delete(document_id)
         result = self.metadata.delete_document(document_id)
         if not result:
             return False
         stored_path = result.get("stored_path")
         if stored_path:
             self.source_store.delete(stored_path)
-        if self.vector_index:
-            try:
-                self.vector_index.delete(document_id)
-            except Exception:
-                pass
         return True
 
     def clear_session(self, session_id: str) -> None: self.metadata.clear_history(session_id)

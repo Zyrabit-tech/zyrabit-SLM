@@ -263,22 +263,27 @@ async def test_document_is_not_ready_when_vector_index_is_unavailable(tmp_path: 
 @pytest.mark.asyncio
 async def test_reindex_creates_a_new_ready_document_version(tmp_path: Path):
     source_pdf = Path(__file__).parents[2] / "docs" / "zyrabit-cioreview-en.pdf"
+    vector_index = InMemoryVectorIndex()
     service = NodeService(SQLiteNodeStore(str(tmp_path / "node.db")), LocalSourceStore(str(tmp_path / "sources")),
-                          LocalDocumentParser(), OfflineInference(), vector_index=InMemoryVectorIndex())
+                          LocalDocumentParser(), OfflineInference(), vector_index=vector_index)
     imported = await service.import_file(source_pdf.name, str(source_pdf))
     while (job := service.job(imported["job_id"]))["status"] not in {"ready", "failed"}:
         await asyncio.sleep(0.05)
     assert job["status"] == "ready"
+    old_id = imported["document_id"]
+    assert any(getattr(item, "document_id", None) == old_id for item in vector_index.evidence)
 
-    reindexed = await service.reindex_document(imported["document_id"])
+    reindexed = await service.reindex_document(old_id)
     while (job := service.job(reindexed["job_id"]))["status"] not in {"ready", "failed"}:
         await asyncio.sleep(0.05)
     assert job["status"] == "ready", job
-    assert reindexed["document_id"] != imported["document_id"]
+    assert reindexed["document_id"] != old_id
     assert service.document(reindexed["document_id"])["version"] == 2
+    assert not any(getattr(item, "document_id", None) == old_id for item in vector_index.evidence)
+    assert any(getattr(item, "document_id", None) == reindexed["document_id"] for item in vector_index.evidence)
     # An existing browser tab may still have version 1 selected. It must remain
     # scoped to this source by resolving to version 2, never query the corpus.
-    result = await service.query("What operation is crucial?", "stale-selection", imported["document_id"])
+    result = await service.query("What operation is crucial?", "stale-selection", old_id)
     assert {source["document_id"] for source in result["metadata"]["sources"]} == {reindexed["document_id"]}
 
 
