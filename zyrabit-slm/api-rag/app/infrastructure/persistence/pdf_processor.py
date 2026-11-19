@@ -27,7 +27,7 @@ class PDFProcessor:
                 logger.info(f"📑 Converting PDF to Markdown: {file_path}")
                 # Keep page boundaries as first-class metadata. Retrieval can then
                 # cite the exact page instead of only naming the whole file.
-                import fitz
+                import pymupdf as fitz
 
                 pdf = fitz.open(file_path)
                 documents = []
