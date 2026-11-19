@@ -19,8 +19,7 @@ class OfflineInference:
     """The import test deliberately does not require a running model."""
     def health(self): return True, "test"
     def answer(self, prompt):
-        import re
-        evidence_id = re.search(r"id=([0-9a-f-]{36})", prompt).group(1)
+        evidence_id = NodeService._EVIDENCE_CITE.search(prompt).group(1)
         return f"Air-Gapped operation is described as crucial for regulated environments. [EVIDENCE:{evidence_id}]", {"provider": "offline-test"}
 
 

@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Citation format mismatch (#207)**: Evidence blocks rendered to the model now use canonical `[EVIDENCE:uuid]` (metadata stays outside the tag). Grounding validation accepts common small-model variants (`id=`, `uuid=`, locator suffixes) when the UUID was supplied. With a selected document, failed grounding uses the extractive fallback instead of returning ungrounded `model-knowledge`.
+
 ## [2.4.9] - 2026-11-10
 
 ### Security
