@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Embedding timeout and honest health**: `DirectOllamaEmbeddings` uses configurable `EMBEDDING_TIMEOUT_SECONDS` (default 60) with retries and optional `EMBEDDING_BATCH_SIZE`. Health reflects recent embed failures and latency near the timeout budget instead of only `/api/tags`. Hybrid query marks `metadata.retrieval=lexical-fallback` when vector search fails (#204).
+
 ## [2.4.9] - 2026-11-10
 
 ### Security

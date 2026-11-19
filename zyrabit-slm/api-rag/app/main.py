@@ -13,8 +13,9 @@ from prometheus_fastapi_instrumentator import Instrumentator
 
 # Infrastructure / Shared
 from app.infrastructure.shared.config import (
-    PROJECT_NAME, API_V1_STR, SLM_URL, 
-    RAG_COLLECTION, EMBEDDING_MODEL, EMBEDDING_URL, NODE_DATA_DIR, NODE_ENABLE_OCR,
+    PROJECT_NAME, API_V1_STR, SLM_URL,
+    RAG_COLLECTION, EMBEDDING_MODEL, EMBEDDING_URL, EMBEDDING_TIMEOUT_SECONDS,
+    EMBEDDING_BATCH_SIZE, EMBEDDING_MAX_RETRIES, NODE_DATA_DIR, NODE_ENABLE_OCR,
     ENABLE_LEGACY_EXTENSIONS, DB_HOST, DB_PORT, MODEL_NAME, NODE_RETRIEVAL_MODE
 )
 from app.infrastructure.shared.logger import setup_logging
@@ -81,7 +82,13 @@ async def lifespan(app: FastAPI):
 
     try:
         # 1. Direct Embeddings
-        embeddings = DirectOllamaEmbeddings(model=EMBEDDING_MODEL, base_url=EMBEDDING_URL)
+        embeddings = DirectOllamaEmbeddings(
+            model=EMBEDDING_MODEL,
+            base_url=EMBEDDING_URL,
+            timeout_seconds=EMBEDDING_TIMEOUT_SECONDS,
+            batch_size=EMBEDDING_BATCH_SIZE,
+            max_retries=EMBEDDING_MAX_RETRIES,
+        )
         
         # 2. Vector Store (Connecting to remote Chroma Server)
         import chromadb

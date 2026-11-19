@@ -173,6 +173,7 @@ class NodeService:
             session_context = self.update_session_context(session_id, document_id)
         effective_question = self._effective_question(question, session_context)
         rag_t0 = time.time()
+        retrieval = self.retrieval_mode
         if not document_id and self._is_conversational(effective_question):
             selected = []
             rag_retrieval_ms = 0.0
@@ -180,8 +181,13 @@ class NodeService:
             lexical = self.metadata.search_lexical(effective_question, limit=16, document_id=document_id)
             vector: list[EvidenceUnit] = []
             if self.retrieval_mode == "hybrid" and self.vector_index:
-                try: vector = await asyncio.to_thread(self.vector_index.search, effective_question, 16, document_id)
-                except Exception: vector = []
+                try:
+                    vector = await asyncio.to_thread(self.vector_index.search, effective_question, 16, document_id)
+                except Exception as exc:
+                    # Do not silent-swallow: lexical still works, but the receipt must say so.
+                    logger.warning("Vector search failed; continuing with lexical retrieval only: %s", exc)
+                    vector = []
+                    retrieval = "lexical-fallback"
             selected = self._select_relevant_evidence(effective_question, lexical, vector, document_id)
             rag_retrieval_ms = round((time.time() - rag_t0) * 1000, 2)
             if document_id and not selected:
@@ -191,13 +197,22 @@ class NodeService:
                     "rag_hits": 0,
                     "context_hits": 0,
                     "rag_retrieval_ms": rag_retrieval_ms,
+                    "retrieval": retrieval,
                     "decision": "abstention-insufficient-evidence",
                     "abstention": True
                 }
                 self.metadata.append_message(session_id, "user", question, document_id=document_id)
                 self.metadata.append_message(session_id, "assistant", answer, metadata=metadata, document_id=document_id)
                 return {"response": answer, "metadata": metadata}
-        return await self._model_response(question, session_id, selected, document_id, session_context, rag_retrieval_ms=rag_retrieval_ms)
+        return await self._model_response(
+            question,
+            session_id,
+            selected,
+            document_id,
+            session_context,
+            rag_retrieval_ms=rag_retrieval_ms,
+            retrieval=retrieval,
+        )
 
     @staticmethod
     def _is_conversational(question: str) -> bool:
@@ -239,12 +254,22 @@ class NodeService:
         """Compatibility wrapper for callers outside the Node query pipeline."""
         return await self._model_response(question, session_id, [])
 
-    async def _model_response(self, question: str, session_id: str, evidence: list[EvidenceUnit], document_id: str | None = None, session_context: dict | None = None, rag_retrieval_ms: float = 0.0) -> dict:
+    async def _model_response(
+        self,
+        question: str,
+        session_id: str,
+        evidence: list[EvidenceUnit],
+        document_id: str | None = None,
+        session_context: dict | None = None,
+        rag_retrieval_ms: float = 0.0,
+        retrieval: str | None = None,
+    ) -> dict:
         """Generate one answer from model knowledge plus bounded local evidence."""
         context = self._bounded_context(evidence)
         history = self.metadata.get_history(session_id)
         session_context = session_context or self.metadata.get_session_context(session_id)
         prompt = self._prompt(question, context, history, session_context)
+        retrieval_mode = retrieval or self.retrieval_mode
         try:
             answer, metrics = await asyncio.to_thread(self.inference.answer, prompt)
         except Exception as exc:
@@ -260,6 +285,7 @@ class NodeService:
                     "rag_hits": 0,
                     "context_hits": len(evidence),
                     "rag_retrieval_ms": rag_retrieval_ms,
+                    "retrieval": retrieval_mode,
                     "decision": "engine-offline-error",
                     "error": str(exc),
                 }
@@ -271,6 +297,7 @@ class NodeService:
             "rag_hits": len(cited),
             "context_hits": len(evidence),
             "rag_retrieval_ms": rag_retrieval_ms,
+            "retrieval": retrieval_mode,
             "decision": decision,
             **metrics
         }

@@ -23,6 +23,10 @@ EMBEDDING_MODEL: str = os.getenv("EMBEDDING_MODEL", "mxbai-embed-large")
 # Generation and embeddings may use different local servers.  This is required
 # for llama.cpp generation, which does not implement Ollama's /api/embed route.
 EMBEDDING_URL: str = os.getenv("EMBEDDING_URL", "http://host.docker.internal:11434").rstrip("/")
+# CPU hosts often need 7–8s per mxbai-embed-large call; 5s was silently killing ingest.
+EMBEDDING_TIMEOUT_SECONDS: float = float(os.getenv("EMBEDDING_TIMEOUT_SECONDS", "60"))
+EMBEDDING_BATCH_SIZE: int = int(os.getenv("EMBEDDING_BATCH_SIZE", "5"))
+EMBEDDING_MAX_RETRIES: int = int(os.getenv("EMBEDDING_MAX_RETRIES", "3"))
 NODE_DATA_DIR: str = os.getenv("NODE_DATA_DIR", "/app/db_data/node")
 NODE_ENABLE_OCR: bool = os.getenv("NODE_ENABLE_OCR", "false").lower() == "true"
 NODE_RETRIEVAL_MODE: str = os.getenv("NODE_RETRIEVAL_MODE", "hybrid").strip().lower()
