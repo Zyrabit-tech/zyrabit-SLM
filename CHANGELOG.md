@@ -19,6 +19,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Citation format mismatch (#207)**: Evidence blocks rendered to the model now use canonical `[EVIDENCE:uuid]` (metadata stays outside the tag). Grounding validation accepts common small-model variants (`id=`, `uuid=`, locator suffixes) when the UUID was supplied. With a selected document, failed grounding uses the extractive fallback instead of returning ungrounded `model-knowledge`.
 - **MCP docker diagnostics**: Removed duplicate `docker_list_containers` / `docker_get_logs` / `docker_inspect_container` FastMCP registrations that triggered "Tool already exists" warnings on import (#210).
 - **PyMuPDF import**: PDF parsers now use `import pymupdf as fitz` instead of the deprecated bare `import fitz` (#210).
+- **Ollama honors token limits and skips ReadTimeout retries**: `OllamaInferenceAdapter` maps `max_tokens`→`num_predict` and `repetition_penalty`→`repeat_penalty`. Read timeouts fail once instead of retrying for up to ~15 minutes on a busy engine (#209).
+- **Hybrid RAG document filter**: `VectorStorePort.similarity_search` and `ChromaAdapter` now accept an optional metadata `filter`, so scoped vector search no longer raises `TypeError` and silently fall back to lexical-only retrieval. When vector search still fails, the query logs the degradation and sets `metadata.retrieval=lexical-fallback` (#205).
+- **Embedding timeout and honest health**: `DirectOllamaEmbeddings` uses configurable `EMBEDDING_TIMEOUT_SECONDS` (default 60) with retries and optional `EMBEDDING_BATCH_SIZE`. Health reflects recent embed failures and latency near the timeout budget instead of only `/api/tags`. Hybrid query marks `metadata.retrieval=lexical-fallback` when vector search fails (#204).
+
 ## [2.4.9] - 2026-11-10
 
 ### Security

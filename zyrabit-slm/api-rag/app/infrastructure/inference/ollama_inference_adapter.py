@@ -22,6 +22,12 @@ from app.infrastructure.inference.circuit_breaker import get_ollama_circuit_brea
 # Exponential backoff delays between retries (seconds)
 _RETRY_DELAYS = [1, 2, 4]
 
+# Domain/OpenAI-style option keys → Ollama /api/generate options
+_OLLAMA_OPTION_KEY_MAP = {
+    "max_tokens": "num_predict",
+    "repetition_penalty": "repeat_penalty",
+}
+
 
 class OllamaInferenceAdapter(InferenceProviderPort):
     """HTTP adapter for Ollama generation endpoint."""
@@ -61,7 +67,8 @@ class OllamaInferenceAdapter(InferenceProviderPort):
                 if key in ("format",):
                     payload[key] = value
                 else:
-                    payload["options"][key] = value
+                    ollama_key = _OLLAMA_OPTION_KEY_MAP.get(key, key)
+                    payload["options"][ollama_key] = value
 
         timeout = request.timeout_seconds or self.default_timeout_seconds
         last_exc: Exception = InferenceProviderError("No attempts made")
@@ -124,6 +131,9 @@ class OllamaInferenceAdapter(InferenceProviderPort):
                     execution_target=execution_target,
                 )
 
+            except requests.exceptions.ReadTimeout as exc:
+                # A busy engine already waited the full timeout; retrying piles on load.
+                raise InferenceProviderError(f"Ollama read timeout: {exc}") from exc
             except (requests.exceptions.ConnectionError, requests.exceptions.Timeout) as exc:
                 last_exc = InferenceProviderError(f"Ollama connection error (attempt {attempt + 1}): {exc}")
                 if attempt < len(_RETRY_DELAYS) - 1:
