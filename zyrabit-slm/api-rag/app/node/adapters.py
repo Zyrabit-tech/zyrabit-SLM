@@ -119,13 +119,34 @@ class ChromaEvidenceIndex:
         return output
 
     def delete(self, document_id: str) -> None:
-        try:
-            if hasattr(self.vector_store, "_collection") and self.vector_store._collection:
-                self.vector_store._collection.delete(where={"document_id": document_id})
-            elif hasattr(self.vector_store, "delete"):
-                self.vector_store.delete(where={"document_id": document_id})
-        except Exception:
-            pass
+        """Remove every vector tagged with ``document_id`` and verify none remain."""
+        if not document_id:
+            raise ValueError("document_id is required for vector delete")
+        where = {"document_id": document_id}
+        deleter = getattr(self.vector_store, "delete", None)
+        if not callable(deleter):
+            raise RuntimeError("Vector store does not support delete")
+        deleter(where=where)
+        remaining = self._count_where(where)
+        if remaining:
+            raise RuntimeError(
+                f"Vector delete incomplete for document_id={document_id}: "
+                f"{remaining} vectors remain"
+            )
+
+    def _count_where(self, where: dict) -> int:
+        counter = getattr(self.vector_store, "count", None)
+        if callable(counter):
+            return int(counter(where=where))
+        getter = getattr(self.vector_store, "get", None)
+        if callable(getter):
+            result = getter(where=where, include=[])
+            return len((result or {}).get("ids") or [])
+        collection = getattr(self.vector_store, "_collection", None)
+        if collection is not None:
+            result = collection.get(where=where, include=[])
+            return len((result or {}).get("ids") or [])
+        raise RuntimeError("Vector store cannot verify delete; refusing silent success")
 
     def health(self) -> tuple[bool, str]:
         try: return bool(self.vector_store.heartbeat()), "connected"
