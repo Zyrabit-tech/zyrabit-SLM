@@ -99,3 +99,45 @@ def test_ollama_adapter_connection_error_raises_domain_error(mock_post):
 
     with pytest.raises(InferenceProviderError):
         provider.generate(InferenceRequest(model="qwen2.5:7b", prompt="hello"))
+
+
+@patch("app.infrastructure.inference.ollama_inference_adapter.requests.post")
+def test_ollama_adapter_maps_domain_options_to_ollama_keys(mock_post):
+    mock_response = MagicMock()
+    mock_response.status_code = 200
+    mock_response.json.return_value = {"response": "ok"}
+    mock_post.return_value = mock_response
+
+    provider = OllamaInferenceAdapter(endpoint="http://localhost:11434/api/generate")
+    provider.generate(
+        InferenceRequest(
+            model="qwen2.5:7b",
+            prompt="hello",
+            options={
+                "temperature": 0.7,
+                "max_tokens": 1024,
+                "repetition_penalty": 1.1,
+            },
+        )
+    )
+
+    _, kwargs = mock_post.call_args
+    options = kwargs["json"]["options"]
+    assert options["num_predict"] == 1024
+    assert options["repeat_penalty"] == 1.1
+    assert options["temperature"] == 0.7
+    assert "max_tokens" not in options
+    assert "repetition_penalty" not in options
+
+
+@patch("app.infrastructure.inference.ollama_inference_adapter.time.sleep")
+@patch("app.infrastructure.inference.ollama_inference_adapter.requests.post")
+def test_ollama_adapter_read_timeout_does_not_retry(mock_post, mock_sleep):
+    mock_post.side_effect = requests.exceptions.ReadTimeout("timed out")
+    provider = OllamaInferenceAdapter(endpoint="http://localhost:11434/api/generate")
+
+    with pytest.raises(InferenceProviderError, match="read timeout"):
+        provider.generate(InferenceRequest(model="qwen2.5:7b", prompt="hello"))
+
+    assert mock_post.call_count == 1
+    mock_sleep.assert_not_called()
