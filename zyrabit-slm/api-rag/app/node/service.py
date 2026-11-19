@@ -281,7 +281,9 @@ class NodeService:
         history = self.metadata.get_history(session_id)
         session_context = session_context or self.metadata.get_session_context(session_id)
         prompt = self._prompt(question, context, history, session_context)
-        retrieval_mode = retrieval or self.retrieval_mode
+        # Default matches NodeService.__init__; getattr keeps unit stubs that
+        # build via __new__ from crashing when they only exercise grounding.
+        retrieval_mode = retrieval or getattr(self, "retrieval_mode", "hybrid")
         try:
             answer, metrics = await asyncio.to_thread(self.inference.answer, prompt)
         except Exception as exc:

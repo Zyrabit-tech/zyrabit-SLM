@@ -23,6 +23,22 @@ def _evidence(identifier: str = UUID) -> EvidenceUnit:
     )
 
 
+def _stub_service(*, answer: str) -> NodeService:
+    """Minimal NodeService for _model_response tests (no full __init__)."""
+    service = NodeService.__new__(NodeService)
+    service.retrieval_mode = "hybrid"
+    service.inference = SimpleNamespace(answer=lambda prompt: (answer, {"provider": "test"}))
+    service.metadata = SimpleNamespace(
+        get_history=lambda session_id: [],
+        get_session_context=lambda session_id: {},
+        append_message=lambda *args, **kwargs: None,
+        upsert_session_context=lambda *args, **kwargs: None,
+    )
+    service.identity = None
+    service._remember_turn = lambda *args, **kwargs: None
+    return service
+
+
 @pytest.mark.parametrize(
     "answer",
     [
@@ -69,18 +85,7 @@ def test_render_evidence_matches_canonical_cite_form():
 @pytest.mark.asyncio
 async def test_extractive_fallback_when_document_selected_and_grounding_fails():
     evidence = [_evidence()]
-    service = NodeService.__new__(NodeService)
-    service.inference = SimpleNamespace(
-        answer=lambda prompt: ("Ungrounded prose about mining.", {"provider": "test"})
-    )
-    service.metadata = SimpleNamespace(
-        get_history=lambda session_id: [],
-        get_session_context=lambda session_id: {},
-        append_message=lambda *args, **kwargs: None,
-        upsert_session_context=lambda *args, **kwargs: None,
-    )
-    service.identity = None
-    service._remember_turn = lambda *args, **kwargs: None
+    service = _stub_service(answer="Ungrounded prose about mining.")
 
     result = await service._model_response(
         "explica prueba de trabajo",
@@ -99,18 +104,7 @@ async def test_extractive_fallback_when_document_selected_and_grounding_fails():
 @pytest.mark.asyncio
 async def test_ungrounded_answer_without_document_stays_model_knowledge():
     evidence = [_evidence()]
-    service = NodeService.__new__(NodeService)
-    service.inference = SimpleNamespace(
-        answer=lambda prompt: ("General knowledge reply.", {"provider": "test"})
-    )
-    service.metadata = SimpleNamespace(
-        get_history=lambda session_id: [],
-        get_session_context=lambda session_id: {},
-        append_message=lambda *args, **kwargs: None,
-        upsert_session_context=lambda *args, **kwargs: None,
-    )
-    service.identity = None
-    service._remember_turn = lambda *args, **kwargs: None
+    service = _stub_service(answer="General knowledge reply.")
 
     result = await service._model_response(
         "what is a transformer?",
