@@ -15,6 +15,58 @@ If you are new to Zyrabit SLM or looking for a fast way to get involved:
 
 ---
 
+## Active repair wave (Nov 2026) — fix what is broken
+
+Verified findings on `main` v2.4.9. **One pull request per issue. Target `beta`. No new product features** — restore contracts the README already promises (hybrid RAG, verified citations, real delete, honest health, safe defaults).
+
+### Rules for every PR in this wave
+
+- Prefer adapters/ports already in the hexagonal layout; do not invent a second RAG stack, MCP gateway, or vector DB.
+- Replace silent `except Exception: pass` / empty fallbacks on the RAG path with logged degradation + response metadata.
+- Tests must exercise the **real adapter signature** (or ephemeral Chroma / fake HTTP). Do not leave fakes that accept kwargs the production adapter rejects.
+- Docs/README that overclaim must be corrected in the same PR that touches that behavior (or in the dedicated docs issue).
+- Leave enhancement/roadmap issues alone (`#115`–`#122`, `#118`, `#184`, `#192`, etc.) until this wave lands.
+
+### Close-first (already shipped — do not reopen)
+
+| Issue | Status |
+| :--- | :--- |
+| `#102` `zyra status --json` | Closed (2.4.7) |
+| `#113` Docker multi-arch tags | Closed (2.4.7 / 2.4.9) |
+| `#136` RFC / CURP / CLABE masking | Closed (2.4.7) |
+| `#139` `#145` `#150` `#163` `#168` `#188` dated dependency scans | Closed as superseded by `#200` |
+
+### Open repair queue (one PR each)
+
+| Priority | Issue | Title | Effort |
+| :---: | :---: | :--- | :---: |
+| P0 | [#205](https://github.com/Zyrabit-tech/zyrabit-SLM/issues/205) | Vector `document_id` filter TypeError → hybrid becomes lexical | S |
+| P0 | [#207](https://github.com/Zyrabit-tech/zyrabit-SLM/issues/207) | Citation format mismatch (`id=` vs `:uuid`) | S |
+| P0 | [#206](https://github.com/Zyrabit-tech/zyrabit-SLM/issues/206) | Delete/reindex never removes Chroma vectors | S |
+| P1 | [#204](https://github.com/Zyrabit-tech/zyrabit-SLM/issues/204) | Embedding timeout 5s; health false green | S |
+| P1 | [#209](https://github.com/Zyrabit-tech/zyrabit-SLM/issues/209) | Map Ollama `num_predict` / stop ReadTimeout retries | S |
+| P1 | [#213](https://github.com/Zyrabit-tech/zyrabit-SLM/issues/213) | `docker.sock` / docker_* allowlist / Chroma bind | M |
+| P1 | [#208](https://github.com/Zyrabit-tech/zyrabit-SLM/issues/208) | ES questions vs EN docs (lexical gate) — after `#205` | M |
+| P2 | [#212](https://github.com/Zyrabit-tech/zyrabit-SLM/issues/212) | `zyra status` / `verify` false healthy | S |
+| P2 | [#214](https://github.com/Zyrabit-tech/zyrabit-SLM/issues/214) | `/v1/extract` `valid` → `schema_valid` + docs | M |
+| P2 | [#211](https://github.com/Zyrabit-tech/zyrabit-SLM/issues/211) | README MCP `:8001` docs correction only | S |
+| P3 | [#210](https://github.com/Zyrabit-tech/zyrabit-SLM/issues/210) | Duplicate `docker_*` tools + `pymupdf` import | XS |
+
+### Related good-first / security hygiene (same wave)
+
+| Issue | Note |
+| :--- | :--- |
+| [#137](https://github.com/Zyrabit-tech/zyrabit-SLM/issues/137) | Show cited passage next to the answer (UI) |
+| [#138](https://github.com/Zyrabit-tech/zyrabit-SLM/issues/138) | Empty default `PII_CUSTOM_NAMES` fallback |
+| [#200](https://github.com/Zyrabit-tech/zyrabit-SLM/issues/200) | Current dependency scan (`dnspython` / `opentelemetry-api` bumps) |
+| [#158](https://github.com/Zyrabit-tech/zyrabit-SLM/issues/158) / [#159](https://github.com/Zyrabit-tech/zyrabit-SLM/issues/159) | gitleaks / Semgrep — need org secrets before CI can enforce |
+
+### Suggested merge order into `beta`
+
+`#205` → `#207` → `#206` → `#204` + `#209` → `#213` → `#208` → `#212` → `#214` → `#211` → `#210` (plus `#137` / `#138` whenever ready).
+
+---
+
 ## Branching Model
 
 ```
