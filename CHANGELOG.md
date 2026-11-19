@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+
+- **dnspython 2.9.2 / opentelemetry-api 1.45.2**: Lock overrides clear CVE-2026-128089 and CVE-2026-126360 so `pip-audit` no longer fails on undocumented advisories.
+
 ## [2.4.9] - 2026-11-10
 
 ### Security
