@@ -113,7 +113,7 @@ This single command:
 | **API** | http://localhost:8082/v1 |
 | **Health** | http://localhost:8082/v1/health |
 | **Grafana** | http://localhost:3001 |
-| **ChromaDB** | http://localhost:8000 |
+| **ChromaDB** | Internal only (`http://zyrabit-db:8000` on the compose network) |
 
 ### Verify Health
 

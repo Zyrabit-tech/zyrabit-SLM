@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+
+- **Docker socket hardening (#213)**: `zyrabit-api` no longer mounts the host `/var/run/docker.sock`. MCP `docker_*` tools reach a read-only `tecnativa/docker-socket-proxy` (`CONTAINERS` only) and filter containers with `DOCKER_MCP_CONTAINER_ALLOWLIST` (default `zyrabit-*`). Chroma (`zyrabit-db`) no longer publishes host port `8000` (compose-network only). Compose integrity tests reject a raw API sock mount or a published Chroma port.
+
 ## [2.4.9] - 2026-11-10
 
 ### Security

@@ -30,6 +30,20 @@ services:
     networks:
       - zyrabit-sovereign-net
 
+  # 0.5 DOCKER SOCKET PROXY: read-only CONTAINERS API for MCP diagnostics
+  # zyrabit-api must never mount the raw host docker.sock (see scripts/check_compose_docker_sock.py).
+  zyrabit-docker-proxy:
+    image: tecnativa/docker-socket-proxy:0.3.0
+    container_name: zyrabit-docker-proxy
+    environment:
+      CONTAINERS: 1
+      POST: 0
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - zyrabit-sovereign-net
+    restart: unless-stopped
+
   # 1. THE BRAIN: API RAG
   zyrabit-api:
     image: zyrabit-slm/api-rag
@@ -48,10 +62,12 @@ services:
       - N8N_WEBHOOK_SIGNING_SECRET_FILE=/run/secrets/n8n_webhook_signing_secret
       - ONNXRUNTIME_LOGGING_LEVEL=3
       - DOCS_DIR=/app/document_source
+      - DOCKER_HOST=tcp://zyrabit-docker-proxy:2375
     extra_hosts:
       - "host.docker.internal:host-gateway"
     depends_on:
-
+      zyrabit-docker-proxy:
+        condition: service_started
       zyrabit-db:
         condition: service_started
       zyrabit-engine:
@@ -69,7 +85,6 @@ services:
     networks:
       - zyrabit-sovereign-net
     volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
       - ./secrets:/run/secrets:ro
       - ./prompts:/app/prompts:ro
       - ./document_source:/app/document_source
@@ -176,7 +191,7 @@ services:
     networks:
       - zyrabit-sovereign-net
 
-  # 3. THE MEMORY: Vector DB
+  # 3. THE MEMORY: Vector DB (internal only — no host port; unauthenticated)
   zyrabit-db:
     image: chromadb/chroma:1.5.9
     container_name: zyrabit-db
@@ -185,8 +200,8 @@ services:
       - CHROMA_OTEL_COLLECTION_ENDPOINT=http://localhost:4317
       - CHROMA_OTEL_SERVICE_NAME=zyrabit-vector-db
       - ORT_LOGGING_LEVEL=3
-    ports:
-      - "${ZYRABIT_BIND_IP:-127.0.0.1}:8000:8000"
+    expose:
+      - "8000"
     volumes:
       - ./chroma-data:/data
     networks:

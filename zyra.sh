@@ -1049,7 +1049,7 @@ run_start() {
         if [[ "${current_provider}" == "tenstorrent" || "${current_provider}" == "vllm" ]]; then
             echo -e "  ${CYAN}➜ NPU Engine (vLLM)${NC}   http://localhost:8090"
         fi
-        echo -e "  ${CYAN}➜ Vector DB (Chroma)${NC}   http://localhost:8000"
+        echo -e "  ${CYAN}➜ Vector DB (Chroma)${NC}   internal only (zyrabit-db:8000)"
         echo -e "  ${CYAN}➜ MCP Agent Server${NC}     http://localhost:8001"
     else
         echo -e "  ${BOLD}🚀 Zyrabit Production Services Ready (Traefik TLS)!${NC}"
