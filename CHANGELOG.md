@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Security
 
 - **dnspython 2.9.2 / opentelemetry-api 1.45.2**: Lock overrides clear CVE-2026-128089 and CVE-2026-126360 so `pip-audit` no longer fails on undocumented advisories.
+- **Docker socket hardening (#213)**: `zyrabit-api` no longer mounts the host `/var/run/docker.sock`. MCP `docker_*` tools reach a read-only `tecnativa/docker-socket-proxy` (`CONTAINERS` only) and filter containers with `DOCKER_MCP_CONTAINER_ALLOWLIST` (default `zyrabit-*`). Chroma (`zyrabit-db`) no longer publishes host port `8000` (compose-network only). Compose integrity tests reject a raw API sock mount or a published Chroma port.
 
 ### Fixed
 
