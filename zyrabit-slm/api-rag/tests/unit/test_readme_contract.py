@@ -110,8 +110,9 @@ def test_readme_endpoints_consistency(readme_content):
     assert "http://localhost:3000" in readme_content
     # Prometheus is on port 9090
     assert "http://localhost:9090" in readme_content
-    # Chroma is on port 8000
-    assert "http://localhost:8000" in readme_content
+    # Chroma stays on the compose network (no host publish)
+    assert "http://zyrabit-db:8000" in readme_content
+    assert "http://localhost:8000" not in readme_content
     # :8001 is installer diagnostics (not the ReAct tool gateway)
     assert "http://localhost:8001" in readme_content
     assert "MCP Installer Diagnostics" in readme_content

@@ -230,7 +230,7 @@ In **Local / Dev Mode** (default), direct service ports are exposed for easy deb
 | **API Health Probe** | [`http://localhost:8088/v1/health`](http://localhost:8088/v1/health) | `8088` | Liveness & readiness probe with active provider capabilities |
 | **Grafana Telemetry** | [`http://localhost:3000`](http://localhost:3000) | `3000` | Real-time TPS, TTFT, token latency & hardware metrics |
 | **Prometheus Engine** | [`http://localhost:9090`](http://localhost:9090) | `9090` | Time-series metrics scraper & alerting rules |
-| **Vector DB (Chroma)** | [`http://localhost:8000`](http://localhost:8000) | `8000` | Local vector embedding store |
+| **Vector DB (Chroma)** | _(internal only)_ `http://zyrabit-db:8000` | — | Compose-network vector store (no host port; unauthenticated) |
 | **MCP Installer Diagnostics** | [`http://localhost:8001`](http://localhost:8001) | `8001` | Standalone installer diagnostic MCP server (`mcp/install_server.py`); ReAct tools use in-process FastMCP, not this port |
 | **Hardware Engine (TT)** | [`http://localhost:8090`](http://localhost:8090) | `8090` | Tenstorrent vLLM-TT hardware acceleration inference server |
 
