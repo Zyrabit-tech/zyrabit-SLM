@@ -113,10 +113,26 @@ def test_readme_endpoints_consistency(readme_content):
     # Chroma stays on the compose network (no host publish)
     assert "http://zyrabit-db:8000" in readme_content
     assert "http://localhost:8000" not in readme_content
-    # MCP is on port 8001
+    # :8001 is installer diagnostics (not the ReAct tool gateway)
     assert "http://localhost:8001" in readme_content
+    assert "MCP Installer Diagnostics" in readme_content
+    assert "install_server.py" in readme_content
     # Tenstorrent Hardware Server is on port 8090
     assert "http://localhost:8090" in readme_content
+
+
+def test_readme_mcp_docs_match_actual_servers(readme_content):
+    """
+    README must not overclaim :8001 as the ReAct MCP gateway or advertise a
+    non-existent `uv run zyrabit-mcp` script entry.
+    """
+    assert "Local MCP Gateway (`:8001`)" not in readme_content
+    assert "MCP Tool Server" not in readme_content
+    assert "In-process FastMCP" in readme_content
+    assert '"zyrabit-mcp"' not in readme_content
+    assert "run\",\n      \"zyrabit-mcp\"" not in readme_content
+    assert "zyrabit-installer" in readme_content
+    assert "install_server.py" in readme_content
 
 
 def test_no_deprecated_wizard_in_active_cli_or_docs(readme_content, zyra_content):

@@ -41,7 +41,7 @@ Zyrabit Platform is an enterprise-ready, **local-first AI infrastructure layer**
 | **Local Inference Engine** | `Beta` | Pluggable Ollama, MLX, llama.cpp, vLLM-TT | Apple Metal / CUDA / Tenstorrent / CPU |
 | **Hybrid Document RAG** | `Beta` | Vector (Chroma) + BM25 in-memory keyword retrieval | Local storage & memory |
 | **PII Guardrail Sandwich** | `Beta` | Regex + Luhn validation test suite (zero egress) | Inline pre/post inference pipeline |
-| **ReAct Autonomous Agent** | `Beta` | Dynamic MCP tool calling with circuit-breaker | Local MCP Gateway (`:8001`) |
+| **ReAct Autonomous Agent** | `Beta` | Dynamic MCP tool calling with circuit-breaker | In-process FastMCP (API `/mcp`) |
 | **Air-gapped Execution** | `Validated` | `docker-compose.yml` internal isolated network | 100% offline with preloaded weights |
 | **Observability & Telemetry** | `Beta` | Prometheus metrics + preconfigured Grafana dashboards | Local ports `:9090` / `:3000` |
 
@@ -231,7 +231,7 @@ In **Local / Dev Mode** (default), direct service ports are exposed for easy deb
 | **Grafana Telemetry** | [`http://localhost:3000`](http://localhost:3000) | `3000` | Real-time TPS, TTFT, token latency & hardware metrics |
 | **Prometheus Engine** | [`http://localhost:9090`](http://localhost:9090) | `9090` | Time-series metrics scraper & alerting rules |
 | **Vector DB (Chroma)** | _(internal only)_ `http://zyrabit-db:8000` | — | Compose-network vector store (no host port; unauthenticated) |
-| **MCP Tool Server** | [`http://localhost:8001`](http://localhost:8001) | `8001` | Model Context Protocol agent tool execution server |
+| **MCP Installer Diagnostics** | [`http://localhost:8001`](http://localhost:8001) | `8001` | Standalone installer diagnostic MCP server (`mcp/install_server.py`); ReAct tools use in-process FastMCP, not this port |
 | **Hardware Engine (TT)** | [`http://localhost:8090`](http://localhost:8090) | `8090` | Tenstorrent vLLM-TT hardware acceleration inference server |
 
 > **Production Deployments (Traefik TLS):** When launched with `--production`, all external traffic is routed securely via Traefik over HTTPS (`port 443`) with path-based routing: `https://${DOMAIN}/` routes to the Web UI, and `https://${DOMAIN}/v1` routes to the API.
@@ -324,30 +324,27 @@ Task: Setup, verify, and operate the local Zyrabit SLM environment.
 4. Architectural Invariants:
    - Zero external egress: All models, embeddings, and vector stores must run locally.
    - PII Sandwich: Prompts are sanitized before reaching inference engines.
-   - Tool calling must be routed through the local MCP gateway.
+   - ReAct tool calling uses the in-process FastMCP bridge in `api-rag` (`/mcp/tools`, `/mcp/rpc`), not the `:8001` installer server.
 ```
 
-### 🧩 MCP Server Configuration for Agents
+### 🧩 MCP Installer Diagnostics (optional)
 
-Connect this Zyrabit instance as a local MCP server for your agent (`claude_desktop_config.json`, Cursor MCP, or Antigravity MCP):
+Port `:8001` is the **installer diagnostic** MCP server (`mcp/install_server.py` / compose service `zyrabit-mcp`). It helps with install and host health checks. It is **not** the ReAct agent tool runtime — those tools are registered in-process via FastMCP inside the API.
+
+There is no `uv run zyrabit-mcp` script entry in this repository. To attach an IDE client to the installer diagnostic server over stdio:
 
 ```json
 {
-  "zyrabit-slm": {
-    "command": "uv",
-    "args": [
-      "--directory",
-      "/path/to/zyrabit-SLM/mcp",
-      "run",
-      "zyrabit-mcp"
-    ],
-    "env": {
-      "ZYRABIT_API_URL": "http://localhost:8088",
-      "ZYRABIT_API_KEY": "zyrabit-local-token"
+  "mcpServers": {
+    "zyrabit-installer": {
+      "command": "python",
+      "args": ["/absolute/path/to/zyrabit-SLM/mcp/install_server.py"]
     }
   }
 }
 ```
+
+> For HTTP diagnostics: `curl http://localhost:8001/health` and `curl http://localhost:8001/diagnose`. See [`mcp/README.md`](mcp/README.md).
 
 ---
 
@@ -376,7 +373,7 @@ zyrabit-slm/
 ├── traefik/              # Reverse proxy, TLS, routing (production only)
 ├── scripts/              # Operational helpers
 ├── docker-compose.yml    # Unified stack (Local & Production profiles)
-mcp/                      # Model Context Protocol server (controlled tool access)
+mcp/                      # Installer diagnostic MCP server (HTTP :8001 / stdio); ReAct tools live in api-rag
 validation/               # Validation scripts and compliance artifacts
 zyra.sh                   # Unified CLI: install · start · stop · verify · benchmark
 zyra-up.sh                # Legacy shim → delegates to zyra.sh

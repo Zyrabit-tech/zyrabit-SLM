@@ -23,7 +23,7 @@ Watch the system process voice commands and capture images in real-time without 
 
 Zyrabit SLM serves as a **local-first backend and security firewall for autonomous AI agents** (Cursor, Antigravity, AutoGen, CrewAI, LangGraph, and Cline):
 
-- **Zero-Trust Tool Execution (MCP)**: Safely exposes local file operations, databases, and internal APIs to agents via the standard [Model Context Protocol](https://modelcontextprotocol.io).
+- **Zero-Trust Tool Execution (MCP)**: ReAct agents call in-process FastMCP tools through the API bridge (`/mcp`); an optional installer diagnostic MCP server listens on `:8001` and is separate from agent tool execution.
 - **PII & Secret Protection**: Outbound agent prompts are automatically scrubbed of credentials, API keys, and sensitive personally identifiable information before hitting models.
 - **Sovereign Agent Memory**: State, conversation history, and document embeddings stay local in SQLite WAL and ChromaDB — zero external data egress.
 
@@ -34,7 +34,7 @@ Zyrabit is built on a zero-trust architecture, ensuring that data processing rem
 ### Core Capabilities
 
 - **Private RAG & Agent Memory:** A high-performance vector retrieval system coupled with local language models for deterministic, context-aware querying of proprietary datasets.
-- **Autonomous Agent Tooling (MCP):** Pre-packaged Model Context Protocol servers allowing AI agents to interact with on-premise infrastructure safely.
+- **Autonomous Agent Tooling (MCP):** In-process FastMCP tools for ReAct inside `api-rag`, plus an optional installer diagnostic MCP server on `:8001` (`mcp/install_server.py`) — not a general external agent gateway.
 - **Hardware-Aware Inference:** Dynamic compute routing that automatically maps execution to the optimal available backend (Apple Metal, NVIDIA CUDA, or CPU/AVX2) without manual configuration overhead.
 - **Native Observability:** Integrated telemetry stack utilizing Prometheus and Grafana to expose critical metrics, including inference latency, VRAM allocation, and query throughput.
 - **Workflow Orchestration:** Native integration with n8n to enable the design and execution of complex, API-driven AI pipelines.

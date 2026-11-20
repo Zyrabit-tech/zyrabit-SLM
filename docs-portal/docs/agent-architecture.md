@@ -55,10 +55,12 @@ SLMs perform best when context remains within optimal attention bounds. The harn
 - **Emergency Compaction**: If context exceeds limits, the harness automatically drops low-priority RAG context and trims chat history to prevent context truncation.
 
 ### D. Model Context Protocol (MCP) RPC Bridge
-Zyrabit SLM exposes all registered tools over standard **Model Context Protocol (MCP RPC 2.0)**:
+ReAct tool execution uses the **in-process FastMCP** instance inside `api-rag`. The API exposes those tools over **MCP RPC 2.0**:
 
 - **Discovery (`/mcp/tools`)**: Exposes schemas for connected clients.
 - **Execution (`/mcp/rpc`)**: Safe RPC execution of tool calls (e.g. `tools/call`) with strict argument schema validation and audit logging.
+
+Port `:8001` is the separate **installer diagnostic** MCP server (`mcp/install_server.py` / compose `zyrabit-mcp`). It is not the ReAct tool runtime and there is no `uv run zyrabit-mcp` package entry point.
 
 ---
 
