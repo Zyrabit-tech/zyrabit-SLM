@@ -212,7 +212,8 @@ By default, the installer pulls and configures `mxbai-embed-large` for document 
 | `./zyra.sh install -y` | Silent automated setup using existing `.env` without interactive prompts |
 | `./zyra.sh start` | Re-launch existing container stack without reconfiguration |
 | `./zyra.sh stop` | Tear down all runtime containers and profiles |
-| `./zyra.sh verify` | Health check: container lifecycle status and HTTP API probes |
+| `./zyra.sh verify` | Health check: core containers (api/web/db/mcp/+engine) must leave Docker `starting`; then HTTP API probes |
+| `./zyra.sh status` | Core stack status (`--json` for scripts). Healthy only when api, web, db, mcp, and engine (if Docker-backed) are running |
 | `./zyra.sh benchmark` | Run live inference throughput (t/s) and TTFT benchmark against active model |
 | `./zyra.sh audit` | Generate 0-egress compliance and PII verification report |
 | `./zyra.sh validate` | Execute full offline QA test suite (tests, architecture boundaries, air-gap) |
