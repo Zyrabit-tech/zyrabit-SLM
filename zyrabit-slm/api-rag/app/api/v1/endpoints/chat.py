@@ -49,8 +49,9 @@ class ExtractionQuery(BaseModel):
 
 class ExtractionResponse(BaseModel):
     data: Dict[str, Any]
-    valid: bool
+    schema_valid: bool
     errors: List[str] = []
+    ungrounded_fields: List[str] = []
     raw_response: str
     model: str
 
@@ -61,7 +62,10 @@ async def extract_structured_data(
 ):
     """
     Structured JSON extraction endpoint.
-    Extracts structured schema-conforming entities from unstructured input text.
+
+    ``schema_valid`` means types/required fields match the schema only — it is
+    **not** a claim that numeric or string values are factually grounded in the
+    source text. See ``ungrounded_fields`` for values that do not appear literally.
     """
     if not inference_provider:
         raise HTTPException(status_code=503, detail="Inference provider is offline")
