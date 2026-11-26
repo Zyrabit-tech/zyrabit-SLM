@@ -107,12 +107,37 @@ async def test_end_to_end_extraction():
     service = StructuredExtractionService(provider)
 
     result = await service.extract(
-        text="Artillery shelling reported near hospital sector. Coordinates 34.0522 N, 118.2437 W. 3 casualties confirmed.",
+        text=(
+            "CRITICAL artillery shelling reported near hospital sector. "
+            "Coordinates 34.0522 N, 118.2437 W. 3 casualties confirmed. "
+            "Incident type: Artillery Shelling."
+        ),
         schema=schema,
     )
 
-    assert result["valid"] is True
+    assert result["schema_valid"] is True
     assert result["errors"] == []
+    assert result["ungrounded_fields"] == []
     assert result["data"]["incident_type"] == "Artillery Shelling"
     assert result["data"]["casualties"] == 3
     assert result["model"] == "mock-qwen2.5:7b"
+
+
+def test_schema_valid_does_not_mean_grounded_numbers():
+    """#214: invented numbers can still pass schema checks; flag ungrounded fields."""
+    schema = {
+        "type": "object",
+        "required": ["title", "pages"],
+        "properties": {
+            "title": {"type": "string"},
+            "pages": {"type": "integer"},
+        },
+    }
+    data = {"title": "Bitcoin", "pages": 999}
+    source = "The Bitcoin paper is titled Bitcoin: A Peer-to-Peer Electronic Cash System."
+    ok, errors = StructuredExtractionService.validate_schema(data, schema)
+    assert ok is True
+    assert errors == []
+    ungrounded = StructuredExtractionService.find_ungrounded_fields(data, schema, source)
+    assert "pages" in ungrounded
+    assert "title" not in ungrounded  # "Bitcoin" appears literally

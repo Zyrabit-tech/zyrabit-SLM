@@ -84,6 +84,30 @@ class StructuredExtractionService:
 
         return len(errors) == 0, errors
 
+    @staticmethod
+    def find_ungrounded_fields(data: dict, schema: dict, source_text: str) -> list[str]:
+        """Mark string/number fields whose string form does not appear in the source text.
+
+        This is a minimal literal check — not a calculation engine. ``schema_valid``
+        can still be true when values are invented by the model (#214).
+        """
+        haystack = source_text.casefold()
+        ungrounded: list[str] = []
+        properties = schema.get("properties", {})
+        for prop, prop_spec in properties.items():
+            if prop not in data or data[prop] is None:
+                continue
+            expected = prop_spec.get("type")
+            if expected not in {"string", "number", "integer"}:
+                continue
+            value = data[prop]
+            needle = str(value).strip()
+            if not needle:
+                continue
+            if needle.casefold() not in haystack:
+                ungrounded.append(prop)
+        return ungrounded
+
     async def extract(
         self,
         text: str,
@@ -93,6 +117,9 @@ class StructuredExtractionService:
     ) -> Dict[str, Any]:
         """
         Extracts structured JSON conforming to schema from input text.
+
+        ``schema_valid`` reflects required fields and JSON types only — not
+        factual grounding of extracted values against the source text.
         """
         schema_json = json.dumps(schema, indent=2, ensure_ascii=False)
         system_prompt = (
@@ -126,22 +153,26 @@ class StructuredExtractionService:
         result = self.inference_provider.generate(request)
         raw_output = result.text.strip()
         parsed_data = self.extract_json_block(raw_output)
+        model_name = result.raw_payload.get("model") or result.provider or model or "unknown"
 
         if parsed_data is None:
             return {
                 "data": {},
-                "valid": False,
+                "schema_valid": False,
                 "errors": ["Failed to parse valid JSON from model response"],
+                "ungrounded_fields": [],
                 "raw_response": raw_output,
-                "model": result.raw_payload.get("model") or result.provider or model or "unknown",
+                "model": model_name,
             }
 
         is_valid, validation_errors = self.validate_schema(parsed_data, schema)
+        ungrounded = self.find_ungrounded_fields(parsed_data, schema, text)
 
         return {
             "data": parsed_data,
-            "valid": is_valid,
+            "schema_valid": is_valid,
             "errors": validation_errors,
+            "ungrounded_fields": ungrounded,
             "raw_response": raw_output,
-            "model": result.raw_payload.get("model") or result.provider or model or "unknown",
+            "model": model_name,
         }

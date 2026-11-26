@@ -112,6 +112,8 @@ Lists all documents currently indexed in the sovereign vault.
 
 Extracts schema-conforming JSON entities from unstructured text with automatic schema validation.
 
+`schema_valid` means required fields and JSON types match the schema. It is **not** proof that numbers or strings are factually correct. Fields whose literal string form does not appear in the source text are listed in `ungrounded_fields`.
+
 **Request Body (`application/json`):**
 
 ```json
@@ -140,8 +142,9 @@ Extracts schema-conforming JSON entities from unstructured text with automatic s
     "amount": 4500.0,
     "currency": "USD"
   },
-  "valid": true,
+  "schema_valid": true,
   "errors": [],
+  "ungrounded_fields": [],
   "raw_response": "{\"invoice_number\": \"10293\", ...}",
   "model": "qwen2.5:1.5b"
 }
