@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import os
-from typing import Sequence
+from typing import Any, Sequence
 
 from app.node.domain import EvidenceUnit
 from app.ports.inference_port import InferenceRequest
@@ -107,15 +107,34 @@ class ChromaEvidenceIndex:
     def search(self, query: str, limit: int = 8, document_id: str | None = None) -> list[EvidenceUnit]:
         # Metadata filtering is deliberately adapter-specific.
         kwargs = {"k": limit}
-        if document_id: kwargs["filter"] = {"document_id": document_id}
-        results = self.vector_store.similarity_search(query, **kwargs)
+        if document_id:
+            kwargs["filter"] = {"document_id": document_id}
+        scored_pairs: list[tuple[Any, float | None]] = []
+        with_score = getattr(self.vector_store, "similarity_search_with_score", None)
+        if callable(with_score):
+            try:
+                scored_pairs = [(doc, float(score)) for doc, score in with_score(query, **kwargs)]
+            except TypeError:
+                scored_pairs = []
+        if not scored_pairs:
+            scored_pairs = [(doc, None) for doc in self.vector_store.similarity_search(query, **kwargs)]
         output = []
-        for ordinal, item in enumerate(results, start=1):
-            metadata = item.metadata
+        for ordinal, (item, distance) in enumerate(scored_pairs, start=1):
+            metadata = dict(item.metadata)
+            if distance is not None:
+                metadata["vector_distance"] = distance
             evidence_id = metadata.get("evidence_id")
             if evidence_id and (not document_id or metadata.get("document_id") == document_id):
-                output.append(EvidenceUnit(evidence_id, metadata.get("document_id", ""), item.page_content, ordinal,
-                    {key: metadata[key] for key in ("page", "sheet", "range", "slide", "paragraph", "table") if key in metadata}, metadata))
+                output.append(
+                    EvidenceUnit(
+                        evidence_id,
+                        metadata.get("document_id", ""),
+                        item.page_content,
+                        ordinal,
+                        {key: metadata[key] for key in ("page", "sheet", "range", "slide", "paragraph", "table") if key in metadata},
+                        metadata,
+                    )
+                )
         return output
 
     def delete(self, document_id: str) -> None:

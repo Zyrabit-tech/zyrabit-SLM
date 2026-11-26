@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Hybrid retrieval no longer blocks Spanish questions on English documents (#208)**: Evidence selection keeps strong vector hits *or* lexical term matches. Instruction words (`resume`, `explica`, `viñetas`, …) are stripped from the lexical gate. Vector distances from `similarity_search_with_score` feed the strength check so out-of-domain weak neighbors still abstain.
 - **Chroma document delete actually removes vectors**: `ChromaAdapter.delete` now deletes by `document_id` metadata filter instead of `pass`. `ChromaEvidenceIndex.delete` no longer swallows errors and fails if vectors remain. `DELETE /v1/documents/{id}` removes vectors before metadata so a failed index cleanup cannot report success. Reindex drops the previous document's vectors after the new version is indexed (#206).
 - **Citation format mismatch (#207)**: Evidence blocks rendered to the model now use canonical `[EVIDENCE:uuid]` (metadata stays outside the tag). Grounding validation accepts common small-model variants (`id=`, `uuid=`, locator suffixes) when the UUID was supplied. With a selected document, failed grounding uses the extractive fallback instead of returning ungrounded `model-knowledge`.
 - **Docs: MCP `:8001` claims**: README and docs-portal now describe `:8001` as the installer diagnostic MCP server and ReAct tooling as in-process FastMCP; removed the broken `uv … run zyrabit-mcp` client snippet (#211).
