@@ -471,6 +471,19 @@ class NodeService:
         if len(excerpt) > 900: excerpt = f"{excerpt[:897].rstrip()}…"
         return f"No puedo verificar una respuesta redactada por el modelo con evidencia trazable. Este es el fragmento recuperado del documento seleccionado:\n\n{excerpt}\n\n[EVIDENCE:{item.id}]"
 
+    # Instruction / formatting words must not inflate the lexical relevance gate (#208).
+    _INSTRUCTION_STOP_WORDS = {
+        "resume", "resumir", "resumen", "explica", "explicar", "explicame", "explicalo",
+        "vineta", "vinetas", "bullet", "bullets", "lista", "list", "lists",
+        "please", "porfavor", "hazme", "escribe", "redacta", "describe", "describir",
+        "summary", "summarize", "summarise", "tell", "show", "write", "make",
+        "punto", "puntos", "breve", "corto", "detallado",
+    }
+    # Cosine / embedding distance: lower is closer. Above this is not "high similarity".
+    _MAX_VECTOR_DISTANCE = 0.75
+    _MIN_VECTOR_SIMILARITY = 0.35
+    _VECTOR_RANK_KEEP = 4
+
     @staticmethod
     def _query_terms(question: str) -> set[str]:
         """Keep only meaningful terms for a conservative local relevance gate."""
@@ -481,9 +494,30 @@ class NodeService:
             "otra", "vez", "chingado", "chale", "rayos", "carajo", "dime", "zyra",
             "explain", "better", "more", "that", "this", "again", "continue",
             "and", "are", "do", "for", "how", "is", "of", "the", "to", "what", "which", "with",
+            *NodeService._INSTRUCTION_STOP_WORDS,
         }
         normalized = unicodedata.normalize("NFKD", question).encode("ascii", "ignore").decode().lower()
         return {token.rstrip("s") for token in re.findall(r"[a-z0-9]{3,}", normalized) if token not in stop_words}
+
+    @classmethod
+    def _vector_hit_is_strong(cls, item: EvidenceUnit, vector_rank: int | None, document_id: str | None) -> bool:
+        """True when a vector candidate is high-similarity (or top-ranked when scoped and unscored)."""
+        if vector_rank is None:
+            return False
+        meta = item.metadata or {}
+        if "similarity" in meta:
+            try:
+                return float(meta["similarity"]) >= cls._MIN_VECTOR_SIMILARITY
+            except (TypeError, ValueError):
+                return False
+        for key in ("vector_distance", "distance"):
+            if key in meta:
+                try:
+                    return float(meta[key]) <= cls._MAX_VECTOR_DISTANCE
+                except (TypeError, ValueError):
+                    return False
+        # No numeric score from the adapter: only trust top ranks when scoped to a document.
+        return document_id is not None and vector_rank <= cls._VECTOR_RANK_KEEP
 
     @staticmethod
     def _is_general_knowledge_question(question: str) -> bool:
@@ -493,7 +527,7 @@ class NodeService:
         return technical_topic and not asks_for_document
 
     def _select_relevant_evidence(self, question: str, lexical: list[EvidenceUnit], vector: list[EvidenceUnit], document_id: str | None) -> list[EvidenceUnit]:
-        """Rank retrieved candidates and keep only evidence with textual support."""
+        """Rank retrieved candidates; keep lexical matches OR strong vector hits (#208)."""
         terms = self._query_terms(question)
         if not terms:
             return []
@@ -505,21 +539,43 @@ class NodeService:
             text = unicodedata.normalize("NFKD", item.content).encode("ascii", "ignore").decode().lower()
             return sum(term in text for term in terms)
 
+        vector_rank = {item.id: rank for rank, item in enumerate(vector, start=1)}
         fused: dict[str, tuple[EvidenceUnit, float]] = {}
         for rank, item in enumerate(lexical, start=1):
             fused[item.id] = (item, fused.get(item.id, (item, 0.0))[1] + 1 / (60 + rank))
         for rank, item in enumerate(vector, start=1):
             fused[item.id] = (item, fused.get(item.id, (item, 0.0))[1] + 1 / (60 + rank))
 
-        ranked = sorted(fused.values(), key=lambda pair: (match_count(pair[0]), pair[1]), reverse=True)
+        ranked = sorted(
+            fused.values(),
+            key=lambda pair: (
+                match_count(pair[0]),
+                self._vector_hit_is_strong(pair[0], vector_rank.get(pair[0].id), document_id),
+                pair[1],
+            ),
+            reverse=True,
+        )
         candidates: list[EvidenceUnit] = []
         for item, score in ranked:
             if document_id and item.document_id != document_id:
                 continue
             matches = match_count(item)
-            if matches < required_matches:
+            lexical_ok = matches >= required_matches
+            vector_ok = self._vector_hit_is_strong(item, vector_rank.get(item.id), document_id)
+            # Hybrid intent: strong semantic hits survive even when query language ≠ document language.
+            if not (lexical_ok or vector_ok):
                 continue
-            candidates.append(replace(item, metadata={**item.metadata, "score": item.metadata.get("score", score), "matches": matches}))
+            candidates.append(
+                replace(
+                    item,
+                    metadata={
+                        **item.metadata,
+                        "score": item.metadata.get("score", score),
+                        "matches": matches,
+                        "selection": "lexical" if lexical_ok and not vector_ok else ("vector" if vector_ok and not lexical_ok else "hybrid"),
+                    },
+                )
+            )
             if len(candidates) == 4:
                 break
         return candidates

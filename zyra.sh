@@ -162,11 +162,68 @@ docker_container_status() {
     docker inspect --format='{{.State.Status}}' "$c" 2>/dev/null | tr -d '[:space:]' || echo "not_found"
 }
 
+docker_container_health() {
+    local c="$1"
+    docker inspect --format='{{if .State.Health}}{{.State.Health.Status}}{{else}}N/A{{end}}' "$c" 2>/dev/null | tr -d '[:space:]' || echo "N/A"
+}
+
 docker_published_ports_csv() {
     local c="$1"
     docker inspect "$c" >/dev/null 2>&1 || return 0
     docker inspect -f '{{range $p, $bindings := .NetworkSettings.Ports}}{{range $bindings}}{{.HostPort}}{{"\n"}}{{end}}{{end}}' "$c" 2>/dev/null \
         | { grep -E '^[0-9]+$' || true; } | sort -nu | { paste -sd, - 2>/dev/null || true; }
+}
+
+# Core compose services that must be up for status/verify to report healthy.
+# Optional engine container is appended when the active provider runs one in Docker.
+zyra_inference_provider() {
+    grep '^INFERENCE_PROVIDER=' "${ENV_FILE}" 2>/dev/null | cut -d= -f2 || echo "ollama_host"
+}
+
+zyra_provider_needs_engine_container() {
+    case "$(zyra_inference_provider)" in
+        tenstorrent|vllm|ollama_docker|ollama|cuda) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
+zyra_core_containers() {
+    local containers=("zyrabit-api" "zyrabit-web" "zyrabit-db" "zyrabit-mcp")
+    local provider
+    provider="$(zyra_inference_provider)"
+    if [[ "${PRODUCTION_MODE}" == "true" ]]; then
+        containers=("zyrabit-traefik" "${containers[@]}" "zyrabit-prometheus" "zyrabit-grafana" "zyrabit-loki")
+    fi
+    if [[ "${provider}" == "tenstorrent" || "${provider}" == "vllm" ]]; then
+        containers+=("zyrabit-vllm-tt")
+    elif zyra_provider_needs_engine_container; then
+        containers+=("zyrabit-engine")
+    fi
+    printf '%s\n' "${containers[@]}"
+}
+
+# Wait out Docker health "starting"; fail if still starting/unhealthy when the budget ends.
+wait_container_health_ready() {
+    local c="$1"
+    local health status
+    local budget="${VERIFY_STARTING_TIMEOUT_SECONDS:-60}"
+    local waited=0
+    health="$(docker_container_health "$c")"
+    while [[ "${health}" == "starting" && "${waited}" -lt "${budget}" ]]; do
+        sleep 2
+        waited=$((waited + 2))
+        status="$(docker_container_status "$c")"
+        if [[ "${status}" != "running" ]]; then
+            echo "${status}|—"
+            return 1
+        fi
+        health="$(docker_container_health "$c")"
+    done
+    echo "running|${health}"
+    if [[ "${health}" == "unhealthy" || "${health}" == "starting" ]]; then
+        return 1
+    fi
+    return 0
 }
 
 status_wants_json() {
@@ -1077,26 +1134,20 @@ run_stop() {
 run_verify() {
     log_header "HEALTH CHECK"
     local current_provider
-    current_provider=$(grep '^INFERENCE_PROVIDER=' "${ENV_FILE}" 2>/dev/null | cut -d= -f2 || echo "ollama_host")
+    current_provider="$(zyra_inference_provider)"
 
-    local containers=("zyrabit-api" "zyrabit-web" "zyrabit-db" "zyrabit-mcp")
-
-    if [[ "${PRODUCTION_MODE}" == "true" ]]; then
-        containers=("zyrabit-traefik" "${containers[@]}" "zyrabit-prometheus" "zyrabit-grafana" "zyrabit-loki")
-    fi
-    if [[ "${current_provider}" == "tenstorrent" || "${current_provider}" == "vllm" ]]; then
-        containers+=("zyrabit-vllm-tt")
-    elif [[ "${current_provider}" == "ollama_docker" || "${current_provider}" == "ollama" || "${current_provider}" == "cuda" ]]; then
-        containers+=("zyrabit-engine")
-    fi
+    local containers=()
+    while IFS= read -r c; do
+        [[ -n "$c" ]] && containers+=("$c")
+    done < <(zyra_core_containers)
 
     local pass=0 fail=0
     printf "  ${BOLD}%-28s %-15s %-10s${NC}\n" "CONTAINER" "STATUS" "HEALTH"
     printf "  ${CYAN}%-28s %-15s %-10s${NC}\n"  "────────────────────────────" "───────────────" "──────────"
 
     for c in "${containers[@]}"; do
-        local status health
-        status=$(docker inspect --format='{{.State.Status}}' "$c" 2>/dev/null | tr -d '[:space:]' || echo "not_found")
+        local status health wait_out
+        status="$(docker_container_status "$c")"
         if [[ "$c" == "zyrabit-engine" && "$status" == "not_found" ]]; then
             if [[ "${current_provider}" == "embedded_metal" || "${current_provider}" == "mlx" ]]; then
                 printf "  ${GREEN}%-28s %-15s %-10s${NC}\n" "$c" "native-metal" "healthy"
@@ -1107,15 +1158,25 @@ run_verify() {
             fi
         fi
         if [[ "$status" == "running" ]]; then
-            health=$(docker inspect --format='{{if .State.Health}}{{.State.Health.Status}}{{else}}N/A{{end}}' "$c" 2>/dev/null | tr -d '[:space:]')
-            if [[ "$health" == "unhealthy" ]]; then
-                printf "  ${RED}%-28s %-15s %-10s${NC}\n" "$c" "running" "$health"
-                log_err "Container $c is unhealthy."
-                docker logs --tail 10 "$c" 2>/dev/null || true
-                fail=$((fail + 1))
-            else
-                printf "  ${GREEN}%-28s %-15s %-10s${NC}\n" "$c" "running" "$health"
+            # Do not treat Docker health "starting" as OK — wait it out or fail.
+            if wait_out="$(wait_container_health_ready "$c")"; then
+                status="${wait_out%%|*}"
+                health="${wait_out#*|}"
+                printf "  ${GREEN}%-28s %-15s %-10s${NC}\n" "$c" "$status" "$health"
                 pass=$((pass + 1))
+            else
+                status="${wait_out%%|*}"
+                health="${wait_out#*|}"
+                printf "  ${RED}%-28s %-15s %-10s${NC}\n" "$c" "$status" "$health"
+                if [[ "$health" == "starting" ]]; then
+                    log_err "Container $c is still starting after ${VERIFY_STARTING_TIMEOUT_SECONDS:-60}s."
+                elif [[ "$health" == "unhealthy" ]]; then
+                    log_err "Container $c is unhealthy."
+                    docker logs --tail 10 "$c" 2>/dev/null || true
+                else
+                    log_err "Required container $c is ${status}."
+                fi
+                fail=$((fail + 1))
             fi
         else
             printf "  ${RED}%-28s %-15s %-10s${NC}\n" "$c" "$status" "—"
@@ -1127,7 +1188,9 @@ run_verify() {
     echo -e "\n  ${BOLD}Containers:${NC} ${GREEN}${pass} up${NC}  ${RED}${fail} down${NC}"
     local rc=0
     if [[ $fail -gt 0 ]]; then
-        rc=1
+        # Incomplete or stuck-starting stack: fail before HTTP probes (#212).
+        log_err "Required containers are not ready (${fail} failed). Skipping API probes."
+        return 1
     fi
 
     local base_url; base_url="$(api_base_url)"
@@ -1278,15 +1341,22 @@ run_status() {
     done
 
     local platform_docker="zyrabit-web"
-    local platform_name="zyrabit-platform"
+    local platform_name="zyrabit-web"
     local engine_docker="zyrabit-engine"
     local engine_name="zyrabit-engine"
+    local api_docker="zyrabit-api"
+    local db_docker="zyrabit-db"
+    local mcp_docker="zyrabit-mcp"
 
     local current_provider
-    current_provider=$(grep '^INFERENCE_PROVIDER=' "${ENV_FILE}" 2>/dev/null | cut -d= -f2 || echo "ollama_host")
+    current_provider="$(zyra_inference_provider)"
 
-    local platform_status engine_status engine_native=false native_engine_port=""
+    local platform_status engine_status api_status db_status mcp_status
+    local engine_native=false native_engine_port=""
     platform_status=$(docker_container_status "${platform_docker}")
+    api_status=$(docker_container_status "${api_docker}")
+    db_status=$(docker_container_status "${db_docker}")
+    mcp_status=$(docker_container_status "${mcp_docker}")
     engine_status=$(docker_container_status "${engine_docker}")
     # Native providers have no engine container: embedded_metal/mlx run the engine
     # inside the platform process, while llama.cpp and host Ollama expose a host
@@ -1310,11 +1380,14 @@ run_status() {
         esac
     fi
 
-    local platform_ports engine_ports
+    local platform_ports engine_ports api_ports db_ports mcp_ports
     platform_ports=$(docker_published_ports_csv "${platform_docker}")
     if [[ -z "${platform_ports}" && "${platform_status}" == "running" ]]; then
         platform_ports="${ZYRABIT_LOCAL_PORT:-8080}"
     fi
+    api_ports=$(docker_published_ports_csv "${api_docker}")
+    db_ports=$(docker_published_ports_csv "${db_docker}")
+    mcp_ports=$(docker_published_ports_csv "${mcp_docker}")
     engine_ports=$(docker_published_ports_csv "${engine_docker}")
     if [[ -z "${engine_ports}" && "${engine_status}" == "running" ]]; then
         if [[ "${engine_native}" == "true" ]]; then
@@ -1326,14 +1399,22 @@ run_status() {
 
     local version healthy=false
     version=$(zyra_version)
-    if [[ "${platform_status}" == "running" && "${engine_status}" == "running" ]]; then
+    # Healthy only when the full core stack is up — web+engine alone is not enough (#212).
+    if [[ "${api_status}" == "running" \
+       && "${platform_status}" == "running" \
+       && "${db_status}" == "running" \
+       && "${mcp_status}" == "running" \
+       && "${engine_status}" == "running" ]]; then
         healthy=true
     fi
 
     if [[ "${json}" == "true" ]]; then
         PLATFORM_STATUS="${platform_status}" ENGINE_STATUS="${engine_status}" \
+        API_STATUS="${api_status}" DB_STATUS="${db_status}" MCP_STATUS="${mcp_status}" \
         PLATFORM_NAME="${platform_name}" ENGINE_NAME="${engine_name}" \
+        API_NAME="${api_docker}" DB_NAME="${db_docker}" MCP_NAME="${mcp_docker}" \
         PLATFORM_PORTS="${platform_ports}" ENGINE_PORTS="${engine_ports}" \
+        API_PORTS="${api_ports}" DB_PORTS="${db_ports}" MCP_PORTS="${mcp_ports}" \
         ZYRA_VERSION="${version}" ZYRA_HEALTHY="${healthy}" \
         python3 -c '
 import json, os
@@ -1344,18 +1425,20 @@ def ports_csv(raw):
         return []
     return [int(p) for p in raw.split(",") if p.isdigit()]
 
+def service(name_key, status_key, ports_key):
+    return {
+        "container": os.environ[name_key],
+        "status": os.environ[status_key],
+        "ports": ports_csv(os.environ.get(ports_key)),
+    }
+
 healthy = os.environ.get("ZYRA_HEALTHY") == "true"
 print(json.dumps({
-    "platform": {
-        "container": os.environ["PLATFORM_NAME"],
-        "status": os.environ["PLATFORM_STATUS"],
-        "ports": ports_csv(os.environ.get("PLATFORM_PORTS")),
-    },
-    "engine": {
-        "container": os.environ["ENGINE_NAME"],
-        "status": os.environ["ENGINE_STATUS"],
-        "ports": ports_csv(os.environ.get("ENGINE_PORTS")),
-    },
+    "api": service("API_NAME", "API_STATUS", "API_PORTS"),
+    "platform": service("PLATFORM_NAME", "PLATFORM_STATUS", "PLATFORM_PORTS"),
+    "db": service("DB_NAME", "DB_STATUS", "DB_PORTS"),
+    "mcp": service("MCP_NAME", "MCP_STATUS", "MCP_PORTS"),
+    "engine": service("ENGINE_NAME", "ENGINE_STATUS", "ENGINE_PORTS"),
     "version": os.environ["ZYRA_VERSION"],
     "healthy": healthy,
 }))
@@ -1364,11 +1447,17 @@ print(json.dumps({
     fi
 
     log_header "SYSTEM STATUS"
-    local plat_color="${RED}" engine_color="${RED}"
+    local api_color="${RED}" plat_color="${RED}" db_color="${RED}" mcp_color="${RED}" engine_color="${RED}"
+    [[ "${api_status}" == "running" ]] && api_color="${GREEN}"
     [[ "${platform_status}" == "running" ]] && plat_color="${GREEN}"
+    [[ "${db_status}" == "running" ]] && db_color="${GREEN}"
+    [[ "${mcp_status}" == "running" ]] && mcp_color="${GREEN}"
     [[ "${engine_status}" == "running" ]] && engine_color="${GREEN}"
     printf "  ${BOLD}%-12s %-22s %-12s %s${NC}\n" "SERVICE" "CONTAINER" "STATUS" "PORTS"
-    printf "  ${plat_color}%-12s %-22s %-12s %s${NC}\n" "Platform" "${platform_name}" "${platform_status}" "${platform_ports:-—}"
+    printf "  ${api_color}%-12s %-22s %-12s %s${NC}\n" "API" "${api_docker}" "${api_status}" "${api_ports:-—}"
+    printf "  ${plat_color}%-12s %-22s %-12s %s${NC}\n" "Web" "${platform_name}" "${platform_status}" "${platform_ports:-—}"
+    printf "  ${db_color}%-12s %-22s %-12s %s${NC}\n" "DB" "${db_docker}" "${db_status}" "${db_ports:-—}"
+    printf "  ${mcp_color}%-12s %-22s %-12s %s${NC}\n" "MCP" "${mcp_docker}" "${mcp_status}" "${mcp_ports:-—}"
     printf "  ${engine_color}%-12s %-22s %-12s %s${NC}\n" "Engine" "${engine_name}" "${engine_status}" "${engine_ports:-—}"
     echo -e "\n  ${BOLD}Version:${NC} ${version}"
     if [[ "${healthy}" == "true" ]]; then
